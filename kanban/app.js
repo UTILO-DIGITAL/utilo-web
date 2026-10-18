@@ -1,0 +1,128 @@
+/*
+ * Kanban web de Utilo · parte común para todos los negocios.
+ * Cada negocio tiene su carpeta con un index.html que define window.KANBAN = { api, clave }
+ * y carga este archivo. El kanban y la ficha los genera su DAILY (librería KANBAN_CORE) y
+ * aquí se pintan; google.script.run se sustituye por llamadas a la API con persona + PIN.
+ */
+(function () {
+  'use strict';
+  var C = window.KANBAN || {};
+  var CLAVE = 'kanban_' + (C.clave || 'negocio');
+
+  function leer() { try { return JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) { return null; } }
+  function guardar(o) { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) {} }
+  function borrar() { try { localStorage.removeItem(CLAVE); } catch (e) {} }
+
+  function llamar(cuerpo) {
+    return fetch(C.api, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(cuerpo)
+    }).then(function (r) {
+      if (!r.ok) throw new Error('No hay conexión con el DAILY (' + r.status + ').');
+      return r.json();
+    }).then(function (o) {
+      if (!o.ok) { var e = new Error(String(o.error || 'Error')); e.acceso = /^ACCESO:/.test(e.message); throw e; }
+      return o.r;
+    });
+  }
+
+  function $(id) { return document.getElementById(id); }
+  function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  /* ---------- pantalla de carga y de acceso ---------- */
+
+  function pantalla(html) { document.body.innerHTML = '<div class="kz">' + html + '</div>'; }
+
+  function cargando(msg) { pantalla('<div class="kz-caja"><div class="kz-giro"></div><p>' + texto(msg || 'Cargando…') + '</p></div>'); }
+
+  function acceso(aviso) {
+    cargando('Conectando…');
+    llamar({ fn: 'inicio' }).then(function (ini) {
+      var r = document.documentElement.style;
+      if (ini.color) r.setProperty('--kz-color', ini.color);
+      if (ini.accion) r.setProperty('--kz-accion', ini.accion);
+      if (ini.fondo) r.setProperty('--kz-fondo', ini.fondo);
+      if (ini.texto) r.setProperty('--kz-texto', ini.texto);
+      document.title = ini.titulo || 'Kanban';
+      var ant = leer() || {};
+      var ops = (ini.personas || []).map(function (p) {
+        return '<option' + (p === ant.persona ? ' selected' : '') + '>' + texto(p) + '</option>';
+      }).join('');
+      pantalla('<form class="kz-caja" id="kz-form" autocomplete="off">' +
+        '<h1>' + texto(ini.titulo || 'Kanban') + '</h1>' +
+        (ops ? '<label>¿Quién eres?<select id="kz-persona">' + ops + '</select></label>' +
+          '<label>PIN<input id="kz-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="current-password"></label>' +
+          '<button type="submit">Entrar</button>'
+          : '<p>Todavía nadie tiene PIN. Ponlo en el DAILY: menú «📋 Tareas › 🔑 PIN de la web».</p>') +
+        '<p class="kz-aviso" id="kz-aviso">' + texto(aviso || '') + '</p></form>');
+      var f = $('kz-form');
+      if (!ops) return;
+      $('kz-pin').focus();
+      f.onsubmit = function (ev) {
+        ev.preventDefault();
+        var cred = { persona: $('kz-persona').value, pin: $('kz-pin').value.trim() };
+        var b = f.querySelector('button'); b.disabled = true; b.textContent = 'Entrando…';
+        llamar({ fn: 'entrar', persona: cred.persona, pin: cred.pin }).then(function () {
+          guardar(cred); abrir(cred);
+        }, function (e) {
+          b.disabled = false; b.textContent = 'Entrar';
+          $('kz-aviso').textContent = e.message.replace(/^ACCESO:\s*/, '');
+          $('kz-pin').value = ''; $('kz-pin').focus();
+        });
+      };
+    }, function (e) {
+      pantalla('<div class="kz-caja"><p>' + texto(e.message) + '</p><button onclick="location.reload()">Reintentar</button></div>');
+    });
+  }
+
+  /* ---------- kanban o ficha ---------- */
+
+  function puente(cred) {
+    // Sustituye a google.script.run dentro de la página que genera el DAILY.
+    return '(function(){var API=' + JSON.stringify(C.api) + ',P=' + JSON.stringify(cred.persona) +
+      ',N=' + JSON.stringify(cred.pin) + ',K=' + JSON.stringify(CLAVE) + ';' +
+      'function llamar(fn,args){return fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},' +
+      'body:JSON.stringify({fn:fn,args:args,persona:P,pin:N})}).then(function(r){if(!r.ok)throw new Error("No hay conexión con el DAILY ("+r.status+").");return r.json();})' +
+      '.then(function(o){if(!o.ok){if(/^ACCESO:/.test(o.error)){try{localStorage.removeItem(K)}catch(e){}location.reload();}throw new Error(o.error);}return o.r;});}' +
+      'function run(s,f,u){return new Proxy({},{get:function(_,k){' +
+      'if(k==="withSuccessHandler")return function(h){return run(h,f,u)};' +
+      'if(k==="withFailureHandler")return function(h){return run(s,h,u)};' +
+      'if(k==="withUserObject")return function(o){return run(s,f,o)};' +
+      'return function(){var a=[].slice.call(arguments);llamar(k,a).then(function(r){if(s)s(r,u)},function(e){if(f)f(e,u);else console.error(e)});};}});}' +
+      'window.google={script:{run:run(null,null,undefined),host:{close:function(){history.back()}}}};})();';
+  }
+
+  function cabecera(cred) {
+    return '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
+      '<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icono-180.png">' +
+      '<link rel="icon" href="icono-192.png"><meta name="apple-mobile-web-app-capable" content="yes">' +
+      '<meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="' + texto(C.color || '#ffffff') + '">' +
+      '<meta name="apple-mobile-web-app-title" content="' + texto(C.nombreApp || 'Kanban') + '">' +
+      '<script>' + puente(cred) + '<\/script>';
+  }
+
+  function abrir(cred) {
+    cargando('Cargando el kanban…');
+    var id = new URLSearchParams(location.search).get('id') || '';
+    llamar({ fn: 'pagina', id: id, persona: cred.persona, pin: cred.pin }).then(function (p) {
+      var html = String(p.html || '');
+      var cab = cabecera(cred);
+      if (/<head[^>]*>/i.test(html)) html = html.replace(/<head[^>]*>/i, function (m) { return m + cab; });
+      else html = '<!DOCTYPE html><html><head>' + cab + '</head><body>' + html + '</body></html>';
+      if (!/<!DOCTYPE/i.test(html)) html = '<!DOCTYPE html>' + html;
+      document.open();
+      document.write(html);
+      document.close();
+      if (p.titulo) document.title = p.titulo;
+    }, function (e) {
+      if (e.acceso) { borrar(); acceso(e.message.replace(/^ACCESO:\s*/, '')); return; }
+      pantalla('<div class="kz-caja"><p>' + texto(e.message) + '</p><button onclick="location.reload()">Reintentar</button></div>');
+    });
+  }
+
+  /* ---------- arranque ---------- */
+  if (new URLSearchParams(location.search).get('salir') !== null) { borrar(); history.replaceState(null, '', location.pathname); }
+  var cred = leer();
+  if (cred && cred.persona && cred.pin) abrir(cred); else acceso('');
+})();
