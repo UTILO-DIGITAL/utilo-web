@@ -55,7 +55,7 @@
           '<label>PIN<input id="kz-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="current-password"></label>' +
           '<button type="submit">Entrar</button>' +
           '<p class="kz-ayuda">' + texto(C.ayudaPin || '¿Has olvidado el PIN? Pide que te pongan uno nuevo en la pestaña ACCESOS del DAILY.') + '</p>'
-          : '<p>Todavía nadie tiene PIN. Ponlo en el DAILY: menú «📋 Tareas › 🔑 PIN de la web».</p>') +
+          : '<p>Todavía nadie tiene PIN. Ponlo en la pestaña ACCESOS del DAILY.</p>') +
         '<p class="kz-aviso" id="kz-aviso">' + texto(aviso || '') + '</p></form>');
       var f = $('kz-form');
       if (!ops) return;
