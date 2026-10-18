@@ -16,3 +16,4 @@ html,body{margin:0;min-height:100%;background:var(--kz-fondo,#fff);color:var(--k
 .kz-giro{width:34px;height:34px;margin:0 auto;border-radius:50%;border:4px solid #dde;border-top-color:var(--kz-color,#0e8a7a);
   animation:kz-g .8s linear infinite}
 @keyframes kz-g{to{transform:rotate(360deg)}}
+.kz-ayuda{margin:0;font-size:13px;opacity:.75}
