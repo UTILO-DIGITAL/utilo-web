@@ -6,7 +6,7 @@
  *   window.SX_MOD.ECONOMIA.abrir(elemento)  → pinta la sección dentro del elemento.
  * Lo ya cargado se guarda en memoria: volver a la sección es instantáneo; ↻ vuelve a pedirlo.
  * Resumen: cada partida y subpartida dice si queda margen o te has pasado (y cuánto). Caja: lista solo con saldos;
- * en cada persona, recibido/pagado y el equipo
+ * en cada persona, recibido/pagado y el equipo. El avance de la temporada se despliega por competición (avanceComp).
  * de cada inscripción o paga y señal (CAJA!N, ECONOMIA_WEB.gs).
  * Resumen: desplegable discreto «Beneficio y reparto» de la temporada elegida (beneficio, reparto a socios, resultado) y pestaña Presupuesto
  * (T0134): avisos para afinar el presupuesto y de dónde sale cada partida (CONFIG · ORIGEN DEL PRESUPUESTO).
@@ -86,6 +86,8 @@
       '.ec-lineas{padding:0 0 10px 14px}.ec-linea{font-size:13.5px;padding:8px 0;border-top:1px dashed var(--ec-l)}' +
       '.ec-linea .ec-gl b{font-size:13.5px;font-weight:600}.ec-linea .ec-barra{height:4px;margin-top:5px}.ec-linea .ec-gs{font-size:12px}' +
       '.ec-gs b{font-weight:700}' +
+      '.ec-avd summary{list-style:none;cursor:pointer}.ec-avd summary::-webkit-details-marker{display:none}.ec-avd[open] summary .ec-flecha{transform:rotate(90deg)}' +
+      '.ec-avc{margin:10px 0 0 18px}.ec-avc .ec-av-t{font-size:12.5px}.ec-avc .ec-barra{height:5px;margin-top:4px}' +
       '.ec-socio{display:flex;justify-content:space-between;gap:10px;padding:5px 0 5px 14px;font-size:13px;color:var(--ec-g)}.ec-socio span:last-child{font-variant-numeric:tabular-nums}' +
       '.ec-rep{padding:0 16px}.ec-rep summary{list-style:none;cursor:pointer;padding:12px 0;display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:14px}' +
       '.ec-rep summary::-webkit-details-marker{display:none}.ec-rep summary b{font-weight:700}.ec-rep summary .ec-flecha{transition:transform .15s}.ec-rep[open] summary .ec-flecha{transform:rotate(90deg)}' +
@@ -230,7 +232,15 @@
       var opC = (r.competiciones || ['TODAS']).map(function (c) { return '<option value="' + esc(c) + '"' + (c === S.comp ? ' selected' : '') + '>' + esc(c === 'TODAS' ? 'Todas las competiciones' : c.slice(8)) + '</option>'; }).join('');
       var h = '<div class="ec-fila"><select class="ec-sel" id="ec-temp" aria-label="Temporada">' + opT + '</select>' +
         '<select class="ec-sel" id="ec-comp" aria-label="Competición">' + opC + '</select></div>';
-      if (r.avance != null) h += '<div class="ec-av"><div class="ec-av-t"><span>Avance de la temporada · ' + esc(r.avanceTxt) + '</span><span>' + esc(r.partidosTxt) + '</span></div>' + barra(r.avance) + '</div>';
+      if (r.avance != null) {
+        var avc = S.comp === 'TODAS' ? (r.avanceComp || []) : [];
+        var cab = '<div class="ec-av-t"><span>' + (avc.length ? '<span class="ec-flecha" aria-hidden="true">›</span> ' : '') + 'Avance · ' + esc(r.avanceTxt) + '</span><span>' + esc(r.partidosTxt) + '</span></div>' + barra(r.avance);
+        h += avc.length ? '<details class="ec-av ec-avd" id="ec-avd"' + (abiertos.avc ? ' open' : '') + '><summary>' + cab + '</summary>' + avc.map(function (c) {
+          var p = c.total ? c.jugados / c.total : 0;
+          return '<div class="ec-avc"><div class="ec-av-t"><span>' + esc(c.comp.slice(8).trim()) + (c.total ? ' · ' + Math.round(p * 100) + '%' : '') + '</span><span>' +
+            (c.total ? c.jugados + ' de ' + c.total + ' partidos' : 'sin calendario en DB_JORNADAS') + '</span></div>' + (c.total ? barra(p) : '') + '</div>';
+        }).join('') + '</details>' : '<div class="ec-av">' + cab + '</div>';
+      }
       h += '<div class="ec-kpis">' +
         '<div class="ec-kpi ec-grande"><b>Beneficio</b><span class="ec-val">' + esc(K.resultado.t) + '</span>' +
         '<span class="ec-sub">Presupuesto ' + esc(K.presupuesto.t) + ' · ' + (K.desviacion.n == null ? '' : eur(K.desviacion.n) + (K.desviacion.n >= 0 ? ' mejor' : ' peor') + ' de lo previsto') + '</span></div>' +
@@ -276,6 +286,7 @@
       $('#ec-comp').onchange = function () { S.comp = this.value; pintar(); };
       $('#ec-irpend').onclick = function () { var b = S.el.querySelector('[data-ec-tab=pendientes]'); if (b) b.click(); };
       var rp = $('#ec-rep'); if (rp) rp.ontoggle = function () { abiertos.rep = rp.open; };
+      var ad = $('#ec-avd'); if (ad) ad.ontoggle = function () { abiertos.avc = ad.open; };
       [].forEach.call(main.querySelectorAll('[data-ec-g]'), function (b) {
         b.onclick = function () {
           var id = b.getAttribute('data-ec-g'), l = $('#ec-l-' + id); if (!l) return;
