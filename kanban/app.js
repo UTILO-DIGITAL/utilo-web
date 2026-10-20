@@ -103,22 +103,109 @@
       '<script>' + puente(cred) + '<\/script>';
   }
 
+  /* ---------- secciones (T0132) ----------
+   * Cada persona ve las secciones de su perfil (KANBAN_CORE v25, CONFIG · SECCIONES_WEB).
+   * La sección va en la URL: ?s=kanban, ?s=gestion… Sin ?s se abre la primera de la persona.
+   * Con más de una sección sale una barra arriba para cambiar; con una sola, todo como antes.
+   * El KANBAN lo genera el DAILY; las demás, por ahora, enseñan que están en preparación. */
+
+  var SECCIONES = {
+    KANBAN: { t: 'Kanban', i: '📋' },
+    GESTION: { t: 'Gestión', i: '🗂️' },
+    ECONOMIA: { t: 'Economía', i: '💶' },
+    LIGAS: { t: 'Ligas', i: '⚽' }
+  };
+
+  function infoSeccion(s) {
+    return SECCIONES[s] || { t: s.charAt(0) + s.slice(1).toLowerCase(), i: '•' };
+  }
+
+  function seccionPedida() {
+    return String(new URLSearchParams(location.search).get('s') || '').trim().toUpperCase();
+  }
+
+  function urlSeccion(s) { return location.pathname + '?s=' + encodeURIComponent(s.toLowerCase()); }
+
+  function barra(secs, actual, persona) {
+    if (!secs || secs.length < 2) return '';
+    var color = C.color || '#0E8A7A', accion = C.accion || '#FF5A3C';
+    var css = '.sx{background:#fff;border-bottom:1px solid #e3e3ee;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}' +
+      '.sx-in{display:flex;align-items:stretch;gap:2px;padding:0 10px;overflow-x:auto;-webkit-overflow-scrolling:touch}' +
+      '.sx a{display:flex;align-items:center;gap:6px;min-height:46px;padding:0 12px;text-decoration:none;color:' + color + ';' +
+      'font-size:14px;font-weight:700;border-bottom:3px solid transparent;white-space:nowrap}' +
+      '.sx a[aria-current=page]{border-bottom-color:' + accion + '}' +
+      '.sx a:focus-visible{outline:3px solid ' + color + ';outline-offset:-3px}' +
+      '.sx .sx-salir{margin-left:auto;font-weight:600;font-size:13px;opacity:.75}' +
+      '.sx .sx-i{font-size:17px;line-height:1}' +
+      '@media(max-width:560px){.sx-in{padding:0 4px;gap:0}.sx a{flex:1 1 0;flex-direction:column;justify-content:center;gap:2px;' +
+      'min-height:54px;padding:4px 6px;font-size:11.5px}.sx .sx-salir{margin-left:0;flex:0 0 auto;font-size:11px}}';
+    var as = secs.map(function (s) {
+      var f = infoSeccion(s);
+      return '<a href="' + texto(urlSeccion(s)) + '" target="_top"' + (s === actual ? ' aria-current="page"' : '') + '>' +
+        '<span class="sx-i" aria-hidden="true">' + f.i + '</span><span>' + texto(f.t) + '</span></a>';
+    }).join('');
+    var salir = '<a class="sx-salir" href="' + texto(location.pathname + '?salir') + '" target="_top" title="Salir (' +
+      texto(persona || '') + ')"><span class="sx-i" aria-hidden="true">↩</span><span>Salir</span></a>';
+    return '<style>' + css + '</style><nav class="sx" aria-label="Secciones"><div class="sx-in">' + as + salir + '</div></nav>';
+  }
+
+  /** Página de una sección que aún no está hecha (o que no es del DAILY). */
+  function pintarSeccion(cred, secs, s) {
+    var f = infoSeccion(s), color = C.color || '#0E8A7A';
+    document.title = f.t + ' · ' + (C.nombreApp || 'App');
+    document.body.innerHTML = barra(secs, s, cred.persona) +
+      '<header style="background:' + texto(color) + ';color:#fff;padding:14px 18px"><h1 style="margin:0;font-size:24px;letter-spacing:.5px">' +
+      texto(f.t.toUpperCase()) + '</h1></header>' +
+      '<main style="padding:28px 18px;display:flex;justify-content:center"><div style="max-width:420px;text-align:center">' +
+      '<div style="font-size:44px" aria-hidden="true">' + f.i + '</div>' +
+      '<p style="font-size:17px;font-weight:700;margin:10px 0 6px">Esta sección está en preparación.</p>' +
+      '<p style="margin:0;opacity:.75">Cuando esté lista, la tendrás aquí mismo.</p></div></main>';
+  }
+
+  function error(e) {
+    if (e.acceso) { borrar(); acceso(e.message.replace(/^ACCESO:\s*/, '')); return; }
+    pantalla('<div class="kz-caja"><p>' + texto(e.message.replace(/^SECCION:\s*/, '')) +
+      '</p><button onclick="location.reload()">Reintentar</button></div>');
+  }
+
   function abrir(cred) {
-    cargando('Cargando el kanban…');
     var id = new URLSearchParams(location.search).get('id') || '';
+    var pedida = seccionPedida();
+    if (!id && pedida && pedida !== 'KANBAN') {
+      // Otra sección: se comprueba el PIN y qué secciones tiene la persona.
+      cargando('Cargando…');
+      llamar({ fn: 'entrar', persona: cred.persona, pin: cred.pin }).then(function (r) {
+        var secs = r.secciones || ['KANBAN'];
+        if (secs.indexOf(pedida) < 0) { location.replace(urlSeccion(secs[0])); return; }
+        pintarSeccion(cred, secs, pedida);
+      }, error);
+      return;
+    }
+    cargando('Cargando el kanban…');
     llamar({ fn: 'pagina', id: id, persona: cred.persona, pin: cred.pin }).then(function (p) {
       var html = String(p.html || '');
       var cab = cabecera(cred);
       if (/<head[^>]*>/i.test(html)) html = html.replace(/<head[^>]*>/i, function (m) { return m + cab; });
       else html = '<!DOCTYPE html><html><head>' + cab + '</head><body>' + html + '</body></html>';
       if (!/<!DOCTYPE/i.test(html)) html = '<!DOCTYPE html>' + html;
+      if (!id) { // T0132: barra de secciones encima del tablero (solo si la persona tiene más de una)
+        var nav = barra(p.secciones, 'KANBAN', cred.persona);
+        if (nav) html = html.replace(/<body[^>]*>/i, function (m) { return m + nav; });
+      }
       document.open();
       document.write(html);
       document.close();
       if (p.titulo) document.title = p.titulo;
     }, function (e) {
-      if (e.acceso) { borrar(); acceso(e.message.replace(/^ACCESO:\s*/, '')); return; }
-      pantalla('<div class="kz-caja"><p>' + texto(e.message) + '</p><button onclick="location.reload()">Reintentar</button></div>');
+      if (/^SECCION:/.test(e.message) && !id) {
+        // Sin KANBAN en su perfil: se va a su primera sección.
+        llamar({ fn: 'entrar', persona: cred.persona, pin: cred.pin }).then(function (r) {
+          var secs = r.secciones || [];
+          if (secs.length && secs[0] !== 'KANBAN') location.replace(urlSeccion(secs[0])); else error(e);
+        }, error);
+        return;
+      }
+      error(e);
     });
   }
 
