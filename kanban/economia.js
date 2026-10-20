@@ -5,10 +5,10 @@
  *   window.SX_CTX = { api, persona, pin, clave, color, accion }
  *   window.SX_MOD.ECONOMIA.abrir(elemento)  → pinta la sección dentro del elemento.
  * Lo ya cargado se guarda en memoria: volver a la sección es instantáneo; ↻ vuelve a pedirlo.
- * Resumen: cada partida y subpartida dice si queda margen o te has pasado (y cuánto), y «¿Vamos al ritmo previsto?»
- * explica el resultado esperado a hoy. Caja: lista solo con saldos; en cada persona, recibido/pagado y el equipo
+ * Resumen: cada partida y subpartida dice si queda margen o te has pasado (y cuánto). Caja: lista solo con saldos;
+ * en cada persona, recibido/pagado y el equipo
  * de cada inscripción o paga y señal (CAJA!N, ECONOMIA_WEB.gs).
- * Reparto a socios en el Resumen (temporada elegida + temporadas anteriores, hoja HISTORICO) y pestaña Presupuesto
+ * Resumen: desplegable discreto «Beneficio y reparto» de la temporada elegida (beneficio, reparto a socios, resultado) y pestaña Presupuesto
  * (T0134): avisos para afinar el presupuesto y de dónde sale cada partida (CONFIG · ORIGEN DEL PRESUPUESTO).
  */
 (function () {
@@ -86,11 +86,12 @@
       '.ec-lineas{padding:0 0 10px 14px}.ec-linea{font-size:13.5px;padding:8px 0;border-top:1px dashed var(--ec-l)}' +
       '.ec-linea .ec-gl b{font-size:13.5px;font-weight:600}.ec-linea .ec-barra{height:4px;margin-top:5px}.ec-linea .ec-gs{font-size:12px}' +
       '.ec-gs b{font-weight:700}' +
-      '.ec-ritmo p{margin:6px 0 0;font-size:13.5px}.ec-ritmo .ec-nota{font-size:12px;color:var(--ec-g);margin-top:8px}' +
-      '.ec-socio{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px dashed var(--ec-l);font-size:14px}.ec-socio span:last-child{font-weight:700;font-variant-numeric:tabular-nums}' +
-      '.ec-det{margin-top:10px}.ec-det summary{cursor:pointer;color:var(--ec-c);font-weight:700;font-size:13.5px;padding:6px 0}' +
-      '.ec-hist{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--ec-l);font-size:13.5px}.ec-hist small{display:block;color:var(--ec-g);font-size:12px;margin-top:2px}' +
-      '.ec-hist b{font-variant-numeric:tabular-nums;white-space:nowrap}' +
+      '.ec-socio{display:flex;justify-content:space-between;gap:10px;padding:5px 0 5px 14px;font-size:13px;color:var(--ec-g)}.ec-socio span:last-child{font-variant-numeric:tabular-nums}' +
+      '.ec-rep{padding:0 16px}.ec-rep summary{list-style:none;cursor:pointer;padding:12px 0;display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:14px}' +
+      '.ec-rep summary::-webkit-details-marker{display:none}.ec-rep summary b{font-weight:700}.ec-rep summary .ec-flecha{transition:transform .15s}.ec-rep[open] summary .ec-flecha{transform:rotate(90deg)}' +
+      '.ec-rep summary span:last-child{color:var(--ec-g);font-size:13px;white-space:nowrap}' +
+      '.ec-rf{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--ec-l);font-size:14px}.ec-rf span:last-child{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}' +
+      '.ec-rf.ec-tot{font-weight:800}.ec-rf small{display:block;color:var(--ec-g);font-size:12px;font-weight:400}' +
       '.ec-av2{border-left:4px solid var(--ec-r);padding:10px 12px;background:#fff;border-radius:10px;margin-top:10px;box-shadow:0 0 0 1px var(--ec-l) inset}' +
       '.ec-av2.ec-amb{border-left-color:#d98a00}.ec-av2.ec-inf{border-left-color:var(--ec-c)}' +
       '.ec-av2 b{display:block;font-size:14.5px}.ec-av2 p{margin:4px 0 0;font-size:13.5px}.ec-av2 .ec-a{display:inline-block;margin-top:6px}' +
@@ -227,26 +228,17 @@
       S.datos['res_' + S.temp + '_' + S.comp] = r;
       var K = r.kpis, opT = (r.temporadas || [r.temporada]).map(function (t) { return '<option' + (t === r.temporada ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('');
       var opC = (r.competiciones || ['TODAS']).map(function (c) { return '<option value="' + esc(c) + '"' + (c === S.comp ? ' selected' : '') + '>' + esc(c === 'TODAS' ? 'Todas las competiciones' : c.slice(8)) + '</option>'; }).join('');
-      var esperado = (r.resultado || []).filter(function (x) { return /^Resultado esperado/.test(x.n); })[0];
       var h = '<div class="ec-fila"><select class="ec-sel" id="ec-temp" aria-label="Temporada">' + opT + '</select>' +
         '<select class="ec-sel" id="ec-comp" aria-label="Competición">' + opC + '</select></div>';
       if (r.avance != null) h += '<div class="ec-av"><div class="ec-av-t"><span>Avance de la temporada · ' + esc(r.avanceTxt) + '</span><span>' + esc(r.partidosTxt) + '</span></div>' + barra(r.avance) + '</div>';
       h += '<div class="ec-kpis">' +
-        '<div class="ec-kpi ec-grande"><b>Resultado</b><span class="ec-val">' + esc(K.resultado.t) + '</span>' +
+        '<div class="ec-kpi ec-grande"><b>Beneficio</b><span class="ec-val">' + esc(K.resultado.t) + '</span>' +
         '<span class="ec-sub">Presupuesto ' + esc(K.presupuesto.t) + ' · ' + (K.desviacion.n == null ? '' : eur(K.desviacion.n) + (K.desviacion.n >= 0 ? ' mejor' : ' peor') + ' de lo previsto') + '</span></div>' +
         '<div class="ec-kpi"><b>Ingresos</b><span class="ec-val ec-pos">' + esc(K.ingresos.t) + '</span>' + (r.totalIngresos ? '<span class="ec-sub">de ' + esc(r.totalIngresos.pres) + ' previstos</span>' : '') + '</div>' +
         '<div class="ec-kpi"><b>Gastos</b><span class="ec-val">' + esc(K.gastos.t) + '</span>' + (r.totalGastos ? '<span class="ec-sub">de ' + esc(r.totalGastos.pres) + ' previstos</span>' : '') + '</div></div>' +
         '<div class="ec-mini"><div><b>' + esc(K.equipos.t) + '</b><small>Equipos</small></div><div><b>' + esc(K.partidos.t) + '</b><small>Partidos</small></div>' +
         '<button type="button" id="ec-irpend"' + (K.pendientes.n ? ' class="ec-alerta"' : '') + '><b>' + esc(K.pendientes.t) + '</b><small>Por revisar ›</small></button></div>';
-      if (esperado && r.avance != null && r.totalGastos) {
-        var gEsp = (r.totalGastos.presN || 0) * r.avance, gReal = r.totalGastos.realN || 0, dR = esperado.difN || 0;
-        h += '<div class="ec-card ec-ritmo"><div class="ec-gl"><b>¿Vamos al ritmo previsto?</b><span class="ec-num ' + signo(dR) + '">' +
-          eur(dR) + (dR >= 0 ? ' por encima' : ' por debajo') + '</span></div>' +
-          '<p>Con el <b>' + esc(r.avanceTxt) + '</b> de la temporada jugada, al ritmo del presupuesto tocaba llevar gastados unos <b>' + eur(gEsp) + '</b>; llevamos <b>' + eur(gReal) + '</b>.</p>' +
-          '<p>Hoy deberíamos tener <b>' + esc(esperado.pres) + '</b> de resultado y tenemos <b>' + esc(esperado.real) + '</b>.</p>' +
-          '<p class="ec-nota">Las inscripciones se cobran al empezar y el presupuesto de gastos se reparte según los partidos jugados. Lo que se paga de golpe al principio (IVA trimestral, camisetas, material) hace que a inicio de temporada salga por debajo aunque todo vaya bien: mira abajo qué partidas se han pasado.</p></div>';
-      }
-      h += '<h2 class="ec-h2">Reparto a socios</h2><div class="ec-card" id="ec-reparto">' + repartoTemporada(r) + '<div id="ec-reparto-h"></div></div>';
+      h += repartoHtml(r);
       ['INGRESOS', 'GASTOS'].forEach(function (sec) {
         var gs = (r.grupos || []).filter(function (g) { return g.seccion === sec; });
         if (!gs.length) return;
@@ -283,7 +275,7 @@
       $('#ec-temp').onchange = function () { S.temp = this.value; S.comp = 'TODAS'; pintar(); };
       $('#ec-comp').onchange = function () { S.comp = this.value; pintar(); };
       $('#ec-irpend').onclick = function () { var b = S.el.querySelector('[data-ec-tab=pendientes]'); if (b) b.click(); };
-      dato('hist', 'economiaHistorico').then(function (H) { var x = $('#ec-reparto-h'); if (x) x.innerHTML = repartoHistorico(H, r.temporada); }, function () {});
+      var rp = $('#ec-rep'); if (rp) rp.ontoggle = function () { abiertos.rep = rp.open; };
       [].forEach.call(main.querySelectorAll('[data-ec-g]'), function (b) {
         b.onclick = function () {
           var id = b.getAttribute('data-ec-g'), l = $('#ec-l-' + id); if (!l) return;
@@ -296,36 +288,19 @@
   /* ---------- REPARTO A SOCIOS ---------- */
   function idxR(lista, re) { for (var i = 0; i < lista.length; i++) if (re.test(lista[i].n)) return i; return -1; }
 
-  /** Reparto de la temporada elegida, de la hoja TEMPORADA (filas entre «Reparto a socios» y «Resultado tras reparto»). */
-  function repartoTemporada(r) {
+  /** Desplegable «Beneficio y reparto» de la temporada elegida (hoja TEMPORADA): beneficio → reparto a socios → resultado. */
+  function repartoHtml(r) {
     var res = r.resultado || [], i0 = idxR(res, /^Reparto a socios/), i1 = idxR(res, /^Resultado tras reparto/);
-    if (i0 < 0) return '<div class="ec-vacio" style="padding:8px">Sin datos de reparto.</div>';
-    var tot = res[i0], socios = res.slice(i0 + 1, i1 > i0 ? i1 : i0 + 1).filter(function (x) { return !vacio(x.real); });
-    var tras = i1 >= 0 ? res[i1] : null;
-    var h = '<div class="ec-gl"><b>Temporada ' + esc(r.temporada) + '</b><span class="ec-num">' + esc(vacio(tot.real) ? '0 €' : tot.real) + '</span></div>';
-    h += socios.length ? socios.map(function (x) { return '<div class="ec-socio"><span>' + esc(x.n) + '</span><span>' + esc(x.real) + '</span></div>'; }).join('') :
-      '<p class="ec-s" style="color:var(--ec-g);font-size:13px;margin:6px 0 0">Todavía no se ha repartido nada esta temporada.</p>';
-    if (tras) h += '<div class="ec-gs" style="margin-top:8px"><span>Resultado tras reparto (queda en Konami)</span><span><b>' + esc(tras.real) + '</b></span></div>';
-    return h;
-  }
-
-  /** Temporadas anteriores, de la hoja HISTORICO: total repartido y lo de cada socio. */
-  function repartoHistorico(H, temp) {
-    var f = H.filas || [], i0 = idxR(f, /^Reparto a socios/), i1 = idxR(f, /^Resultado tras reparto/);
     if (i0 < 0) return '';
-    var socios = f.slice(i0 + 1, i1 > i0 ? i1 : i0 + 1), tras = i1 >= 0 ? f[i1] : null, resu = f[idxR(f, /^RESULTADO$/)];
-    var filas = H.temporadas.map(function (t, j) {
-      if (t === temp) return '';
-      var tot = f[i0].v[j] || 0;
-      var quien = socios.filter(function (s) { return s.v[j]; }).map(function (s) { return esc(s.n) + ' ' + eur(s.v[j]); }).join(' · ');
-      return '<div class="ec-hist"><div>' + esc(t) + '<small>' + (quien || 'Sin reparto') + '</small>' +
-        (resu && resu.v[j] != null ? '<small>Resultado ' + eur(resu.v[j]) + (tras && tras.v[j] ? ' · quedó en Konami ' + eur(tras.v[j]) : '') + '</small>' : '') + '</div><b>' + eur(tot) + '</b></div>';
-    }).reverse().join('');
-    var porSocio = socios.map(function (s) { return { n: s.n, t: s.v.reduce(function (a, x) { return a + (x || 0); }, 0) }; })
-      .filter(function (s) { return s.t; }).sort(function (a, b) { return b.t - a.t; });
-    return '<details class="ec-det"><summary>Temporadas anteriores</summary>' + filas +
-      (porSocio.length ? '<div class="ec-gs" style="margin-top:10px"><span><b>Total por socio, todas las temporadas</b></span></div>' +
-        porSocio.map(function (s) { return '<div class="ec-socio"><span>' + esc(s.n) + '</span><span>' + eur(s.t) + '</span></div>'; }).join('') : '') + '</details>';
+    var tot = res[i0], socios = res.slice(i0 + 1, i1 > i0 ? i1 : i0 + 1).filter(function (x) { return !vacio(x.real); });
+    var tras = i1 >= 0 ? res[i1] : null, repN = tot.realN || 0;
+    var queda = tras && !vacio(tras.real) ? tras.real : r.kpis.resultado.t;
+    return '<details class="ec-card ec-rep" id="ec-rep"' + (abiertos.rep ? ' open' : '') + '><summary><b><span class="ec-flecha" aria-hidden="true">›</span> Beneficio y reparto</b>' +
+      '<span>' + (repN ? 'repartido ' + eur(repN) : 'sin reparto') + '</span></summary>' +
+      '<div class="ec-rf"><span>Beneficio<small>Ingresos − gastos de la ' + esc(r.temporada) + '</small></span><span>' + esc(r.kpis.resultado.t) + '</span></div>' +
+      '<div class="ec-rf"><span>Reparto a socios</span><span>' + (repN ? '− ' + eur(repN) : '0 €') + '</span></div>' +
+      socios.map(function (x) { return '<div class="ec-socio"><span>' + esc(x.n) + '</span><span>' + esc(x.real) + '</span></div>'; }).join('') +
+      '<div class="ec-rf ec-tot"><span>Resultado<small>Lo que queda en Konami</small></span><span>' + esc(queda) + '</span></div></details>';
   }
 
   /* ---------- PRESUPUESTO (T0134): avisos para afinarlo y de dónde sale cada partida ---------- */
