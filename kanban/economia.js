@@ -8,6 +8,8 @@
  * Resumen: cada partida y subpartida dice si queda margen o te has pasado (y cuánto), y «¿Vamos al ritmo previsto?»
  * explica el resultado esperado a hoy. Caja: lista solo con saldos; en cada persona, recibido/pagado y el equipo
  * de cada inscripción o paga y señal (CAJA!N, ECONOMIA_WEB.gs).
+ * Reparto a socios en el Resumen (temporada elegida + temporadas anteriores, hoja HISTORICO) y pestaña Presupuesto
+ * (T0134): avisos para afinar el presupuesto y de dónde sale cada partida (CONFIG · ORIGEN DEL PRESUPUESTO).
  */
 (function () {
   'use strict';
@@ -85,6 +87,16 @@
       '.ec-linea .ec-gl b{font-size:13.5px;font-weight:600}.ec-linea .ec-barra{height:4px;margin-top:5px}.ec-linea .ec-gs{font-size:12px}' +
       '.ec-gs b{font-weight:700}' +
       '.ec-ritmo p{margin:6px 0 0;font-size:13.5px}.ec-ritmo .ec-nota{font-size:12px;color:var(--ec-g);margin-top:8px}' +
+      '.ec-socio{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px dashed var(--ec-l);font-size:14px}.ec-socio span:last-child{font-weight:700;font-variant-numeric:tabular-nums}' +
+      '.ec-det{margin-top:10px}.ec-det summary{cursor:pointer;color:var(--ec-c);font-weight:700;font-size:13.5px;padding:6px 0}' +
+      '.ec-hist{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--ec-l);font-size:13.5px}.ec-hist small{display:block;color:var(--ec-g);font-size:12px;margin-top:2px}' +
+      '.ec-hist b{font-variant-numeric:tabular-nums;white-space:nowrap}' +
+      '.ec-av2{border-left:4px solid var(--ec-r);padding:10px 12px;background:#fff;border-radius:10px;margin-top:10px;box-shadow:0 0 0 1px var(--ec-l) inset}' +
+      '.ec-av2.ec-amb{border-left-color:#d98a00}.ec-av2.ec-inf{border-left-color:var(--ec-c)}' +
+      '.ec-av2 b{display:block;font-size:14.5px}.ec-av2 p{margin:4px 0 0;font-size:13.5px}.ec-av2 .ec-a{display:inline-block;margin-top:6px}' +
+      '.ec-pl{padding:9px 0;border-top:1px dashed var(--ec-l)}.ec-pl:first-child{border-top:0}.ec-pl .ec-gs{font-size:12px}' +
+      '.ec-pl .ec-org{font-size:12px;color:var(--ec-g);margin-top:3px}' +
+      '.ec-chipo{display:inline-block;font-size:11px;font-weight:800;padding:2px 7px;border-radius:999px;background:var(--ec-f);color:var(--ec-g);margin-left:6px;vertical-align:1px}' +
       '.ec-lista{list-style:none;margin:0;padding:0}.ec-item{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-top:1px solid var(--ec-l);align-items:center}' +
       '.ec-item:first-child{border-top:0}.ec-item .ec-t{font-weight:700}.ec-item .ec-s{font-size:12.5px;color:var(--ec-g);margin-top:2px}' +
       '.ec-item .ec-d{text-align:right;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}' +
@@ -154,7 +166,7 @@
   }
 
   /* ---------- armazón ---------- */
-  var TABS = [['resumen', 'Resumen'], ['caja', 'Caja'], ['ligas', 'Ligas'], ['pendientes', 'Pendientes']];
+  var TABS = [['resumen', 'Resumen'], ['caja', 'Caja'], ['ligas', 'Ligas'], ['presupuesto', 'Presupuesto'], ['pendientes', 'Pendientes']];
 
   function abrir(el) {
     S.el = el;
@@ -190,7 +202,7 @@
   function pintar(forzar) {
     var main = $('#ec-main'); if (!main) return;
     var tab = S.tab, re = $('#ec-re');
-    var p = ({ resumen: pResumen, caja: pCaja, ligas: pLigas, pendientes: pPendientes })[tab];
+    var p = ({ resumen: pResumen, caja: pCaja, ligas: pLigas, presupuesto: pPresupuesto, pendientes: pPendientes })[tab];
     if (re) re.disabled = true;
     var listo = p(main, !!forzar);
     Promise.resolve(listo).then(function () { if (re) re.disabled = false; }, function () { if (re) re.disabled = false; });
@@ -234,6 +246,7 @@
           '<p>Hoy deberíamos tener <b>' + esc(esperado.pres) + '</b> de resultado y tenemos <b>' + esc(esperado.real) + '</b>.</p>' +
           '<p class="ec-nota">Las inscripciones se cobran al empezar y el presupuesto de gastos se reparte según los partidos jugados. Lo que se paga de golpe al principio (IVA trimestral, camisetas, material) hace que a inicio de temporada salga por debajo aunque todo vaya bien: mira abajo qué partidas se han pasado.</p></div>';
       }
+      h += '<h2 class="ec-h2">Reparto a socios</h2><div class="ec-card" id="ec-reparto">' + repartoTemporada(r) + '<div id="ec-reparto-h"></div></div>';
       ['INGRESOS', 'GASTOS'].forEach(function (sec) {
         var gs = (r.grupos || []).filter(function (g) { return g.seccion === sec; });
         if (!gs.length) return;
@@ -270,6 +283,7 @@
       $('#ec-temp').onchange = function () { S.temp = this.value; S.comp = 'TODAS'; pintar(); };
       $('#ec-comp').onchange = function () { S.comp = this.value; pintar(); };
       $('#ec-irpend').onclick = function () { var b = S.el.querySelector('[data-ec-tab=pendientes]'); if (b) b.click(); };
+      dato('hist', 'economiaHistorico').then(function (H) { var x = $('#ec-reparto-h'); if (x) x.innerHTML = repartoHistorico(H, r.temporada); }, function () {});
       [].forEach.call(main.querySelectorAll('[data-ec-g]'), function (b) {
         b.onclick = function () {
           var id = b.getAttribute('data-ec-g'), l = $('#ec-l-' + id); if (!l) return;
@@ -277,6 +291,129 @@
         };
       });
     });
+  }
+
+  /* ---------- REPARTO A SOCIOS ---------- */
+  function idxR(lista, re) { for (var i = 0; i < lista.length; i++) if (re.test(lista[i].n)) return i; return -1; }
+
+  /** Reparto de la temporada elegida, de la hoja TEMPORADA (filas entre «Reparto a socios» y «Resultado tras reparto»). */
+  function repartoTemporada(r) {
+    var res = r.resultado || [], i0 = idxR(res, /^Reparto a socios/), i1 = idxR(res, /^Resultado tras reparto/);
+    if (i0 < 0) return '<div class="ec-vacio" style="padding:8px">Sin datos de reparto.</div>';
+    var tot = res[i0], socios = res.slice(i0 + 1, i1 > i0 ? i1 : i0 + 1).filter(function (x) { return !vacio(x.real); });
+    var tras = i1 >= 0 ? res[i1] : null;
+    var h = '<div class="ec-gl"><b>Temporada ' + esc(r.temporada) + '</b><span class="ec-num">' + esc(vacio(tot.real) ? '0 €' : tot.real) + '</span></div>';
+    h += socios.length ? socios.map(function (x) { return '<div class="ec-socio"><span>' + esc(x.n) + '</span><span>' + esc(x.real) + '</span></div>'; }).join('') :
+      '<p class="ec-s" style="color:var(--ec-g);font-size:13px;margin:6px 0 0">Todavía no se ha repartido nada esta temporada.</p>';
+    if (tras) h += '<div class="ec-gs" style="margin-top:8px"><span>Resultado tras reparto (queda en Konami)</span><span><b>' + esc(tras.real) + '</b></span></div>';
+    return h;
+  }
+
+  /** Temporadas anteriores, de la hoja HISTORICO: total repartido y lo de cada socio. */
+  function repartoHistorico(H, temp) {
+    var f = H.filas || [], i0 = idxR(f, /^Reparto a socios/), i1 = idxR(f, /^Resultado tras reparto/);
+    if (i0 < 0) return '';
+    var socios = f.slice(i0 + 1, i1 > i0 ? i1 : i0 + 1), tras = i1 >= 0 ? f[i1] : null, resu = f[idxR(f, /^RESULTADO$/)];
+    var filas = H.temporadas.map(function (t, j) {
+      if (t === temp) return '';
+      var tot = f[i0].v[j] || 0;
+      var quien = socios.filter(function (s) { return s.v[j]; }).map(function (s) { return esc(s.n) + ' ' + eur(s.v[j]); }).join(' · ');
+      return '<div class="ec-hist"><div>' + esc(t) + '<small>' + (quien || 'Sin reparto') + '</small>' +
+        (resu && resu.v[j] != null ? '<small>Resultado ' + eur(resu.v[j]) + (tras && tras.v[j] ? ' · quedó en Konami ' + eur(tras.v[j]) : '') + '</small>' : '') + '</div><b>' + eur(tot) + '</b></div>';
+    }).reverse().join('');
+    var porSocio = socios.map(function (s) { return { n: s.n, t: s.v.reduce(function (a, x) { return a + (x || 0); }, 0) }; })
+      .filter(function (s) { return s.t; }).sort(function (a, b) { return b.t - a.t; });
+    return '<details class="ec-det"><summary>Temporadas anteriores</summary>' + filas +
+      (porSocio.length ? '<div class="ec-gs" style="margin-top:10px"><span><b>Total por socio, todas las temporadas</b></span></div>' +
+        porSocio.map(function (s) { return '<div class="ec-socio"><span>' + esc(s.n) + '</span><span>' + eur(s.t) + '</span></div>'; }).join('') : '') + '</details>';
+  }
+
+  /* ---------- PRESUPUESTO (T0134): avisos para afinarlo y de dónde sale cada partida ---------- */
+  function pPresupuesto(main, forzar) {
+    var k = 'res_' + S.temp + '_TODAS', tab = S.tab;
+    if (forzar || !S.datos[k] || !S.datos.hist) main.innerHTML = cargando('Repasando el presupuesto…');
+    return Promise.all([dato(k, 'economiaResumen', [S.temp, 'TODAS'], forzar), dato('hist', 'economiaHistorico', [], forzar)]).then(function (x) {
+      if (S.tab !== tab || !document.body.contains(main)) return;
+      var r = x[0], H = x[1];
+      S.temp = r.temporada; S.datos['res_' + r.temporada + '_TODAS'] = r;
+      hora(r.hora); main.innerHTML = presupuestoHtml(r, H);
+      $('#ec-ptemp').onchange = function () { S.temp = this.value; S.comp = 'TODAS'; pintar(); };
+    }, function (e) {
+      if (S.tab === tab) main.innerHTML = errorHtml(e);
+    });
+  }
+
+  function presupuestoHtml(r, H) {
+    var j = H.temporadas.indexOf(r.temporada), jp = j - 1, prev = jp >= 0 ? H.temporadas[jp] : '';
+    var fila = function (n) { for (var i = 0; i < H.filas.length; i++) if (H.filas[i].n === n) return H.filas[i]; return null; };
+    var val = function (n, jj) { var f = fila(n); return f && jj >= 0 ? f.v[jj] : null; };
+    var org = {}; (H.origen || []).forEach(function (o) { org[o.n] = o; });
+    var E = H.enlaces || {};
+    var eqA = r.kpis.equipos.n, eqP = val('Equipos', jp);
+    var ptA = Number(String(r.partidosTxt || '').replace(/\./g, '').replace(/^.*?de\s+(\d+).*$/, '$1')) || 0, ptP = val('Partidos', jp);
+    var lineas = [];
+    (r.grupos || []).forEach(function (g) { (g.lineas || []).forEach(function (l) { lineas.push({ l: l, sec: g.seccion, grupo: g.n }); }); });
+
+    var tipoDe = function (o) {
+      var s = String(o && o.origen || '');
+      if (/^DB_COMPETICIONES\[/.test(s)) return { t: 'mano', col: s.replace(/^DB_COMPETICIONES\[(.*)\]$/, '$1') };
+      if (/^DB_JORNADAS/.test(s)) return { t: 'calendario' };
+      if (/^PARTIDOS/.test(s)) return { t: 'partidos' };
+      if (/^EQUIPOS/.test(s)) return { t: 'equipos' };
+      return { t: 'sin' };
+    };
+    var link = function (u, t) { return u ? '<a class="ec-a" href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(t) + ' ↗</a>' : ''; };
+    var donde = function (tp, n) {
+      if (tp.t === 'mano') return { txt: 'Se pone a mano en GESTION › DB_COMPETICIONES, columna «' + tp.col + '», en cada competición (los gastos fijos van en la fila «' + r.temporada + ' | --»).', a: link(E.competiciones, 'Abrir DB_COMPETICIONES') };
+      if (tp.t === 'calendario') return { txt: /^CAMPOS/.test(n) ? 'Sale solo: suma del PRECIO CAMPO de cada partido de DB_JORNADAS en ese colegio. Se afina revisando que estén todas las jornadas y el precio por partido de cada instalación.' : 'Sale solo: suma del PRECIO ARBIT de cada partido de DB_JORNADAS. Se afina revisando las jornadas y el precio de árbitro.', a: link(E.jornadas, 'Abrir DB_JORNADAS') + (/^CAMPOS/.test(n) ? ' ' + link(E.precios, 'Precios de instalaciones') : '') };
+      if (tp.t === 'partidos') return { txt: 'Sale solo: partidos de DB_JORNADAS (sin campo libre, anulados ni aplazados jugados) × gestión por partido, que está en CONFIG de ECONOMIA.', a: link(E.jornadas, 'Abrir DB_JORNADAS') + ' ' + link(E.config, 'CONFIG de ECONOMIA') };
+      if (tp.t === 'equipos') return { txt: 'Sale solo: equipos de DB_LIGAS × precio de inscripción de DB_COMPETICIONES (la P.S por equipo está en CONFIG de ECONOMIA).', a: link(E.ligas, 'Abrir DB_LIGAS') + ' ' + link(E.competiciones, 'Precios en DB_COMPETICIONES') };
+      return { txt: 'No tiene presupuesto: en CONFIG su ORIGEN DEL PRESUPUESTO es «—».', a: '' };
+    };
+
+    var avisos = [], filasHtml = { calendario: [], partidos: [], equipos: [], mano: [], sin: [] };
+    lineas.forEach(function (x) {
+      var l = x.l, o = org[l.n], tp = tipoDe(o), pres = l.presN || 0, real = l.realN || 0, pas = val(l.n, jp), gasto = x.sec === 'GASTOS';
+      var sug = null, sugTxt = '';
+      if (tp.t === 'mano' && pas) {
+        if (x.grupo === 'Competición' && eqA && eqP) { sug = pas / eqP * eqA; sugTxt = eur(pas) + ' la ' + prev + ' con ' + eqP + ' equipos → ' + eur(sug) + ' con ' + eqA; }
+        else { sug = pas; sugTxt = 'lo de la ' + prev; }
+      }
+      var d = donde(tp, l.n);
+      if (gasto && real > pres + 0.5 && tp.t !== 'sin') {
+        avisos.push({ p: 1, c: '', n: l.n, t: pres ? 'Ya te has pasado: llevas ' + eur(real) + ' de ' + eur(pres) + ' (' + eur(real - pres) + ' más).' : 'Hay ' + eur(real) + ' gastados y no tiene presupuesto.',
+          s: (tp.t === 'mano' ? 'Súbelo al menos a ' + eur(Math.max(real, sug || 0)) + (sug && sug > real ? ' (' + sugTxt + ')' : '') + ', o revisa si algún gasto está en la categoría equivocada.' : 'Revisa los precios o las jornadas de donde sale.'), a: d.a });
+      } else if (!pres && tp.t !== 'sin' && pas && pas > 50) {
+        avisos.push({ p: 2, c: ' ec-amb', n: l.n, t: 'Sin presupuesto, y la ' + prev + ' fueron ' + eur(pas) + '.', s: tp.t === 'mano' ? 'Si se repite, ponle unos ' + eur(sug || pas) + (sugTxt ? ' (' + sugTxt + ')' : '') + '.' : 'Revisa que estén las jornadas o equipos de donde sale.', a: d.a });
+      } else if (tp.t === 'mano' && pres && sug && sug > 200 && Math.abs(pres - sug) / sug > 0.35) {
+        avisos.push({ p: 3, c: ' ec-amb', n: l.n, t: 'Presupuesto ' + eur(pres) + ', muy ' + (pres > sug ? 'por encima' : 'por debajo') + ' de lo esperado: ' + eur(sug) + '.', s: 'Esperado = ' + sugTxt + '. Si hay un motivo (precios, cambios), déjalo así.', a: d.a });
+      } else if ((tp.t === 'calendario' || tp.t === 'partidos') && pres && pas && ptA && ptP) {
+        var a1 = pres / ptA, a0 = pas / ptP;
+        if (Math.abs(a1 - a0) / a0 > 0.15) avisos.push({ p: 3, c: ' ec-amb', n: l.n, t: 'Sale a ' + eur(a1).replace(' €', '') + ' €/partido; la ' + prev + ' fue ' + eur(a0).replace(' €', '') + ' €/partido.', s: 'Revisa los precios por partido de DB_JORNADAS.', a: d.a });
+      } else if (tp.t === 'sin' && gasto && real > 0) {
+        avisos.push({ p: 4, c: ' ec-inf', n: l.n, t: 'Lleva ' + eur(real) + ' y no tiene presupuesto posible.', s: 'Si va a ser habitual, añade una columna en DB_COMPETICIONES y ponle su origen en CONFIG.', a: link(E.config, 'CONFIG de ECONOMIA') });
+      }
+      filasHtml[tp.t].push('<div class="ec-pl"><div class="ec-gl"><b>' + esc(l.n) + '</b><span class="ec-num">' + (pres ? eur(pres) : '—') + '</span></div>' +
+        '<div class="ec-gs"><span>' + (pas != null ? 'La ' + esc(prev) + ': ' + eur(pas) : 'Sin dato de la ' + esc(prev || 'pasada')) + (sug && tp.t === 'mano' && Math.abs(sug - pas) > 1 ? ' · esperado ' + eur(sug) : '') + '</span>' +
+        '<span>Llevamos ' + eur(real) + '</span></div><div class="ec-org">' + esc(d.txt) + (d.a ? '<br>' + d.a : '') + '</div></div>');
+    });
+    var cal = '';
+    if (ptA && ptP && ptA < ptP * 0.9) cal = '<div class="ec-av2 ec-amb"><b>Calendario</b><p>DB_JORNADAS tiene ' + ptA + ' partidos esta temporada; la ' + esc(prev) + ' se jugaron ' + Math.round(ptP) + '. Si faltan jornadas por crear (copas, eliminatorias…), campos, árbitros y gestión saldrán cortos.</p>' + link(E.jornadas, 'Abrir DB_JORNADAS') + '</div>';
+    avisos.sort(function (a, b) { return a.p - b.p; });
+    var opT = (r.temporadas || [r.temporada]).map(function (t) { return '<option' + (t === r.temporada ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('');
+    var h = '<div class="ec-fila"><select class="ec-sel" id="ec-ptemp" aria-label="Temporada">' + opT + '</select></div>' +
+      '<p class="ec-s" style="margin:10px 2px 0;color:var(--ec-g);font-size:13px">Qué partidas mirar para afinar el presupuesto de la ' + esc(r.temporada) + ', comparado con la ' + esc(prev || 'temporada anterior') +
+      (eqA && eqP ? ' (' + eqA + ' equipos ahora, ' + eqP + ' entonces)' : '') + ', y dónde se cambia cada una. El presupuesto se cambia en GESTION; aquí solo se mira.</p>';
+    h += '<h2 class="ec-h2">Avisos · ' + (avisos.length + (cal ? 1 : 0)) + '</h2>' + cal + (avisos.length ? avisos.map(function (a) {
+      return '<div class="ec-av2' + a.c + '"><b>' + esc(a.n) + '</b><p>' + esc(a.t) + '</p><p style="color:var(--ec-g)">' + esc(a.s) + '</p>' + (a.a || '') + '</div>';
+    }).join('') : (cal ? '' : '<div class="ec-card ec-vacio">👌 Nada que afinar ahora mismo.</div>'));
+    var bloques = [['calendario', 'Se calculan solas con el calendario (DB_JORNADAS)'], ['partidos', 'Se calcula sola con los partidos'], ['equipos', 'Se calculan solas con los equipos'],
+      ['mano', 'Se ponen a mano (DB_COMPETICIONES)'], ['sin', 'Sin presupuesto']];
+    bloques.forEach(function (b) {
+      if (!filasHtml[b[0]].length) return;
+      h += '<h2 class="ec-h2">' + esc(b[1]) + '</h2><div class="ec-card">' + filasHtml[b[0]].join('') + '</div>';
+    });
+    return h;
   }
 
   /* ---------- CAJA ---------- */
