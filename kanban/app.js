@@ -8,6 +8,9 @@
   'use strict';
   var C = window.KANBAN || {};
   var CLAVE = 'kanban_' + (C.clave || 'negocio');
+  // T0133: carpeta de este archivo (…/kanban/), para cargar los módulos de las secciones (economia.js…).
+  var BASE = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/[^/]*$/, '') : '../kanban/'; })();
+  var VERSION_MODULOS = '1';
 
   function leer() { try { return JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) { return null; } }
   function guardar(o) { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) {} }
@@ -119,7 +122,7 @@
   var SECCIONES = {
     KANBAN: { t: 'Kanban', i: '📋' },
     GESTION: { t: 'Gestión', i: '🗂️' },
-    ECONOMIA: { t: 'Economía', i: '💶' },
+    ECONOMIA: { t: 'Economía', i: '💶', js: 'economia.js' }, // T0133: sección con módulo propio
     LIGAS: { t: 'Ligas', i: '⚽' },
     PERFIL: { t: 'Perfil', i: '👤' }
   };
@@ -164,6 +167,7 @@
   /** Contenido de una sección que aún no está hecha. */
   function htmlSeccion(s, cred) {
     if (s === 'PERFIL') return htmlPerfil(cred || {});
+    if (infoSeccion(s).js) return '<div data-sx-mod="' + texto(s) + '"><div style="padding:60px 18px;text-align:center;opacity:.7">Cargando…</div></div>';
     var f = infoSeccion(s), color = C.color || '#0E8A7A';
     return '<header style="background:' + texto(color) + ';color:#fff;padding:14px 18px"><h1 style="margin:0;font-size:24px;letter-spacing:.5px;color:#fff">' +
       texto(f.t.toUpperCase()) + '</h1></header>' +
@@ -207,17 +211,46 @@
     return '<style>' + cssBarra() + '</style><nav class="sx" aria-label="Secciones"><div class="sx-in">' + as + '</div></nav>';
   }
 
+  /** T0133: datos que necesitan los módulos de sección (economia.js…) para llamar a la API. */
+  function ctxModulos(cred) {
+    return { api: C.api, persona: cred.persona, pin: cred.pin, clave: CLAVE, color: C.color || '', accion: C.accion || '' };
+  }
+
+  /** T0133: scripts de los módulos de las secciones de la persona (se cargan una vez). */
+  function scriptsModulos(secs, cred) {
+    var js = secs.map(function (s) { return infoSeccion(s).js; }).filter(Boolean);
+    if (!js.length) return '';
+    return '<script>window.SX_CTX=' + JSON.stringify(ctxModulos(cred)).replace(/</g, '\\u003c') + ';<\/script>' +
+      js.map(function (f) { return '<script src="' + texto(BASE + f + '?v=' + VERSION_MODULOS) + '"><\/script>'; }).join('');
+  }
+
+  /** T0133: pinta el módulo de una sección dentro del panel, cuando su script ya está cargado. */
+  function abrirModulo(panel) {
+    var el = panel && panel.querySelector('[data-sx-mod]');
+    if (!el) return;
+    var s = el.getAttribute('data-sx-mod'), M = window.SX_MOD || {};
+    if (M[s]) { M[s].abrir(el); return; }
+    var f = infoSeccion(s).js;
+    var sc = document.createElement('script');
+    sc.src = BASE + f + '?v=' + VERSION_MODULOS;
+    sc.onload = function () { if ((window.SX_MOD || {})[s] && document.body.contains(el)) window.SX_MOD[s].abrir(el); };
+    sc.onerror = function () { el.innerHTML = '<p style="padding:40px 18px;text-align:center">No se ha podido cargar la sección. Comprueba la conexión y vuelve a entrar.</p>'; };
+    document.head.appendChild(sc);
+  }
+
   /** Script que va dentro de la página del tablero: cambia de sección sin recargar. */
   function scriptBarra(secs, cred) {
     var P = {}, T = {};
     secs.forEach(function (s) { T[s] = infoSeccion(s).t; if (s !== 'KANBAN') P[s] = htmlSeccion(s, cred); });
-    return '<script>(function(){var P=' + JSON.stringify(P).replace(/</g, '\\u003c') + ',T=' + JSON.stringify(T) +
+    return scriptsModulos(secs, cred) + '<script>(function(){var P=' + JSON.stringify(P).replace(/</g, '\\u003c') + ',T=' + JSON.stringify(T) +
       ',N=' + JSON.stringify(C.nombreApp || 'App') + ',K0="";' +
       'function ir(s,push){var nav=document.querySelector(".sx"),p=document.getElementById("sx-panel");if(!nav||!p)return;' +
       'if(!document.body.classList.contains("sx-otra"))K0=document.title;' +
       '[].forEach.call(nav.querySelectorAll("a[data-sx]"),function(a){if(a.getAttribute("data-sx")===s)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");});' +
       'if(!P[s]){document.body.classList.remove("sx-otra");p.innerHTML="";if(K0)document.title=K0;}' +
-      'else{p.innerHTML=P[s];document.body.classList.add("sx-otra");document.title=T[s]+" · "+N;}' +
+      'else{p.innerHTML=P[s];document.body.classList.add("sx-otra");document.title=T[s]+" · "+N;' +
+      'var m=p.querySelector("[data-sx-mod]");if(m){var k=m.getAttribute("data-sx-mod"),X=window.SX_MOD||{};' +
+      'if(X[k])X[k].abrir(m);else{var t=setInterval(function(){if((window.SX_MOD||{})[k]&&document.body.contains(m)){clearInterval(t);window.SX_MOD[k].abrir(m);}},100);setTimeout(function(){clearInterval(t);},15000);}}}' +
       'window.scrollTo(0,0);if(push)history.pushState({sx:s},"",location.pathname+"?s="+s.toLowerCase());}' +
       'document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[data-sx]");' +
       'if(!a||e.metaKey||e.ctrlKey||e.shiftKey||e.button)return;e.preventDefault();ir(a.getAttribute("data-sx"),true);});' +
@@ -230,6 +263,8 @@
   function pintarSeccion(cred, secs, s) {
     document.title = infoSeccion(s).t + ' · ' + (C.nombreApp || 'App');
     document.body.innerHTML = barra(seccionesBarra(secs, cred.perfil), s) + '<div id="sx-panel">' + htmlSeccion(s, cred) + '</div>';
+    window.SX_CTX = ctxModulos(cred); // T0133
+    abrirModulo(document.getElementById('sx-panel'));
   }
 
   function error(e) {
