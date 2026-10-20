@@ -5,6 +5,9 @@
  *   window.SX_CTX = { api, persona, pin, clave, color, accion }
  *   window.SX_MOD.ECONOMIA.abrir(elemento)  → pinta la sección dentro del elemento.
  * Lo ya cargado se guarda en memoria: volver a la sección es instantáneo; ↻ vuelve a pedirlo.
+ * Resumen: cada partida y subpartida dice si queda margen o te has pasado (y cuánto), y «¿Vamos al ritmo previsto?»
+ * explica el resultado esperado a hoy. Caja: lista solo con saldos; en cada persona, recibido/pagado y el equipo
+ * de cada inscripción o paga y señal (CAJA!N, ECONOMIA_WEB.gs).
  */
 (function () {
   'use strict';
@@ -78,8 +81,10 @@
       '.ec-gs{display:flex;justify-content:space-between;font-size:12.5px;color:var(--ec-g);margin-top:3px}' +
       '.ec-gb .ec-barra{height:6px}.ec-barra i.ec-mal{background:var(--ec-r)}' +
       '.ec-flecha{display:inline-block;width:14px;color:var(--ec-g);transition:transform .15s}.ec-gb[aria-expanded=true] .ec-flecha{transform:rotate(90deg)}' +
-      '.ec-lineas{padding:0 0 10px 14px}.ec-linea{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;padding:5px 0;border-top:1px dashed var(--ec-l)}' +
-      '.ec-linea span:last-child{white-space:nowrap;font-variant-numeric:tabular-nums}' +
+      '.ec-lineas{padding:0 0 10px 14px}.ec-linea{font-size:13.5px;padding:8px 0;border-top:1px dashed var(--ec-l)}' +
+      '.ec-linea .ec-gl b{font-size:13.5px;font-weight:600}.ec-linea .ec-barra{height:4px;margin-top:5px}.ec-linea .ec-gs{font-size:12px}' +
+      '.ec-gs b{font-weight:700}' +
+      '.ec-ritmo p{margin:6px 0 0;font-size:13.5px}.ec-ritmo .ec-nota{font-size:12px;color:var(--ec-g);margin-top:8px}' +
       '.ec-lista{list-style:none;margin:0;padding:0}.ec-item{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-top:1px solid var(--ec-l);align-items:center}' +
       '.ec-item:first-child{border-top:0}.ec-item .ec-t{font-weight:700}.ec-item .ec-s{font-size:12.5px;color:var(--ec-g);margin-top:2px}' +
       '.ec-item .ec-d{text-align:right;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}' +
@@ -120,6 +125,27 @@
   function errorHtml(e) { return '<div class="ec-error" role="alert">' + esc(e && e.message || e) + '</div>'; }
   function barra(pct, mal) { var p = Math.max(0, Math.min(1, pct || 0)) * 100; return '<div class="ec-barra"><i' + (mal ? ' class="ec-mal"' : '') + ' style="width:' + p.toFixed(1) + '%"></i></div>'; }
   function $(s) { return S.el && S.el.querySelector(s); }
+  /** 1234.5 → «1.235 €» (sin decimales, con punto de miles siempre). */
+  function eur(n) { return String(Math.round(Math.abs(n || 0))).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' €'; }
+  /** Cómo va una partida frente a su presupuesto, en palabras y con color. */
+  function estado(sec, presN, realN) {
+    var p = presN || 0, r = realN || 0;
+    if (!p && !r) return { t: '', c: '', mal: false };
+    if (sec === 'GASTOS') {
+      if (!p) return { t: 'Sin presupuesto', c: 'ec-neg', mal: true };
+      if (r > p + 0.5) return { t: 'Te has pasado ' + eur(r - p), c: 'ec-neg', mal: true };
+      return { t: 'Quedan ' + eur(p - r), c: 'ec-pos', mal: false };
+    }
+    if (!p) return { t: '+' + eur(r) + ' sin prever', c: 'ec-pos', mal: false };
+    if (r + 0.5 < p) return { t: 'Faltan ' + eur(p - r), c: 'ec-neg', mal: true };
+    return { t: (r - p >= 0.5 ? '+' + eur(r - p) + ' más de lo previsto' : 'Cobrado todo'), c: 'ec-pos', mal: false };
+  }
+  /** «26-27 | LIGA - LAS FENOMENAS» → «LAS FENOMENAS». */
+  function nombreEquipo(eq, comp) {
+    eq = String(eq || '').trim(); if (!eq) return '';
+    if (comp && eq.indexOf(comp + ' - ') === 0) return eq.slice(comp.length + 3);
+    return eq.replace(/^\d\d-\d\d \| .*? - /, '');
+  }
 
   /** Pide un dato (con memoria): clave → promesa. */
   function dato(clave, fn, args, forzar) {
@@ -195,13 +221,19 @@
       if (r.avance != null) h += '<div class="ec-av"><div class="ec-av-t"><span>Avance de la temporada · ' + esc(r.avanceTxt) + '</span><span>' + esc(r.partidosTxt) + '</span></div>' + barra(r.avance) + '</div>';
       h += '<div class="ec-kpis">' +
         '<div class="ec-kpi ec-grande"><b>Resultado</b><span class="ec-val">' + esc(K.resultado.t) + '</span>' +
-        '<span class="ec-sub">Presupuesto ' + esc(K.presupuesto.t) + ' · <span class="' + signo(K.desviacion.n) + '">' + (K.desviacion.n > 0 ? '+' : '') + esc(K.desviacion.t) + '</span></span></div>' +
+        '<span class="ec-sub">Presupuesto ' + esc(K.presupuesto.t) + ' · ' + (K.desviacion.n == null ? '' : eur(K.desviacion.n) + (K.desviacion.n >= 0 ? ' mejor' : ' peor') + ' de lo previsto') + '</span></div>' +
         '<div class="ec-kpi"><b>Ingresos</b><span class="ec-val ec-pos">' + esc(K.ingresos.t) + '</span>' + (r.totalIngresos ? '<span class="ec-sub">de ' + esc(r.totalIngresos.pres) + ' previstos</span>' : '') + '</div>' +
         '<div class="ec-kpi"><b>Gastos</b><span class="ec-val">' + esc(K.gastos.t) + '</span>' + (r.totalGastos ? '<span class="ec-sub">de ' + esc(r.totalGastos.pres) + ' previstos</span>' : '') + '</div></div>' +
         '<div class="ec-mini"><div><b>' + esc(K.equipos.t) + '</b><small>Equipos</small></div><div><b>' + esc(K.partidos.t) + '</b><small>Partidos</small></div>' +
         '<button type="button" id="ec-irpend"' + (K.pendientes.n ? ' class="ec-alerta"' : '') + '><b>' + esc(K.pendientes.t) + '</b><small>Por revisar ›</small></button></div>';
-      if (esperado) h += '<div class="ec-card"><div class="ec-gl"><b>Resultado esperado a hoy</b><span class="ec-num">' + esc(esperado.pres) + '</span></div>' +
-        '<div class="ec-gs"><span>Según el avance de la temporada</span><span class="' + signo(esperado.difN) + '">' + (esperado.difN > 0 ? '+' : '') + esc(esperado.dif) + ' frente a lo real</span></div></div>';
+      if (esperado && r.avance != null && r.totalGastos) {
+        var gEsp = (r.totalGastos.presN || 0) * r.avance, gReal = r.totalGastos.realN || 0, dR = esperado.difN || 0;
+        h += '<div class="ec-card ec-ritmo"><div class="ec-gl"><b>¿Vamos al ritmo previsto?</b><span class="ec-num ' + signo(dR) + '">' +
+          eur(dR) + (dR >= 0 ? ' por encima' : ' por debajo') + '</span></div>' +
+          '<p>Con el <b>' + esc(r.avanceTxt) + '</b> de la temporada jugada, al ritmo del presupuesto tocaba llevar gastados unos <b>' + eur(gEsp) + '</b>; llevamos <b>' + eur(gReal) + '</b>.</p>' +
+          '<p>Hoy deberíamos tener <b>' + esc(esperado.pres) + '</b> de resultado y tenemos <b>' + esc(esperado.real) + '</b>.</p>' +
+          '<p class="ec-nota">Las inscripciones se cobran al empezar y el presupuesto de gastos se reparte según los partidos jugados. Lo que se paga de golpe al principio (IVA trimestral, camisetas, material) hace que a inicio de temporada salga por debajo aunque todo vaya bien: mira abajo qué partidas se han pasado.</p></div>';
+      }
       ['INGRESOS', 'GASTOS'].forEach(function (sec) {
         var gs = (r.grupos || []).filter(function (g) { return g.seccion === sec; });
         if (!gs.length) return;
@@ -209,14 +241,18 @@
         gs.forEach(function (g, i) {
           var id = sec + '_' + i, ab = !!abiertos[id], lin = (g.lineas || []).filter(function (l) { return !vacio(l.real) || !vacio(l.pres); });
           var pct = g.presN ? (g.realN || 0) / g.presN : (g.realN ? 1 : 0);
-          var mal = sec === 'GASTOS' ? (pct > 1.0001 || (!g.presN && g.realN > 0)) : false;
+          var est = estado(sec, g.presN, g.realN), mal = sec === 'GASTOS' && est.mal;
           h += '<div class="ec-grupo"><button type="button" class="ec-gb" data-ec-g="' + id + '" aria-expanded="' + ab + '"' + (lin.length ? '' : ' disabled') + '>' +
             '<div class="ec-gl"><b>' + (lin.length ? '<span class="ec-flecha" aria-hidden="true">›</span>' : '') + esc(g.n) + '</b><span class="ec-num">' + esc(vacio(g.real) ? '0 €' : g.real) + '</span></div>' +
             barra(pct, mal) +
             '<div class="ec-gs"><span>Presupuesto ' + esc(vacio(g.pres) ? '—' : g.pres) + (g.pct ? ' · ' + esc(g.pct) : '') + '</span>' +
-            '<span class="' + signo(g.difN) + '">' + (vacio(g.dif) ? '' : (g.difN > 0 ? '+' : '') + esc(g.dif)) + '</span></div></button>' +
+            '<span class="' + est.c + '"><b>' + esc(est.t) + '</b></span></div></button>' +
             (lin.length ? '<div class="ec-lineas"' + (ab ? '' : ' hidden') + ' id="ec-l-' + id + '">' + lin.map(function (l) {
-              return '<div class="ec-linea"><span>' + esc(l.n) + '</span><span>' + esc(vacio(l.real) ? '0 €' : l.real) + ' <span style="color:var(--ec-g)">/ ' + esc(vacio(l.pres) ? '—' : l.pres) + '</span></span></div>';
+              var e = estado(sec, l.presN, l.realN), lp = l.presN ? (l.realN || 0) / l.presN : (l.realN ? 1 : 0);
+              return '<div class="ec-linea"><div class="ec-gl"><b>' + esc(l.n) + '</b><span class="ec-num">' + esc(vacio(l.real) ? '0 €' : l.real) + '</span></div>' +
+                barra(lp, sec === 'GASTOS' && e.mal) +
+                '<div class="ec-gs"><span>' + (vacio(l.pres) ? 'Sin presupuesto' : 'de ' + esc(l.pres) + (l.pct ? ' · ' + esc(l.pct) : '')) + '</span>' +
+                '<span class="' + e.c + '"><b>' + esc(e.t) + '</b></span></div></div>';
             }).join('') + '</div>' : '') + '</div>';
         });
         h += '</div>';
@@ -248,11 +284,10 @@
     var p = S.cajaPersona;
     if (!p) {
       return cuando(main, 'caja_KONAMI', 'economiaCaja', ['KONAMI'], forzar, 'Mirando quién tiene el dinero…', function (r) {
-        var h = '<p class="ec-s" style="margin:0 2px;color:var(--ec-g);font-size:13px">Lo que cada persona ha recibido para Konami menos lo que ha pagado o entregado. Toca una persona para ver sus movimientos.</p>';
+        var h = '<p class="ec-s" style="margin:0 2px;color:var(--ec-g);font-size:13px">Dinero de Konami que tiene cada persona. Toca una para ver lo recibido, lo pagado y sus movimientos.</p>';
         if (r.estado) h += '<p style="margin:10px 2px 0;font-size:13.5px">' + esc(r.estado) + '</p>';
         h += '<div class="ec-card"><div class="ec-lista">' + r.personas.map(function (x) {
-          return '<button type="button" class="ec-item" data-ec-p="' + esc(x.n) + '"><div><div class="ec-t">' + esc(x.n) + '</div>' +
-            '<div class="ec-s">Recibido ' + esc(x.recibido) + ' · pagado ' + esc(x.pagado) + '</div></div>' +
+          return '<button type="button" class="ec-item" data-ec-p="' + esc(x.n) + '"><div><div class="ec-t">' + esc(x.n) + '</div></div>' +
             '<div class="ec-d ' + signo(x.saldoN) + '">' + esc(x.saldo) + ' ›</div></button>';
         }).join('') + '</div></div>';
         if (r.externos) h += '<p class="ec-s" style="margin:12px 2px;color:var(--ec-g);font-size:12.5px">' + esc(r.externos) + '</p>';
@@ -269,8 +304,10 @@
         (yo ? '<span class="ec-sub">Recibido ' + esc(yo.recibido) + ' · pagado ' + esc(yo.pagado) + '</span>' : '') + '</div></div>' +
         '<h2 class="ec-h2">Movimientos · más reciente arriba</h2><div class="ec-card">';
       h += r.detalle.length ? '<ul class="ec-lista">' + r.detalle.map(function (m) {
-        return '<li class="ec-item"><div><div class="ec-t">' + esc(m.concepto || m.categoria) + '</div>' +
-          '<div class="ec-s">' + esc(m.fecha) + ' · ' + esc(m.deA) + (m.comp ? ' · ' + esc(m.comp) : '') + '</div></div>' +
+        var eq = /^INSCRIPCION/i.test(m.categoria) ? nombreEquipo(m.equipo, m.comp) : '';
+        var tipoIns = /P\.?\s*S\.?$/i.test(m.categoria) ? 'Paga y señal' : 'Inscripción';
+        return '<li class="ec-item"><div><div class="ec-t">' + esc(eq || m.concepto || m.categoria) + '</div>' +
+          '<div class="ec-s">' + (eq ? esc(tipoIns) + ' · ' : '') + esc(m.fecha) + ' · ' + esc(m.deA) + (m.comp ? ' · ' + esc(/^\d\d-\d\d \| /.test(m.comp) ? (m.comp.slice(8) === '--' ? 'General' : m.comp.slice(8)) : m.comp) : '') + '</div></div>' +
           '<div class="ec-d"><span class="' + signo(m.importeN) + '">' + esc(m.importe) + '</span><div class="ec-s">saldo ' + esc(m.saldo) + '</div></div></li>';
       }).join('') + '</ul>' + (r.detalle.length >= 150 ? '<p class="ec-s" style="color:var(--ec-g)">Se ven los 150 últimos.</p>' : '') : '<div class="ec-vacio">Sin movimientos.</div>';
       main.innerHTML = h + '</div>';
