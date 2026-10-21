@@ -406,3 +406,9 @@ body.ver-bandeja .filtros, body.ver-bandeja #tablero { display: none; }
 .u .peligro { color: var(--color-error); border-color: var(--color-error); }
 .u .opc { text-transform: none; font-weight: 400; letter-spacing: 0; }
 .u.k-tablero .cab h1 { order: -1; }
+/* Cabecera del modo edición: nada de texto pequeño sobre el verde */
+.u .cab .id:not(:has(.n)) { flex: 0 0 auto; display: inline-block; padding: 0 var(--e2); border-radius: var(--radio-peq);
+  background: var(--color-fondo); color: var(--color-principal-oscuro); font: 600 15px/1.6 var(--fuente-titulos); }
+.u .cab .meta { flex: 1 1 100%; order: 3; }
+.u .cab .meta { display: inline-block; flex: 0 0 auto; padding: 0 var(--e2); border-radius: var(--radio-peq);
+  background: var(--color-fondo); color: var(--color-texto); font: 600 13px/1.8 var(--fuente-texto); }
