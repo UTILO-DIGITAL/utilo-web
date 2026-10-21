@@ -11,19 +11,21 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Kanban Utilo">
 <meta name="theme-color" content="#0E8A7A">
-<link rel="stylesheet" href="../kanban/estilo.css">
-<style>:root{--kz-color:#0E8A7A;--kz-accion:#FF5A3C;--kz-fondo:#FFFCF7;--kz-texto:#1C2B26}</style>
+<!-- T0150: estilos comunes (PROTOCOLO DISEÑO UTILO). Los colores solo están en marca.css. -->
+<link rel="stylesheet" href="marca.css?v=12">
+<link rel="stylesheet" href="../estilos/base.css?v=12">
 <script>
   window.KANBAN = {
     clave: 'utilo',
+    marca: 'utilo', // T0150: usa utilo/marca.css y estilos/base.css
     nombreApp: 'Kanban Utilo',
     color: '#0E8A7A',
     api: 'https://script.google.com/macros/s/AKfycbz-TCnvyLhtJvWjDQ1-Ju2l3Qi7y55aRNLfmx0-evP72lxHnwXlcSygIOP_FjuIzEhG/exec'
   };
 </script>
 </head>
-<body>
-<div class="kz"><div class="kz-caja"><div class="kz-giro"></div><p>Cargando…</p></div></div>
+<body class="u">
+<div class="kz"><div class="kz-caja kz-centro" role="status"><div class="u-carga"></div><p>Cargando…</p></div></div>
 <script src="../kanban/app.js"></script>
 </body>
 </html>

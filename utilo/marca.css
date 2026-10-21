@@ -1,0 +1,30 @@
+/*
+ * Marca de Utilo en pantalla · T0150
+ * Variables de la ficha de marca (brand book, apartado 7) y de su ficha de estilo (PROTOCOLO DISEÑO UTILO, apartado 7).
+ * Es el único sitio con los colores de Utilo: las vistas solo usan var(--…). Cambiar aquí cambia todas.
+ * Orden de carga: marca.css → ../estilos/base.css → ../estilos/kanban.css
+ */
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700;800&display=swap');
+
+:root {
+  /* Paleta del brand book */
+  --color-fondo: #FFFCF7;            /* marfil · fondo general (60 %) */
+  --color-principal: #0E8A7A;        /* verde azulado · cabeceras y titulares (25 %) */
+  --color-principal-oscuro: #0B6E61; /* verde oscuro · enlaces y texto verde pequeño */
+  --color-accion: #FF5A3C;           /* coral · solo el botón principal y la o del logo */
+  --color-destacado: #FFC845;        /* amarillo sol · subrayado de una cifra clave por pantalla */
+  --color-bloque: #FFE9D2;           /* melocotón · bloques y etiquetas suaves */
+  --color-texto: #1C2B26;            /* verde noche · texto corrido */
+  --color-sobre-principal: #FFFCF7;  /* texto sobre verde azulado: solo grande y en negrita */
+  --color-sobre-accion: #FFFFFF;     /* texto sobre coral: solo grande y en negrita (botones) */
+  --color-superficie: #FFFFFF;       /* tarjetas y campos sobre el marfil */
+
+  /* Letras */
+  --fuente-titulos: 'Fredoka', 'Nunito', sans-serif;
+  --fuente-texto: 'Nunito', sans-serif;
+  --peso-titulos: 600;
+
+  /* Forma: esquinas redondeadas de 10 px (las del botón del brand book) */
+  --radio: 10px;
+  --radio-peq: 5px;
+}
