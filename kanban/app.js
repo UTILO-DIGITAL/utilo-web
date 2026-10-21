@@ -10,7 +10,7 @@
   var CLAVE = 'kanban_' + (C.clave || 'negocio');
   // T0133: carpeta de este archivo (…/kanban/), para cargar los módulos de las secciones (economia.js…).
   var BASE = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/[^/]*$/, '') : '../kanban/'; })();
-  var VERSION_MODULOS = '7';
+  var VERSION_MODULOS = '8';
 
   function leer() { try { return JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) { return null; } }
   function guardar(o) { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) {} }
@@ -121,7 +121,7 @@
 
   var SECCIONES = {
     KANBAN: { t: 'Kanban', i: '📋' },
-    GESTION: { t: 'Gestión', i: '🗂️' },
+    GESTION: { t: 'Gestión', i: '🗂️', js: 'gestion.js' }, // T0139: sección con módulo propio (equipos y jugadoras)
     ECONOMIA: { t: 'Economía', i: '💶', js: 'economia.js' }, // T0133: sección con módulo propio
     LIGAS: { t: 'Ligas', i: '⚽' },
     PERFIL: { t: 'Perfil', i: '👤' }
