@@ -5,7 +5,8 @@
  *   window.SX_CTX = { api, persona, pin, clave, color, accion }
  *   window.SX_MOD.GESTION.abrir(elemento)  → pinta la sección dentro del elemento.
  * Se carga una TEMPORADA entera (todas sus competiciones) y se filtra por competición y liga.
- * Resumen: como la hoja RESUMEN, por día y liga: equipos por nivel, color, capitana, jugadoras y cómo van los pagos.
+ * Resumen: como la hoja RESUMEN, por día y liga (desplegables, con el gestor y su WhatsApp): equipos por nivel, color, capitana,
+ *   jugadoras y pagos. Los KPIs llevan a su pestaña ya filtrada; Alertas junta pagos, problemas de inscripción y jugadoras con alerta.
  * T0142 · Equipos: filtros (sin liga, por pagar, avisos, buscan equipo, error); ficha con liga, nivel, asignado, color, fechas
  *   límite y casillas de seguimiento, fotos del equipo y los WhatsApp que ya prepara el Excel.
  * T0143 · Jugadoras: por equipo, con sus alertas; se corrigen los datos del formulario, se marcan ERROR, G.CONTACTS y XPORTY
@@ -200,6 +201,18 @@
       '.gs-eqr b{display:flex;align-items:center;min-width:0}.gs-eqr b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
       '.gs-eqr small{grid-column:2/4;color:var(--gs-g);font-size:12.5px}' +
       '.gs-eqr .gs-pag{font-size:12.5px;font-weight:700;white-space:nowrap}' +
+      '.gs-liga summary{list-style:none;cursor:pointer;position:relative;padding-right:28px}.gs-liga summary::-webkit-details-marker{display:none}' +
+      '.gs-liga summary:after{content:"\\25BE";position:absolute;right:0;top:0;font-size:20px;color:var(--gs-g);transition:transform .2s}.gs-liga[open] summary:after{transform:rotate(180deg)}' +
+      '.gs-liga[open] summary{margin-bottom:6px}' +
+      '.gs-liga-n{font-family:var(--gs-fh);font-size:20px;font-weight:600;color:var(--gs-c);line-height:1.15}.gs-liga-n small{display:block;font-family:inherit;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--gs-g);font-weight:700;margin-bottom:2px}' +
+      '.gs-liga-g{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:13.5px}' +
+      '.gs-wa{font-size:12.5px;padding:4px 11px;border-radius:999px;background:#e6f6ec;color:#11713a;text-decoration:none;font-weight:700;border:1px solid #bfe6cd}' +
+      '.gs-liga-s{font-size:12.5px;color:var(--gs-g);margin-top:4px}' +
+      '.gs-alts{padding-top:10px;padding-bottom:6px}.gs-alts-t{font-weight:700;font-size:15px;margin-bottom:4px}' +
+      '.gs-alt{border-top:1px dashed var(--gs-l);padding:9px 0}.gs-alt summary{display:flex;justify-content:space-between;gap:10px;cursor:pointer;list-style:none;font-size:14.5px}' +
+      '.gs-alt summary::-webkit-details-marker{display:none}.gs-alt summary em{font-style:normal;font-weight:700}.gs-alt[data-gs-vacio] summary{cursor:default;color:var(--gs-g)}' +
+      '.gs-alt-i{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;width:100%;background:none;border:0;border-top:1px solid var(--gs-f);padding:8px 0;text-align:left;color:inherit;cursor:pointer;font-size:14px}' +
+      '.gs-alt-i b{display:flex;align-items:center;min-width:0}.gs-alt-i b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gs-alt-i small{grid-column:1/-1;color:var(--gs-g);font-size:12.5px}.gs-alt-i .gs-pag{font-size:12.5px;font-weight:700;white-space:nowrap}' +
       '.gs-dia-h{font-family:var(--gs-fh);font-weight:500;font-size:20px;color:var(--gs-c);margin:22px 2px 0}' +
       '.gs-fotos{display:flex;gap:8px;flex-wrap:wrap}.gs-fotos button{font-size:14px}' +
       '.gs-visor img{display:block;max-width:100%;max-height:70vh;margin:0 auto;border-radius:10px;background:var(--gs-f)}';
@@ -439,12 +452,24 @@
   function esCorreo(q) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(q || '').trim()); }
 
   /* ---------- RESUMEN (como la hoja RESUMEN, de la temporada elegida) ---------- */
+  function edad1(x, entero) {
+    var n = parseFloat(String(x == null ? '' : x).replace(',', '.'));
+    if (!isFinite(n) || n <= 0) return '';
+    if (entero && n === Math.round(n)) return String(n);
+    return (Math.round(n * 10) / 10).toFixed(1).replace('.', ',');
+  }
+  function telDe(n) { return ((S.opciones || {}).tels || {})[n] || ''; }
+  function estadoPago(e) {
+    return !e.ps ? '<span class="gs-pag gs-neg">Sin P.S.</span>' : e.pendiente > 0.005 ? '<span class="gs-pag gs-neg">Faltan ' + eur(e.pendiente) + '</span>' :
+      e.pago ? '<span class="gs-pag gs-pos">Pagado</span>' : '<span class="gs-pag" style="color:#a35d00">Falta inscripción</span>';
+  }
+
   function pResumen(main, forzar) {
     return cuando(main, 'eq', forzar, 'Cargando la temporada…', function (o, r) {
       var vale = function (e) { return !e.error && !e.buscan && enFiltro(e); };
       var eqs = r.lista.filter(vale);
       var nJug = eqs.reduce(function (a, e) { return a + (e.jugadoras || 0); }, 0);
-      var porPagar = eqs.filter(function (e) { return e.pendiente > 0.005 || !e.ps; });
+      var porPagar = eqs.filter(FILTROS_EQ.pagar), avisos = eqs.filter(FILTROS_EQ.avisos), sinLiga = eqs.filter(FILTROS_EQ.sinliga);
       // Días con ligas (por el día de juego de DB_LIGAS), en orden de la semana; al final, los equipos sin liga.
       var grupos = {};
       eqs.forEach(function (e) { var k = e.liga || 'SIN'; (grupos[k] = grupos[k] || []).push(e); });
@@ -452,27 +477,40 @@
       Object.keys(grupos).forEach(function (k) { var d = k === 'SIN' ? 'SIN LIGA' : (diaDeLiga(k) || 'OTRO'); (dias[d] = dias[d] || []).push(k); });
       var ordenDias = DIAS.filter(function (d) { return dias[d]; }).concat(Object.keys(dias).filter(function (d) { return DIAS.indexOf(d) < 0; }));
       if (S.dia && !dias[S.dia]) S.dia = '';
+      S.abiertas = S.abiertas || {};
+      var nAl = porPagar.length + avisos.length + sinLiga.length;
       var h = htmlFiltros(o) +
-        '<div class="gs-mini" style="margin-top:12px"><div><b>' + eqs.length + '</b><small>Equipos</small></div><div><b>' + nJug + '</b><small>Jugadoras</small></div>' +
-        '<button type="button" class="' + (porPagar.length ? 'gs-alerta' : '') + '" id="gs-rpag"><b>' + porPagar.length + '</b><small>Por pagar</small></button></div>' +
+        '<div class="gs-mini" style="margin-top:12px;grid-template-columns:repeat(4,1fr)">' +
+        '<button type="button" data-gs-kpi="equipos"><b>' + eqs.length + '</b><small>Equipos</small></button>' +
+        '<button type="button" data-gs-kpi="jugadoras"><b>' + nJug + '</b><small>Jugadoras</small></button>' +
+        '<button type="button" data-gs-kpi="pagar" class="' + (porPagar.length ? 'gs-alerta' : '') + '"><b>' + porPagar.length + '</b><small>Por pagar</small></button>' +
+        '<button type="button" data-gs-kpi="alertas" class="' + (nAl ? 'gs-alerta' : '') + '"><b id="gs-nal">' + nAl + '</b><small>Alertas</small></button></div>' +
+        // Alertas: pagos, avisos del Excel, equipos sin liga y jugadoras con alerta (estas, en cuanto se cargan).
+        '<div class="gs-card gs-alts" id="gs-alts"><div class="gs-alts-t">⚠️ Alertas</div>' +
+        htmlAlerta('pagar', 'Pagos pendientes', porPagar, function (e) { return estadoPago(e); }, r) +
+        htmlAlerta('avisos', 'Problemas en la inscripción', avisos, function (e) { return '<span class="gs-pag" style="color:#a35d00">' + esc(e.ocupado ? 'Nombre repetido ×' + e.ocupado : e.revisar) + '</span>'; }, r) +
+        htmlAlerta('sinliga', 'Equipos sin liga', sinLiga, function () { return ''; }, r) +
+        '<div id="gs-aljug"><details class="gs-alt"><summary><span>Jugadoras con alerta</span><em>…</em></summary><p class="gs-nota">Cargando las jugadoras…</p></details></div></div>' +
         '<div class="gs-dias">' + [''].concat(ordenDias).map(function (d) {
           return '<button type="button" class="gs-chip" data-gs-dia="' + esc(d) + '" aria-pressed="' + (d === (S.dia || '')) + '">' + esc(d ? nomDia(d) : 'Todos los días') + '</button>';
-        }).join('') + '</div>';
+        }).join('') + '<button type="button" class="gs-chip" id="gs-todas">' + (Object.keys(S.abiertas).some(function (k) { return S.abiertas[k]; }) ? 'Cerrar todas' : 'Abrir todas') + '</button></div>';
       ordenDias.filter(function (d) { return !S.dia || d === S.dia; }).forEach(function (d) {
         h += '<div class="gs-dia-h">' + esc(nomDia(d)) + '</div>';
         dias[d].sort().forEach(function (k) {
           var lista = grupos[k].slice().sort(function (a, b) { return (b.nivel || 0) - (a.nivel || 0) || a.equipo.localeCompare(b.equipo); });
           var jug = lista.reduce(function (a, e) { return a + (e.jugadoras || 0); }, 0);
-          var gestor = k === 'SIN' ? '' : gestorDeLiga(k);
-          h += '<div class="gs-card"><div class="gs-liga-t"><b>' + esc(k === 'SIN' ? 'Sin liga' : compCorta(k.split('|').slice(0, 2).join('|')) + ' · ' + ligaCorta(k)) + '</b>' +
-            '<span>' + lista.length + ' equipos · ' + jug + ' jugadoras' + (gestor ? ' · ' + esc(gestor) : '') + '</span></div>' +
+          var pend = lista.filter(FILTROS_EQ.pagar).length;
+          var gestor = k === 'SIN' ? '' : gestorDeLiga(k), tel = telDe(gestor);
+          h += '<details class="gs-card gs-liga" data-gs-liga="' + esc(k) + '"' + (S.abiertas[k] ? ' open' : '') + '><summary>' +
+            '<div class="gs-liga-n">' + (k === 'SIN' ? 'Sin liga' : '<small>' + esc(compCorta(k.split('|').slice(0, 2).join('|'))) + '</small>' + esc(ligaCorta(k))) + '</div>' +
+            (gestor ? '<div class="gs-liga-g"><span>Gestor: <b>' + esc(gestor) + '</b></span>' + (tel ? aWa(wa(tel), '💬 WhatsApp').replace('class="gs-b2"', 'class="gs-wa"') : '') + '</div>' : '') +
+            '<div class="gs-liga-s">' + lista.length + (lista.length === 1 ? ' equipo · ' : ' equipos · ') + jug + ' jugadoras' + (pend ? ' · <b class="gs-neg">' + pend + ' por pagar</b>' : ' · todo pagado') + '</div>' +
+            '</summary>' +
             lista.map(function (e) {
-              var pag = !e.ps ? '<span class="gs-pag gs-neg">Sin P.S.</span>' : e.pendiente > 0.005 ? '<span class="gs-pag gs-neg">Faltan ' + eur(e.pendiente) + '</span>' :
-                e.pago ? '<span class="gs-pag gs-pos">Pagado</span>' : '<span class="gs-pag" style="color:#a35d00">Falta inscripción</span>';
               return '<button type="button" class="gs-eqr" data-gs-i="' + r.lista.indexOf(e) + '"><span class="gs-n">' + (e.nivel || '–') + '</span>' +
-                '<b>' + punto(e.color) + '<span>' + esc(e.equipo) + '</span></b>' + pag +
-                '<small>' + esc([e.capi, e.jugadoras ? e.jugadoras + ' jugadoras' : 'sin jugadoras', e.edad ? e.edad + ' años' : ''].filter(String).join(' · ')) + '</small></button>';
-            }).join('') + '</div>';
+                '<b>' + punto(e.color) + '<span>' + esc(e.equipo) + '</span></b>' + estadoPago(e) +
+                '<small>' + esc([e.capi, e.jugadoras ? e.jugadoras + ' jugadoras' : 'sin jugadoras', edad1(e.edad) ? edad1(e.edad) + ' años' : ''].filter(String).join(' · ')) + '</small></button>';
+            }).join('') + '</details>';
         });
       });
       if (!ordenDias.length) h += '<div class="gs-vacio">No hay equipos con estos filtros.</div>';
@@ -480,7 +518,61 @@
       engancharFiltros(main, function () { pResumen(main); });
       [].forEach.call(main.querySelectorAll('[data-gs-dia]'), function (b) { b.onclick = function () { S.dia = b.getAttribute('data-gs-dia'); pResumen(main); }; });
       [].forEach.call(main.querySelectorAll('[data-gs-i]'), function (b) { b.onclick = function () { fichaEquipo(r.lista[Number(b.getAttribute('data-gs-i'))], o, r); }; });
-      $('#gs-rpag').onclick = function () { S.eq.filtro = 'pagar'; irTab('equipos'); };
+      [].forEach.call(main.querySelectorAll('details.gs-liga'), function (x) {
+        x.addEventListener('toggle', function () { S.abiertas[x.getAttribute('data-gs-liga')] = x.open; });
+      });
+      $('#gs-todas').onclick = function () {
+        var ls = main.querySelectorAll('details.gs-liga'), abrir = !Object.keys(S.abiertas).some(function (k) { return S.abiertas[k]; });
+        [].forEach.call(ls, function (x) { S.abiertas[x.getAttribute('data-gs-liga')] = abrir; });
+        pResumen(main);
+      };
+      // KPIs: llevan a la pestaña donde se ven esos datos, con los mismos filtros.
+      [].forEach.call(main.querySelectorAll('[data-gs-kpi]'), function (b) {
+        b.onclick = function () {
+          var k = b.getAttribute('data-gs-kpi');
+          if (k === 'alertas') { var a = $('#gs-alts'); a.scrollIntoView({ behavior: 'smooth', block: 'start' }); [].forEach.call(a.querySelectorAll('details'), function (x) { if (x.querySelector('.gs-alt-i')) x.open = true; }); return; }
+          if (k === 'jugadoras') { S.jug.filtro = 'todas'; S.jug.q = ''; S.jug.equipo = ''; irTab('jugadoras'); return; }
+          S.eq.filtro = k === 'pagar' ? 'pagar' : 'todos'; S.eq.q = ''; irTab('equipos');
+        };
+      });
+      engancharAlertas(main, function (e) { fichaEquipo(e, o, r); });
+      // Jugadoras con alerta: se cargan aparte (o salen de lo ya cargado) y se añaden a Alertas.
+      dato('jug_' + S.temp, 'gestionJugadoras', [S.temp, false]).then(function (rj) {
+        var cont = main.querySelector('#gs-aljug'); if (!cont || !document.body.contains(cont)) return;
+        var js = rj.lista.filter(function (j) { return enFiltro(j) && FILTROS_JUG.alerta(j); });
+        cont.innerHTML = htmlAlerta('alerta', 'Jugadoras con alerta', js, function (j) { return '<span class="gs-pag" style="color:#a35d00">' + esc(String(j.alerta).split('·')[0].trim().slice(0, 40)) + '</span>'; }, rj, true);
+        var n = main.querySelector('#gs-nal'); if (n) { n.textContent = nAl + js.length; if (nAl + js.length) n.parentNode.classList.add('gs-alerta'); }
+        engancharAlertas(cont, function (j) { fichaJugadora(j, o, rj); });
+      }, function () { var cont = main.querySelector('#gs-aljug'); if (cont) cont.innerHTML = ''; });
+    });
+  }
+
+  /** Un grupo de Alertas: se despliega con la lista; cada una abre su ficha; al final, ir a la pestaña ya filtrada. */
+  function htmlAlerta(filtro, titulo, lista, detalle, r, deJugadoras) {
+    if (!lista.length) return '<details class="gs-alt" data-gs-vacio><summary><span>' + esc(titulo) + '</span><em class="gs-pos">0</em></summary></details>';
+    return '<details class="gs-alt"><summary><span>' + esc(titulo) + '</span><em class="gs-neg">' + lista.length + '</em></summary>' +
+      lista.slice(0, 40).map(function (x) {
+        return '<button type="button" class="gs-alt-i" data-gs-al="' + r.lista.indexOf(x) + '"><b>' + (deJugadoras ? '' : punto(x.color)) + '<span>' +
+          esc(deJugadoras ? (x.nombreCompleto || x.mail) : x.equipo) + '</span></b>' + detalle(x) +
+          '<small>' + esc(deJugadoras ? [x.equipo, ligaCorta(x.liga)].filter(String).join(' · ') : [x.capi, x.liga ? ligaCorta(x.liga) : compCorta(x.comp)].filter(String).join(' · ')) + '</small></button>';
+      }).join('') + (lista.length > 40 ? '<div class="gs-mas">Y ' + (lista.length - 40) + ' más.</div>' : '') +
+      '<p style="margin:8px 0 2px"><button type="button" class="gs-chip" data-gs-ir="' + filtro + '">Ver en ' + (deJugadoras ? 'Jugadoras' : 'Equipos') + ' ›</button></p></details>';
+  }
+  function engancharAlertas(cont, abrirFicha) {
+    [].forEach.call(cont.querySelectorAll('[data-gs-ir]'), function (b) {
+      if (b.closest('#gs-aljug') && cont.id !== 'gs-aljug') return;
+      b.onclick = function () {
+        var f = b.getAttribute('data-gs-ir');
+        if (f === 'alerta') { S.jug.filtro = 'alerta'; S.jug.q = ''; S.jug.equipo = ''; irTab('jugadoras'); }
+        else { S.eq.filtro = f; S.eq.q = ''; irTab('equipos'); }
+      };
+    });
+    [].forEach.call(cont.querySelectorAll('[data-gs-al]'), function (b) {
+      if (b.closest('#gs-aljug') && cont.id !== 'gs-aljug') return;
+      b.onclick = function () {
+        var det = b.closest('details'), datos = det && det.parentNode.id === 'gs-aljug' ? S.datos['jug_' + S.temp] : S.datos['eq_' + S.temp];
+        abrirFicha(datos.lista[Number(b.getAttribute('data-gs-al'))]);
+      };
     });
   }
 
@@ -586,7 +678,7 @@
       fila('Alta', esc(e.alta)) + fila('Correo', esc(e.mail)) + fila('Capitana', esc(e.capi)) + fila('Teléfono', esc(e.tel)) +
       fila('Nombre en el formulario', esc(e.teamForm)) + fila('Antes se llamaba', esc(e.teamAnterior)) +
       fila('Disponibilidad', esc(e.dispo)) + fila('Horas favoritas', esc(e.horas)) + fila('Nacidas en', esc(e.nacimiento)) +
-      fila('Jugadoras inscritas', e.jugadoras ? esc(e.jugadoras) : '') + fila('Edad media', esc(e.edad)) + fila('Temporadas de media', esc(e.exp)) + '</div>' +
+      fila('Jugadoras inscritas', e.jugadoras ? esc(e.jugadoras) : '') + fila('Edad media', esc(edad1(e.edad))) + fila('Temporadas de media', esc(edad1(e.exp) || e.exp)) + '</div>' +
       (e.comenta ? '<div class="gs-dtx"><b>Comentario</b><p>' + esc(e.comenta) + '</p></div>' : '') +
       '<div class="gs-error" id="gs-err" hidden></div>' +
       '<div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-gs-cerrar>Cerrar</button><button type="button" class="gs-b1" id="gs-ok" disabled>Sin cambios</button></div>');
@@ -621,7 +713,7 @@
     if (!j.error && j.incluida === '🚫') t.push(tag('Cami personalizada', 'gs-tag-g'));
     return '<button type="button" class="gs-item" data-gs-j="' + i + '"><div style="min-width:0">' +
       '<div class="gs-t">' + esc(j.nombreCompleto || j.mail) + '</div>' +
-      '<div class="gs-s">' + esc([conEquipo ? compCorta(j.comp) + ' · ' + j.equipo : '', j.cami ? '👕 ' + j.cami : (j.dorsal ? '👕 ' + j.dorsal : ''), j.edad ? j.edad + ' años' : ''].filter(String).join(' · ')) +
+      '<div class="gs-s">' + esc([conEquipo ? compCorta(j.comp) + ' · ' + j.equipo : '', j.cami ? '👕 ' + j.cami : (j.dorsal ? '👕 ' + j.dorsal : ''), edad1(j.edad, true) ? edad1(j.edad, true) + ' años' : ''].filter(String).join(' · ')) +
       (j.color ? ' ' + punto(j.color) : '') + '</div>' +
       (t.length ? '<div class="gs-tags">' + t.join('') + '</div>' : '') + '</div></button>';
   }
@@ -702,7 +794,7 @@
       fila('Color', j.color ? punto(j.color) + esc(j.color) : '') + fila('Pedido', esc(j.pedido)) + fila('Preparada', j.preparada ? 'Sí' : 'No') + fila('Entregada', j.entregada ? 'Sí' : 'No') +
       fila('Incidencia', esc(j.incidencia)) + '</div>' +
       '<div class="gs-sec">Más datos</div><div class="gs-dl">' +
-      fila('Alta', esc(j.alta)) + fila('Correo', esc(j.mail)) + fila('Liga', esc(ligaCorta(j.liga))) + fila('Edad', esc(j.edad)) +
+      fila('Alta', esc(j.alta)) + fila('Correo', esc(j.mail)) + fila('Liga', esc(ligaCorta(j.liga))) + fila('Edad', esc(edad1(j.edad, true))) +
       fila('Temporadas con nosotras', esc(j.veterania)) + fila('Normas, imagen, datos y responsabilidad', esc(j.normas)) + '</div>' +
       '<div class="gs-error" id="gs-err" hidden></div>' +
       '<div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-gs-cerrar>Cerrar</button><button type="button" class="gs-b1" id="gs-ok" disabled>Sin cambios</button></div>');
