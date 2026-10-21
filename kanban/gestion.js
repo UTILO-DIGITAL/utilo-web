@@ -264,20 +264,44 @@
     });
     return o;
   }
-  /** Activa «Guardar» solo cuando hay cambios; al guardar llama a fn(cambios). */
-  function guardable(v, campos, fn) {
+  /** Activa «Guardar» solo cuando hay cambios; al guardar llama a fn(cambios) y, si va bien, aplicar(cambios) en lo cargado.
+   * No se vuelve a pedir la lista: GESTION tarda en recalcular tras un cambio y la app esperaría para nada. */
+  function guardable(v, campos, fn, aplicar) {
     var ok = v.el.querySelector('#gs-ok'), err = v.el.querySelector('#gs-err');
     var mira = function () { var n = Object.keys(cambios(v.el, campos)).length; ok.disabled = !n; ok.textContent = n ? 'Guardar ' + n + (n === 1 ? ' cambio' : ' cambios') : 'Sin cambios'; };
     v.el.addEventListener('input', mira); v.el.addEventListener('change', mira); mira();
     ok.onclick = function () {
       var c = cambios(v.el, campos); if (!Object.keys(c).length) return;
       ok.disabled = true; ok.textContent = 'Guardando…'; err.hidden = true;
+      // Si otro cambio acaba de hacerse, GESTION aún está recalculando y guardar puede tardar hasta un minuto.
+      var lento = setTimeout(function () { ok.textContent = 'Guardando… (el Excel está recalculando, puede tardar un minuto)'; }, 8000);
       fn(c).then(function (r) {
-        v.cerrar(); olvidar();
+        clearTimeout(lento); v.cerrar();
+        if (r.cambios && aplicar) aplicar(c);
         aviso(r.cambios ? 'Guardado en GESTION (' + r.cambios + (r.cambios === 1 ? ' cambio).' : ' cambios).') : 'No había nada que cambiar.');
-        pintar(true);
-      }, function (e) { err.textContent = e.message; err.hidden = false; mira(); });
+        pintar();
+      }, function (e) { clearTimeout(lento); err.textContent = e.message; err.hidden = false; mira(); });
     };
+  }
+
+  /** Columna del Excel → campo del registro en la app (igual que GES_EQ_PROP y GES_JUG_PROP de GESTION_WEB.gs). */
+  var PROP_EQ = { 'NIVEL': 'nivel', 'LIGA': 'liga', 'ASIG': 'asig', 'COLOR': 'color', 'DESCUENTO': 'descuento', 'TEAM NEW NAME': 'teamNuevo',
+    'F.L (P.S)': 'flP', 'F.L (Insc)': 'flI', 'ERROR': 'error', 'F.J': 'fj', 'M.I ENVIADO': 'mi', 'Gr C/TS': 'gr', 'CASH': 'cash', 'E.E ENVIADO': 'ee', 'XPORTY': 'xporty' };
+  var PROP_JUG = { 'NOMBRE': 'nombre', '1er APELLIDO': 'ap1', '2ndo APELLIDO': 'ap2', 'FECHA NACIMIENTO': 'fnac', 'NUMERO TELEFONO': 'tel', 'DNI': 'dni',
+    'Usuario Instagram': 'insta', 'DORSAL - CAMISETA': 'dorsal', 'ERROR': 'error', 'G.CONTACTS': 'gcontacts', 'XPORTY': 'xporty', 'EQUIPO': 'equipo' };
+  function fechaTxt(f) { var m = String(f || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? Number(m[3]) + '/' + m[2] + '/' + m[1] : ''; }
+  /** Pone en el registro ya cargado lo que se acaba de guardar (lo que calculan las fórmulas se ve al pulsar ↻). */
+  function aplicarCambios(o, c, props) {
+    Object.keys(c).forEach(function (k) {
+      var p = props[k]; if (!p) return;
+      var v = c[k];
+      if (p === 'nivel' || p === 'descuento') v = v === '' ? null : Number(String(v).replace(',', '.'));
+      if (p === 'equipo') v = String(v).toUpperCase();
+      o[p] = v;
+      if (p === 'flP') o.flPTxt = fechaTxt(v);
+      if (p === 'flI') o.flITxt = fechaTxt(v);
+      if (p === 'fnac') o.fnacTxt = fechaTxt(v);
+    });
   }
 
   /* ---------- armazón ---------- */
@@ -320,7 +344,7 @@
     var tab = S.tab;
     if (forzar || !S.opciones || !S.datos[clave()]) main.innerHTML = cargando(msg);
     return opciones(forzar && !S.opciones).then(function (o) {
-      return dato(clave(), fn, [S.comp], forzar).then(function (r) {
+      return dato(clave(), fn, [S.comp, !!forzar], forzar).then(function (r) { // forzar: el servidor relee GESTION (↻)
         if (S.tab !== tab || !document.body.contains(main)) return;
         hora(r.hora); pinta(o, r);
       });
@@ -450,7 +474,7 @@
     if (vj) vj.onclick = function () { v.cerrar(); S.jug.equipo = e.equipo; S.jug.filtro = 'todas'; S.jug.q = ''; irTab('jugadoras'); };
     guardable(v, todos, function (c) {
       return llamar('gestionEquipoEditar', [{ fila: e.fila, ts: e.ts, mail: e.mail, comp: e.comp, equipo: e.equipo }, c]);
-    });
+    }, function (c) { aplicarCambios(e, c, PROP_EQ); });
   }
 
   /* ---------- JUGADORAS (T0143) ---------- */
@@ -547,6 +571,9 @@
       '<div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-gs-cerrar>Cerrar</button><button type="button" class="gs-b1" id="gs-ok" disabled>Sin cambios</button></div>');
     guardable(v, campos.concat(checks), function (c) {
       return llamar('gestionJugadoraEditar', [{ fila: j.fila, ts: j.ts, mail: j.mail, comp: j.comp, nombre: j.nombreCompleto }, c]);
+    }, function (c) {
+      aplicarCambios(j, c, PROP_JUG);
+      if (c['NOMBRE'] != null || c['1er APELLIDO'] != null) j.nombreCompleto = (j.nombre + ' ' + j.ap1).trim();
     });
   }
 
