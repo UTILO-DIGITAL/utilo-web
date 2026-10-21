@@ -4,11 +4,13 @@
  * Contrato con app.js (igual que Economía):
  *   window.SX_CTX = { api, persona, pin, clave, color, accion }
  *   window.SX_MOD.GESTION.abrir(elemento)  → pinta la sección dentro del elemento.
- * T0142 · Equipos: inscripciones de equipos de una competición, con filtros (sin liga, por pagar, avisos, buscan equipo,
- *   error); en cada equipo se cambian liga, nivel, asignado, color, fechas límite y casillas de seguimiento, y se abren
- *   los WhatsApp que ya prepara el Excel (mensaje inicial, estado del equipo).
- * T0143 · Jugadoras: inscripciones de jugadoras por competición y equipo, con sus alertas; se corrigen los datos del
- *   formulario, se marcan ERROR, G.CONTACTS y XPORTY y se cambia de equipo.
+ * Se carga una TEMPORADA entera (todas sus competiciones) y se filtra por competición y liga.
+ * Resumen: como la hoja RESUMEN, por día y liga: equipos por nivel, color, capitana, jugadoras y cómo van los pagos.
+ * T0142 · Equipos: filtros (sin liga, por pagar, avisos, buscan equipo, error); ficha con liga, nivel, asignado, color, fechas
+ *   límite y casillas de seguimiento, fotos del equipo y los WhatsApp que ya prepara el Excel.
+ * T0143 · Jugadoras: por equipo, con sus alertas; se corrigen los datos del formulario, se marcan ERROR, G.CONTACTS y XPORTY
+ *   y se cambia de equipo. Buscar mira en toda la temporada (también ERROR); con un correo, «todo lo de este correo».
+ * WhatsApp: en el móvil se abre la app (whatsapp://); en el ordenador, WhatsApp Web.
  * Mismo estilo que Economía (se copia de economia.js con el prefijo gs-). Cada cambio queda en GESTION › LOG_APP.
  */
 (function () {
@@ -16,7 +18,8 @@
   var M = window.SX_MOD = window.SX_MOD || {};
   if (M.GESTION) return;
 
-  var S = { tab: 'equipos', comp: '', datos: {}, opciones: null, el: null,
+  // temp: temporada cargada (todas sus competiciones); fComp y fLiga: filtros de la app; dia: día elegido en Resumen.
+  var S = { tab: 'resumen', temp: '', fComp: '', fLiga: '', dia: '', datos: {}, opciones: null, el: null,
     eq: { filtro: 'todos', q: '' }, jug: { filtro: 'todas', q: '', equipo: '' } };
 
   function ctx() { return window.SX_CTX || {}; }
@@ -180,13 +183,26 @@
       '.gs-btns{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 6px}.gs-btns a,.gs-btns button{font-size:14px;padding:9px 13px;border-width:1.5px}' +
       '.gs-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}' +
       '.gs-tag-r{background:#fdecec;color:var(--gs-r)}.gs-tag-v{background:#e6f4ec;color:var(--gs-v)}.gs-tag-a{background:#fff4e0;color:#a35d00}' +
-      '.gs-alerta{border-left:4px solid #d98a00;background:#fff8ec;border-radius:10px;padding:10px 12px;margin:4px 0 8px;font-size:14px}' +
-      '.gs-alerta p{margin:0 0 6px}.gs-alerta p:last-child{margin:0}' +
+      '.gs-al{border-left:4px solid #d98a00;background:#fff8ec;border-radius:10px;padding:10px 12px;margin:4px 0 8px;font-size:14px}' +
+      '.gs-al p{margin:0 0 6px}.gs-al p:last-child{margin:0}' +
       '.gs-nota{font-size:12.5px;color:var(--gs-g);font-weight:400;margin-top:3px}' +
       '.gs-mas{text-align:center;color:var(--gs-g);font-size:13px;padding:12px 0 2px}' +
-      '.gs-color{display:inline-block;width:12px;height:12px;border-radius:50%;border:1px solid #cfd8d4;vertical-align:-1px;margin-right:4px}' +
+      '.gs-color{display:inline-block;width:13px;height:13px;border-radius:50%;border:1px solid rgba(0,0,0,.25);vertical-align:-2px;margin-right:6px;flex:none}' +
       '.gs-pie{position:sticky;bottom:-18px;background:#fff;padding:12px 0 4px;margin-top:6px;border-top:1px solid var(--gs-l)}' +
-      '.gs-checks .gs-check{margin-top:9px}';
+      '.gs-checks .gs-check{margin-top:9px}' +
+      '.gs-filtros{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.gs-filtros select{width:100%}' +
+      '@media(max-width:520px){.gs-filtros{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.gs-filtros select:first-child{grid-column:1/-1}}' +
+      '.gs-aviso-b{font-size:12.5px;color:var(--gs-g);margin:8px 2px 0}' +
+      '.gs-dias{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}' +
+      '.gs-liga-t{display:flex;justify-content:space-between;gap:10px;align-items:baseline}.gs-liga-t b{font-size:15.5px}.gs-liga-t span{font-size:12.5px;color:var(--gs-g)}' +
+      '.gs-eqr{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 8px;align-items:center;width:100%;background:none;border:0;border-top:1px dashed var(--gs-l);padding:9px 0;text-align:left;color:inherit;cursor:pointer;font-size:14px}' +
+      '.gs-eqr .gs-n{font-weight:700;font-size:12px;background:var(--gs-f);border-radius:6px;padding:2px 6px;text-align:center;min-width:24px}' +
+      '.gs-eqr b{display:flex;align-items:center;min-width:0}.gs-eqr b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+      '.gs-eqr small{grid-column:2/4;color:var(--gs-g);font-size:12.5px}' +
+      '.gs-eqr .gs-pag{font-size:12.5px;font-weight:700;white-space:nowrap}' +
+      '.gs-dia-h{font-family:var(--gs-fh);font-weight:500;font-size:20px;color:var(--gs-c);margin:22px 2px 0}' +
+      '.gs-fotos{display:flex;gap:8px;flex-wrap:wrap}.gs-fotos button{font-size:14px}' +
+      '.gs-visor img{display:block;max-width:100%;max-height:70vh;margin:0 auto;border-radius:10px;background:var(--gs-f)}';
   }
 
   /* ---------- utilidades ---------- */
@@ -198,7 +214,19 @@
   function compCorta(c) { return String(c || '').replace(/^\d\d-\d\d \|\s*/, '').trim(); }
   function tag(t, c) { return '<span class="gs-tag ' + (c || '') + '">' + esc(t) + '</span>'; }
   function fila(et, v) { return v ? '<div class="gs-df"><span>' + esc(et) + '</span><span>' + v + '</span></div>' : ''; }
-  function wa(tel) { var d = String(tel || '').replace(/\D/g, ''); if (!d) return ''; if (d.length === 9) d = '34' + d; return 'https://wa.me/' + d; }
+  function esMovil() { return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (window.matchMedia && matchMedia('(pointer:coarse)').matches); }
+  /** WhatsApp: en el ordenador, WhatsApp Web; en el móvil, la app (whatsapp://), que es lo que funciona desde la app web. */
+  function waUrl(u) {
+    u = String(u || ''); if (!u) return '';
+    var m = u.match(/^https:\/\/(?:web|api)\.whatsapp\.com\/send\/?\?(.*)$/) || u.match(/^https:\/\/wa\.me\/(\d+)\??(.*)$/);
+    if (!m) return u;
+    var q = m.length === 3 ? 'phone=' + m[1] + (m[2] ? '&' + m[2] : '') : m[1];
+    return esMovil() ? 'whatsapp://send?' + q : 'https://web.whatsapp.com/send?' + q;
+  }
+  function wa(tel) { var d = String(tel || '').replace(/\D/g, ''); if (!d) return ''; if (d.length === 9) d = '34' + d; return waUrl('https://web.whatsapp.com/send?phone=' + d); }
+  function aWa(url, txt) { url = waUrl(url); return url ? '<a class="gs-b2" href="' + esc(url) + '"' + (/^whatsapp:/.test(url) ? '' : ' target="_blank" rel="noopener"') + '>' + txt + '</a>' : ''; }
+  function colorHex(n) { var c = (S.opciones && S.opciones.colores || []).filter(function (x) { return x.n === n; })[0]; return c && /^#/.test(c.hex) ? c.hex : ''; }
+  function punto(n) { var h = colorHex(n); return h ? '<i class="gs-color" style="background:' + esc(h) + '" title="' + esc(n) + '"></i>' : ''; }
   function aviso(t) {
     var a = document.createElement('div'); a.className = 'gs-aviso'; a.setAttribute('role', 'status'); a.textContent = t;
     (S.el.querySelector('.gs') || document.body).appendChild(a);
@@ -212,13 +240,18 @@
     if (S.opciones && !forzar) return Promise.resolve(S.opciones);
     return llamar('gestionOpciones').then(function (o) {
       S.opciones = o;
-      if (!S.comp) { var c = o.competiciones.filter(function (x) { return x.temp === o.temporada; })[0]; S.comp = c ? c.hash : ''; }
+      if (!S.temp) S.temp = o.temporada;
       return o;
     });
   }
   function olvidar() { var o = S.opciones; S.datos = {}; S.opciones = o; }
   function hora(h) { var x = $('#gs-hora'); if (x && h) x.textContent = 'Datos de las ' + String(h).slice(-5); }
-  function urlFila(gid, f) { return S.opciones && S.opciones.url ? S.opciones.url + '#gid=' + gid + '&range=A' + f : ''; }
+  function urlFila(gid, f) { return S.opciones && S.opciones.url && gid ? S.opciones.url + '#gid=' + gid + '&range=A' + f : ''; }
+  function norm2(s) { return norm(s).replace(/\s+/g, ' ').trim(); }
+  var DIAS = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO'];
+  function nomDia(d) { return ({ MIERCOLES: 'Miércoles', SABADO: 'Sábado', 'SIN LIGA': 'Sin liga' })[d] || (d.charAt(0) + d.slice(1).toLowerCase()); }
+  function diaDeLiga(hash) { var l = ((S.opciones || {}).ligas || []).filter(function (x) { return x.hash === hash; })[0]; return l ? norm(l.dia) : ''; }
+  function gestorDeLiga(hash) { var l = ((S.opciones || {}).ligas || []).filter(function (x) { return x.hash === hash; })[0]; return l ? l.gestor : ''; }
 
   /* ---------- ventanas (como las de Economía) ---------- */
   function ventana(titulo, html) {
@@ -228,10 +261,30 @@
     raiz.appendChild(m);
     document.documentElement.classList.add('gs-sin-scroll');
     var cerrar = function () { m.remove(); document.removeEventListener('keydown', tecla); if (!raiz.querySelector('.gs-velo')) document.documentElement.classList.remove('gs-sin-scroll'); };
-    var tecla = function (e) { if (e.key === 'Escape') cerrar(); };
+    var tecla = function (e) { if (e.key === 'Escape' && raiz.lastElementChild === m) cerrar(); };
     document.addEventListener('keydown', tecla);
-    m.addEventListener('click', function (e) { if (e.target === m || e.target.closest('.gs-x') || e.target.closest('[data-gs-cerrar]')) cerrar(); });
+    m.addEventListener('click', function (e) { if (e.target === m || e.target.closest('.gs-x') === m.querySelector('.gs-x') || e.target.closest('[data-gs-cerrar]')) cerrar(); });
     return { el: m.querySelector('.gs-hoja'), cerrar: cerrar };
+  }
+
+  /** Ver un archivo de Drive (foto, factura, ticket) dentro de la app. */
+  function visor(url, titulo) {
+    var v = ventana(titulo || 'Archivo', '<div class="gs-visor">' + cargando('Abriendo el archivo…') + '</div>');
+    llamar('gestionArchivo', [url]).then(function (a) {
+      v.el.querySelector('.gs-visor').innerHTML = (a.img ? '<img alt="' + esc(a.nombre) + '" src="' + a.img + '">' : '<p>Este archivo no se puede ver aquí.</p>') +
+        '<div class="gs-acc"><a class="gs-b2" href="' + esc(a.url || url) + '" target="_blank" rel="noopener">Abrir en Drive ↗</a></div>';
+    }, function (e) { v.el.querySelector('.gs-visor').innerHTML = errorHtml(e) + '<div class="gs-acc"><a class="gs-b2" href="' + esc(url) + '" target="_blank" rel="noopener">Abrir en Drive ↗</a></div>'; });
+  }
+  function htmlFotos(lista) {
+    if (!lista || !lista.length) return '';
+    return '<div class="gs-sec">Fotos</div><div class="gs-fotos">' + lista.map(function (f, i) {
+      return '<button type="button" class="gs-b2" data-gs-foto="' + i + '">📷 ' + esc(f.t || 'Foto ' + (i + 1)) + '</button>';
+    }).join('') + '</div>';
+  }
+  function engancharFotos(hoja, lista, titulo) {
+    [].forEach.call(hoja.querySelectorAll('[data-gs-foto]'), function (b) {
+      b.onclick = function () { var f = lista[Number(b.getAttribute('data-gs-foto'))]; visor(f.url, titulo + ' · ' + (f.t || 'Foto')); };
+    });
   }
 
   /* ---------- formulario de campos editables (equipos y jugadoras) ----------
@@ -250,7 +303,7 @@
       var tipo = c.t === 'fecha' ? 'date' : 'text', extra = c.t === 'num' ? ' inputmode="decimal"' : '';
       inp = '<input type="' + tipo + '" id="' + id + '" data-gs-k="' + esc(c.k) + '" value="' + esc(v) + '"' + extra + ' autocomplete="off">';
     }
-    return '<label class="gs-campo" for="' + id + '">' + esc(c.et) + inp + (c.nota ? '<div class="gs-nota">' + esc(c.nota) + '</div>' : '') + '</label>';
+    return '<label class="gs-campo" for="' + id + '">' + (c.pre || '') + esc(c.et) + inp + (c.nota ? '<div class="gs-nota">' + esc(c.nota) + '</div>' : '') + '</label>';
   }
   function valorCampo(el) { return el.type === 'checkbox' ? el.checked : el.value.trim(); }
   /** Lo que ha cambiado respecto a los valores originales: { COLUMNA: valor }. */
@@ -305,7 +358,7 @@
   }
 
   /* ---------- armazón ---------- */
-  var TABS = [['equipos', 'Equipos'], ['jugadoras', 'Jugadoras']];
+  var TABS = [['resumen', 'Resumen'], ['equipos', 'Equipos'], ['jugadoras', 'Jugadoras']];
 
   function abrir(el) {
     S.el = el;
@@ -313,7 +366,7 @@
     el.innerHTML = '<div class="gs"><style>' + css() + cssExtra() + '</style>' +
       '<header class="gs-cab">' + (ver ? '<button type="button" class="gs-ver" id="gs-ver" title="Versión y novedades">' + esc(ver.textContent.trim()) + '</button>' : '') +
       (sol ? '<button type="button" class="gs-sol" id="gs-sol" title="Pide un cambio, cuéntanos un fallo o pregúntanos una duda" aria-label="Pedir algo a Utilo">💬</button>' : '') +
-      '<h1>GESTIÓN</h1><p><span id="gs-hora">Excel GESTION</span><button class="gs-re" id="gs-re" type="button" aria-label="Actualizar" title="Actualizar">↻</button></p>' +
+      '<h1>GESTIÓN</h1><p><span id="gs-hora">Excel GESTION</span><button class="gs-re" id="gs-re" type="button" aria-label="Actualizar" title="Volver a leer el Excel">↻</button></p>' +
       '<nav class="gs-tabs" role="tablist">' + TABS.map(function (t) {
         return '<button type="button" role="tab" data-gs-tab="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + t[1] + '</button>';
       }).join('') + '</nav></header>' +
@@ -335,16 +388,17 @@
   function pintar(forzar) {
     var main = $('#gs-main'); if (!main) return;
     var re = $('#gs-re'); if (re) re.disabled = true;
-    var p = S.tab === 'jugadoras' ? pJugadoras : pEquipos;
+    var p = S.tab === 'jugadoras' ? pJugadoras : S.tab === 'equipos' ? pEquipos : pResumen;
     Promise.resolve(p(main, !!forzar)).then(function () { if (re) re.disabled = false; }, function () { if (re) re.disabled = false; });
   }
 
-  /** Carga opciones + datos de la pestaña y pinta. */
-  function cuando(main, clave, fn, forzar, msg, pinta) {
+  /** Carga opciones + los datos de la temporada y pinta. forzar: el servidor relee GESTION (↻). */
+  function cuando(main, tipo, forzar, msg, pinta) {
     var tab = S.tab;
+    var clave = function () { return tipo + '_' + S.temp; }, fn = tipo === 'jug' ? 'gestionJugadoras' : 'gestionEquipos';
     if (forzar || !S.opciones || !S.datos[clave()]) main.innerHTML = cargando(msg);
     return opciones(forzar && !S.opciones).then(function (o) {
-      return dato(clave(), fn, [S.comp, !!forzar], forzar).then(function (r) { // forzar: el servidor relee GESTION (↻)
+      return dato(clave(), fn, [S.temp, !!forzar], forzar).then(function (r) {
         if (S.tab !== tab || !document.body.contains(main)) return;
         hora(r.hora); pinta(o, r);
       });
@@ -354,19 +408,80 @@
     });
   }
 
-  function selectorComp(o) {
-    var temps = {};
-    o.competiciones.forEach(function (c) { (temps[c.temp] = temps[c.temp] || []).push(c); });
-    return '<select class="gs-sel" id="gs-comp" aria-label="Competición">' + Object.keys(temps).sort().reverse().map(function (t) {
-      return '<optgroup label="Temporada ' + esc(t) + '">' + temps[t].map(function (c) {
-        return '<option value="' + esc(c.hash) + '"' + (c.hash === S.comp ? ' selected' : '') + '>' + esc(t + ' · ' + c.nombre.trim()) + '</option>';
-      }).join('') + '</optgroup>';
-    }).join('') + '</select>';
+  /* ---------- filtros comunes: temporada (se carga entera), competición y liga ---------- */
+  function htmlFiltros(o) {
+    var temps = []; o.competiciones.forEach(function (c) { if (temps.indexOf(c.temp) < 0) temps.push(c.temp); });
+    temps.sort().reverse();
+    var comps = o.competiciones.filter(function (c) { return c.temp === S.temp; });
+    var ligas = o.ligas.filter(function (l) { return l.comp.slice(0, 5) === S.temp && (!S.fComp || l.comp === S.fComp); });
+    return '<div class="gs-filtros">' +
+      '<select class="gs-sel" id="gs-temp" aria-label="Temporada">' + temps.map(function (t) { return '<option' + (t === S.temp ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select>' +
+      '<select class="gs-sel" id="gs-fcomp" aria-label="Competición"><option value="">Todas las competiciones</option>' + comps.map(function (c) {
+        return '<option value="' + esc(c.hash) + '"' + (c.hash === S.fComp ? ' selected' : '') + '>' + esc(c.nombre.trim()) + '</option>';
+      }).join('') + '</select>' +
+      '<select class="gs-sel" id="gs-fliga" aria-label="Liga"><option value="">Todas las ligas</option>' + ligas.map(function (l) {
+        return '<option value="' + esc(l.hash) + '"' + (l.hash === S.fLiga ? ' selected' : '') + '>' + esc((S.fComp ? '' : compCorta(l.comp) + ' · ') + ligaCorta(l.hash)) + '</option>';
+      }).join('') + '<option value="SIN"' + (S.fLiga === 'SIN' ? ' selected' : '') + '>Sin liga</option></select></div>';
+  }
+  function engancharFiltros(main, repinta) {
+    $('#gs-temp').onchange = function () { S.temp = this.value; S.fComp = ''; S.fLiga = ''; S.jug.equipo = ''; pintar(); };
+    $('#gs-fcomp').onchange = function () { S.fComp = this.value; S.fLiga = ''; S.jug.equipo = ''; repinta(); };
+    $('#gs-fliga').onchange = function () { S.fLiga = this.value; S.jug.equipo = ''; repinta(); };
+  }
+  function enFiltro(x) {
+    return (!S.fComp || x.comp === S.fComp) && (!S.fLiga || (S.fLiga === 'SIN' ? !x.liga : x.liga === S.fLiga));
   }
   function chips(lista, actual, id) {
     return '<div class="gs-chips" id="' + id + '" style="margin-top:10px">' + lista.map(function (c) {
       return '<button type="button" class="gs-chip" data-gs-f="' + c[0] + '" aria-pressed="' + (c[0] === actual) + '">' + esc(c[1]) + (c[2] != null ? ' · ' + c[2] : '') + '</button>';
     }).join('') + '</div>';
+  }
+  function esCorreo(q) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(q || '').trim()); }
+
+  /* ---------- RESUMEN (como la hoja RESUMEN, de la temporada elegida) ---------- */
+  function pResumen(main, forzar) {
+    return cuando(main, 'eq', forzar, 'Cargando la temporada…', function (o, r) {
+      var vale = function (e) { return !e.error && !e.buscan && enFiltro(e); };
+      var eqs = r.lista.filter(vale);
+      var nJug = eqs.reduce(function (a, e) { return a + (e.jugadoras || 0); }, 0);
+      var porPagar = eqs.filter(function (e) { return e.pendiente > 0.005 || !e.ps; });
+      // Días con ligas (por el día de juego de DB_LIGAS), en orden de la semana; al final, los equipos sin liga.
+      var grupos = {};
+      eqs.forEach(function (e) { var k = e.liga || 'SIN'; (grupos[k] = grupos[k] || []).push(e); });
+      var dias = {};
+      Object.keys(grupos).forEach(function (k) { var d = k === 'SIN' ? 'SIN LIGA' : (diaDeLiga(k) || 'OTRO'); (dias[d] = dias[d] || []).push(k); });
+      var ordenDias = DIAS.filter(function (d) { return dias[d]; }).concat(Object.keys(dias).filter(function (d) { return DIAS.indexOf(d) < 0; }));
+      if (S.dia && !dias[S.dia]) S.dia = '';
+      var h = htmlFiltros(o) +
+        '<div class="gs-mini" style="margin-top:12px"><div><b>' + eqs.length + '</b><small>Equipos</small></div><div><b>' + nJug + '</b><small>Jugadoras</small></div>' +
+        '<button type="button" class="' + (porPagar.length ? 'gs-alerta' : '') + '" id="gs-rpag"><b>' + porPagar.length + '</b><small>Por pagar</small></button></div>' +
+        '<div class="gs-dias">' + [''].concat(ordenDias).map(function (d) {
+          return '<button type="button" class="gs-chip" data-gs-dia="' + esc(d) + '" aria-pressed="' + (d === (S.dia || '')) + '">' + esc(d ? nomDia(d) : 'Todos los días') + '</button>';
+        }).join('') + '</div>';
+      ordenDias.filter(function (d) { return !S.dia || d === S.dia; }).forEach(function (d) {
+        h += '<div class="gs-dia-h">' + esc(nomDia(d)) + '</div>';
+        dias[d].sort().forEach(function (k) {
+          var lista = grupos[k].slice().sort(function (a, b) { return (b.nivel || 0) - (a.nivel || 0) || a.equipo.localeCompare(b.equipo); });
+          var jug = lista.reduce(function (a, e) { return a + (e.jugadoras || 0); }, 0);
+          var gestor = k === 'SIN' ? '' : gestorDeLiga(k);
+          h += '<div class="gs-card"><div class="gs-liga-t"><b>' + esc(k === 'SIN' ? 'Sin liga' : compCorta(k.split('|').slice(0, 2).join('|')) + ' · ' + ligaCorta(k)) + '</b>' +
+            '<span>' + lista.length + ' equipos · ' + jug + ' jugadoras' + (gestor ? ' · ' + esc(gestor) : '') + '</span></div>' +
+            lista.map(function (e) {
+              var pag = !e.ps ? '<span class="gs-pag gs-neg">Sin P.S.</span>' : e.pendiente > 0.005 ? '<span class="gs-pag gs-neg">Faltan ' + eur(e.pendiente) + '</span>' :
+                e.pago ? '<span class="gs-pag gs-pos">Pagado</span>' : '<span class="gs-pag" style="color:#a35d00">Falta inscripción</span>';
+              return '<button type="button" class="gs-eqr" data-gs-i="' + r.lista.indexOf(e) + '"><span class="gs-n">' + (e.nivel || '–') + '</span>' +
+                '<b>' + punto(e.color) + '<span>' + esc(e.equipo) + '</span></b>' + pag +
+                '<small>' + esc([e.capi, e.jugadoras ? e.jugadoras + ' jugadoras' : 'sin jugadoras', e.edad ? e.edad + ' años' : ''].filter(String).join(' · ')) + '</small></button>';
+            }).join('') + '</div>';
+        });
+      });
+      if (!ordenDias.length) h += '<div class="gs-vacio">No hay equipos con estos filtros.</div>';
+      main.innerHTML = h;
+      engancharFiltros(main, function () { pResumen(main); });
+      [].forEach.call(main.querySelectorAll('[data-gs-dia]'), function (b) { b.onclick = function () { S.dia = b.getAttribute('data-gs-dia'); pResumen(main); }; });
+      [].forEach.call(main.querySelectorAll('[data-gs-i]'), function (b) { b.onclick = function () { fichaEquipo(r.lista[Number(b.getAttribute('data-gs-i'))], o, r); }; });
+      $('#gs-rpag').onclick = function () { S.eq.filtro = 'pagar'; irTab('equipos'); };
+    });
   }
 
   /* ---------- EQUIPOS (T0142) ---------- */
@@ -380,18 +495,22 @@
   };
 
   function pEquipos(main, forzar) {
-    return cuando(main, function () { return 'eq_' + S.comp; }, 'gestionEquipos', forzar, 'Cargando los equipos…', function (o, r) {
-      var f = S.eq, cuenta = function (k) { return r.lista.filter(FILTROS_EQ[k]).length; };
-      main.innerHTML = '<div class="gs-fila">' + selectorComp(o) + '</div>' +
+    return cuando(main, 'eq', forzar, 'Cargando los equipos…', function (o, r) {
+      var f = S.eq, base = r.lista.filter(enFiltro), cuenta = function (k) { return base.filter(FILTROS_EQ[k]).length; };
+      main.innerHTML = htmlFiltros(o) +
         chips([['todos', 'Inscritos', cuenta('todos')], ['sinliga', 'Sin liga', cuenta('sinliga')], ['pagar', 'Por pagar', cuenta('pagar')],
           ['avisos', 'Avisos', cuenta('avisos')], ['buscan', 'Buscan equipo', cuenta('buscan')], ['error', 'Con ERROR', cuenta('error')]], f.filtro, 'gs-eqf') +
-        '<div class="gs-fila" style="margin-top:10px"><input type="search" class="gs-sel" id="gs-eqq" placeholder="Buscar: equipo, capitana, liga…" value="' + esc(f.q) + '" aria-label="Buscar"></div>' +
+        '<div class="gs-fila" style="margin-top:10px"><input type="search" class="gs-sel" id="gs-eqq" placeholder="Buscar: equipo, capitana, correo, liga…" value="' + esc(f.q) + '" aria-label="Buscar"></div>' +
         '<div id="gs-eqlista"></div>';
       var pinta = function () {
-        var q = norm(f.q).trim();
-        var lista = r.lista.filter(FILTROS_EQ[f.filtro]).filter(function (e) { return !q || norm([e.equipo, e.capi, e.liga, e.asig, e.teamForm, e.mail].join(' ')).indexOf(q) >= 0; });
-        $('#gs-eqlista').innerHTML = '<p class="gs-s" style="margin:12px 2px 0;font-size:13px;color:var(--gs-g)">' + lista.length + (lista.length === 1 ? ' inscripción' : ' inscripciones') + '</p>' +
-          '<div class="gs-card"><div class="gs-lista">' + (lista.length ? lista.map(function (e, i) {
+        var q = norm2(f.q);
+        // Buscando, se mira en toda la temporada, también lo que tiene ERROR.
+        var lista = q ? r.lista.filter(function (e) { return norm2([e.equipo, e.capi, e.liga, e.asig, e.teamForm, e.mail, e.tel].join(' ')).indexOf(q) >= 0; })
+          : base.filter(FILTROS_EQ[f.filtro]);
+        $('#gs-eqlista').innerHTML = (q ? '<p class="gs-aviso-b">Buscando en toda la temporada ' + esc(S.temp) + ', también en las inscripciones con ERROR.</p>' : '') +
+          (esCorreo(f.q) ? '<p style="margin:8px 0 0"><button type="button" class="gs-b2" id="gs-eqcorreo">📧 Ver todo lo de este correo</button></p>' : '') +
+          '<p class="gs-s" style="margin:12px 2px 0;font-size:13px;color:var(--gs-g)">' + lista.length + (lista.length === 1 ? ' inscripción' : ' inscripciones') + '</p>' +
+          '<div class="gs-card"><div class="gs-lista">' + (lista.length ? lista.map(function (e) {
             var t = [];
             if (e.error) t.push(tag('ERROR', 'gs-tag-r'));
             if (e.buscan && !e.error) t.push(tag('Busca equipo', 'gs-tag-g'));
@@ -402,16 +521,17 @@
             if (e.revisar) t.push(tag(e.revisar, 'gs-tag-a'));
             if (!e.error && !e.buscan && !e.xporty) t.push(tag('Sin Xporty', 'gs-tag-g'));
             return '<button type="button" class="gs-item" data-gs-i="' + r.lista.indexOf(e) + '"><div style="min-width:0">' +
-              '<div class="gs-t">' + esc(e.equipo || '(sin nombre)') + '</div>' +
-              '<div class="gs-s">' + esc([e.liga ? ligaCorta(e.liga) : (e.dispo ? 'Quiere: ' + e.dispo : ''), e.capi, e.jugadoras ? e.jugadoras + ' jugadoras' : ''].filter(String).join(' · ')) + '</div>' +
+              '<div class="gs-t">' + punto(e.color) + esc(e.equipo || '(sin nombre)') + '</div>' +
+              '<div class="gs-s">' + esc([S.fComp ? '' : compCorta(e.comp), e.liga ? ligaCorta(e.liga) : (e.dispo ? 'Quiere: ' + e.dispo : ''), e.capi, e.jugadoras ? e.jugadoras + ' jugadoras' : ''].filter(String).join(' · ')) + '</div>' +
               (t.length ? '<div class="gs-tags">' + t.join('') + '</div>' : '') +
               '</div><div class="gs-d">' + (e.nivel ? 'Nivel ' + esc(e.nivel) : '') + '</div></button>';
           }).join('') : '<div class="gs-vacio">No hay inscripciones con este filtro.</div>') + '</div></div>';
         [].forEach.call(main.querySelectorAll('[data-gs-i]'), function (b) { b.onclick = function () { fichaEquipo(r.lista[Number(b.getAttribute('data-gs-i'))], o, r); }; });
+        var bc = $('#gs-eqcorreo'); if (bc) bc.onclick = function () { verCorreo(f.q.trim()); };
       };
       pinta();
-      $('#gs-comp').onchange = function () { S.comp = this.value; S.jug.equipo = ''; pintar(); };
-      $('#gs-eqf').onclick = function (ev) { var b = ev.target.closest('[data-gs-f]'); if (!b) return; f.filtro = b.getAttribute('data-gs-f'); pEquipos(main); };
+      engancharFiltros(main, function () { pEquipos(main); });
+      $('#gs-eqf').onclick = function (ev) { var b = ev.target.closest('[data-gs-f]'); if (!b) return; f.filtro = b.getAttribute('data-gs-f'); f.q = ''; pEquipos(main); };
       var t0; $('#gs-eqq').oninput = function () { var v = this.value; clearTimeout(t0); t0 = setTimeout(function () { f.q = v; pinta(); }, 150); };
     });
   }
@@ -422,7 +542,7 @@
       { k: 'LIGA', t: 'select', et: 'Liga', v: e.liga, opts: [['', '— Sin liga —']].concat(ligas.map(function (l) { return [l.hash, ligaCorta(l.hash) + (l.gestor ? ' · ' + l.gestor : '')]; })) },
       { k: 'NIVEL', t: 'select', et: 'Nivel', v: e.nivel == null ? '' : String(e.nivel), opts: [['', '—'], ['1', '1'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5']] },
       { k: 'ASIG', t: 'select', et: 'Asignado (recibe la paga y señal)', v: e.asig, opts: [['', '—']].concat(o.staff.map(function (s) { return [s, s]; })) },
-      { k: 'COLOR', t: 'select', et: 'Color de camiseta', v: e.color, opts: [['', '—']].concat(o.colores.map(function (c) { return [c.n, c.n]; })) },
+      { k: 'COLOR', t: 'select', et: 'Color de camiseta', pre: '<i class="gs-color" id="gs-colpre" style="background:' + esc(colorHex(e.color) || 'transparent') + '"></i>', v: e.color, opts: [['', '—']].concat(o.colores.map(function (c) { return [c.n, c.n]; })) },
       { k: 'F.L (P.S)', t: 'fecha', et: 'Fecha límite paga y señal', v: e.flP },
       { k: 'F.L (Insc)', t: 'fecha', et: 'Fecha límite inscripción', v: e.flI },
       { k: 'DESCUENTO', t: 'num', et: 'Descuento (€)', v: e.descuento == null ? '' : String(e.descuento) },
@@ -437,7 +557,7 @@
       { k: 'CASH', t: 'si', et: 'Paga en efectivo', v: e.cash },
       { k: 'ERROR', t: 'si', et: 'Inscripción con ERROR (no cuenta)', v: e.error }
     ];
-    var todos = campos.concat(checks), url = urlFila(r.gid, e.fila);
+    var todos = campos.concat(checks), url = urlFila(r.gid || r.gidE, e.fila);
     var t = [];
     if (e.error) t.push(tag('ERROR', 'gs-tag-r'));
     if (e.buscan) t.push(tag('Busca equipo', 'gs-tag-g'));
@@ -445,16 +565,17 @@
     if (e.revisar) t.push(tag(e.revisar, 'gs-tag-a'));
     var pend = e.pendiente == null ? '<span class="gs-pos">Al día</span>' : e.pendiente > 0 ? '<b class="gs-neg">Faltan ' + eur(e.pendiente) + '</b>' : '<b class="gs-pos">Ha pagado ' + eur(e.pendiente) + ' de más</b>';
     var v = ventana(e.equipo || 'Inscripción',
-      (t.length ? '<div class="gs-tags" style="margin:-6px 0 8px">' + t.join('') + '</div>' : '') +
+      '<p class="gs-nota" style="margin:-8px 0 8px">' + esc(compCorta(e.comp) + (e.liga ? ' · ' + ligaCorta(e.liga) : '')) + '</p>' +
+      (t.length ? '<div class="gs-tags" style="margin:-4px 0 8px">' + t.join('') + '</div>' : '') +
       '<div class="gs-btns">' +
-      (e.linkContacto || wa(e.tel) ? '<a class="gs-b2" href="' + esc(e.linkContacto || wa(e.tel)) + '" target="_blank" rel="noopener">💬 Capitana</a>' : '') +
-      (e.linkMensaje ? '<a class="gs-b2" href="' + esc(e.linkMensaje) + '" target="_blank" rel="noopener">📤 Mensaje inicial</a>' : '') +
-      (e.linkEstado ? '<a class="gs-b2" href="' + esc(e.linkEstado) + '" target="_blank" rel="noopener">📋 Estado del equipo</a>' : '') +
+      aWa(e.linkContacto || wa(e.tel), '💬 Capitana') + aWa(e.linkMensaje, '📤 Mensaje inicial') + aWa(e.linkEstado, '📋 Estado del equipo') +
       (!e.error && !e.buscan ? '<button type="button" class="gs-b2" id="gs-verjug">👥 Jugadoras</button>' : '') +
+      (e.mail ? '<button type="button" class="gs-b2" id="gs-vercorreo">📧 Su correo</button>' : '') +
       (url ? '<a class="gs-b2" href="' + esc(url) + '" target="_blank" rel="noopener">Excel ↗</a>' : '') + '</div>' +
       '<div class="gs-sec">Liga y organización</div><div class="gs-dos">' + campos.slice(0, 4).map(htmlCampo).join('') + '</div>' +
       '<div class="gs-dos">' + campos.slice(4, 7).map(htmlCampo).join('') + '</div>' + htmlCampo(campos[7]) +
       '<div class="gs-sec">Seguimiento</div><div class="gs-checks">' + checks.map(htmlCampo).join('') + '</div>' +
+      htmlFotos(e.fotosLinks) +
       '<div class="gs-sec">Pagos</div><div class="gs-dl">' +
       fila('Precio', esc(e.precio)) + fila('Camisetas personalizadas', esc(e.camis)) + fila('Descuento', e.descuento ? eur(e.descuento) : '') +
       fila('Paga y señal', e.ps ? esc(e.ps + ' · ' + e.psFecha + (e.psRec ? ' · a ' + e.psRec : '')) : '<b class="gs-neg">Sin pagar</b>' + (e.flPTxt ? ' (límite ' + esc(e.flPTxt) + ')' : '')) +
@@ -465,13 +586,16 @@
       fila('Alta', esc(e.alta)) + fila('Correo', esc(e.mail)) + fila('Capitana', esc(e.capi)) + fila('Teléfono', esc(e.tel)) +
       fila('Nombre en el formulario', esc(e.teamForm)) + fila('Antes se llamaba', esc(e.teamAnterior)) +
       fila('Disponibilidad', esc(e.dispo)) + fila('Horas favoritas', esc(e.horas)) + fila('Nacidas en', esc(e.nacimiento)) +
-      fila('Jugadoras inscritas', e.jugadoras ? esc(e.jugadoras) : '') + fila('Edad media', esc(e.edad)) + fila('Temporadas de media', esc(e.exp)) +
-      fila('Fotos', esc(e.fotos)) + '</div>' +
+      fila('Jugadoras inscritas', e.jugadoras ? esc(e.jugadoras) : '') + fila('Edad media', esc(e.edad)) + fila('Temporadas de media', esc(e.exp)) + '</div>' +
       (e.comenta ? '<div class="gs-dtx"><b>Comentario</b><p>' + esc(e.comenta) + '</p></div>' : '') +
       '<div class="gs-error" id="gs-err" hidden></div>' +
       '<div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-gs-cerrar>Cerrar</button><button type="button" class="gs-b1" id="gs-ok" disabled>Sin cambios</button></div>');
+    engancharFotos(v.el, e.fotosLinks || [], e.equipo);
+    var sc = v.el.querySelector('[data-gs-k="COLOR"]'), pre = v.el.querySelector('#gs-colpre');
+    if (sc && pre) sc.addEventListener('change', function () { pre.style.background = colorHex(sc.value) || 'transparent'; });
     var vj = v.el.querySelector('#gs-verjug');
-    if (vj) vj.onclick = function () { v.cerrar(); S.jug.equipo = e.equipo; S.jug.filtro = 'todas'; S.jug.q = ''; irTab('jugadoras'); };
+    if (vj) vj.onclick = function () { v.cerrar(); S.jug.equipo = e.equipo; S.jug.filtro = 'todas'; S.jug.q = ''; S.fComp = e.comp; S.fLiga = ''; irTab('jugadoras'); };
+    var vc = v.el.querySelector('#gs-vercorreo'); if (vc) vc.onclick = function () { verCorreo(e.mail); };
     guardable(v, todos, function (c) {
       return llamar('gestionEquipoEditar', [{ fila: e.fila, ts: e.ts, mail: e.mail, comp: e.comp, equipo: e.equipo }, c]);
     }, function (c) { aplicarCambios(e, c, PROP_EQ); });
@@ -488,52 +612,61 @@
   };
   var MAX_LISTA = 250;
 
+  function itemJugadora(j, i, conEquipo) {
+    var t = [];
+    if (j.error) t.push(tag('ERROR', 'gs-tag-r'));
+    if (j.porDni) t.push(tag('Mismo DNI, otro correo', 'gs-tag-a'));
+    if (j.alerta) t.push(tag('⚠️ ' + j.alerta.split('·')[0].trim().slice(0, 60), 'gs-tag-a'));
+    if (!j.error && !j.xporty) t.push(tag('Sin Xporty', 'gs-tag-g'));
+    if (!j.error && j.incluida === '🚫') t.push(tag('Cami personalizada', 'gs-tag-g'));
+    return '<button type="button" class="gs-item" data-gs-j="' + i + '"><div style="min-width:0">' +
+      '<div class="gs-t">' + esc(j.nombreCompleto || j.mail) + '</div>' +
+      '<div class="gs-s">' + esc([conEquipo ? compCorta(j.comp) + ' · ' + j.equipo : '', j.cami ? '👕 ' + j.cami : (j.dorsal ? '👕 ' + j.dorsal : ''), j.edad ? j.edad + ' años' : ''].filter(String).join(' · ')) +
+      (j.color ? ' ' + punto(j.color) : '') + '</div>' +
+      (t.length ? '<div class="gs-tags">' + t.join('') + '</div>' : '') + '</div></button>';
+  }
+
   function pJugadoras(main, forzar) {
-    return cuando(main, function () { return 'jug_' + S.comp; }, 'gestionJugadoras', forzar, 'Cargando las jugadoras…', function (o, r) {
-      var f = S.jug;
-      var equipos = []; r.lista.forEach(function (j) { if (j.equipo && equipos.indexOf(j.equipo) < 0) equipos.push(j.equipo); });
+    return cuando(main, 'jug', forzar, 'Cargando las jugadoras…', function (o, r) {
+      var f = S.jug, enF = r.lista.filter(enFiltro);
+      var equipos = []; enF.forEach(function (j) { if (j.equipo && equipos.indexOf(j.equipo) < 0) equipos.push(j.equipo); });
       equipos.sort();
       if (f.equipo && equipos.indexOf(f.equipo) < 0) equipos.unshift(f.equipo);
-      var base = function (j) { return !f.equipo || j.equipo === f.equipo; };
-      var cuenta = function (k) { return r.lista.filter(base).filter(FILTROS_JUG[k]).length; };
-      main.innerHTML = '<div class="gs-fila">' + selectorComp(o) +
-        '<select class="gs-sel" id="gs-jeq" aria-label="Equipo"><option value="">Todos los equipos (' + equipos.length + ')</option>' +
+      var base = enF.filter(function (j) { return !f.equipo || j.equipo === f.equipo; });
+      var cuenta = function (k) { return base.filter(FILTROS_JUG[k]).length; };
+      main.innerHTML = htmlFiltros(o) +
+        '<div class="gs-fila" style="margin-top:8px"><select class="gs-sel" id="gs-jeq" aria-label="Equipo"><option value="">Todos los equipos (' + equipos.length + ')</option>' +
         equipos.map(function (x) { return '<option' + (x === f.equipo ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select></div>' +
         chips([['todas', 'Inscritas', cuenta('todas')], ['alerta', 'Con alerta', cuenta('alerta')], ['xporty', 'Sin Xporty', cuenta('xporty')],
           ['contactos', 'Sin contacto', cuenta('contactos')], ['personal', 'Cami personalizada', cuenta('personal')], ['error', 'Con ERROR', cuenta('error')]], f.filtro, 'gs-jf') +
-        '<div class="gs-fila" style="margin-top:10px"><input type="search" class="gs-sel" id="gs-jq" placeholder="Buscar: nombre, DNI, correo, dorsal…" value="' + esc(f.q) + '" aria-label="Buscar"></div>' +
+        '<div class="gs-fila" style="margin-top:10px"><input type="search" class="gs-sel" id="gs-jq" placeholder="Buscar: nombre, correo, DNI, teléfono, dorsal…" value="' + esc(f.q) + '" aria-label="Buscar"></div>' +
         '<div id="gs-jlista"></div>';
       var pinta = function () {
-        var q = norm(f.q).trim();
-        var lista = r.lista.filter(base).filter(FILTROS_JUG[f.filtro]).filter(function (j) {
-          return !q || norm([j.nombreCompleto, j.nombre, j.ap1, j.ap2, j.dni, j.mail, j.cami, j.equipo, j.tel].join(' ')).indexOf(q) >= 0;
-        });
-        $('#gs-jlista').innerHTML = '<p class="gs-s" style="margin:12px 2px 0;font-size:13px;color:var(--gs-g)">' + lista.length + (lista.length === 1 ? ' jugadora' : ' jugadoras') + '</p>' +
-          '<div class="gs-card"><div class="gs-lista">' + (lista.length ? lista.slice(0, MAX_LISTA).map(function (j) {
-            var t = [];
-            if (j.error) t.push(tag('ERROR', 'gs-tag-r'));
-            if (j.alerta) t.push(tag('⚠️ ' + j.alerta.split('·')[0].trim().slice(0, 60), 'gs-tag-a'));
-            if (!j.error && !j.xporty) t.push(tag('Sin Xporty', 'gs-tag-g'));
-            if (!j.error && j.incluida === '🚫') t.push(tag('Cami personalizada', 'gs-tag-g'));
-            return '<button type="button" class="gs-item" data-gs-i="' + r.lista.indexOf(j) + '"><div style="min-width:0">' +
-              '<div class="gs-t">' + esc(j.nombreCompleto || j.mail) + '</div>' +
-              '<div class="gs-s">' + esc([f.equipo ? '' : j.equipo, j.cami ? '👕 ' + j.cami : (j.dorsal ? '👕 ' + j.dorsal : ''), j.edad ? j.edad + ' años' : ''].filter(String).join(' · ')) + '</div>' +
-              (t.length ? '<div class="gs-tags">' + t.join('') + '</div>' : '') + '</div></button>';
-          }).join('') + (lista.length > MAX_LISTA ? '<div class="gs-mas">Y ' + (lista.length - MAX_LISTA) + ' más: elige un equipo o busca.</div>' : '')
+        var q = norm2(f.q);
+        // Buscando, se mira en toda la temporada, también lo que tiene ERROR (p. ej. dos inscripciones del mismo correo).
+        var lista = q ? r.lista.filter(function (j) { return norm2([j.nombreCompleto, j.nombre, j.ap1, j.ap2, j.dni, j.mail, j.cami, j.equipo, j.tel].join(' ')).indexOf(q) >= 0; })
+          : base.filter(FILTROS_JUG[f.filtro]);
+        $('#gs-jlista').innerHTML = (q ? '<p class="gs-aviso-b">Buscando en toda la temporada ' + esc(S.temp) + ', también en las inscripciones con ERROR.</p>' : '') +
+          (esCorreo(f.q) ? '<p style="margin:8px 0 0"><button type="button" class="gs-b2" id="gs-jcorreo">📧 Ver todo lo de este correo (todas las temporadas)</button></p>' : '') +
+          '<p class="gs-s" style="margin:12px 2px 0;font-size:13px;color:var(--gs-g)">' + lista.length + (lista.length === 1 ? ' inscripción' : ' inscripciones') + '</p>' +
+          '<div class="gs-card"><div class="gs-lista">' + (lista.length ? lista.slice(0, MAX_LISTA).map(function (j) { return itemJugadora(j, r.lista.indexOf(j), q || !f.equipo); }).join('') +
+            (lista.length > MAX_LISTA ? '<div class="gs-mas">Y ' + (lista.length - MAX_LISTA) + ' más: elige un equipo o busca.</div>' : '')
             : '<div class="gs-vacio">No hay jugadoras con este filtro.</div>') + '</div></div>';
-        [].forEach.call(main.querySelectorAll('[data-gs-i]'), function (b) { b.onclick = function () { fichaJugadora(r.lista[Number(b.getAttribute('data-gs-i'))], o, r, equipos); }; });
+        [].forEach.call(main.querySelectorAll('[data-gs-j]'), function (b) { b.onclick = function () { fichaJugadora(r.lista[Number(b.getAttribute('data-gs-j'))], o, r, equipos); }; });
+        var bc = $('#gs-jcorreo'); if (bc) bc.onclick = function () { verCorreo(f.q.trim()); };
       };
       pinta();
-      $('#gs-comp').onchange = function () { S.comp = this.value; f.equipo = ''; pintar(); };
+      engancharFiltros(main, function () { pJugadoras(main); });
       $('#gs-jeq').onchange = function () { f.equipo = this.value; pJugadoras(main); };
-      $('#gs-jf').onclick = function (ev) { var b = ev.target.closest('[data-gs-f]'); if (!b) return; f.filtro = b.getAttribute('data-gs-f'); pJugadoras(main); };
+      $('#gs-jf').onclick = function (ev) { var b = ev.target.closest('[data-gs-f]'); if (!b) return; f.filtro = b.getAttribute('data-gs-f'); f.q = ''; pJugadoras(main); };
       var t0; $('#gs-jq').oninput = function () { var v = this.value; clearTimeout(t0); t0 = setTimeout(function () { f.q = v; pinta(); }, 150); };
     });
   }
 
   function fichaJugadora(j, o, r, equipos) {
-    // Equipos a los que se puede pasar: los inscritos (sin ERROR) de la competición, si ya están cargados.
-    var eqs = (S.datos['eq_' + S.comp] ? S.datos['eq_' + S.comp].lista.filter(function (e) { return !e.error && !e.buscan; }).map(function (e) { return e.equipo; }) : equipos).slice().sort();
+    // Equipos a los que se puede pasar: los inscritos (sin ERROR) de su competición, si ya están cargados.
+    var dEq = S.datos['eq_' + String(j.comp).slice(0, 5)];
+    var eqs = (dEq ? dEq.lista.filter(function (e) { return !e.error && !e.buscan && e.comp === j.comp; }).map(function (e) { return e.equipo; }) : (equipos || [])).slice().sort();
     var campos = [
       { k: 'EQUIPO', t: 'select', et: 'Equipo', v: j.equipo, opts: eqs.map(function (x) { return [x, x]; }) },
       { k: 'DORSAL - CAMISETA', t: 'texto', et: 'Dorsal y talla', v: j.dorsal, nota: 'Como en el formulario, p. ej. «DORSAL 3 - Talla S». De aquí sale la camiseta: ' + (j.cami || '—') },
@@ -550,31 +683,61 @@
       { k: 'G.CONTACTS', t: 'si', et: 'Guardada en Google Contacts', v: j.gcontacts },
       { k: 'ERROR', t: 'si', et: 'Inscripción con ERROR (no cuenta)', v: j.error }
     ];
-    var url = urlFila(r.gid, j.fila), tel = wa(j.tel);
+    var url = urlFila(r.gid || r.gidJ, j.fila);
     var alertas = j.alerta ? j.alerta.split(' · ').map(function (x) { return '<p>' + esc(x) + '</p>'; }).join('') : '';
+    var lAl = waUrl(j.linkAlerta);
     var v = ventana(j.nombreCompleto || 'Jugadora',
-      (j.error ? '<div class="gs-tags" style="margin:-6px 0 8px">' + tag('ERROR: esta inscripción no cuenta', 'gs-tag-r') + '</div>' : '') +
-      (alertas ? '<div class="gs-alerta">' + alertas + (j.linkAlerta ? '<p><a class="gs-a" href="' + esc(j.linkAlerta) + '" target="_blank" rel="noopener">💬 Enviar el aviso por WhatsApp ↗</a></p>' : '') + '</div>' : '') +
-      '<div class="gs-btns">' + (tel ? '<a class="gs-b2" href="' + esc(tel) + '" target="_blank" rel="noopener">💬 WhatsApp</a>' : '') +
+      '<p class="gs-nota" style="margin:-8px 0 8px">' + esc(compCorta(j.comp) + ' · ' + j.equipo + ' · alta ' + j.alta) + '</p>' +
+      (j.error ? '<div class="gs-tags" style="margin:-4px 0 8px">' + tag('ERROR: esta inscripción no cuenta', 'gs-tag-r') + '</div>' : '') +
+      (alertas ? '<div class="gs-al">' + alertas + (lAl ? '<p><a class="gs-a" href="' + esc(lAl) + '"' + (/^whatsapp:/.test(lAl) ? '' : ' target="_blank" rel="noopener"') + '>💬 Enviar el aviso por WhatsApp</a></p>' : '') + '</div>' : '') +
+      '<div class="gs-btns">' + aWa(wa(j.tel), '💬 WhatsApp') +
+      (j.mail ? '<button type="button" class="gs-b2" id="gs-vercorreo">📧 Todo lo de su correo</button>' : '') +
       (url ? '<a class="gs-b2" href="' + esc(url) + '" target="_blank" rel="noopener">Excel ↗</a>' : '') + '</div>' +
       '<div class="gs-sec">Inscripción</div>' + htmlCampo(campos[0]) + htmlCampo(campos[1]) +
       '<div class="gs-sec">Datos personales</div><div class="gs-dos">' + campos.slice(2, 9).map(htmlCampo).join('') + '</div>' +
       '<div class="gs-sec">Seguimiento</div><div class="gs-checks">' + checks.map(htmlCampo).join('') + '</div>' +
+      htmlFotos(j.fotosLinks) +
       '<div class="gs-sec">Camiseta</div><div class="gs-dl">' +
       fila('Camiseta', esc(j.cami)) + fila('Incluida en el precio', j.incluida === '🚫' ? 'No: personalizada (+10 €)' : j.incluida === '✅' ? 'Sí' : '') +
-      fila('Color', esc(j.color)) + fila('Pedido', esc(j.pedido)) + fila('Preparada', j.preparada ? 'Sí' : 'No') + fila('Entregada', j.entregada ? 'Sí' : 'No') +
+      fila('Color', j.color ? punto(j.color) + esc(j.color) : '') + fila('Pedido', esc(j.pedido)) + fila('Preparada', j.preparada ? 'Sí' : 'No') + fila('Entregada', j.entregada ? 'Sí' : 'No') +
       fila('Incidencia', esc(j.incidencia)) + '</div>' +
       '<div class="gs-sec">Más datos</div><div class="gs-dl">' +
       fila('Alta', esc(j.alta)) + fila('Correo', esc(j.mail)) + fila('Liga', esc(ligaCorta(j.liga))) + fila('Edad', esc(j.edad)) +
-      fila('Temporadas con nosotras', esc(j.veterania)) + fila('Normas, imagen, datos y responsabilidad', esc(j.normas)) + fila('Fotos', esc(j.fotos)) + '</div>' +
+      fila('Temporadas con nosotras', esc(j.veterania)) + fila('Normas, imagen, datos y responsabilidad', esc(j.normas)) + '</div>' +
       '<div class="gs-error" id="gs-err" hidden></div>' +
       '<div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-gs-cerrar>Cerrar</button><button type="button" class="gs-b1" id="gs-ok" disabled>Sin cambios</button></div>');
+    engancharFotos(v.el, j.fotosLinks || [], j.nombreCompleto);
+    var vc = v.el.querySelector('#gs-vercorreo'); if (vc) vc.onclick = function () { verCorreo(j.mail); };
     guardable(v, campos.concat(checks), function (c) {
       return llamar('gestionJugadoraEditar', [{ fila: j.fila, ts: j.ts, mail: j.mail, comp: j.comp, nombre: j.nombreCompleto }, c]);
     }, function (c) {
       aplicarCambios(j, c, PROP_JUG);
       if (c['NOMBRE'] != null || c['1er APELLIDO'] != null) j.nombreCompleto = (j.nombre + ' ' + j.ap1).trim();
     });
+  }
+
+  /* ---------- todo lo de un correo (todas las temporadas) ---------- */
+  function verCorreo(mail) {
+    var v = ventana('📧 ' + mail, cargando('Buscando en todo GESTION…'));
+    var c = { mail: String(mail || '').trim().toLowerCase() };
+    opciones().then(function (o) {
+      return llamar('gestionCorreo', [c.mail]).then(function (r) {
+        var h = '<p class="gs-nota" style="margin:-8px 0 6px">Todas las temporadas. Lo más reciente, arriba.</p>' +
+          '<div class="gs-sec">Inscripciones de jugadora (' + r.jugadoras.length + ')</div>' +
+          (r.jugadoras.length ? '<div class="gs-lista">' + r.jugadoras.map(function (j, i) {
+            return itemJugadora(j, i, true).replace('<div class="gs-s">', '<div class="gs-s">' + esc('Alta ' + j.alta) + ' · ');
+          }).join('') + '</div>' : '<p class="gs-nota">Ninguna.</p>') +
+          '<div class="gs-sec">Inscripciones de equipo como capitana (' + r.equipos.length + ')</div>' +
+          (r.equipos.length ? '<div class="gs-lista">' + r.equipos.map(function (e, i) {
+            return '<button type="button" class="gs-item" data-gs-ce="' + i + '"><div style="min-width:0"><div class="gs-t">' + punto(e.color) + esc(e.equipo || '(sin nombre)') + '</div>' +
+              '<div class="gs-s">' + esc(['Alta ' + e.alta, compCorta(e.comp) || e.comp, e.liga ? ligaCorta(e.liga) : ''].filter(String).join(' · ')) + '</div>' +
+              (e.error ? '<div class="gs-tags">' + tag('ERROR', 'gs-tag-r') + '</div>' : '') + '</div></button>';
+          }).join('') + '</div>' : '<p class="gs-nota">Ninguna.</p>');
+        v.el.innerHTML = v.el.querySelector('h2').outerHTML + h;
+        [].forEach.call(v.el.querySelectorAll('[data-gs-j]'), function (b) { b.onclick = function () { fichaJugadora(r.jugadoras[Number(b.getAttribute('data-gs-j'))], o, { gidJ: r.gidJ }); }; });
+        [].forEach.call(v.el.querySelectorAll('[data-gs-ce]'), function (b) { b.onclick = function () { fichaEquipo(r.equipos[Number(b.getAttribute('data-gs-ce'))], o, { gidE: r.gidE }); }; });
+      });
+    }).then(null, function (e) { var g = v.el.querySelector('.gs-cargando'); if (g) g.outerHTML = errorHtml(e); });
   }
 
   M.GESTION = { abrir: abrir };
