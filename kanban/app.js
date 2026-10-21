@@ -10,7 +10,7 @@
   var CLAVE = 'kanban_' + (C.clave || 'negocio');
   // T0133: carpeta de este archivo (…/kanban/), para cargar los módulos de las secciones (economia.js…).
   var BASE = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/[^/]*$/, '') : '../kanban/'; })();
-  var VERSION_MODULOS = '5';
+  var VERSION_MODULOS = '6';
 
   function leer() { try { return JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) { return null; } }
   function guardar(o) { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) {} }
@@ -193,7 +193,8 @@
       '#alta-btn{bottom:calc(84px + env(safe-area-inset-bottom,0px))!important}' +
       '#alta-aviso,#estado-aviso{bottom:calc(140px + env(safe-area-inset-bottom,0px))!important}' +
       '#sx-panel{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:#1A1A40}' +
-      'body.sx-otra>*:not(.sx):not(#sx-panel):not(script):not(style){display:none!important}' +
+      // T0135: las ventanas de versión y de «Pedir algo a Utilo» del kanban se pueden abrir desde cualquier sección.
+      'body.sx-otra>*:not(.sx):not(#sx-panel):not(script):not(style):not(.ver-velo):not(.sol-velo){display:none!important}' +
       '@media(min-width:900px){.sx{position:sticky;top:0;bottom:auto;border-top:0;border-bottom:1px solid #e3e3ee;box-shadow:none;padding-bottom:0}' +
       '.sx-in{max-width:none;margin:0;padding:0 10px;gap:2px}' +
       '.sx a{flex:0 0 auto;flex-direction:row;gap:7px;min-height:46px;padding:0 14px;font-size:14px;border-top:0;border-bottom:3px solid transparent}' +
@@ -284,7 +285,10 @@
   function abrir(cred) {
     var id = new URLSearchParams(location.search).get('id') || '';
     var pedida = seccionPedida();
-    if (!id && pedida && pedida !== 'KANBAN') {
+    // T0135: con KANBAN en el perfil, una sección abierta directamente (?s=economia) también carga el tablero por
+    // debajo, para tener la versión y «Pedir algo a Utilo» en todas las secciones (el tablero abre la sección de la URL).
+    var conKanban = (cred.secciones || []).indexOf('KANBAN') >= 0;
+    if (!id && pedida && pedida !== 'KANBAN' && !conKanban) {
       // Otra sección abierta directamente: si ya sabemos sus secciones, se pinta al momento
       // y se comprueba con el servidor por detrás.
       var permitida = function (secs, perfil) { return seccionesBarra(secs, perfil).indexOf(pedida) >= 0; };
@@ -299,7 +303,7 @@
       }, error);
       return;
     }
-    cargando('Cargando el kanban…');
+    cargando(pedida && pedida !== 'KANBAN' ? 'Cargando…' : 'Cargando el kanban…');
     llamar({ fn: 'pagina', id: id, persona: cred.persona, pin: cred.pin }).then(function (p) {
       recordarSecciones(cred, p.secciones, p.perfil);
       var html = String(p.html || '');
