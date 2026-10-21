@@ -11,6 +11,18 @@
   // T0133: carpeta de este archivo (…/kanban/), para cargar los módulos de las secciones (economia.js…).
   var BASE = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/[^/]*$/, '') : '../kanban/'; })();
   var VERSION_MODULOS = '12';
+  // T0150: diseño de PROTOCOLO DISEÑO UTILO. Solo para los negocios que tienen su marca.css (index.html con marca: '…').
+  // Los demás (Konamigas hasta T0149) siguen exactamente como antes.
+  var MARCA = String(C.marca || '').replace(/[^a-z0-9_-]/gi, '');
+  var RAIZ = BASE.replace(/kanban\/$/, '');
+  function linksEstilos() {
+    if (!MARCA) return '';
+    return '<link rel="stylesheet" href="' + RAIZ + MARCA + '/marca.css?v=' + VERSION_MODULOS + '">' +
+      '<link rel="stylesheet" href="' + RAIZ + 'estilos/base.css?v=' + VERSION_MODULOS + '">';
+  }
+  function boton(txt, extra, tipo) { // T0150: botón con las clases de base.css (o el de siempre sin marca)
+    return '<button' + (tipo ? ' type="' + tipo + '"' : '') + (MARCA ? ' class="u-btn' + (extra ? ' ' + extra : '') + '"' : '') + '>' + texto(txt) + '</button>';
+  }
 
   function leer() { try { return JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) { return null; } }
   function guardar(o) { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) {} }
@@ -37,7 +49,9 @@
 
   function pantalla(html) { document.body.innerHTML = '<div class="kz">' + html + '</div>'; }
 
-  function cargando(msg) { pantalla('<div class="kz-caja"><div class="kz-giro"></div><p>' + texto(msg || 'Cargando…') + '</p></div>'); }
+  function cargando(msg) {
+    pantalla('<div class="kz-caja' + (MARCA ? ' kz-centro' : '') + '" role="status"><div class="' + (MARCA ? 'u-carga' : 'kz-giro') + '"></div><p>' + texto(msg || 'Cargando…') + '</p></div>');
+  }
 
   function acceso(aviso) {
     cargando('Conectando…');
@@ -56,7 +70,7 @@
         '<h1>' + texto(ini.titulo || 'Kanban') + '</h1>' +
         (ops ? '<label>¿Quién eres?<select id="kz-persona">' + ops + '</select></label>' +
           '<label>PIN<input id="kz-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="current-password"></label>' +
-          '<button type="submit">Entrar</button>' +
+          boton('Entrar', 'u-btn-accion', 'submit') +
           '<p class="kz-ayuda">' + texto('¿Has olvidado el PIN? Habla con un administrador para que te ponga uno nuevo.') + '</p>'
           : '<p>Todavía nadie tiene PIN. Ponlo en la pestaña ACCESOS del DAILY.</p>') +
         '<p class="kz-aviso" id="kz-aviso">' + texto(aviso || '') + '</p></form>');
@@ -77,7 +91,7 @@
         });
       };
     }, function (e) {
-      pantalla('<div class="kz-caja"><p>' + texto(e.message) + '</p><button onclick="location.reload()">Reintentar</button></div>');
+      pantalla('<div class="kz-caja"><p>' + texto(e.message) + '</p>' + boton('Volver a intentarlo').replace('<button', '<button onclick="location.reload()"') + '</div>');
     });
   }
 
@@ -104,7 +118,7 @@
       '<link rel="icon" href="icono-192.png"><meta name="apple-mobile-web-app-capable" content="yes">' +
       '<meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="' + texto(C.color || '#ffffff') + '">' +
       '<meta name="apple-mobile-web-app-title" content="' + texto(C.nombreApp || 'Kanban') + '">' +
-      '<script>' + puente(cred) + '<\/script>';
+      '<script>' + puente(cred) + '<\/script>' + linksEstilos();
   }
 
   /* ---------- secciones (T0132) ----------
@@ -129,6 +143,18 @@
 
   function infoSeccion(s) {
     return SECCIONES[s] || { t: s.charAt(0) + s.slice(1).toLowerCase(), i: '•' };
+  }
+
+  /* T0150: iconos de la barra en SVG (mismo trazo y tamaño), en lugar de emojis. Solo con marca. */
+  var ICONOS = {
+    KANBAN: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/>',
+    GESTION: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    ECONOMIA: '<path d="M17 6.5A7 7 0 1 0 17 17.5"/><path d="M4 10.5h9M4 13.5h9"/>',
+    LIGAS: '<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4"/><path d="M12 13v4M9 20h6"/>',
+    PERFIL: '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"/>'
+  };
+  function icono(s) {
+    return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (ICONOS[s] || '<circle cx="12" cy="12" r="3"/>') + '</svg>';
   }
 
   function seccionPedida() {
@@ -164,9 +190,26 @@
       '</div></main>';
   }
 
+  /** T0150: Perfil con el diseño común. Sin promesas de lo que vendrá: solo quién eres y cerrar sesión. */
+  function htmlPerfilU(cred) {
+    return '<div class="u"><header class="u-cab"><h1>Perfil</h1></header><main class="u-main u-perfil">' +
+      '<div class="u-perfil-quien"><strong>' + texto(cred.persona || '') + '</strong>' +
+      (cred.perfil ? '<span>' + texto(cred.perfil) + '</span>' : '') + '</div>' +
+      '<dl><dt>Aplicación</dt><dd>' + texto(C.nombreApp || 'Kanban') + '</dd>' +
+      '<dt>Dispositivo</dt><dd>Sesión guardada en este dispositivo</dd></dl>' +
+      '<a class="u-btn" href="' + texto(location.pathname + '?salir') + '" target="_top">Cerrar sesión</a>' +
+      '<p class="u-nota">Al cerrar la sesión tendrás que volver a poner tu PIN.</p>' +
+      '</main></div>';
+  }
+
   /** Contenido de una sección que aún no está hecha. */
   function htmlSeccion(s, cred) {
-    if (s === 'PERFIL') return htmlPerfil(cred || {});
+    if (s === 'PERFIL') return MARCA ? htmlPerfilU(cred || {}) : htmlPerfil(cred || {});
+    if (MARCA && !infoSeccion(s).js) {
+      return '<div class="u"><header class="u-cab"><h1>' + texto(infoSeccion(s).t) + '</h1></header><main class="u-main">' +
+        '<p><strong>Esta sección todavía no está lista.</strong></p>' +
+        '<p class="u-nota">Mientras tanto, lo que necesites de aquí pídelo desde el tablero.</p></main></div>';
+    }
     if (infoSeccion(s).js) return '<div data-sx-mod="' + texto(s) + '"><div style="padding:60px 18px;text-align:center;opacity:.7">Cargando…</div></div>';
     var f = infoSeccion(s), color = C.color || '#0E8A7A';
     return '<header style="background:' + texto(color) + ';color:#fff;padding:14px 18px"><h1 style="margin:0;font-size:24px;letter-spacing:.5px;color:#fff">' +
@@ -204,6 +247,12 @@
 
   function barra(secs, actual) {
     if (!secs || secs.length < 2) return '';
+    if (MARCA) { // T0150: estilos en estilos/base.css, iconos SVG
+      return '<nav class="sx u-sx" aria-label="Secciones"><div class="sx-in">' + secs.map(function (s) {
+        return '<a href="' + texto(urlSeccion(s)) + '" target="_top" data-sx="' + texto(s) + '"' + (s === actual ? ' aria-current="page"' : '') + '>' +
+          icono(s) + '<span>' + texto(infoSeccion(s).t) + '</span></a>';
+      }).join('') + '</div></nav>';
+    }
     var as = secs.map(function (s) {
       var f = infoSeccion(s);
       return '<a href="' + texto(urlSeccion(s)) + '" target="_top" data-sx="' + texto(s) + '"' + (s === actual ? ' aria-current="page"' : '') + '>' +
@@ -263,6 +312,7 @@
   /** Página suelta de una sección (cuando se abre directamente con ?s=…, sin pasar por el tablero). */
   function pintarSeccion(cred, secs, s) {
     document.title = infoSeccion(s).t + ' · ' + (C.nombreApp || 'App');
+    if (MARCA) document.body.className = 'u u-con-barra'; // T0150
     document.body.innerHTML = barra(seccionesBarra(secs, cred.perfil), s) + '<div id="sx-panel">' + htmlSeccion(s, cred) + '</div>';
     window.SX_CTX = ctxModulos(cred); // T0133
     abrirModulo(document.getElementById('sx-panel'));
@@ -271,7 +321,7 @@
   function error(e) {
     if (e.acceso) { borrar(); acceso(e.message.replace(/^ACCESO:\s*/, '')); return; }
     pantalla('<div class="kz-caja"><p>' + texto(e.message.replace(/^SECCION:\s*/, '')) +
-      '</p><button onclick="location.reload()">Reintentar</button></div>');
+      '</p>' + boton('Volver a intentarlo').replace('<button', '<button onclick="location.reload()"') + '</div>');
   }
 
   /** Guarda en el dispositivo las secciones de la persona (para pintar la barra al momento). */
@@ -315,7 +365,10 @@
         var sb = seccionesBarra(p.secciones, p.perfil);
         var nav = barra(sb, 'KANBAN');
         if (nav) {
-          html = html.replace(/<body[^>]*>/i, function (m) { return m + nav + '<div id="sx-panel"></div>'; });
+          html = html.replace(/<body[^>]*>/i, function (m) {
+            if (MARCA) m = /class="/i.test(m) ? m.replace(/class="/i, 'class="u-con-barra ') : m.replace(/>$/, ' class="u-con-barra">'); // T0150
+            return m + nav + '<div id="sx-panel"></div>';
+          });
           var sc = scriptBarra(sb, cred);
           if (/<\/body>/i.test(html)) html = html.replace(/<\/body>(?![\s\S]*<\/body>)/i, function (m) { return sc + m; });
           else html += sc;
