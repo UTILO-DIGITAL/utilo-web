@@ -550,8 +550,8 @@
     ];
     var checks = [
       { k: 'M.I ENVIADO', t: 'si', et: 'Mensaje inicial enviado (M.I)', v: e.mi },
-      { k: 'F.J', t: 'si', et: 'Formulario de jugadoras enviado (F.J)', v: e.fj },
-      { k: 'Gr C/TS', t: 'si', et: 'En el grupo de capis / Team Search (Gr C/TS)', v: e.gr },
+      { k: 'F.J', t: 'si', et: 'Equipo añadido al formulario de jugadoras (F.J)', v: e.fj },
+      { k: 'Gr C/TS', t: 'si', et: 'En el grupo de WhatsApp de capitanas o de Team Search (Gr C/TS)', v: e.gr },
       { k: 'E.E ENVIADO', t: 'si', et: 'Estado del equipo enviado (E.E)', v: e.ee },
       { k: 'XPORTY', t: 'si', et: 'Dado de alta en Xporty', v: e.xporty },
       { k: 'CASH', t: 'si', et: 'Paga en efectivo', v: e.cash },
