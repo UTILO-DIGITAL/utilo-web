@@ -562,7 +562,11 @@
     return esc(em) + ' → ' + esc(re);
   }
   function opciones() {
-    return S.opciones ? Promise.resolve(S.opciones) : llamar('economiaOpciones').then(function (o) { S.opciones = o; return o; });
+    return S.opciones ? Promise.resolve(S.opciones) : llamar('economiaOpciones').then(function (o) {
+      // Fuera notas de CONFIG que se cuelan en la lista de categorías (textos largos o con «»).
+      o.categorias = (o.categorias || []).filter(function (c) { return c.n && c.n.length <= 40 && !/[«»]/.test(c.n); });
+      S.opciones = o; return o;
+    });
   }
   function urlExcel(fila) {
     var p = S.datos.pendientes && S.datos.pendientes.lista && S.datos.pendientes.lista[0];
