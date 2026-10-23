@@ -368,6 +368,8 @@ body.ver-bandeja .bj-tabs .hora { display: none; }
 /* T0173 (KANBAN_CORE v34): bloque «Empezar con Claude». Clases nuevas: las fichas de versiones anteriores no cambian */
 .u .claude-herr { margin: 0; font: 700 16px/1.4 var(--fuente-texto); color: var(--color-texto); }
 .u .claude .claude-ayuda { margin: var(--e1) 0 var(--e3); }
+/* Botón coral más bajo que el de la acción de una pantalla; 19 px en negrita para que el blanco sobre coral sea texto grande */
+.u .claude-herr ~ .claude-fila .accion { min-height: 44px; padding: 0 var(--e4); font: 700 19px/1 var(--fuente-texto); }
 .u .claude-msg { margin-top: var(--e2); }
 .u .claude-msg summary { display: inline-flex; align-items: center; min-height: 44px; cursor: pointer;
   font: 700 14px/1.2 var(--fuente-texto); color: var(--color-principal-oscuro); list-style: none; }
