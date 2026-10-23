@@ -455,3 +455,19 @@ body.ver-bandeja .bj-tabs .hora { display: none; }
 .u .cab .meta { flex: 1 1 100%; order: 3; }
 .u .cab .meta { display: inline-block; flex: 0 0 auto; padding: 0 var(--e2); border-radius: var(--radio-peq);
   background: var(--color-fondo); color: var(--color-texto); font: 600 13px/1.8 var(--fuente-texto); }
+
+/* ===================== Ficha en una ventana sobre el tablero (FICHA_VENTANA_WEB · T0172) ===================== */
+html.fv-abierta, html.fv-abierta body { overflow: hidden; }
+.u .fv-velo { position: fixed; inset: 0; z-index: 60; background: var(--color-velo); display: none;
+  align-items: center; justify-content: center; padding: var(--e5) var(--e4); }
+.u .fv-velo.abierto { display: flex; }
+.u .fv-caja { width: 100%; max-width: 900px; height: 100%; background: var(--color-fondo); border-radius: var(--radio);
+  box-shadow: var(--sombra-flota); overflow: hidden; display: flex; flex-direction: column; }
+.u .fv-marco { flex: 1 1 auto; display: block; width: 100%; height: 100%; border: 0; background: var(--color-fondo); }
+.u .fv-carga { display: none; flex: 1 1 auto; flex-direction: column; align-items: center; justify-content: center; gap: var(--e3);
+  padding: var(--e5) var(--e4); text-align: center; color: var(--color-suave); font: 600 15px/1.4 var(--fuente-texto); }
+.u .fv-caja.cargando .fv-carga, .u .fv-caja.fallo .fv-carga { display: flex; }
+.u .fv-caja.cargando .fv-marco, .u .fv-caja.fallo .fv-marco { display: none; }
+.u .fv-error { max-width: 420px; color: var(--color-texto); }
+.u .fv-error-bot { display: flex; flex-wrap: wrap; gap: var(--e2); justify-content: center; margin-top: var(--e3); }
+@media (max-width: 640px) { .u .fv-velo { padding: 0; } .u .fv-caja { max-width: none; border-radius: 0; } }
