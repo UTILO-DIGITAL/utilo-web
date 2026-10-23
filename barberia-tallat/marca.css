@@ -2,23 +2,24 @@
  * Marca de Barbería Tallat en pantalla · T0029
  * Barbería inventada para la demo de visitas (Sant Antoni, Barcelona). No es un cliente real.
  * Es el único sitio con sus colores: las vistas solo usan var(--…). Cambiar aquí cambia todas.
+ * Marca oscura: el negro del sillón, el latón de los espejos y el rojo del poste de barbero.
+ * Como el fondo es oscuro, «principal-oscuro» es el latón claro: el que se lee en texto pequeño.
  * Orden de carga: marca.css → ../estilos/base.css
  * Su ficha de estilo está en el guion de la demo (07_DEMOS).
  */
-@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Atkinson+Hyperlegible:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Atkinson+Hyperlegible:wght@400;700&display=swap');
 
 :root {
-  /* Paleta: el azul del sillón y el rojo del poste de barbero, sobre azulejo claro */
-  --color-fondo: #F4F6F5;            /* azulejo claro · fondo general */
-  --color-principal: #17405A;        /* azul petróleo · cabecera y titulares */
-  --color-principal-oscuro: #12344A; /* azul oscuro · enlaces y texto pequeño */
-  --color-accion: #C62B2B;           /* rojo poste · solo el botón principal */
-  --color-destacado: #E3B23C;        /* latón · subrayado de una cifra por pantalla, nunca en texto */
-  --color-bloque: #DCE6EA;           /* azul lavado · bloques y etiquetas suaves */
-  --color-texto: #14212B;            /* casi negro azulado · texto corrido */
-  --color-sobre-principal: #F4F6F5;  /* texto sobre azul petróleo */
+  --color-fondo: #11171B;            /* negro sillón · fondo general */
+  --color-principal: #D4A853;        /* latón · rótulo, titulares y lo elegido */
+  --color-principal-oscuro: #E6C380; /* latón claro · enlaces, etiquetas y bordes de botón */
+  --color-accion: #C2302A;           /* rojo poste · solo el botón principal */
+  --color-destacado: #E6C380;        /* latón claro · subrayado de una cifra por pantalla */
+  --color-bloque: #1D262C;           /* gris pizarra · bloques y etiquetas suaves */
+  --color-texto: #EFE9DD;            /* crema · texto corrido */
+  --color-sobre-principal: #11171B;  /* texto sobre latón */
   --color-sobre-accion: #FFFFFF;     /* texto sobre rojo: grande y en negrita (botones) */
-  --color-superficie: #FFFFFF;       /* campos y filas sobre el fondo */
+  --color-superficie: #182026;       /* campos, filas y tarjetas sobre el fondo */
 
   /* Letras: la de rótulo para títulos y una muy legible para el resto */
   --fuente-titulos: 'Big Shoulders Display', 'Arial Narrow', sans-serif;

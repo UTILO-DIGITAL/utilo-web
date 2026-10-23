@@ -8,200 +8,319 @@
 <!--
   Demo navegable de Utilo para visitas a barberías · T0029
   Barbería inventada, datos inventados. Nada se guarda ni se envía: todo vive en esta página.
-  Menú de la demo: pulsación larga en el logo (o la tecla M).
+  En tablet apaisada y ordenador se ven a la vez el móvil del cliente y el mostrador de la barbería.
+  En el móvil se ve una cosa cada vez; se cambia con el menú de la demo: pulsación larga en el logo (o la tecla M).
   Orden de carga del PROTOCOLO DISEÑO UTILO: marca.css → ../estilos/base.css.
   Los estilos de abajo son solo de esta demo y usan las variables de la marca (sin HEX).
 -->
 <link rel="stylesheet" href="marca.css">
 <link rel="stylesheet" href="../estilos/base.css">
 <style>
-/* Composición: una columna en el móvil; en el ordenador, paso + resumen de la cita y agenda en tres columnas (una por barbero) */
-.tl-in { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+/* Composición: en el móvil, una pantalla (cliente o barbería); desde 980 px, el móvil del cliente a la izquierda
+   y el mostrador de la barbería a la derecha, para ver entrar la cita en directo. */
 
-/* Cabecera con el rótulo y la franja del poste (el recurso propio de la marca, una vez por pantalla) */
-.tl-cab { background: var(--color-principal); color: var(--color-sobre-principal); padding-top: env(safe-area-inset-top, 0px); }
-.tl-cab-in { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); padding-block: var(--e2); }
-.tl-logo { display: flex; flex-direction: column; justify-content: center; min-height: 48px; padding: 0; border: 0; background: none;
-  color: inherit; text-align: left; cursor: pointer; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
-.tl-logo-nom { font: var(--peso-titulos) 34px/0.95 var(--fuente-titulos); letter-spacing: .08em; text-transform: uppercase; }
-.tl-logo-sub { font: 700 12px/1.3 var(--fuente-texto); letter-spacing: .08em; text-transform: uppercase; }
-.tl-cab-info { margin: 0; font-size: 13px; text-align: right; }
-.tl-poste { display: block; width: 100%; height: 6px; }
-.tl-poste .p1 { fill: var(--color-accion); } .tl-poste .p2 { fill: var(--color-sobre-principal); } .tl-poste .p3 { fill: var(--color-principal); }
+/* En una marca oscura, el velo y la sombra salen del fondo, no del texto (que es claro) */
+:root {
+  --color-velo: color-mix(in srgb, var(--color-fondo) 78%, transparent);
+  --sombra-flota: 0 10px 28px color-mix(in srgb, var(--color-fondo) 60%, black);
+  --marco: color-mix(in srgb, var(--color-fondo) 55%, black);
+}
+body.u { min-height: 100%; }
 
-.tl-main { padding-block: var(--e5) var(--e7); }
-.u .tl-main h1 { font-size: 30px; color: var(--color-principal); text-wrap: balance; }
-.u .tl-main h2 { font-size: 22px; color: var(--color-principal); }
-.tl-cabeza { display: flex; flex-direction: column; gap: var(--e1); margin-bottom: var(--e4); }
+/* ---------- Escena ---------- */
+.tl-escena { min-height: 100vh; }
+.tl-lado-tit { display: none; }
+@media (max-width: 979px) {
+  body[data-lado=cli] .tl-lado-neg, body[data-lado=neg] .tl-lado-cli { display: none; }
+}
+@media (min-width: 980px) {
+  .tl-escena { display: grid; grid-template-columns: 392px minmax(0, 1fr); gap: var(--e7); align-items: start;
+    max-width: 1440px; margin: 0 auto; padding: var(--e5) max(var(--e5), env(safe-area-inset-right, 0px)) var(--e7) max(var(--e5), env(safe-area-inset-left, 0px)); }
+  .tl-lado-cli { position: sticky; top: var(--e5); }
+  .tl-lado-tit { display: block; margin: 0 0 var(--e3); }
+}
+
+/* ---------- El móvil del cliente ---------- */
+.tl-movil { position: relative; }
+.tl-pantalla { min-height: 100vh; background: var(--color-fondo); }
+.tl-estado { display: none; }
+@media (min-width: 980px) {
+  /* Marco del teléfono: excepción al radio único, porque dibuja el aparato y no es un componente */
+  .tl-movil { width: 392px; height: min(812px, calc(100vh - 80px)); border: 10px solid var(--marco); border-radius: 44px;
+    outline: 1px solid var(--color-linea); overflow: hidden; display: flex; flex-direction: column; background: var(--color-fondo); }
+  .tl-estado { display: flex; justify-content: space-between; align-items: center; flex: none; height: 32px; padding: 0 var(--e5);
+    font: 700 13px/1 var(--fuente-texto); font-variant-numeric: tabular-nums; color: var(--color-texto); background: var(--color-fondo); }
+  .tl-estado svg { width: 34px; height: 12px; fill: currentColor; }
+  .tl-pantalla { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+  .tl-pantalla::-webkit-scrollbar { display: none; }
+}
+
+/* Rótulo de la barbería con la franja del poste (recurso propio, una vez por pantalla) */
+.tl-cab { padding-top: env(safe-area-inset-top, 0px); background: var(--color-fondo); }
+.tl-cab-in { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--e3);
+  padding: var(--e4) max(16px, env(safe-area-inset-right, 0px)) var(--e3) max(16px, env(safe-area-inset-left, 0px)); }
+.tl-logo { display: flex; flex-direction: column; min-height: 44px; padding: 0; border: 0; background: none; color: var(--color-principal);
+  text-align: left; cursor: pointer; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+.tl-logo-nom { font: 900 44px/0.85 var(--fuente-titulos); letter-spacing: .1em; text-transform: uppercase; }
+.tl-logo-sub { margin-top: var(--e1); font: 700 12px/1.3 var(--fuente-texto); letter-spacing: .1em; white-space: nowrap; text-transform: uppercase; color: var(--color-texto); }
+.tl-abierto { margin: 0 0 0 auto; font-size: 13px; text-align: right; color: var(--color-suave); }
+.tl-abierto strong { display: block; color: var(--color-texto); }
+.tl-poste { display: block; width: 100%; height: 8px; }
+.tl-poste .p1 { fill: var(--color-accion); } .tl-poste .p2 { fill: var(--color-texto); } .tl-poste .p3 { fill: var(--color-fondo); }
+
+.tl-cli { padding: var(--e5) max(16px, env(safe-area-inset-right, 0px)) var(--e7) max(16px, env(safe-area-inset-left, 0px)); }
+.u .tl-cli h1 { font-size: 34px; line-height: 1; color: var(--color-texto); text-transform: uppercase; letter-spacing: .02em; text-wrap: balance; }
+.tl-cabeza { display: flex; flex-direction: column; gap: var(--e2); margin-bottom: var(--e4); }
 .tl-cabeza p { margin: 0; }
 .tl-atras { align-self: flex-start; margin-left: calc(-1 * var(--e2)); }
+.tl-pasos { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--e1); }
+.tl-pasos span { height: 4px; background: var(--color-bloque); }
+.tl-pasos span.on { background: var(--color-principal); }
 .tl-pie { margin-top: var(--e6); }
 
-/* Paso + resumen */
-.tl-paso-grid { display: grid; gap: var(--e6); }
-.tl-paso-grid > * { min-width: 0; }
-.tl-aside { display: none; }
-.tl-resumen-linea { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e2); margin: 0 0 var(--e4); }
-@media (min-width: 900px) {
-  .tl-paso-grid { grid-template-columns: minmax(0, 1fr) 320px; gap: var(--e7); align-items: start; }
-  .tl-aside { display: block; position: sticky; top: var(--e5); }
-  .tl-resumen-linea { display: none; }
-}
-.tl-resumen h2 { margin-bottom: var(--e3); }
-.tl-resumen dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--e2) var(--e4); margin: 0; }
-.tl-resumen dt { font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .02em; }
-.tl-resumen dd { margin: 0; font-weight: 700; }
-.tl-resumen .vacio { color: var(--color-suave); font-weight: 400; }
+/* Servicios: baldosas que se tocan */
+.tl-servicios { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e2); }
+.tl-serv { display: flex; flex-direction: column; justify-content: space-between; gap: var(--e3); min-height: 132px; padding: var(--e4);
+  border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto);
+  font: inherit; text-align: left; cursor: pointer; transition: border-color 150ms; }
+.tl-serv:hover, .tl-barb:hover { border-color: var(--color-principal); }
+.tl-serv:last-child:nth-child(odd) { grid-column: 1 / -1; min-height: 96px; }
+.tl-serv .nom { font: 800 22px/1 var(--fuente-titulos); text-transform: uppercase; letter-spacing: .02em; }
+.tl-serv .det { font-size: 13px; color: var(--color-suave); }
+.tl-serv .pie { display: flex; align-items: baseline; justify-content: space-between; gap: var(--e2); }
+.tl-serv .eur { font: 800 30px/1 var(--fuente-titulos); color: var(--color-principal); font-variant-numeric: tabular-nums; }
 
-/* Listas de servicios y barberos */
-.tl-lista { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
-.tl-lista button { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--e1) var(--e4); width: 100%;
-  min-height: 64px; padding: var(--e3) var(--e2); border: 0; border-bottom: 1px solid var(--color-linea); background: transparent;
-  color: var(--color-texto); font: inherit; text-align: left; cursor: pointer; }
-.tl-lista button:hover { background: var(--color-bloque); }
-.tl-lista .nom { font-weight: 700; font-size: 17px; }
-.tl-lista .det { grid-column: 1; font-size: 13px; color: var(--color-suave); }
-.tl-lista .eur { grid-row: 1 / span 2; grid-column: 2; font-weight: 700; font-size: 17px; font-variant-numeric: tabular-nums; text-align: right; }
-.tl-lista svg { grid-row: 1 / span 2; grid-column: 2; color: var(--color-principal-oscuro); }
+/* Barberos */
+.tl-barberos { display: flex; flex-direction: column; gap: var(--e2); }
+.tl-barb { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: var(--e1) var(--e4); align-items: center; padding: var(--e3);
+  border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto);
+  font: inherit; text-align: left; cursor: pointer; transition: border-color 150ms; }
+.tl-mono { grid-row: 1 / span 3; display: flex; align-items: flex-end; justify-content: flex-start; width: 64px; height: 64px; padding: var(--e1) var(--e2);
+  border-radius: var(--radio); background: var(--color-bloque); color: var(--color-principal); font: 900 34px/1 var(--fuente-titulos); text-transform: uppercase; }
+.tl-mono.todos { color: var(--color-texto); font-size: 22px; align-items: center; justify-content: center; }
+.tl-barb .nom { font: 800 22px/1 var(--fuente-titulos); text-transform: uppercase; }
+.tl-barb .det { font-size: 13px; color: var(--color-suave); }
+.tl-barb .hueco { font-size: 13px; font-weight: 700; color: var(--color-principal-oscuro); }
 
 /* Día y hora */
-.tl-dias { display: flex; gap: var(--e2); overflow-x: auto; padding-bottom: var(--e2); margin-bottom: var(--e4); scrollbar-width: thin; }
-.tl-dia { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 64px; min-height: 64px;
-  border: 1.5px solid var(--color-borde-campo); border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto);
-  font: inherit; cursor: pointer; }
-.tl-dia .dn { font: 700 12px/1.2 var(--fuente-texto); text-transform: uppercase; letter-spacing: .04em; }
-.tl-dia .dd { font: var(--peso-titulos) 22px/1 var(--fuente-titulos); font-variant-numeric: tabular-nums; }
+.tl-dias { display: flex; gap: var(--e2); overflow-x: auto; padding-bottom: var(--e2); margin-bottom: var(--e4); scrollbar-width: none; }
+.tl-dias::-webkit-scrollbar { display: none; }
+.tl-dia { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 68px; padding: var(--e2) 0;
+  border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto); font: inherit; cursor: pointer; }
+.tl-dia .dn { font: 700 12px/1.2 var(--fuente-texto); text-transform: uppercase; letter-spacing: .06em; }
+.tl-dia .dd { font: 900 28px/1 var(--fuente-titulos); font-variant-numeric: tabular-nums; }
+.tl-dia .dh { font-size: 12px; color: var(--color-suave); }
 .tl-dia[aria-pressed=true] { background: var(--color-principal); border-color: var(--color-principal); color: var(--color-sobre-principal); }
+.tl-dia[aria-pressed=true] .dh { color: var(--color-sobre-principal); }
 .tl-franja { margin: 0 0 var(--e2); }
-.tl-horas { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: var(--e2); margin-bottom: var(--e5); }
-.tl-hora { min-height: 44px; border: 1.5px solid var(--color-principal-oscuro); border-radius: var(--radio); background: var(--color-superficie);
+.tl-horas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e2); margin-bottom: var(--e5); }
+.tl-hora { min-height: 44px; border: 1px solid var(--color-principal-oscuro); border-radius: var(--radio); background: transparent;
   color: var(--color-principal-oscuro); font: 700 15px/1 var(--fuente-texto); font-variant-numeric: tabular-nums; cursor: pointer; }
 .tl-hora:hover { background: var(--color-bloque); }
 
+/* Resumen en chips */
+.tl-resumen { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e2); margin: 0 0 var(--e4); }
+
 /* Datos */
-.tl-form { display: flex; flex-direction: column; gap: var(--e4); max-width: 480px; }
+.tl-form { display: flex; flex-direction: column; gap: var(--e4); }
 .tl-form input:not([type=checkbox]) { width: 100%; }
 .tl-check { display: flex; gap: var(--e3); align-items: flex-start; font-size: 14px; }
 .tl-check input { margin-top: 2px; flex: none; }
-.tl-form .u-btn-accion { align-self: stretch; }
-@media (min-width: 640px) { .tl-form .u-btn-accion { align-self: flex-start; } }
-.tl-acciones { display: flex; flex-wrap: wrap; gap: var(--e3); margin-top: var(--e5); }
+.tl-form .u-btn-accion { width: 100%; min-height: 52px; }
 
-/* Cita reservada */
-.tl-hecho dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--e2) var(--e4); margin: var(--e4) 0 0; padding: var(--e4) 0;
-  border-block: 1px solid var(--color-linea); }
-.tl-hecho dt { font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .02em; }
-.tl-hecho dd { margin: 0; font-weight: 700; }
+/* Ticket de la cita: el resguardo de turno de la barbería, con su troquel */
+.tl-ticket { position: relative; margin: var(--e4) 0 var(--e5); border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); }
+.tl-ticket-a { padding: var(--e4); }
+.tl-ticket-a p { margin: 0; }
+.tl-ticket-a .num { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--color-suave); }
+.tl-ticket-a .hora { margin-top: var(--e2); font: 900 76px/0.9 var(--fuente-titulos); color: var(--color-principal); font-variant-numeric: tabular-nums; }
+.tl-ticket-a .dia { margin-top: var(--e1); font: 800 22px/1.1 var(--fuente-titulos); text-transform: uppercase; }
+.tl-ticket-b { position: relative; padding: var(--e4); border-top: 2px dashed var(--color-linea); }
+.tl-ticket-b::before, .tl-ticket-b::after { content: ""; position: absolute; top: -11px; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--color-fondo); border: 1px solid var(--color-linea); }
+.tl-ticket-b::before { left: -11px; clip-path: inset(0 0 0 50%); }
+.tl-ticket-b::after { right: -11px; clip-path: inset(0 50% 0 0); }
+.tl-ticket dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--e2) var(--e4); margin: 0; }
+.tl-ticket dt { font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .04em; }
+.tl-ticket dd { margin: 0; font-weight: 700; }
+.tl-acciones { display: flex; flex-wrap: wrap; gap: var(--e3); }
 
-/* Aviso que llega al móvil (flota: lleva la única sombra) */
+/* Aviso que llega al móvil (flota: lleva la sombra) */
 .tl-noti { position: fixed; z-index: 80; top: calc(var(--e2) + env(safe-area-inset-top, 0px));
   left: calc(var(--e2) + env(safe-area-inset-left, 0px)); right: calc(var(--e2) + env(safe-area-inset-right, 0px));
   max-width: 440px; margin: 0 auto; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: var(--e1) var(--e3); align-items: start;
-  padding: var(--e3); border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie);
+  padding: var(--e3); border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-bloque);
   color: var(--color-texto); box-shadow: var(--sombra-flota); font: inherit; text-align: left; cursor: pointer;
   transform: translateY(calc(-100% - 24px)); transition: transform 200ms ease-out; }
 .tl-noti.on { transform: none; }
 .tl-noti[hidden] { display: none; }
+@media (min-width: 980px) { .tl-noti { position: absolute; top: 40px; } }
 .tl-noti .app { grid-row: 1 / span 2; }
 .tl-noti .tit { display: flex; justify-content: space-between; gap: var(--e2); font-size: 13px; }
 .tl-noti .tit span { color: var(--color-suave); }
 .tl-noti .txt { font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.tl-av { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--radio);
-  background: var(--color-principal); color: var(--color-sobre-principal); font: var(--peso-titulos) 22px/1 var(--fuente-titulos); }
+.tl-av { display: flex; align-items: center; justify-content: center; flex: none; width: 40px; height: 40px; border-radius: var(--radio);
+  background: var(--color-principal); color: var(--color-sobre-principal); font: 900 24px/1 var(--fuente-titulos); }
 
 /* Chat simulado: neutro, sin la marca ni los colores de ninguna app de mensajería */
-.tl-chat { max-width: 560px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; background: var(--color-bloque); }
-.tl-chat-cab { display: flex; align-items: center; gap: var(--e3); padding: calc(var(--e2) + env(safe-area-inset-top, 0px)) var(--e3) var(--e2);
-  background: var(--color-superficie); border-bottom: 1px solid var(--color-linea); }
+.tl-chat { min-height: 100%; display: flex; flex-direction: column; background: var(--color-bloque); }
+.tl-pantalla.en-chat { background: var(--color-bloque); }
+.tl-chat-cab { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: var(--e3);
+  padding: calc(var(--e2) + env(safe-area-inset-top, 0px)) var(--e3) var(--e2); background: var(--color-superficie); border-bottom: 1px solid var(--color-linea); }
 .tl-chat-cab strong { display: block; }
 .tl-chat-cab div span { font-size: 13px; color: var(--color-suave); }
 .tl-msgs { flex: 1; display: flex; flex-direction: column; gap: var(--e3); padding: var(--e4) var(--e3); }
-.tl-sis { align-self: center; max-width: 90%; padding: var(--e1) var(--e3); border-radius: var(--radio-peq); background: var(--color-fondo);
-  color: var(--color-suave); font-size: 13px; text-align: center; }
+.tl-sis { align-self: center; max-width: 92%; margin: var(--e2) 0 0; padding: var(--e1) var(--e3); border-radius: var(--radio-peq);
+  background: var(--color-fondo); color: var(--color-suave); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; text-align: center; }
 .tl-msg { max-width: 86%; padding: var(--e2) var(--e3); border-radius: var(--radio); font-size: 15px; white-space: pre-line; }
-.tl-msg time { display: block; margin-top: var(--e1); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.tl-msg time { display: block; margin-top: var(--e1); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; color: var(--color-suave); }
 .tl-msg.neg { align-self: flex-start; background: var(--color-superficie); }
-.tl-msg.neg time { color: var(--color-suave); }
-.tl-msg.cli { align-self: flex-end; background: var(--color-principal); color: var(--color-sobre-principal); }
-.tl-resp { display: flex; flex-wrap: wrap; gap: var(--e2); padding: var(--e3); padding-bottom: calc(var(--e3) + env(safe-area-inset-bottom, 0px));
-  background: var(--color-superficie); border-top: 1px solid var(--color-linea); }
+.tl-msg.cli { align-self: flex-end; background: var(--color-principal); color: var(--color-sobre-principal); font-weight: 700; }
+.tl-msg.cli time { color: var(--color-sobre-principal); }
+.tl-msg .u-btn { margin-top: var(--e2); white-space: normal; }
+.tl-msg.entra { animation: tl-entra 200ms ease-out; }
+@keyframes tl-entra { from { opacity: 0; transform: translateY(6px); } }
+.tl-resp { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; gap: var(--e2); padding: var(--e3);
+  padding-bottom: calc(var(--e3) + env(safe-area-inset-bottom, 0px)); background: var(--color-superficie); border-top: 1px solid var(--color-linea); }
 .tl-resp p { flex: 1 0 100%; margin: 0; }
 .tl-resp .u-btn { flex: 1 1 0; padding: 0 var(--e2); }
 
-/* Agenda de la barbería */
-.tl-ag-cab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e3); margin-bottom: var(--e2); }
-.tl-ag-nav { display: flex; gap: var(--e2); }
-.tl-ag-sum { margin: 0 0 var(--e4); font-size: 15px; }
-.tl-cifra { font-weight: 700; font-variant-numeric: tabular-nums; text-decoration: underline; text-decoration-color: var(--color-destacado);
-  text-decoration-thickness: 4px; text-underline-offset: 4px; }
-.tl-filtros { display: flex; flex-wrap: wrap; gap: var(--e2); margin-bottom: var(--e3); }
-.tl-filtro { min-height: 44px; padding: 0 var(--e4); border: 1.5px solid var(--color-borde-campo); border-radius: var(--radio);
-  background: var(--color-superficie); color: var(--color-texto); font: 700 14px/1 var(--fuente-texto); cursor: pointer; }
-.tl-filtro[aria-pressed=true] { background: var(--color-principal); border-color: var(--color-principal); color: var(--color-sobre-principal); }
-.tl-citas { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
-.tl-cita { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 2px var(--e3); align-items: baseline;
-  padding: var(--e3) var(--e2); border-bottom: 1px solid var(--color-linea); }
-.tl-cita .h { font-weight: 700; font-variant-numeric: tabular-nums; }
-.tl-cita .c { font-weight: 700; min-width: 0; }
-.tl-cita .e { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
-.tl-cita .d { grid-column: 2 / span 2; display: flex; flex-wrap: wrap; align-items: center; gap: var(--e1) var(--e2); font-size: 13px; color: var(--color-suave); }
-.tl-cita.pasada .h, .tl-cita.pasada .c, .tl-cita.pasada .e { color: var(--color-suave); font-weight: 400; }
-.tl-cita.libre .c { color: var(--color-suave); font-weight: 400; }
-.tl-cita.nueva { background: var(--color-bloque); }
-.tl-cita.nueva .d { color: var(--color-texto); }
-.tl-cita.nueva .u-chip { background: var(--color-superficie); }
-.tl-ag-cols { display: none; }
-@media (min-width: 900px) {
-  .tl-ag-movil { display: none; }
-  .tl-ag-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e5); }
-  .tl-ag-cols h2 { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--e2); }
-  .tl-ag-cols h2 span { font: 400 13px/1 var(--fuente-texto); color: var(--color-suave); }
-  .tl-ag-cols .tl-cita { grid-template-columns: 48px minmax(0, 1fr) auto; }
-}
+/* ---------- El mostrador de la barbería ---------- */
+.tl-neg { padding: var(--e4) max(16px, env(safe-area-inset-right, 0px)) var(--e7) max(16px, env(safe-area-inset-left, 0px)); }
+@media (min-width: 980px) { .tl-neg { padding: 0; } }
+.tl-ncab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e3); padding-bottom: var(--e3);
+  border-bottom: 1px solid var(--color-linea); }
+.tl-ncab .tl-logo { flex-direction: row; align-items: baseline; gap: var(--e2); }
+.tl-ncab .tl-logo-nom { font-size: 30px; }
+.tl-ncab .tl-logo-sub { margin: 0; color: var(--color-suave); }
+.tl-ndia { display: flex; align-items: center; gap: var(--e2); }
+.u .tl-ndia h1 { min-width: 0; font-size: 24px; text-transform: uppercase; color: var(--color-texto); text-align: center; }
+@media (min-width: 980px) { .u .tl-ndia h1 { min-width: 220px; } }
 
-/* Menú de la demo */
-.tl-menu { padding: var(--e5) var(--e4); display: flex; flex-direction: column; gap: var(--e3); }
-.tl-menu h2 { font-size: 22px; color: var(--color-principal); }
-.tl-menu p { margin: 0; }
-.tl-menu .u-btn { width: 100%; justify-content: flex-start; }
-@media (min-width: 641px) { .u .u-velo { align-items: center; } .u .u-ventana { max-width: 420px; } }
+.tl-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: var(--e4) 0 var(--e2);
+  background: var(--color-linea); border: 1px solid var(--color-linea); border-radius: var(--radio); overflow: hidden; }
+@media (min-width: 640px) { .tl-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.tl-kpi { padding: var(--e3); background: var(--color-superficie); display: flex; flex-direction: column; gap: var(--e1); min-width: 0; }
+.tl-kpi .v { font: 900 34px/1 var(--fuente-titulos); font-variant-numeric: tabular-nums; }
+.tl-kpi .v.cifra { text-decoration: underline; text-decoration-color: var(--color-destacado); text-decoration-thickness: 4px; text-underline-offset: 6px; }
+.tl-kpi .barra { height: 4px; margin-top: var(--e1); background: var(--color-bloque); }
+.tl-kpi .barra span { display: block; height: 100%; background: var(--color-principal); transition: width 200ms; }
+.tl-kpi .n { font-size: 12px; color: var(--color-suave); }
+.tl-mes { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e4); margin: 0 0 var(--e5); font-size: 13px; color: var(--color-suave); }
+.tl-mes strong { color: var(--color-texto); font-variant-numeric: tabular-nums; }
+.tl-mes .cambio, .tl-mes .cambio strong { color: var(--color-principal-oscuro); }
+
+/* Cuadrante: una columna por barbero; cada cita mide lo que dura */
+.tl-cuad-cab { display: grid; grid-template-columns: 44px repeat(3, minmax(0, 1fr)); gap: var(--e2); align-items: end; padding-bottom: var(--e2);
+  position: sticky; top: 0; z-index: 3; background: var(--color-fondo); }
+.tl-cuad-cab strong { font: 800 20px/1 var(--fuente-titulos); text-transform: uppercase; }
+.tl-cuad-cab span { display: block; font-size: 12px; color: var(--color-suave); }
+.tl-cuad { position: relative; display: grid; grid-template-columns: 44px repeat(3, minmax(0, 1fr)); gap: var(--e2); }
+.tl-eje { position: relative; }
+.tl-eje span { position: absolute; left: 0; font-size: 12px; font-weight: 700; color: var(--color-suave); font-variant-numeric: tabular-nums; transform: translateY(-50%); }
+.tl-eje span:first-child { transform: none; }
+.tl-col { position: relative; background: var(--color-superficie); border-radius: var(--radio); }
+.tl-linea { position: absolute; left: 0; right: 0; height: 1px; background: var(--color-linea); }
+.tl-blq { position: absolute; left: 3px; right: 3px; display: flex; flex-direction: column; justify-content: flex-start; gap: 1px; overflow: hidden;
+  padding: 3px var(--e2); border: 1px solid var(--color-linea); border-radius: var(--radio-peq); background: var(--color-bloque); color: var(--color-texto);
+  font: inherit; text-align: left; cursor: pointer; }
+.tl-blq .c { font-size: 13px; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-blq .s { font-size: 12px; line-height: 1.2; color: var(--color-suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-blq.pasada { opacity: .5; }
+.tl-blq.corto { flex-direction: row; align-items: center; gap: var(--e2); padding-block: 0; }
+@media (max-width: 639px) { .tl-blq .hh { display: none; } }
+.tl-blq.mia { border: 2px solid var(--color-principal); background: color-mix(in srgb, var(--color-principal) 22%, var(--color-superficie)); }
+.tl-blq.mia .s { color: var(--color-texto); }
+.tl-blq.flash { animation: tl-flash 200ms ease-out 3; }
+@keyframes tl-flash { 50% { background: var(--color-principal); color: var(--color-sobre-principal); } }
+.tl-ahora { position: absolute; left: 52px; right: 0; height: 2px; background: var(--color-principal); z-index: 2; pointer-events: none; }
+.tl-leyenda { display: flex; flex-wrap: wrap; gap: var(--e2) var(--e4); margin: var(--e4) 0 0; font-size: 13px; color: var(--color-suave); }
+.tl-leyenda i { display: inline-block; width: 12px; height: 12px; margin-right: var(--e1); vertical-align: -1px; border-radius: var(--radio-peq);
+  background: var(--color-bloque); border: 1px solid var(--color-linea); }
+.tl-leyenda i.mia { border: 2px solid var(--color-principal); background: color-mix(in srgb, var(--color-principal) 22%, var(--color-superficie)); }
+.tl-leyenda i.ahora { height: 2px; border: 0; vertical-align: 3px; background: var(--color-principal); }
+
+/* Aviso del mostrador cuando entra o cambia una cita */
+.tl-toast { position: fixed; z-index: 70; left: 50%; transform: translateX(-50%); bottom: calc(var(--e5) + env(safe-area-inset-bottom, 0px));
+  width: max-content; max-width: calc(100% - var(--e6)); display: flex; gap: var(--e3); align-items: center; padding: var(--e3) var(--e4);
+  border: 1px solid var(--color-principal); border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto);
+  box-shadow: var(--sombra-flota); font-size: 15px; }
+.tl-toast[hidden] { display: none; }
+.tl-toast strong { color: var(--color-principal); font: 800 18px/1 var(--fuente-titulos); text-transform: uppercase; white-space: nowrap; }
+@media (min-width: 980px) { .tl-toast { left: calc(50% + 220px); max-width: calc(100% - 520px); } }
+
+/* Ficha del cliente y menú de la demo */
+.tl-ficha, .tl-menu { padding: var(--e5) var(--e4); display: flex; flex-direction: column; gap: var(--e3); }
+.u .tl-ficha h2, .u .tl-menu h2 { font-size: 30px; text-transform: uppercase; color: var(--color-texto); }
+.tl-ficha p, .tl-menu p { margin: 0; }
+.tl-ficha dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--e2) var(--e4); margin: 0; padding: var(--e3) 0; border-block: 1px solid var(--color-linea); }
+.tl-ficha dt { font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .04em; }
+.tl-ficha dd { margin: 0; font-weight: 700; }
+.tl-ficha table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tl-ficha th { text-align: left; font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .04em; padding: 0 0 var(--e1); }
+.tl-ficha td { padding: var(--e2) 0; border-top: 1px solid var(--color-linea); }
+.tl-ficha td.num, .tl-ficha th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.tl-ficha .vueltas { display: flex; gap: var(--e3); align-items: baseline; }
+.tl-ficha .vueltas strong { font: 900 44px/1 var(--fuente-titulos); color: var(--color-principal); font-variant-numeric: tabular-nums; }
+.tl-menu .u-btn, .tl-ficha .u-btn { width: 100%; justify-content: flex-start; }
+@media (min-width: 641px) { .u .u-velo { align-items: center; } .u .u-ventana { max-width: 440px; } }
 </style>
 </head>
-<body class="u">
+<body class="u" data-lado="cli">
 
-<header class="tl-cab" id="cab">
-  <div class="tl-in tl-cab-in">
-    <button type="button" class="tl-logo" id="logo" aria-label="Barbería Tallat, Sant Antoni. Pulsación larga: menú de la demo">
-      <span class="tl-logo-nom">Tallat</span>
-      <span class="tl-logo-sub">Barbería · Sant Antoni</span>
-    </button>
-    <p class="tl-cab-info" id="cab-info">Martes a sábado<br>10:00 a 20:30</p>
-  </div>
-  <svg class="tl-poste" aria-hidden="true" preserveAspectRatio="none">
-    <defs><pattern id="poste" width="24" height="6" patternUnits="userSpaceOnUse">
-      <rect class="p2" width="24" height="6"/>
-      <polygon class="p1" points="0,6 6,0 11,0 5,6"/>
-      <polygon class="p3" points="12,6 18,0 23,0 17,6"/>
-    </pattern></defs>
-    <rect width="100%" height="6" fill="url(#poste)"/>
-  </svg>
-</header>
+<div class="tl-escena">
+  <section class="tl-lado-cli" aria-label="Lo que ve el cliente">
+    <p class="u-etiqueta tl-lado-tit">Lo que ve el cliente, en su móvil</p>
+    <div class="tl-movil">
+      <div class="tl-estado" aria-hidden="true"><span id="reloj">10:00</span>
+        <svg viewBox="0 0 34 12"><rect x="0" y="8" width="3" height="4"/><rect x="5" y="5" width="3" height="7"/><rect x="10" y="2" width="3" height="10"/><rect x="18" y="1" width="14" height="10" rx="2" fill="none" stroke="currentColor"/><rect x="20" y="3" width="10" height="6"/></svg></div>
+      <div class="tl-pantalla" id="pantalla">
+        <header class="tl-cab" id="cab">
+          <div class="tl-cab-in">
+            <button type="button" class="tl-logo" data-logo aria-label="Barbería Tallat, Sant Antoni. Pulsación larga: menú de la demo">
+              <span class="tl-logo-nom">Tallat</span>
+              <span class="tl-logo-sub">Barbería · Sant Antoni</span>
+            </button>
+            <p class="tl-abierto" id="abierto"></p>
+          </div>
+          <svg class="tl-poste" aria-hidden="true" preserveAspectRatio="none">
+            <defs><pattern id="poste" width="30" height="8" patternUnits="userSpaceOnUse">
+              <rect class="p3" width="30" height="8"/>
+              <polygon class="p1" points="0,8 8,0 15,0 7,8"/>
+              <polygon class="p2" points="15,8 23,0 26,0 18,8"/>
+            </pattern></defs>
+            <rect width="100%" height="8" fill="url(#poste)"/>
+          </svg>
+        </header>
+        <main id="cli" class="tl-cli" aria-live="polite"></main>
+      </div>
+      <button type="button" class="tl-noti" id="noti" hidden>
+        <span class="tl-av app" aria-hidden="true">T</span>
+        <span class="tit"><strong>Barbería Tallat</strong><span>ahora</span></span>
+        <span class="txt" id="noti-txt"></span>
+      </button>
+    </div>
+  </section>
 
-<main id="app" class="tl-main tl-in" aria-live="polite"></main>
+  <section class="tl-lado-neg" aria-label="Lo que ve la barbería">
+    <p class="u-etiqueta tl-lado-tit">Lo que ve la barbería, en el mostrador</p>
+    <div id="neg" class="tl-neg"></div>
+  </section>
+</div>
 
-<button type="button" class="tl-noti" id="noti" hidden>
-  <span class="tl-av app" aria-hidden="true">T</span>
-  <span class="tit"><strong>Barbería Tallat</strong><span>ahora</span></span>
-  <span class="txt" id="noti-txt"></span>
-</button>
+<div class="tl-toast" id="toast" role="status" hidden></div>
+
+<div class="u-velo" id="ficha" role="dialog" aria-modal="true" aria-labelledby="ficha-tit">
+  <div class="u-ventana tl-ficha" id="ficha-in"></div>
+</div>
 
 <div class="u-velo" id="menu" role="dialog" aria-modal="true" aria-labelledby="menu-tit">
   <div class="u-ventana tl-menu">
     <h2 id="menu-tit">Menú de la demo</h2>
-    <p class="u-nota">Solo lo ves tú. Se abre con una pulsación larga en el logo.</p>
+    <p class="u-nota">Solo lo ves tú. Se abre con una pulsación larga en el logo o con la tecla M.</p>
     <button type="button" class="u-btn" data-ir="servicio">Reservar como cliente</button>
-    <button type="button" class="u-btn" data-ir="chat" id="menu-chat">Ver el aviso que recibe el cliente</button>
-    <button type="button" class="u-btn" data-ir="agenda">Ver la agenda de la barbería</button>
+    <button type="button" class="u-btn" data-ir="chat" id="menu-chat">Ver los WhatsApp que recibe el cliente</button>
+    <button type="button" class="u-btn" data-ir="neg">Ver el mostrador de la barbería</button>
     <button type="button" class="u-btn" data-ir="reiniciar">Reiniciar la demo</button>
     <button type="button" class="u-btn u-btn-texto" data-ir="cerrar">Cerrar el menú</button>
   </div>
@@ -213,11 +332,11 @@
 
   /* ---------- Datos de la barbería (inventados) ---------- */
   var SERV = [
-    { id: 'corte',  nom: 'Corte',          min: 30, eur: 16, det: 'Tijera o máquina, con lavado' },
-    { id: 'cb',     nom: 'Corte y barba',  min: 45, eur: 22, det: 'Con toalla caliente' },
-    { id: 'barba',  nom: 'Barba',          min: 20, eur: 10, det: 'Arreglo y perfilado a navaja' },
-    { id: 'rapado', nom: 'Rapado',         min: 20, eur: 12, det: 'Al cero o a un solo número' },
-    { id: 'inf',    nom: 'Corte infantil', min: 30, eur: 13, det: 'Hasta 12 años' }
+    { id: 'corte',  nom: 'Corte',          corto: 'Corte',       min: 30, eur: 16 },
+    { id: 'cb',     nom: 'Corte y barba',  corto: 'Corte+barba', min: 45, eur: 22 },
+    { id: 'barba',  nom: 'Barba',          corto: 'Barba',       min: 20, eur: 10 },
+    { id: 'rapado', nom: 'Rapado',         corto: 'Rapado',      min: 20, eur: 12 },
+    { id: 'inf',    nom: 'Corte infantil', corto: 'Infantil',    min: 30, eur: 13 }
   ];
   var BARB = [
     { id: 'Toni',    det: 'Cortes clásicos y a tijera' },
@@ -228,9 +347,10 @@
     'Víctor', 'Joan', 'Marcel', 'Hugo', 'Ricard', 'Pol', 'Aleix', 'Hamza', 'Enric', 'Lucas', 'Biel', 'Gerard', 'Xavi',
     'Rubén', 'Imran', 'Quim', 'Mateo', 'Albert', 'Eric', 'Martí', 'Abdel', 'Roger', 'Ivan', 'Jan', 'Samir', 'Carles',
     'Luis', 'Guillem'];
-  var ABRE = 600, CIERRA = 1230, PASO = 30;   // minutos desde las 00:00: 10:00 a 20:30
+  var ABRE = 600, CIERRA = 1230, PASO = 30, PPM = 1.6;   // minutos desde las 00:00 (10:00 a 20:30) y píxeles por minuto
   var DIA_C = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
   var DIA_L = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  var MES_BASE = { web: 64, avisos: 132, ausencias: 9, resenas: 17 };   // cifras de ejemplo del mes
 
   var ICO = {
     atras: '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
@@ -242,9 +362,11 @@
   function dos(n) { return (n < 10 ? '0' : '') + n; }
   function hhmm(m) { return dos(Math.floor(m / 60)) + ':' + dos(m % 60); }
   function clave(d) { return d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()); }
-  function fecha(k) { var p = k.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function fecha(k) { var p = k.split('-'); return new Date(+p[0], +p[1] - 1, +p[2], 12); }
   function ddmm(k) { var d = fecha(k); return dos(d.getDate()) + '/' + dos(d.getMonth() + 1); }
-  function diaLargo(k) { var d = fecha(k); return DIA_L[d.getDay()] + ' ' + dos(d.getDate()) + '/' + dos(d.getMonth() + 1) + '/' + d.getFullYear(); }
+  function ddmmaaaa(k) { return ddmm(k) + '/' + fecha(k).getFullYear(); }
+  function diaLargo(k) { return DIA_L[fecha(k).getDay()] + ' ' + ddmmaaaa(k); }
+  function sumarDias(k, n) { var d = fecha(k); d.setDate(d.getDate() + n); return clave(d); }
   function eur(n) { return n.toLocaleString('es-ES') + ' €'; }
   function serv(id) { return SERV.filter(function (s) { return s.id === id; })[0]; }
   function ahoraMin() { var d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
@@ -255,11 +377,8 @@
     for (var i = 0; out.length < n && i < 21; i++) { if (abierto(d)) out.push(clave(d)); d.setDate(d.getDate() + 1); }
     return out;
   }
-  function otroDiaAbierto(k, paso) {
-    var d = fecha(k); d.setHours(12);
-    do { d.setDate(d.getDate() + paso); } while (!abierto(d));
-    return clave(d);
-  }
+  function otroDiaAbierto(k, paso) { var d = fecha(k); do { d.setDate(d.getDate() + paso); } while (!abierto(d)); return clave(d); }
+  function cuando(k) { return k === hoy() ? 'hoy' : k === sumarDias(hoy(), 1) ? 'mañana' : DIA_C[fecha(k).getDay()] + ' ' + ddmm(k); }
   function mascara(tel) { return tel.charAt(0) + '•• ••• ' + tel.slice(-3); }
 
   /* Agenda inventada pero estable: la misma para cada día cada vez que se abre */
@@ -283,7 +402,7 @@
         if (r() < p) {
           var x = r(), s = x < 0.45 ? SERV[0] : x < 0.7 ? SERV[1] : x < 0.8 ? SERV[2] : x < 0.9 ? SERV[3] : SERV[4];
           if (t + s.min <= CIERRA) {
-            out.push({ dia: k, barbero: b.id, ini: t, serv: s.id, cliente: nombre() });
+            out.push({ id: k + b.id + t, dia: k, barbero: b.id, ini: t, serv: s.id, cliente: nombre() });
             t += Math.ceil(s.min / PASO) * PASO; continue;
           }
         }
@@ -293,101 +412,114 @@
     return (cache[k] = out);
   }
   function citasDe(k) {
-    var l = generadas(k).slice();
-    if (st.reserva && st.reserva.dia === k && !st.reserva.anulada) l.push(st.reserva);
+    var l = generadas(k).concat(st.mias.filter(function (c) { return c.dia === k && c.estado !== 'anulada'; }));
     return l.sort(function (a, b) { return a.ini - b.ini || a.barbero.localeCompare(b.barbero); });
   }
-  function pasada(k, ini) { return k === hoy() && ini <= ahoraMin() + 15; }
+  function cita(id) { return st.mias.filter(function (c) { return c.id === id; })[0]; }
+  function buscarCita(id) {
+    return cita(id) || generadas(id.slice(0, 10)).filter(function (c) { return c.id === id; })[0];
+  }
+  function pasada(k, ini) { return k < hoy() || (k === hoy() && ini <= ahoraMin() + 15); }
   function barberoLibre(k, b, ini, min) {
     if (ini + min > CIERRA || pasada(k, ini)) return false;
-    return !citasDe(k).some(function (c) {
-      return c.barbero === b && c.ini < ini + min && ini < c.ini + serv(c.serv).min;
-    });
+    return !citasDe(k).some(function (c) { return c.barbero === b && c.ini < ini + min && ini < c.ini + serv(c.serv).min; });
   }
   function libreQuien(k, b, ini, min) {
     var lista = b === '*' ? BARB.map(function (x) { return x.id; }) : [b];
     for (var i = 0; i < lista.length; i++) if (barberoLibre(k, lista[i], ini, min)) return lista[i];
     return null;
   }
+  function horasLibres(k, b, min) {
+    var out = [];
+    for (var t = ABRE; t + min <= CIERRA; t += PASO) if (libreQuien(k, b, t, min)) out.push(t);
+    return out;
+  }
+  function horaCercana(k, b, ini, min) {
+    var l = horasLibres(k, b, min).sort(function (x, y) { return Math.abs(x - ini) - Math.abs(y - ini) || x - y; });
+    return l.length ? { t: l[0], b: b } : null;
+  }
+  function primerHueco(b, min) {
+    var dias = diasAbiertos(6);
+    for (var i = 0; i < dias.length; i++) { var h = horasLibres(dias[i], b, min); if (h.length) return cuando(dias[i]) + ' a las ' + hhmm(h[0]); }
+    return null;
+  }
 
   /* ---------- Estado de la demo ---------- */
-  var st;
+  var st, tPost1 = null, tPost2 = null;
   function reiniciar() {
-    st = { vista: 'servicio', serv: null, barb: null, dia: null, ini: null, nombre: '', tel: '', reserva: null,
-      chat: [], agDia: null, agFiltro: 'todos', error: '' };
+    st = { lado: 'cli', vista: 'servicio', serv: null, barb: null, dia: null, ini: null, nombre: '', tel: '', error: '',
+      mias: [], chat: [], fase: null, actual: null, agDia: null, flash: null, mes: { web: 0, avisos: 0, ausencias: 0, resenas: 0 }, cambioMes: null };
     ocultarNoti();
+    clearTimeout(tPost1); clearTimeout(tPost2);
   }
 
-  /* ---------- Vistas ---------- */
-  var app = document.getElementById('app');
-  var cab = document.getElementById('cab');
-  var cabInfo = document.getElementById('cab-info');
+  /* ---------- Pantallas del cliente ---------- */
+  var cliEl = document.getElementById('cli'), negEl = document.getElementById('neg');
+  var pantalla = document.getElementById('pantalla'), cab = document.getElementById('cab');
 
-  function cabeza(paso, nombre, titulo, atras) {
-    return '<div class="tl-cabeza">' +
-      (atras ? '<button type="button" class="u-btn u-btn-texto tl-atras" data-accion="atras">' + ICO.atras + 'Atrás</button>' : '') +
-      '<p class="u-etiqueta">Paso ' + paso + ' de 4 · ' + nombre + '</p>' +
-      '<h1>' + titulo + '</h1></div>';
+  function estadoAbierto() {
+    var k = hoy(), m = ahoraMin();
+    if (abierto(fecha(k)) && m >= ABRE && m < CIERRA) return '<strong>Abierto ahora</strong>hasta las 20:30';
+    var sig = abierto(fecha(k)) && m < ABRE ? k : otroDiaAbierto(k, 1);
+    return '<strong>Cerrado</strong>abre ' + (sig === k ? 'hoy' : sig === sumarDias(k, 1) ? 'mañana' : 'el ' + DIA_C[fecha(sig).getDay()]) + ', 10:00';
+  }
+  function cabeza(paso, titulo) {
+    var barras = '';
+    for (var i = 1; i <= 4; i++) barras += '<span' + (i <= paso ? ' class="on"' : '') + '></span>';
+    return '<div class="tl-cabeza"><button type="button" class="u-btn u-btn-texto tl-atras" data-accion="atras">' + ICO.atras + 'Atrás</button>' +
+      '<div class="tl-pasos" aria-hidden="true">' + barras + '</div>' +
+      '<p class="u-etiqueta">Paso ' + paso + ' de 4</p><h1>' + titulo + '</h1></div>';
   }
   function resumen() {
-    var s = st.serv && serv(st.serv);
-    function v(x) { return x ? esc(x) : '<span class="vacio">Sin elegir</span>'; }
-    var barb = st.barb === '*' ? 'El primero libre' : st.barb;
-    return '<aside class="tl-aside"><div class="u-bloque tl-resumen"><h2>Tu cita</h2><dl>' +
-      '<dt>Servicio</dt><dd>' + v(s && s.nom) + '</dd>' +
-      '<dt>Barbero</dt><dd>' + v(barb) + '</dd>' +
-      '<dt>Día</dt><dd>' + v(st.dia && diaLargo(st.dia)) + '</dd>' +
-      '<dt>Hora</dt><dd>' + v(st.ini != null && hhmm(st.ini)) + '</dd>' +
-      '<dt>Precio</dt><dd>' + v(s && eur(s.eur)) + '</dd>' +
-      '</dl></div></aside>';
-  }
-  function resumenLinea() {
     var p = [];
     if (st.serv) p.push(serv(st.serv).nom + ' · ' + eur(serv(st.serv).eur));
     if (st.barb) p.push(st.barb === '*' ? 'El primero libre' : 'Con ' + st.barb);
-    if (st.dia) p.push(DIA_C[fecha(st.dia).getDay()] + ' ' + ddmm(st.dia) + (st.ini != null ? ' · ' + hhmm(st.ini) : ''));
-    return p.length ? '<p class="tl-resumen-linea">' + p.map(function (x) { return '<span class="u-chip">' + esc(x) + '</span>'; }).join('') + '</p>' : '';
+    if (st.dia && st.ini != null) p.push(cuando(st.dia) + ' · ' + hhmm(st.ini));
+    return p.length ? '<p class="tl-resumen">' + p.map(function (x) { return '<span class="u-chip">' + esc(x) + '</span>'; }).join('') + '</p>' : '';
   }
-  function paso(html) { return '<div class="tl-paso-grid"><div>' + html + '</div>' + resumen() + '</div>'; }
   var pie = '<p class="u-nota tl-pie">Demo de Utilo. La barbería y los datos son inventados; no se guarda ni se envía nada.</p>';
 
   function vServicio() {
-    return paso(cabeza(1, 'Servicio', 'Pide cita', false) +
-      '<p class="u-nota" style="margin:0 0 var(--e4)">Carrer de Manso, Sant Antoni · se paga en la barbería</p>' +
-      '<ul class="tl-lista">' + SERV.map(function (s) {
-        return '<li><button type="button" data-serv="' + s.id + '"><span class="nom">' + s.nom + '</span>' +
-          '<span class="eur">' + eur(s.eur) + '</span><span class="det">' + s.min + ' min · ' + s.det + '</span></button></li>';
-      }).join('') + '</ul>') + pie;
+    return '<div class="tl-cabeza"><p class="u-etiqueta">Pide cita · paso 1 de 4</p><h1>¿Qué te hacemos hoy?</h1></div>' +
+      '<div class="tl-servicios">' + SERV.map(function (s) {
+        return '<button type="button" class="tl-serv" data-serv="' + s.id + '"><span class="nom">' + s.nom + '</span>' +
+          '<span class="pie"><span class="det">' + s.min + ' min</span><span class="eur">' + s.eur + ' €</span></span></button>';
+      }).join('') + '</div>' +
+      '<p class="u-nota" style="margin-top:var(--e4)">Carrer de Manso, Sant Antoni · martes a sábado de 10:00 a 20:30 · se paga en la barbería</p>' + pie;
   }
   function vBarbero() {
+    var min = serv(st.serv).min;
     var filas = BARB.map(function (b) {
-      return '<li><button type="button" data-barb="' + b.id + '"><span class="nom">' + b.id + '</span>' + ICO.sig +
-        '<span class="det">' + b.det + '</span></button></li>';
-    }).join('') + '<li><button type="button" data-barb="*"><span class="nom">Me da igual</span>' + ICO.sig +
-      '<span class="det">Te damos la primera hora libre de los tres</span></button></li>';
-    return paso(cabeza(2, 'Barbero', '¿Con quién?', true) + resumenLinea() + '<ul class="tl-lista">' + filas + '</ul>');
+      var h = primerHueco(b.id, min);
+      return '<button type="button" class="tl-barb" data-barb="' + b.id + '"><span class="tl-mono" aria-hidden="true">' + b.id.slice(0, 2) + '</span>' +
+        '<span class="nom">' + b.id + '</span><span class="det">' + b.det + '</span>' +
+        '<span class="hueco">' + (h ? 'Primer hueco: ' + h : 'Sin huecos esta semana') + '</span></button>';
+    }).join('');
+    var h = primerHueco('*', min);
+    filas += '<button type="button" class="tl-barb" data-barb="*"><span class="tl-mono todos" aria-hidden="true">3</span>' +
+      '<span class="nom">Me da igual</span><span class="det">Te damos la primera hora libre de los tres</span>' +
+      '<span class="hueco">' + (h ? 'Primer hueco: ' + h : '') + '</span></button>';
+    return cabeza(2, '¿Con quién?') + resumen() + '<div class="tl-barberos">' + filas + '</div>';
   }
   function vHora() {
-    var dias = diasAbiertos(6), min = serv(st.serv).min, man = [], tar = [];
-    function hayHora(k) { for (var t = ABRE; t + min <= CIERRA; t += PASO) if (libreQuien(k, st.barb, t, min)) return true; return false; }
-    if (!st.dia || dias.indexOf(st.dia) < 0) st.dia = dias.filter(hayHora)[0] || dias[0];
-    for (var t = ABRE; t + min <= CIERRA; t += PASO) {
-      if (libreQuien(st.dia, st.barb, t, min)) (t < 840 ? man : tar).push(t);
-    }
+    var dias = diasAbiertos(7), min = serv(st.serv).min;
+    if (!st.dia || dias.indexOf(st.dia) < 0) st.dia = dias.filter(function (k) { return horasLibres(k, st.barb, min).length; })[0] || dias[0];
+    var libres = horasLibres(st.dia, st.barb, min), man = libres.filter(function (t) { return t < 840; }), tar = libres.filter(function (t) { return t >= 840; });
     function botones(l) { return '<div class="tl-horas">' + l.map(function (t) { return '<button type="button" class="tl-hora" data-hora="' + t + '">' + hhmm(t) + '</button>'; }).join('') + '</div>'; }
-    var horas = !man.length && !tar.length
-      ? '<p class="u-vacio">No quedan horas libres este día' + (st.barb !== '*' ? ' con ' + esc(st.barb) : '') + '. Prueba con otro día o elige «Me da igual» como barbero.</p>'
+    var horas = !libres.length
+      ? '<p class="u-vacio">No quedan horas libres este día' + (st.barb !== '*' ? ' con ' + esc(st.barb) : '') + '. Prueba con otro día o vuelve atrás y elige «Me da igual».</p>'
       : (man.length ? '<p class="u-etiqueta tl-franja">Mañana</p>' + botones(man) : '') + (tar.length ? '<p class="u-etiqueta tl-franja">Tarde</p>' + botones(tar) : '');
-    return paso(cabeza(3, 'Día y hora', '¿Qué día te va bien?', true) + resumenLinea() +
+    return cabeza(3, '¿Qué día te va bien?') + resumen() +
       '<div class="tl-dias" role="group" aria-label="Día">' + dias.map(function (k) {
-        var d = fecha(k);
+        var d = fecha(k), n = horasLibres(k, st.barb, min).length;
         return '<button type="button" class="tl-dia" data-dia="' + k + '" aria-pressed="' + (k === st.dia) + '">' +
-          '<span class="dn">' + (k === hoy() ? 'hoy' : DIA_C[d.getDay()]) + '</span><span class="dd">' + d.getDate() + '</span></button>';
-      }).join('') + '</div>' + horas);
+          '<span class="dn">' + (k === hoy() ? 'hoy' : DIA_C[d.getDay()]) + '</span><span class="dd">' + d.getDate() + '</span>' +
+          '<span class="dh">' + (n ? n + ' libres' : 'lleno') + '</span></button>';
+      }).join('') + '</div>' + horas;
   }
   function vDatos() {
     var s = serv(st.serv);
-    return paso(cabeza(4, 'Tus datos', 'Último paso', true) + resumenLinea() +
+    return cabeza(4, 'Último paso') + resumen() +
       '<form class="tl-form" id="f-datos" novalidate>' +
       '<label class="u-campo" for="f-nombre"><span class="u-etiqueta">Nombre</span>' +
       '<input id="f-nombre" name="nombre" autocomplete="given-name" placeholder="Cómo te llamamos" value="' + esc(st.nombre) + '"></label>' +
@@ -397,102 +529,166 @@
       '<span>Acepto que Barbería Tallat guarde mi nombre y mi móvil para gestionar la cita y avisarme por WhatsApp. Se borran 30 días después de la cita.</span></label>' +
       (st.error ? '<p class="u-error" role="alert" style="margin:0">' + esc(st.error) + '</p>' : '') +
       '<button type="submit" class="u-btn u-btn-accion">Reservar cita · ' + eur(s.eur) + '</button>' +
-      '</form>');
+      '</form>';
   }
   function vReservada() {
-    var r = st.reserva, s = serv(r.serv);
-    return '<div class="tl-hecho" style="max-width:560px">' +
-      '<div class="tl-cabeza"><p class="u-etiqueta">Reserva hecha a las ' + r.hecha + '</p><h1>Cita reservada, ' + esc(r.cliente) + '</h1></div>' +
+    var r = cita(st.actual), s = serv(r.serv);
+    return '<div class="tl-cabeza"><p class="u-etiqueta">Cita reservada</p><h1>Te esperamos, ' + esc(r.cliente) + '</h1></div>' +
       '<p style="margin:0">Te llega ahora la confirmación por WhatsApp al ' + mascara(r.tel) + '. ' +
-      (r.dia === hoy() ? 'Dos horas antes' : 'El día antes, a las 19:00,') + ' te mandamos un recordatorio.</p>' +
-      '<dl><dt>Servicio</dt><dd>' + s.nom + ' · ' + s.min + ' min</dd><dt>Barbero</dt><dd>' + esc(r.barbero) + '</dd>' +
-      '<dt>Día</dt><dd>' + diaLargo(r.dia) + '</dd><dt>Hora</dt><dd>' + hhmm(r.ini) + '</dd>' +
-      '<dt>Precio</dt><dd>' + eur(s.eur) + ', se paga en la barbería</dd></dl>' +
-      '<div class="tl-acciones"><button type="button" class="u-btn" data-accion="ver-chat">Ver la confirmación</button>' +
-      '<button type="button" class="u-btn u-btn-texto" data-accion="otra">Pedir otra cita</button></div></div>' + pie;
+      (r.dia === hoy() ? 'Dos horas antes' : 'El día antes, a las 19:00,') + ' te recordamos la cita.</p>' +
+      '<div class="tl-ticket"><div class="tl-ticket-a"><p class="num"><span>Barbería Tallat</span><span>Nº ' + (400 + hash(r.id) % 500) + '</span></p>' +
+      '<p class="hora">' + hhmm(r.ini) + '</p><p class="dia">' + diaLargo(r.dia) + '</p></div>' +
+      '<div class="tl-ticket-b"><dl><dt>Servicio</dt><dd>' + s.nom + ' · ' + s.min + ' min</dd><dt>Barbero</dt><dd>' + esc(r.barbero) + '</dd>' +
+      '<dt>Precio</dt><dd>' + eur(s.eur) + ', en la barbería</dd><dt>Dónde</dt><dd>Carrer de Manso, Sant Antoni</dd></dl></div></div>' +
+      '<div class="tl-acciones"><button type="button" class="u-btn" data-accion="ver-chat">Ver el WhatsApp</button>' +
+      '<button type="button" class="u-btn u-btn-texto" data-accion="otra">Pedir otra cita</button></div>' + pie;
   }
   function vChat() {
-    if (!st.reserva) return '<div class="tl-cabeza"><h1>Todavía no hay aviso</h1></div><p class="u-vacio">El aviso llega cuando alguien reserva. Haz una reserva de prueba y vuelve aquí.</p>' +
+    if (!st.actual) return '<div class="tl-cabeza"><h1>Todavía no hay avisos</h1></div><p class="u-vacio">Los WhatsApp llegan cuando alguien reserva. Haz una reserva de prueba y vuelve aquí.</p>' +
       '<button type="button" class="u-btn" data-ir="servicio">Hacer una reserva</button>';
-    var abiertaResp = !st.reserva.anulada && !st.chat.some(function (m) { return m.de === 'cli'; });
+    var botones = '';
+    if (st.fase === 'recordatorio') botones = '<p class="u-etiqueta">Contesta al recordatorio como el cliente</p>' +
+      '<button type="button" class="u-btn" data-resp="SÍ">SÍ</button><button type="button" class="u-btn" data-resp="CAMBIAR">CAMBIAR</button>' +
+      '<button type="button" class="u-btn" data-resp="ANULAR">ANULAR</button>';
+    if (st.fase === 'vuelta') botones = '<p class="u-etiqueta">Contesta como el cliente</p>' +
+      '<button type="button" class="u-btn" data-resp="GUARDAR">SÍ, GUÁRDAMELA</button><button type="button" class="u-btn" data-resp="OTRO">OTRO DÍA</button>';
     return '<div class="tl-chat">' +
       '<div class="tl-chat-cab"><button type="button" class="u-btn u-btn-icono u-btn-texto" data-accion="atras" aria-label="Volver">' + ICO.atras + '</button>' +
-      '<span class="tl-av" aria-hidden="true">T</span><div><strong>Barbería Tallat</strong><span>Cuenta de empresa · responde al momento</span></div></div>' +
-      '<div class="tl-msgs" id="msgs"><p class="tl-sis">Simulación del WhatsApp que recibe el cliente</p>' +
+      '<span class="tl-av" aria-hidden="true">T</span><div><strong>Barbería Tallat</strong><span>Cuenta de empresa</span></div></div>' +
+      '<div class="tl-msgs" id="msgs"><p class="tl-sis">Simulación de los WhatsApp que recibe el cliente</p>' +
       st.chat.map(function (m) {
         if (m.de === 'sis') return '<p class="tl-sis">' + esc(m.txt) + '</p>';
-        return '<div class="tl-msg ' + m.de + '">' + esc(m.txt) + '<time>' + m.hora + '</time></div>';
+        return '<div class="tl-msg ' + m.de + (m.nuevo ? ' entra' : '') + '">' + esc(m.txt) +
+          (m.boton ? '<br><button type="button" class="u-btn" data-accion="' + m.boton.accion + '">' + m.boton.txt + '</button>' : '') +
+          '<time>' + m.hora + '</time></div>';
       }).join('') + '</div>' +
-      (abiertaResp ? '<div class="tl-resp" role="group" aria-labelledby="resp-tit"><p class="u-etiqueta" id="resp-tit">Responder al recordatorio como el cliente</p>' +
-        '<button type="button" class="u-btn" data-resp="SÍ">SÍ</button>' +
-        '<button type="button" class="u-btn" data-resp="CAMBIAR">CAMBIAR</button>' +
-        '<button type="button" class="u-btn" data-resp="ANULAR">ANULAR</button></div>' : '') +
-      '</div>';
+      (botones ? '<div class="tl-resp" role="group" aria-label="Respuestas">' + botones + '</div>' : '') + '</div>';
   }
-  function filaCita(c, conBarbero) {
-    var s = serv(c.serv), cls = 'tl-cita' + (c.nueva ? ' nueva' : '') + (pasada(c.dia, c.ini + s.min - 16) ? ' pasada' : '');
-    return '<li class="' + cls + '"><span class="h">' + hhmm(c.ini) + '</span><span class="c">' + esc(c.cliente) + '</span>' +
-      '<span class="e">' + eur(s.eur) + '</span><span class="d">' + s.nom + ' · ' + s.min + ' min' +
-      (conBarbero ? ' <span class="u-chip">' + c.barbero + '</span>' : '') +
-      (c.nueva ? ' <span class="u-chip">Nueva · por la web</span> Aviso enviado al ' + mascara(c.tel) : '') + '</span></li>';
+
+  /* ---------- Mostrador de la barbería ---------- */
+  function ocupacion(k) {
+    var min = citasDe(k).reduce(function (a, c) { return a + serv(c.serv).min; }, 0);
+    return Math.round(min / (BARB.length * (CIERRA - ABRE)) * 100);
   }
-  function filasBarbero(k, b) {
-    var citas = citasDe(k).filter(function (c) { return c.barbero === b; }), out = [], t = ABRE;
-    while (t < CIERRA) {
-      var c = citas.filter(function (x) { return x.ini === t; })[0];
-      if (c) { out.push(filaCita(c, false)); t += Math.ceil(serv(c.serv).min / PASO) * PASO; continue; }
-      if (!pasada(k, t)) out.push('<li class="tl-cita libre"><span class="h">' + hhmm(t) + '</span><span class="c">Libre</span><span class="e"></span></li>');
-      t += PASO;
-    }
-    return out;
-  }
-  function libres(k) {
+  function huecos(k) {
     var n = 0;
     BARB.forEach(function (b) { for (var t = ABRE; t + PASO <= CIERRA; t += PASO) if (barberoLibre(k, b.id, t, PASO)) n++; });
     return n;
   }
-  function vAgenda() {
-    if (!st.agDia) st.agDia = st.reserva && !st.reserva.anulada ? st.reserva.dia : diasAbiertos(1)[0];
-    var k = st.agDia, citas = citasDe(k);
-    var total = citas.reduce(function (a, c) { return a + serv(c.serv).eur; }, 0);
-    var titulo = k === hoy() ? 'Agenda de hoy' : 'Agenda del ' + DIA_L[fecha(k).getDay()] + ' ' + ddmm(k);
-    var f = st.agFiltro;
-    var movil = f === 'todos'
-      ? (citas.length ? citas.map(function (c) { return filaCita(c, true); }).join('') : '')
-      : filasBarbero(k, f).join('');
-    return '<div class="tl-ag-cab"><h1>' + titulo + '</h1><div class="tl-ag-nav">' +
-      '<button type="button" class="u-btn u-btn-icono" data-agdia="-1" aria-label="Día anterior">' + ICO.atras + '</button>' +
-      '<button type="button" class="u-btn u-btn-icono" data-agdia="1" aria-label="Día siguiente">' + ICO.sig + '</button></div></div>' +
-      '<p class="tl-ag-sum">' + diaLargo(k).replace(/^./, function (x) { return x.toUpperCase(); }) + ' · ' + citas.length + ' citas · ' +
-      '<span class="tl-cifra">' + eur(total) + '</span> previstos · ' + libres(k) + ' huecos libres</p>' +
-      '<div class="tl-ag-movil"><div class="tl-filtros" role="group" aria-label="Barbero">' +
-      ['todos'].concat(BARB.map(function (b) { return b.id; })).map(function (x) {
-        return '<button type="button" class="tl-filtro" data-filtro="' + x + '" aria-pressed="' + (f === x) + '">' + (x === 'todos' ? 'Todos' : x) + '</button>';
+  function vNegocio() {
+    if (!st.agDia) st.agDia = diasAbiertos(2).filter(function (k) { return k !== hoy() || ahoraMin() < CIERRA - 60; })[0];
+    var k = st.agDia, citas = citasDe(k), total = citas.reduce(function (a, c) { return a + serv(c.serv).eur; }, 0), oc = ocupacion(k);
+    var titulo = k === hoy() ? 'Hoy · ' + ddmm(k) : DIA_C[fecha(k).getDay()] + ' ' + ddmm(k);
+    var m = st.mes, cm = st.cambioMes;
+    function dato(c, txt) { return '<span' + (cm === c ? ' class="cambio"' : '') + '><strong>' + (MES_BASE[c] + m[c]) + '</strong> ' + txt + '</span>'; }
+    var alto = (CIERRA - ABRE) * PPM, eje = '', lineas = '';
+    for (var t = ABRE; t < CIERRA; t += 60) eje += '<span style="top:' + ((t - ABRE) * PPM) + 'px">' + hhmm(t) + '</span>';
+    for (var u = ABRE + 30; u < CIERRA; u += 30) lineas += '<div class="tl-linea" style="top:' + ((u - ABRE) * PPM) + 'px"></div>';
+    var cols = BARB.map(function (b) {
+      return '<div class="tl-col" style="height:' + alto + 'px">' + lineas + citas.filter(function (c) { return c.barbero === b.id; }).map(function (c) {
+        var s = serv(c.serv), cls = 'tl-blq' + (s.min * PPM < 40 ? ' corto' : '') + (c.mia ? ' mia' : '') + (pasada(c.dia, c.ini + s.min - 16) ? ' pasada' : '') + (st.flash === c.id ? ' flash' : '');
+        return '<button type="button" class="' + cls + '" data-cita="' + c.id + '" style="top:' + ((c.ini - ABRE) * PPM + 1) + 'px;height:' + (s.min * PPM - 2) + 'px">' +
+          '<span class="c">' + esc(c.cliente) + '</span><span class="s"><span class="hh">' + hhmm(c.ini) + ' · </span>' + (c.mia ? (c.estado === 'confirmada' ? 'Confirmada' : 'Nueva · web') : s.corto) + '</span></button>';
+      }).join('') + '</div>';
+    }).join('');
+    var hayAhora = k === hoy() && ahoraMin() >= ABRE && ahoraMin() < CIERRA;
+    var ahora = hayAhora ? '<div class="tl-ahora" style="top:' + ((ahoraMin() - ABRE) * PPM) + 'px"></div>' : '';
+    return '<div class="tl-ncab"><button type="button" class="tl-logo" data-logo aria-label="Barbería Tallat. Pulsación larga: menú de la demo">' +
+      '<span class="tl-logo-nom">Tallat</span><span class="tl-logo-sub">Mostrador</span></button>' +
+      '<div class="tl-ndia"><button type="button" class="u-btn u-btn-icono" data-agdia="-1" aria-label="Día anterior">' + ICO.atras + '</button>' +
+      '<h1>' + titulo + '</h1><button type="button" class="u-btn u-btn-icono" data-agdia="1" aria-label="Día siguiente">' + ICO.sig + '</button></div></div>' +
+      '<div class="tl-kpis">' +
+      '<div class="tl-kpi"><span class="u-etiqueta">Citas</span><span class="v">' + citas.length + '</span><span class="n">' + diaLargo(k) + '</span></div>' +
+      '<div class="tl-kpi"><span class="u-etiqueta">Ocupación</span><span class="v">' + oc + ' %</span><span class="barra"><span style="width:' + oc + '%"></span></span></div>' +
+      '<div class="tl-kpi"><span class="u-etiqueta">Previsto</span><span class="v cifra">' + eur(total) + '</span><span class="n">se cobra en la barbería</span></div>' +
+      '<div class="tl-kpi"><span class="u-etiqueta">Huecos libres</span><span class="v">' + huecos(k) + '</span><span class="n">de media hora</span></div></div>' +
+      '<p class="tl-mes"><span>Este mes (ejemplo):</span>' + dato('web', 'reservas sin llamar') + dato('avisos', 'WhatsApp enviados') +
+      dato('ausencias', 'ausencias evitadas') + dato('resenas', 'reseñas pedidas') + '</p>' +
+      '<div class="tl-cuad-cab"><span></span>' + BARB.map(function (b) {
+        return '<div><strong>' + b.id + '</strong><span>' + citas.filter(function (c) { return c.barbero === b.id; }).length + ' citas</span></div>';
       }).join('') + '</div>' +
-      (movil ? '<ul class="tl-citas">' + movil + '</ul>' : '<p class="u-vacio">No hay citas este día. Las reservas nuevas aparecen aquí en cuanto entran.</p>') + '</div>' +
-      '<div class="tl-ag-cols">' + BARB.map(function (b) {
-        var n = citas.filter(function (c) { return c.barbero === b.id; }).length;
-        return '<section><h2>' + b.id + '<span>' + n + ' citas</span></h2><ul class="tl-citas">' + filasBarbero(k, b.id).join('') + '</ul></section>';
-      }).join('') + '</div>' +
-      '<p class="u-nota tl-pie">Vista de la barbería, en su móvil o en el ordenador del mostrador. Las citas de ejemplo son inventadas.</p>';
+      '<div class="tl-cuad"><div class="tl-eje" style="height:' + alto + 'px">' + eje + '</div>' + cols + ahora + '</div>' +
+      '<p class="tl-leyenda"><span><i></i>Cita de ejemplo</span><span><i class="mia"></i>Reservada en la demo</span>' +
+      (hayAhora ? '<span><i class="ahora"></i>Ahora</span>' : '') + '<span>Toca una cita para ver la ficha del cliente</span></p>';
   }
 
-  var VISTAS = { servicio: vServicio, barbero: vBarbero, hora: vHora, datos: vDatos, reservada: vReservada, chat: vChat, agenda: vAgenda };
-  var ATRAS = { barbero: 'servicio', hora: 'barbero', datos: 'hora', chat: 'reservada' };
+  /* ---------- Ficha del cliente ---------- */
+  var fichaEl = document.getElementById('ficha'), fichaIn = document.getElementById('ficha-in');
+  function abrirFicha(id) {
+    var c = buscarCita(id); if (!c) return;
+    var s = serv(c.serv), html;
+    if (c.mia) {
+      html = '<p class="u-etiqueta">Ficha del cliente</p><h2 id="ficha-tit">' + esc(c.cliente) + '</h2>' +
+        '<p>Cliente nuevo. Reservó ' + (c.origen === 'whatsapp' ? 'contestando al WhatsApp de «ya te toca»' : 'por la web a las ' + c.hecha) + ', sin llamar.</p>' +
+        '<dl><dt>Móvil</dt><dd>' + mascara(c.tel) + '</dd><dt>Cita</dt><dd>' + diaLargo(c.dia) + ' · ' + hhmm(c.ini) + '</dd>' +
+        '<dt>Servicio</dt><dd>' + s.nom + ' · ' + eur(s.eur) + '</dd><dt>Barbero</dt><dd>' + c.barbero + '</dd>' +
+        '<dt>Estado</dt><dd>' + (c.estado === 'confirmada' ? 'Confirmada por WhatsApp' : 'Pendiente de confirmar') + '</dd>' +
+        '<dt>Avisos</dt><dd>Confirmación enviada · recordatorio ' + (c.dia === hoy() ? 'dos horas antes' : 'el día antes a las 19:00') + '</dd></dl>';
+    } else {
+      var r = azar(hash(c.cliente + c.barbero)), visitas = 2 + Math.floor(r() * 14), cada = 3 + Math.floor(r() * 4), filas = '', gasto = 0;
+      for (var i = 1; i <= 3; i++) {
+        var k = sumarDias(c.dia, -7 * cada * i), sv = i === 1 ? s : SERV[Math.floor(r() * 2)];
+        filas += '<tr><td>' + ddmmaaaa(k) + '</td><td>' + sv.nom + '</td><td class="num">' + eur(sv.eur) + '</td></tr>';
+      }
+      for (var j = 0; j < visitas; j++) gasto += j % 3 === 2 ? 22 : 16;
+      html = '<p class="u-etiqueta">Ficha del cliente</p><h2 id="ficha-tit">' + esc(c.cliente) + '</h2>' +
+        '<p class="vueltas"><strong>' + visitas + '</strong><span>visitas · viene cada ' + cada + ' semanas, casi siempre con ' + c.barbero + '</span></p>' +
+        '<dl><dt>Cita</dt><dd>' + cuando(c.dia) + ' · ' + hhmm(c.ini) + ' · ' + s.nom + '</dd><dt>Gastado</dt><dd>' + eur(gasto) + ' en total</dd>' +
+        '<dt>Avisos</dt><dd>Recordatorio enviado y confirmado</dd></dl>' +
+        '<table><thead><tr><th>Últimas visitas</th><th>Servicio</th><th class="num">Importe</th></tr></thead><tbody>' + filas + '</tbody></table>';
+    }
+    fichaIn.innerHTML = html + '<p class="u-nota">Datos de ejemplo.</p><button type="button" class="u-btn" data-cerrar>Cerrar la ficha</button>';
+    fichaEl.classList.add('abierto');
+    fichaIn.querySelector('[data-cerrar]').focus();
+  }
+  fichaEl.addEventListener('click', function (e) { if (e.target === fichaEl || e.target.closest('[data-cerrar]')) fichaEl.classList.remove('abierto'); });
 
-  function pintar(foco) {
-    var esChat = st.vista === 'chat' && st.reserva;
+  /* ---------- Pintar ---------- */
+  var VISTAS = { servicio: vServicio, barbero: vBarbero, hora: vHora, datos: vDatos, reservada: vReservada, chat: vChat };
+  var ATRAS = { barbero: 'servicio', hora: 'barbero', datos: 'hora' };
+  /* Al volver atrás se borra lo que se eligió en el paso al que se vuelve: no se queda nada marcado */
+  var DESHACER = { barbero: function () { st.serv = null; }, hora: function () { st.barb = null; st.dia = null; st.ini = null; }, datos: function () { st.ini = null; } };
+
+  function escritorio() { return window.matchMedia('(min-width: 980px)').matches; }
+  function pintarCli(arriba) {
+    var esChat = st.vista === 'chat' && st.actual;
     cab.hidden = !!esChat;
-    app.classList.toggle('tl-in', !esChat);
-    app.classList.toggle('tl-main', !esChat);
-    cabInfo.innerHTML = st.vista === 'agenda' ? 'Vista de la barbería' : 'Martes a sábado<br>10:00 a 20:30';
-    app.innerHTML = VISTAS[st.vista]();
-    if (esChat) { var m = document.getElementById('msgs'); window.scrollTo(0, document.body.scrollHeight); if (m) m.lastElementChild.scrollIntoView({ block: 'end' }); }
-    else if (foco !== false) window.scrollTo(0, 0);
+    cliEl.className = esChat ? '' : 'tl-cli';
+    pantalla.classList.toggle('en-chat', !!esChat);
+    document.getElementById('abierto').innerHTML = estadoAbierto();
+    cliEl.innerHTML = VISTAS[st.vista]();
+    st.chat.forEach(function (m) { m.nuevo = false; });
+    if (esChat) { var m = document.getElementById('msgs'); if (m && m.lastElementChild) m.lastElementChild.scrollIntoView({ block: 'end' }); }
+    else if (arriba !== false) { pantalla.scrollTop = 0; if (!escritorio()) window.scrollTo(0, 0); }
   }
-  function ir(v) { st.error = ''; st.vista = v; pintar(); }
+  function pintarNeg() { negEl.innerHTML = vNegocio(); }
+  function pintar(arriba) {
+    document.body.dataset.lado = st.lado;
+    document.getElementById('reloj').textContent = hhmm(ahoraMin());
+    pintarCli(arriba); pintarNeg();
+  }
+  function ir(v) { st.error = ''; st.vista = v; st.lado = 'cli'; pintar(); }
+  function irNeg() {
+    st.lado = 'neg'; pintar();
+    if (escritorio()) negEl.scrollIntoView({ block: 'start' }); else window.scrollTo(0, 0);
+  }
+  function mostrarFlash() {
+    if (!st.flash) return;
+    var el = negEl.querySelector('[data-cita="' + st.flash + '"]');
+    if (el && (escritorio() || st.lado === 'neg')) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    st.flash = null;
+  }
 
-  /* ---------- Aviso y chat ---------- */
+  /* ---------- Aviso del mostrador ---------- */
+  var toast = document.getElementById('toast'), tToast = null;
+  function avisoMostrador(tit, txt) {
+    if (!escritorio() && st.lado !== 'neg') return;   // en el móvil solo sale si se está mirando el mostrador
+    toast.innerHTML = '<strong>' + tit + '</strong><span>' + esc(txt) + '</span>';
+    toast.hidden = false; clearTimeout(tToast);
+    tToast = setTimeout(function () { toast.hidden = true; }, 5000);
+  }
+
+  /* ---------- Aviso en el móvil y chat ---------- */
   var noti = document.getElementById('noti'), notiTimer = null;
   function textoConfirmacion(r) {
     var s = serv(r.serv);
@@ -501,84 +697,149 @@
       'Carrer de Manso, Sant Antoni.\nSi no puedes venir, responde CAMBIAR o ANULAR y dejamos el hueco a otro cliente.';
   }
   function textoRecordatorio(r) {
-    var hoyEs = r.dia === hoy();
-    return 'Hola ' + r.cliente + ', te recordamos tu cita de ' + (hoyEs ? 'hoy' : 'mañana') + ' a las ' + hhmm(r.ini) + ' con ' + r.barbero +
+    return 'Hola ' + r.cliente + ', te recordamos tu cita de ' + (r.dia === hoy() ? 'hoy' : 'mañana') + ' a las ' + hhmm(r.ini) + ' con ' + r.barbero +
       '. Responde SÍ para confirmarla, o CAMBIAR o ANULAR si no puedes venir.';
   }
   function mostrarNoti() {
-    if (!st.reserva) return;
-    document.getElementById('noti-txt').textContent = textoConfirmacion(st.reserva);
+    if (!st.actual) return;
+    document.getElementById('noti-txt').textContent = textoConfirmacion(cita(st.actual));
     noti.hidden = false;
     requestAnimationFrame(function () { requestAnimationFrame(function () { noti.classList.add('on'); }); });
   }
   function ocultarNoti() { clearTimeout(notiTimer); noti.classList.remove('on'); noti.hidden = true; }
   noti.addEventListener('click', function () { ocultarNoti(); ir('chat'); });
 
+  function msg(de, txt, hora, boton) { st.chat.push({ de: de, txt: txt, hora: hora || hhmm(ahoraMin()), boton: boton, nuevo: true }); }
+  function sumarMes(c, n) { st.mes[c] += n || 1; st.cambioMes = c; }
+  function nuevaCita(k, barbero, ini, sv, cliente, tel, origen) {
+    var c = { id: k + '-m' + (st.mias.length + 1), dia: k, barbero: barbero, ini: ini, serv: sv, cliente: cliente, tel: tel,
+      mia: true, estado: 'pendiente', origen: origen, hecha: hhmm(ahoraMin()) };
+    st.mias.push(c);
+    return c;
+  }
+
   function responder(txt) {
-    var r = st.reserva, h = hhmm(ahoraMin());
-    st.chat.push({ de: 'cli', txt: txt, hora: h });
-    var resp;
-    if (txt === 'SÍ') resp = 'Perfecto, ' + r.cliente + '. Te esperamos el ' + DIA_L[fecha(r.dia).getDay()] + ' a las ' + hhmm(r.ini) + '.';
-    else if (txt === 'CAMBIAR') resp = 'Sin problema. Elige otra hora en el enlace de reservas y te guardamos la nueva. La de las ' + hhmm(r.ini) + ' queda libre.';
-    else { resp = 'Cita anulada. Hemos dejado libre el hueco de las ' + hhmm(r.ini) + ' para otro cliente. Gracias por avisar.'; r.anulada = true; }
-    if (txt === 'CAMBIAR') r.anulada = true;
-    st.chat.push({ de: 'neg', txt: resp, hora: h });
-    st.chat.push({ de: 'sis', txt: r.anulada ? 'La agenda de la barbería ya muestra el hueco libre' : 'La agenda de la barbería marca la cita como confirmada' });
-    pintar();
+    var r = cita(st.actual), s = serv(r.serv);
+    if (txt === 'SÍ') {
+      msg('cli', 'SÍ');
+      r.estado = 'confirmada';
+      msg('neg', 'Perfecto, ' + r.cliente + '. Te esperamos el ' + DIA_L[fecha(r.dia).getDay()] + ' a las ' + hhmm(r.ini) + '.');
+      st.fase = null; st.agDia = r.dia; st.flash = r.id;
+      avisoMostrador('Confirmada', r.cliente + ' ha confirmado su cita de las ' + hhmm(r.ini) + ' con ' + r.barbero + '.');
+      /* Lo que llega después del corte: la reseña y, a las 4 semanas, «ya te toca» */
+      tPost1 = setTimeout(function () {
+        msg('sis', 'El mismo día, una hora después del corte');
+        msg('neg', '¿Qué tal el ' + s.nom.toLowerCase() + ' con ' + r.barbero + ', ' + r.cliente + '? Si te ha gustado, nos ayudas mucho con una reseña en Google. Es un minuto: [enlace a vuestra ficha de Google]', hhmm(Math.min(r.ini + s.min + 60, 1439)));
+        sumarMes('avisos'); sumarMes('resenas'); pintar(false);
+      }, 1200);
+      tPost2 = setTimeout(function () {
+        var vuelta = sumarDias(r.dia, 28);
+        msg('sis', '4 semanas después');
+        msg('neg', 'Hola ' + r.cliente + ', hace 4 semanas de tu ' + s.nom.toLowerCase() + ' con ' + r.barbero + '. ¿Te guardo el ' + DIA_L[fecha(vuelta).getDay()] + ' ' + ddmm(vuelta) + ' a las ' + hhmm(r.ini) + ', como la otra vez?', '11:00');
+        st.fase = 'vuelta'; sumarMes('avisos'); pintar(false);
+      }, 2600);
+    } else if (txt === 'CAMBIAR') {
+      msg('cli', 'CAMBIAR');
+      r.estado = 'anulada';
+      msg('neg', 'Sin problema, ' + r.cliente + '. Elige otra hora y te la guardamos. La de las ' + hhmm(r.ini) + ' queda libre para otro cliente.', null, { accion: 'otra-hora', txt: 'Elegir otra hora' });
+      st.fase = null; st.agDia = r.dia;
+      avisoMostrador('Hueco libre', r.cliente + ' cambia su cita: las ' + hhmm(r.ini) + ' con ' + r.barbero + ' quedan libres.');
+    } else if (txt === 'ANULAR') {
+      msg('cli', 'ANULAR');
+      r.estado = 'anulada';
+      msg('neg', 'Cita anulada. Hemos dejado libre el hueco de las ' + hhmm(r.ini) + ' para otro cliente. Gracias por avisar, ' + r.cliente + '.');
+      st.fase = null; st.agDia = r.dia; sumarMes('ausencias');
+      avisoMostrador('Ausencia evitada', r.cliente + ' ha anulado: las ' + hhmm(r.ini) + ' con ' + r.barbero + ' vuelven a estar libres.');
+    } else if (txt === 'GUARDAR') {
+      msg('cli', 'SÍ, GUÁRDAMELA');
+      /* La misma hora y el mismo barbero si están libres; si no, la hora más cercana con él o con otro */
+      var k = sumarDias(r.dia, 28), hueco = horaCercana(k, r.barbero, r.ini, s.min) || horaCercana(k, '*', r.ini, s.min);
+      if (hueco) {
+        var quien = libreQuien(k, hueco.b, hueco.t, s.min), n = nuevaCita(k, quien, hueco.t, r.serv, r.cliente, r.tel, 'whatsapp');
+        n.estado = 'confirmada';
+        msg('neg', 'Hecho, ' + r.cliente + '. Te esperamos el ' + DIA_L[fecha(k).getDay()] + ' ' + ddmm(k) + ' a las ' + hhmm(hueco.t) + ' con ' + quien +
+          (hueco.t !== r.ini || quien !== r.barbero ? ' (a las ' + hhmm(r.ini) + (quien !== r.barbero ? ' ' + r.barbero + ' ya lo tenía cogido' : ' ya estaba cogido') + ').' : '.'));
+        st.agDia = k; st.flash = n.id; sumarMes('web');
+        avisoMostrador('Vuelve', r.cliente + ' repite el ' + DIA_C[fecha(k).getDay()] + ' ' + ddmm(k) + ' a las ' + hhmm(hueco.t) + ' con ' + quien + '. Sin llamadas.');
+      } else msg('neg', 'Ese día ya está lleno a esa hora. Elige otra hora y te la guardamos.', null, { accion: 'otra-hora', txt: 'Elegir día y hora' });
+      st.fase = null;
+    } else if (txt === 'OTRO') {
+      msg('cli', 'OTRO DÍA');
+      msg('neg', 'Sin problema. Cuando te vaya bien, elige día y hora y te la guardamos.', null, { accion: 'otra-hora', txt: 'Elegir día y hora' });
+      st.fase = null;
+    }
+    pintar(false); mostrarFlash();
   }
 
   /* ---------- Eventos ---------- */
-  app.addEventListener('click', function (e) {
-    var b = e.target.closest('button'); if (!b) return;
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b || b.closest('#menu') || b.closest('#ficha') || b.hasAttribute('data-logo') || b.id === 'noti') return;
     var d = b.dataset;
-    if (d.serv) { st.serv = d.serv; st.ini = null; ir('barbero'); }
-    else if (d.barb) { st.barb = d.barb; st.ini = null; ir('hora'); }
-    else if (d.dia) { st.dia = d.dia; st.ini = null; pintar(false); }
+    if (d.serv) { st.serv = d.serv; st.barb = null; st.dia = null; st.ini = null; ir('barbero'); }
+    else if (d.barb) { st.barb = d.barb; st.dia = null; st.ini = null; ir('hora'); }
+    else if (d.dia) { st.dia = d.dia; st.ini = null; pintarCli(false); }
     else if (d.hora) { st.ini = +d.hora; ir('datos'); }
     else if (d.resp) responder(d.resp);
-    else if (d.filtro) { st.agFiltro = d.filtro; pintar(false); }
-    else if (d.agdia) { st.agDia = otroDiaAbierto(st.agDia, +d.agdia); pintar(false); }
+    else if (d.agdia) { st.agDia = otroDiaAbierto(st.agDia, +d.agdia); st.cambioMes = null; pintarNeg(); }
+    else if (d.cita) abrirFicha(d.cita);
     else if (d.ir) ir(d.ir);
-    else if (d.accion === 'atras') { if (st.vista === 'chat') ocultarNoti(); ir(ATRAS[st.vista] || 'servicio'); }
+    else if (d.accion === 'atras') {
+      if (st.vista === 'chat') { ocultarNoti(); ir('reservada'); return; }
+      var a = ATRAS[st.vista] || 'servicio';
+      if (DESHACER[st.vista]) DESHACER[st.vista]();
+      ir(a);
+    }
     else if (d.accion === 'ver-chat') { ocultarNoti(); ir('chat'); }
-    else if (d.accion === 'otra') { var r = st.reserva; reiniciar(); st.reserva = r; ir('servicio'); }
+    else if (d.accion === 'otra') { st.serv = st.barb = st.dia = st.ini = null; ir('servicio'); }
+    else if (d.accion === 'otra-hora') { var r = cita(st.actual); st.serv = r.serv; st.barb = r.barbero; st.dia = null; st.ini = null; ir('hora'); }
   });
-  app.addEventListener('input', function (e) {
+  cliEl.addEventListener('input', function (e) {
     if (e.target.id === 'f-nombre') st.nombre = e.target.value;
     if (e.target.id === 'f-tel') st.tel = e.target.value;
   });
-  app.addEventListener('submit', function (e) {
+  cliEl.addEventListener('submit', function (e) {
     e.preventDefault();
     var nombre = st.nombre.trim().replace(/\s+/g, ' '), tel = st.tel.replace(/[\s.-]/g, '').replace(/^(\+34|0034)/, '');
     if (nombre.length < 2) st.error = 'Escribe tu nombre para que sepamos a quién esperamos.';
     else if (!/^[67]\d{8}$/.test(tel)) st.error = 'Revisa el móvil: son 9 cifras y empieza por 6 o 7.';
     else if (!document.getElementById('f-ok').checked) st.error = 'Marca la casilla para que podamos guardar la cita y avisarte.';
     else st.error = '';
-    if (st.error) { pintar(false); var el = app.querySelector('.u-error'); if (el) el.scrollIntoView({ block: 'center' }); return; }
+    if (st.error) { pintarCli(false); var el = cliEl.querySelector('.u-error'); if (el) el.scrollIntoView({ block: 'center' }); return; }
     var min = serv(st.serv).min, quien = libreQuien(st.dia, st.barb, st.ini, min);
-    if (!quien) { st.error = 'Esa hora se acaba de ocupar. Vuelve atrás y elige otra.'; pintar(false); return; }
-    st.reserva = { dia: st.dia, barbero: quien, ini: st.ini, serv: st.serv, cliente: nombre.split(' ')[0], tel: tel, nueva: true, anulada: false, hecha: hhmm(ahoraMin()) };
-    var h = hhmm(ahoraMin());
-    st.chat = [
-      { de: 'neg', txt: textoConfirmacion(st.reserva), hora: h },
-      { de: 'sis', txt: st.reserva.dia === hoy() ? 'Así llegará el recordatorio, dos horas antes de la cita' : 'Así llegará el recordatorio, el día antes a las 19:00' },
-      { de: 'neg', txt: textoRecordatorio(st.reserva), hora: st.reserva.dia === hoy() ? hhmm(Math.max(st.reserva.ini - 120, ahoraMin())) : '19:00' }
-    ];
-    st.agDia = null;
+    if (!quien) { st.error = 'Esa hora se acaba de ocupar. Vuelve atrás y elige otra.'; pintarCli(false); return; }
+    clearTimeout(tPost1); clearTimeout(tPost2);
+    var r = nuevaCita(st.dia, quien, st.ini, st.serv, nombre.split(' ')[0], tel, 'web');
+    st.actual = r.id;
+    st.chat = [];
+    msg('neg', textoConfirmacion(r));
+    msg('sis', r.dia === hoy() ? 'Dos horas antes de la cita' : 'El día antes, a las 19:00');
+    msg('neg', textoRecordatorio(r), r.dia === hoy() ? hhmm(Math.max(r.ini - 120, ahoraMin())) : '19:00');
+    st.fase = 'recordatorio';
+    st.agDia = r.dia; st.flash = r.id;
+    sumarMes('avisos', 2); sumarMes('web');
     ir('reservada');
+    mostrarFlash();
+    avisoMostrador('Nueva cita', r.cliente + ' · ' + cuando(r.dia) + ' a las ' + hhmm(r.ini) + ' con ' + quien + '. WhatsApp de confirmación enviado.');
     notiTimer = setTimeout(mostrarNoti, 1800);
   });
 
-  /* ---------- Menú oculto: pulsación larga en el logo (o tecla M) ---------- */
-  var menu = document.getElementById('menu'), logo = document.getElementById('logo'), pulsa = null, largo = false;
-  function abrirMenu() { document.getElementById('menu-chat').disabled = !st.reserva; menu.classList.add('abierto'); menu.querySelector('button').focus(); }
+  /* ---------- Menú oculto: pulsación larga en un logo (o tecla M) ---------- */
+  var menu = document.getElementById('menu'), pulsa = null, largo = false;
+  function abrirMenu() { document.getElementById('menu-chat').disabled = !st.actual; menu.classList.add('abierto'); menu.querySelector('button').focus(); }
   function cerrarMenu() { menu.classList.remove('abierto'); }
-  logo.addEventListener('pointerdown', function () { largo = false; pulsa = setTimeout(function () { largo = true; abrirMenu(); }, 600); });
-  ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { logo.addEventListener(ev, function () { clearTimeout(pulsa); }); });
-  logo.addEventListener('contextmenu', function (e) { e.preventDefault(); });
-  logo.addEventListener('click', function (e) { if (largo) { e.preventDefault(); largo = false; return; } if (st.vista !== 'agenda') ir('servicio'); });
+  document.addEventListener('pointerdown', function (e) {
+    if (!e.target.closest('[data-logo]')) return;
+    largo = false; pulsa = setTimeout(function () { largo = true; abrirMenu(); }, 600);
+  });
+  ['pointerup', 'pointercancel'].forEach(function (ev) { document.addEventListener(ev, function () { clearTimeout(pulsa); }); });
+  document.addEventListener('contextmenu', function (e) { if (e.target.closest('[data-logo]')) e.preventDefault(); });
+  document.addEventListener('click', function (e) {
+    var l = e.target.closest('[data-logo]'); if (!l) return;
+    if (largo) { largo = false; return; }
+    if (l.closest('#cab')) { st.serv = st.barb = st.dia = st.ini = null; ir('servicio'); }
+  });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') cerrarMenu();
+    if (e.key === 'Escape') { cerrarMenu(); fichaEl.classList.remove('abierto'); }
     if ((e.key === 'm' || e.key === 'M') && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) abrirMenu();
   });
   menu.addEventListener('click', function (e) {
@@ -588,14 +849,18 @@
     cerrarMenu();
     if (v === 'cerrar') return;
     if (v === 'reiniciar') { reiniciar(); pintar(); return; }
-    if (v === 'agenda') { st.agDia = null; st.agFiltro = 'todos'; }
+    if (v === 'neg') { irNeg(); return; }
     ocultarNoti();
+    if (v === 'servicio') { st.serv = st.barb = st.dia = st.ini = null; }
     ir(v);
   });
 
-  /* Enlace directo a la agenda de la barbería: #agenda */
+  /* El reloj del móvil y la línea de «ahora» se mueven solos */
+  setInterval(function () { document.getElementById('reloj').textContent = hhmm(ahoraMin()); if (!fichaEl.classList.contains('abierto')) pintarNeg(); }, 60000);
+
+  /* Enlace directo al mostrador: #mostrador */
   reiniciar();
-  if (location.hash === '#agenda') st.vista = 'agenda';
+  if (location.hash === '#mostrador') st.lado = 'neg';
   pintar();
 })();
 </script>
