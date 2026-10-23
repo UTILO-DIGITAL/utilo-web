@@ -1,0 +1,31 @@
+/*
+ * Marca de Barbería Tallat en pantalla · T0029
+ * Barbería inventada para la demo de visitas (Sant Antoni, Barcelona). No es un cliente real.
+ * Es el único sitio con sus colores: las vistas solo usan var(--…). Cambiar aquí cambia todas.
+ * Orden de carga: marca.css → ../estilos/base.css
+ * Su ficha de estilo está en el guion de la demo (07_DEMOS).
+ */
+@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Atkinson+Hyperlegible:wght@400;700&display=swap');
+
+:root {
+  /* Paleta: el azul del sillón y el rojo del poste de barbero, sobre azulejo claro */
+  --color-fondo: #F4F6F5;            /* azulejo claro · fondo general */
+  --color-principal: #17405A;        /* azul petróleo · cabecera y titulares */
+  --color-principal-oscuro: #12344A; /* azul oscuro · enlaces y texto pequeño */
+  --color-accion: #C62B2B;           /* rojo poste · solo el botón principal */
+  --color-destacado: #E3B23C;        /* latón · subrayado de una cifra por pantalla, nunca en texto */
+  --color-bloque: #DCE6EA;           /* azul lavado · bloques y etiquetas suaves */
+  --color-texto: #14212B;            /* casi negro azulado · texto corrido */
+  --color-sobre-principal: #F4F6F5;  /* texto sobre azul petróleo */
+  --color-sobre-accion: #FFFFFF;     /* texto sobre rojo: grande y en negrita (botones) */
+  --color-superficie: #FFFFFF;       /* campos y filas sobre el fondo */
+
+  /* Letras: la de rótulo para títulos y una muy legible para el resto */
+  --fuente-titulos: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+  --fuente-texto: 'Atkinson Hyperlegible', 'Trebuchet MS', sans-serif;
+  --peso-titulos: 800;
+
+  /* Forma: esquinas casi rectas, como el mármol y el espejo de la barbería */
+  --radio: 4px;
+  --radio-peq: 2px;
+}
