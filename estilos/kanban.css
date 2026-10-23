@@ -365,6 +365,23 @@ body.ver-bandeja .bj-tabs .hora { display: none; }
 .u .boton { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 var(--e4); border-radius: var(--radio); text-decoration: none; font-weight: 700; }
 .u .accion { background: var(--color-accion); color: var(--color-sobre-accion); border: 0; font: 800 19px/1 var(--fuente-texto); min-height: 52px; padding: 0 var(--e5); cursor: pointer; }
 .u .accion:disabled { opacity: .4; cursor: default; }
+/* T0173 (KANBAN_CORE v34): bloque «Empezar con Claude». Clases nuevas: las fichas de versiones anteriores no cambian */
+.u .claude-herr { margin: 0; font: 700 16px/1.4 var(--fuente-texto); color: var(--color-texto); }
+.u .claude .claude-ayuda { margin: var(--e1) 0 var(--e3); }
+/* Botón coral más bajo que el de la acción de una pantalla; 19 px en negrita para que el blanco sobre coral sea texto grande */
+.u .claude-herr ~ .claude-fila .accion { min-height: 44px; padding: 0 var(--e4); font: 700 19px/1 var(--fuente-texto); }
+.u .claude-msg { margin-top: var(--e2); }
+.u .claude-msg summary { display: inline-flex; align-items: center; min-height: 44px; cursor: pointer;
+  font: 700 14px/1.2 var(--fuente-texto); color: var(--color-principal-oscuro); list-style: none; }
+.u .claude-msg summary::-webkit-details-marker { display: none; }
+.u .claude-msg summary::before { content: ""; width: 7px; height: 7px; margin: 0 var(--e3) 0 2px; border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s; }
+.u .claude-msg[open] summary::before { transform: rotate(45deg); }
+@media (prefers-reduced-motion: reduce) { .u .claude-msg summary::before { transition: none; } }
+.u .claude-texto { margin: 0; padding: var(--e2) var(--e3); background: var(--color-bloque); border-radius: var(--radio);
+  font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
+.u .claude .claude-alt { margin: var(--e2) 0 0; }
+.u .claude-dato .nota { margin: 2px 0 0; }
 .u .pie { display: flex; gap: var(--e2); justify-content: flex-end; padding: var(--e3) var(--e4) var(--e5); }
 .u .ffechas { display: flex; flex-wrap: wrap; gap: var(--e2); min-width: 0; }
 .u .ffecha { display: flex; flex-direction: column; min-width: 136px; padding: var(--e2) var(--e3); background: var(--color-superficie);
@@ -389,6 +406,7 @@ body.ver-bandeja .bj-tabs .hora { display: none; }
 @media (max-width: 600px) {
   .u .volver { width: 100%; justify-content: center; }
   .u .pie { flex-wrap: wrap; } .u .pie .boton { flex: 1 1 100%; }
+  .u .claude-herr ~ .claude-fila .accion { flex: 1 1 100%; }
   .u .datos .fila { flex-direction: column; gap: var(--e1); } .u .datos .fila > b { width: auto; }
   .u .frtit { white-space: normal; } .u .ffecha { flex: 1 1 136px; }
   .u .fmeta .hora { margin-left: 0; flex: 1 1 100%; }
