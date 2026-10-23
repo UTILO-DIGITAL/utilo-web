@@ -358,6 +358,9 @@ body.ver-bandeja .bj-tabs .hora { display: none; }
 .u .bloque p { margin: 2px 0; }
 .u .bloque ul { margin: 2px 0; padding-left: 18px; }
 .u .bloque .hist { font-variant-numeric: tabular-nums; }
+.u .bloque .hito { margin: 0; padding: var(--e2) 0; } /* T0058: una línea por hito del historial */
+.u .bloque .hito + .hito { border-top: 1px solid var(--color-linea); }
+.u .bloque .hito-cuando { color: var(--color-suave); font-size: 13px; }
 .u .claude { margin: var(--e3) var(--e4); padding: var(--e3) var(--e4); border: 1px solid var(--color-linea); border-radius: var(--radio); }
 .u .claude h3 { margin: 0 0 var(--e2); font: 700 12px/1.3 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; }
 .u .claude-fila { display: flex; flex-wrap: wrap; gap: var(--e2); align-items: center; }
