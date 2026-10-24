@@ -155,10 +155,14 @@
       var listo = function () {
         window.gapi.load('picker', function () {
           var P = window.google.picker;
-          // T0208: dentro de una sección, kanban4 oculta lo que cuelga de la página (body.sx-otra): mientras la ventana está abierta, no.
-          var b = document.body, otra = b.classList.contains('sx-otra');
-          var vuelve = function () { if (otra) b.classList.add('sx-otra'); };
-          if (otra) b.classList.remove('sx-otra');
+          // T0208: dentro de una sección, kanban4 oculta lo que cuelga de la página (body.sx-otra) salvo la ventana de Google
+          // (.picker-dialog, en base.css y app.js). Si Google la pinta con otra clase y no se ve, se quita la ocultación mientras está abierta.
+          var b = document.body, otra = false;
+          var vuelve = function () { if (otra) b.classList.add('sx-otra'); otra = false; };
+          setTimeout(function () {
+            var d = document.querySelector('.picker-dialog');
+            if (b.classList.contains('sx-otra') && (!d || !d.offsetParent)) { otra = true; b.classList.remove('sx-otra'); }
+          }, 600);
           new P.PickerBuilder().addView(hacerVista(P)).setOAuthToken(t).setDeveloperKey(C.clavePicker).setAppId(C.proyecto)
             .setTitle(titulo).setCallback(function (d) {
               if (d.action === P.Action.PICKED) { vuelve(); ok((d.docs || [])[0] || {}); }
@@ -202,8 +206,9 @@
       v.querySelector('[data-no]').onclick = function () { v.remove(); ko(new Error('Sin conectar no se puede seguir. Vuelve a probar cuando quieras.')); };
       si.onclick = function () {
         si.disabled = true;
+        v.style.display = 'none'; // T0208: el aviso no tapa la ventana de Google; vuelve si se cierra sin elegir
         UG.conectar(id, /carpeta/i.test(msg)).then(function () { v.remove(); ok(); }, function (e) {
-          si.disabled = false; var x = v.querySelector('[data-e]'); x.textContent = e.message; x.hidden = false;
+          v.style.display = 'flex'; si.disabled = false; var x = v.querySelector('[data-e]'); x.textContent = e.message; x.hidden = false;
         });
       };
       (document.getElementById('sx-panel') || document.body).appendChild(v);
