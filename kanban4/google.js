@@ -179,7 +179,7 @@
       v.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
       v.innerHTML = '<div style="background:#fff;color:#1C2B26;border-radius:14px;padding:20px;max-width:380px;width:100%;font:15px/1.45 system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.25)">' +
         '<p style="margin:0 0 14px"></p><p data-e style="margin:0 0 12px;color:#B3261E" hidden></p>' +
-        '<div style="display:flex;gap:10px;justify-content:flex-end"><button type="button" data-no style="border:1px solid #ccc;background:#fff;border-radius:8px;padding:9px 14px;font:600 15px system-ui,sans-serif;cursor:pointer">Ahora no</button>' +
+        '<div style="display:flex;gap:10px;justify-content:flex-end"><button type="button" data-no style="border:1px solid #ccc;background:#fff;color:#1C2B26;border-radius:8px;padding:9px 14px;font:600 15px system-ui,sans-serif;cursor:pointer">Ahora no</button>' +
         '<button type="button" data-si style="border:0;background:#1C2B26;color:#fff;border-radius:8px;padding:9px 14px;font:600 15px system-ui,sans-serif;cursor:pointer">Conectar</button></div></div>';
       v.querySelector('p').textContent = String(msg || 'Para seguir, conecta este archivo con la web (solo hace falta una vez).').replace(/^\w/, function (c) { return c.toUpperCase(); });
       var si = v.querySelector('[data-si]');
