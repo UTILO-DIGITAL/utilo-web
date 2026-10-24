@@ -1,0 +1,31 @@
+/*
+ * Marca de Barbería Tallat en pantalla · T0029
+ * Barbería inventada para la demo de visitas (Sant Antoni, Barcelona). No es un cliente real.
+ * Es el único sitio con sus colores: las vistas solo usan var(--…). Cambiar aquí cambia todas.
+ * Marca clara y mínima: papel, tinta y un solo color, el cobalto, para el botón de reservar y el punto del logo.
+ * Orden de carga: marca.css → ../estilos/base.css
+ * Su ficha de estilo está en el guion de la demo (07_DEMOS).
+ */
+@import url('https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap');
+
+:root {
+  --color-fondo: #F6F5F2;            /* papel · fondo general */
+  --color-principal: #141414;        /* tinta · titulares, lo elegido y la marca */
+  --color-principal-oscuro: #141414; /* tinta · enlaces, etiquetas y bordes de botón */
+  --color-accion: #2547D0;           /* cobalto · solo el botón principal y el punto del logo */
+  --color-destacado: #2547D0;        /* cobalto · subrayado de una cifra por pantalla */
+  --color-bloque: #ECEAE5;           /* gris cálido · bloques y etiquetas suaves */
+  --color-texto: #141414;            /* tinta · texto corrido */
+  --color-sobre-principal: #FFFFFF;  /* texto sobre tinta */
+  --color-sobre-accion: #FFFFFF;     /* texto sobre cobalto */
+  --color-superficie: #FFFFFF;       /* tarjetas, filas y campos sobre el papel */
+
+  /* Una sola familia: los títulos se distinguen por tamaño y grosor */
+  --fuente-titulos: 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif;
+  --fuente-texto: 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif;
+  --peso-titulos: 600;
+
+  /* Forma: esquinas suaves y discretas */
+  --radio: 8px;
+  --radio-peq: 4px;
+}
