@@ -14,7 +14,7 @@
   var CLAVE = 'kanban_' + (C.clave || 'negocio');
   // T0133: carpeta de este archivo (…/kanban/), para cargar los módulos de las secciones (economia.js…).
   var BASE = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/[^/]*$/, '') : '../kanban/'; })();
-  var VERSION_MODULOS = '18'; // T0207 · T0208
+  var VERSION_MODULOS = '20'; // T0207 · T0208
   // T0150: diseño de PROTOCOLO DISEÑO UTILO. Solo para los negocios que tienen su marca.css (index.html con marca: '…').
   // Los demás (Konamigas hasta T0149) siguen exactamente como antes.
   var MARCA = String(C.marca || '').replace(/[^a-z0-9_-]/gi, '');
@@ -65,6 +65,7 @@
   function acceso(aviso) {
     cargando('Conectando…');
     llamarSinLlave({ fn: 'inicio' }).then(function (ini) {
+      if (window.UG.configurar) window.UG.configurar(ini); // T0209: sesión larga si el motor la tiene
       var r = document.documentElement.style;
       if (ini.color) r.setProperty('--kz-color', ini.color);
       if (ini.accion) r.setProperty('--kz-accion', ini.accion);
@@ -433,5 +434,10 @@
   /* ---------- arranque ---------- */
   if (new URLSearchParams(location.search).get('salir') !== null) { borrar(); window.UG.salir(); history.replaceState(null, '', location.pathname); }
   var cred = leer();
-  if (cred && cred.persona && window.UG.llave()) abrir(cred); else acceso(''); // T0190: sin llave válida, «Continuar con Google»
+  // T0190: sin llave válida, «Continuar con Google». T0209: con sesión larga en el dispositivo, la llave se renueva sola.
+  if (cred && cred.persona && window.UG.llave()) abrir(cred);
+  else if (cred && cred.persona && window.UG.tieneSesion && window.UG.tieneSesion()) {
+    cargando('Entrando…');
+    window.UG.asegurar().then(function () { abrir(cred); }, function () { acceso(''); });
+  } else acceso('');
 })();
