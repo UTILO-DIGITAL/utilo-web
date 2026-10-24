@@ -86,6 +86,7 @@
           window.UG.recordarCorreo(r.correo || '');
           guardar(cred); abrir(cred);
         }, function (e) {
+          if (/^CONECTAR:/.test(e.message)) { pedirConectar(e); return; } // T0201
           b.disabled = false; b.textContent = ant.persona ? 'Continuar con Google' : 'Entrar con Google';
           $('kz-aviso').textContent = e.message.replace(/^ACCESO:\s*/, '');
         });
@@ -103,7 +104,7 @@
     // y sin pisar window.google, que es también donde está la librería de Google.
     return '(function(){var API=' + JSON.stringify(C.api) + ',K=' + JSON.stringify(CLAVE) + ';' +
       'function llamar(fn,args){return window.UG.llamar(API,{fn:fn,args:args}).catch(function(e){' +
-      'if(e.acceso){try{localStorage.removeItem(K)}catch(x){}location.reload();}throw e;});}' +
+      'if(e.acceso||/^CONECTAR:/.test(e.message)){if(e.acceso){try{localStorage.removeItem(K)}catch(x){}}location.reload();}throw e;});}' +
       'function run(s,f,u){return new Proxy({},{get:function(_,k){' +
       'if(k==="withSuccessHandler")return function(h){return run(h,f,u)};' +
       'if(k==="withFailureHandler")return function(h){return run(s,h,u)};' +
@@ -320,7 +321,24 @@
     abrirModulo(document.getElementById('sx-panel'));
   }
 
+  /** T0201: la persona aún no ha conectado el Excel del negocio con la web (permiso «solo los archivos de esta web»). */
+  function pedirConectar(e) {
+    var m = /^CONECTAR:([^:]+):\s*(.*)$/.exec(e.message) || [];
+    pantalla('<div class="kz-caja" id="kz-con"><h1>' + texto(C.nombreApp || 'Kanban') + '</h1>' +
+      '<p class="kz-ayuda">' + texto('Para que la web pueda usar el Excel del negocio, elígelo una vez en la ventana de Google. Solo hace falta la primera vez.') + '</p>' +
+      boton('Conectar el Excel', 'u-btn-accion', 'button') + '<p class="kz-aviso" id="kz-aviso"></p></div>');
+    var b = $('kz-con').querySelector('button');
+    b.onclick = function () {
+      b.disabled = true;
+      window.UG.conectar(m[1]).then(function () { location.reload(); }, function (x) {
+        b.disabled = false; $('kz-aviso').textContent = x.message;
+      });
+    };
+    b.focus();
+  }
+
   function error(e) {
+    if (/^CONECTAR:/.test(e.message)) { pedirConectar(e); return; }
     if (e.acceso) { borrar(); acceso(e.message.replace(/^ACCESO:\s*/, '')); return; }
     pantalla('<div class="kz-caja"><p>' + texto(e.message.replace(/^SECCION:\s*/, '')) +
       '</p>' + boton('Volver a intentarlo').replace('<button', '<button onclick="location.reload()"') + '</div>');
