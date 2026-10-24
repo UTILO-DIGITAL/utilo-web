@@ -8,8 +8,9 @@
 <!--
   Demo navegable de Utilo para visitas a barberías · T0029
   Barbería inventada, datos inventados. Nada se guarda ni se envía: todo vive en esta página.
-  A la izquierda, la app del cliente (inicio, reservar, mis cortes con fotos, perfil); a la derecha, el mostrador de la barbería.
+  A la izquierda, la app del cliente dentro de un iPhone; a la derecha, el mostrador de la barbería.
   En tablet apaisada y ordenador se ven a la vez; en el móvil, una cosa cada vez.
+  El chat se parece a WhatsApp en forma y uso, pero sin su logo ni sus colores.
   Menú de la demo: pulsación larga en el logo (o la tecla M).
   Orden de carga del PROTOCOLO DISEÑO UTILO: marca.css → ../estilos/base.css.
   Los estilos de abajo son solo de esta demo y usan las variables de la marca (sin HEX).
@@ -17,295 +18,300 @@
 <link rel="stylesheet" href="marca.css">
 <link rel="stylesheet" href="../estilos/base.css">
 <style>
-/* Composición: en el móvil, una pantalla (app del cliente o mostrador); desde 980 px, la app dentro de un teléfono
-   a la izquierda y el mostrador de la barbería a la derecha, para ver entrar la cita en directo. */
-
-/* Color del marco del teléfono en escritorio, derivado de la tinta */
-:root { --marco: color-mix(in srgb, var(--color-texto) 92%, black); }
+/* Composición: en el móvil, una pantalla (app o mostrador); desde 980 px, la app dentro de un iPhone a la izquierda
+   y el mostrador a la derecha. Dentro de la app: barra de navegación arriba, listas agrupadas y barra de secciones abajo. */
+:root {
+  --marco: color-mix(in srgb, var(--color-texto) 92%, black);
+  --fondo-chat: color-mix(in srgb, var(--color-bloque) 75%, var(--color-fondo));
+  --burbuja-mia: color-mix(in srgb, var(--color-accion) 13%, var(--color-superficie));
+}
 body.u { min-height: 100%; }
+.tl-app, .tl-app * { -webkit-tap-highlight-color: transparent; }
 
 /* ---------- Escena ---------- */
 .tl-escena { min-height: 100vh; }
 .tl-lado-tit { display: none; }
-@media (max-width: 979px) {
-  body[data-lado=cli] .tl-lado-neg, body[data-lado=neg] .tl-lado-cli { display: none; }
-}
+@media (max-width: 979px) { body[data-lado=cli] .tl-lado-neg, body[data-lado=neg] .tl-lado-cli { display: none; } }
 @media (min-width: 980px) {
-  .tl-escena { display: grid; grid-template-columns: 392px minmax(0, 1fr); gap: var(--e7); align-items: start;
+  .tl-escena { display: grid; grid-template-columns: 414px minmax(0, 1fr); gap: var(--e7); align-items: start;
     max-width: 1440px; margin: 0 auto; padding: var(--e5) max(var(--e5), env(safe-area-inset-right, 0px)) var(--e7) max(var(--e5), env(safe-area-inset-left, 0px)); }
   .tl-lado-cli { position: sticky; top: var(--e5); }
-  .tl-lado-tit { display: block; margin: 0 0 var(--e3); }
+  .tl-lado-tit { display: block; margin: 0 0 var(--e3); font-size: 13px; color: var(--color-suave); }
 }
 
-/* ---------- La app del cliente ---------- */
+/* ---------- El iPhone (solo en escritorio; en un móvil de verdad, la app ocupa la pantalla) ---------- */
 .tl-movil { position: relative; }
 .tl-pantalla { min-height: 100vh; background: var(--color-fondo); }
-.tl-estado { display: none; }
+.tl-estado, .tl-isla, .tl-home { display: none; }
 @media (min-width: 980px) {
-  /* Marco del teléfono: excepción al radio único, porque dibuja el aparato y no es un componente */
-  .tl-movil { width: 392px; height: min(812px, calc(100vh - 80px)); border: 10px solid var(--marco); border-radius: 44px;
-    outline: 1px solid var(--color-linea); overflow: hidden; display: flex; flex-direction: column; background: var(--color-fondo); }
-  .tl-estado { display: flex; justify-content: space-between; align-items: center; flex: none; height: 32px; padding: 0 var(--e5);
-    font: 700 13px/1 var(--fuente-texto); font-variant-numeric: tabular-nums; color: var(--color-texto); background: var(--color-fondo); }
-  .tl-estado svg { width: 34px; height: 12px; fill: currentColor; }
+  /* Marco, isla y barra de inicio dibujan el aparato: sus esquinas no siguen el radio de la marca */
+  .tl-movil { width: 414px; height: min(860px, calc(100vh - 64px)); border: 12px solid var(--marco); border-radius: 60px;
+    overflow: hidden; display: flex; flex-direction: column; background: var(--color-fondo); }
+  .tl-estado { display: flex; justify-content: space-between; align-items: center; flex: none; height: 50px; padding: 4px 32px 0 40px;
+    font: 600 15px/1 var(--fuente-texto); color: var(--color-texto); background: var(--color-fondo); }
+  .tl-pantalla.en-chat ~ .tl-estado, .tl-movil.chat .tl-estado { background: var(--color-superficie); }
+  .tl-estado svg { width: 66px; height: 13px; fill: currentColor; }
+  .tl-isla { display: block; position: absolute; z-index: 90; top: 11px; left: 50%; width: 120px; height: 34px; margin-left: -60px;
+    border-radius: 20px; background: var(--marco); }
+  .tl-home { display: block; position: absolute; z-index: 90; bottom: 8px; left: 50%; width: 134px; height: 5px; margin-left: -67px;
+    border-radius: 3px; background: var(--color-texto); }
   .tl-pantalla { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; }
   .tl-pantalla::-webkit-scrollbar { display: none; }
   .tl-pantalla > main { flex: 1; }
 }
 
-/* Cabecera: la marca en minúsculas con su punto cobalto (recurso propio) y una línea fina */
-.tl-cab { padding-top: env(safe-area-inset-top, 0px); background: var(--color-fondo); border-bottom: 1px solid var(--color-linea); }
-.tl-cab-in { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--e3);
-  padding: var(--e4) max(16px, env(safe-area-inset-right, 0px)) var(--e3) max(16px, env(safe-area-inset-left, 0px)); }
-.tl-logo { display: flex; flex-direction: column; min-height: 44px; padding: 0; border: 0; background: none; color: var(--color-principal);
-  text-align: left; cursor: pointer; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
-.tl-logo-nom { font: 700 32px/1 var(--fuente-titulos); letter-spacing: -.04em; }
+/* ---------- Tipografía y piezas de la app ---------- */
+.tl-app { font-size: 15px; line-height: 1.4; }
+.tl-app p { margin: 0; }
+.tl-cli { padding: var(--e2) max(16px, env(safe-area-inset-right, 0px)) var(--e6) max(16px, env(safe-area-inset-left, 0px)); }
+.u .tl-titulo { margin: var(--e2) 0 var(--e4); font: 600 26px/1.15 var(--fuente-titulos); letter-spacing: -.02em; color: var(--color-texto); }
+.tl-sub { font-size: 13px; color: var(--color-suave); }
+.tl-app .tl-sec { margin: var(--e5) var(--e4) var(--e2); font-size: 13px; color: var(--color-suave); }
+.tl-sec-fila { display: flex; justify-content: space-between; align-items: baseline; margin: var(--e5) var(--e4) var(--e2); }
+.tl-app .tl-sec-fila .tl-sec { margin: 0; }
+.tl-app .tl-pie { margin: var(--e5) var(--e4) 0; font-size: 12px; color: var(--color-suave); }
+
+/* Barra de navegación */
+.tl-nav { position: sticky; top: 0; z-index: 30; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; min-height: 44px;
+  margin: 0 calc(-1 * max(16px, env(safe-area-inset-right, 0px))) 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+  padding: env(safe-area-inset-top, 0px) var(--e2) 0; background: var(--color-fondo); }
+@media (min-width: 980px) { .tl-nav { padding-top: 0; } }
+.tl-nav h1 { grid-column: 2; margin: 0; font: 600 16px/1.2 var(--fuente-texto); color: var(--color-texto); }
+.tl-volver { justify-self: start; display: inline-flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 var(--e2); border: 0; background: none;
+  color: var(--color-texto); font: 400 16px/1 var(--fuente-texto); cursor: pointer; }
+.tl-volver svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tl-progreso { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 0 0 var(--e3); }
+.tl-progreso span { height: 3px; border-radius: 2px; background: var(--color-bloque); }
+.tl-progreso span.on { background: var(--color-texto); }
+
+/* Cabecera de inicio: la marca con su punto cobalto (recurso propio) */
+.tl-marca { display: flex; justify-content: space-between; align-items: center; gap: var(--e3); min-height: 44px; padding-top: env(safe-area-inset-top, 0px); }
+@media (min-width: 980px) { .tl-marca { padding-top: 0; } }
+.tl-logo { display: inline-flex; flex-direction: column; padding: 0; border: 0; background: none; color: var(--color-texto); text-align: left; cursor: pointer;
+  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+.tl-logo-nom { font: 700 22px/1 var(--fuente-titulos); letter-spacing: -.04em; }
 .tl-punto { font-style: normal; color: var(--color-accion); }
-.tl-logo-sub { margin-top: 2px; font: 500 13px/1.3 var(--fuente-texto); white-space: nowrap; color: var(--color-suave); }
-.tl-abierto { margin: 0 0 0 auto; font-size: 13px; text-align: right; color: var(--color-suave); }
-.tl-abierto strong { display: block; color: var(--color-texto); }
+.tl-logo-sub { font: 400 12px/1.3 var(--fuente-texto); color: var(--color-suave); }
+.tl-abierto { font-size: 13px; color: var(--color-suave); text-align: right; }
 
-.tl-cli { padding: var(--e5) max(16px, env(safe-area-inset-right, 0px)) var(--e6) max(16px, env(safe-area-inset-left, 0px)); }
-.u .tl-cli h1 { font-size: 30px; line-height: 1.05; color: var(--color-texto); letter-spacing: -.03em; text-wrap: balance; }
-.u .tl-cli h2 { font-size: 19px; line-height: 1.2; color: var(--color-texto); letter-spacing: -.02em; }
-.tl-cli p { margin: 0; }
-.tl-cabeza { display: flex; flex-direction: column; gap: var(--e2); margin-bottom: var(--e4); }
-.tl-atras { align-self: flex-start; margin-left: calc(-1 * var(--e2)); }
-.tl-pasos { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--e1); }
-.tl-pasos span { height: 4px; background: var(--color-bloque); }
-.tl-pasos span.on { background: var(--color-principal); }
-.tl-seccion { display: flex; flex-direction: column; gap: var(--e3); margin-top: var(--e6); }
-.tl-seccion-cab { display: flex; justify-content: space-between; align-items: baseline; gap: var(--e3); }
-.tl-pie { margin-top: var(--e6); }
+/* Listas agrupadas */
+.tl-grupo { margin: 0; padding: 0; list-style: none; background: var(--color-superficie); border-radius: var(--radio); overflow: hidden; }
+.tl-fila { display: flex; align-items: center; gap: var(--e3); width: 100%; min-height: 48px; padding: var(--e3) var(--e4); border: 0; background: none;
+  color: var(--color-texto); font: inherit; text-align: left; }
+.tl-grupo > li + li > .tl-fila, .tl-grupo > .tl-fila + .tl-fila { border-top: 1px solid var(--color-linea); }
+button.tl-fila, a.tl-fila { cursor: pointer; text-decoration: none; }
+button.tl-fila:active, a.tl-fila:active { background: var(--color-bloque); }
+.tl-fila .t { flex: 1; min-width: 0; }
+.tl-fila .t small { display: block; margin-top: 1px; font-size: 13px; color: var(--color-suave); }
+.tl-fila .v { flex: none; color: var(--color-suave); text-align: right; }
+.tl-fila .v.fuerte { color: var(--color-texto); }
+.tl-fila svg.ch { flex: none; width: 16px; height: 16px; stroke: var(--color-suave); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tl-fila svg.ic { flex: none; width: 20px; height: 20px; stroke: var(--color-texto); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.tl-fila .tl-et { margin-left: var(--e2); padding: 1px 6px; border-radius: var(--radio-peq); background: var(--color-bloque); font-size: 12px; color: var(--color-texto); }
+.tl-av-p { display: flex; align-items: center; justify-content: center; flex: none; width: 36px; height: 36px; border-radius: 50%;
+  background: var(--color-bloque); color: var(--color-texto); font: 500 14px/1 var(--fuente-texto); }
 
-/* Barra de la app: abajo, como en cualquier app del móvil */
+/* Tarjeta principal de inicio */
+.tl-tarjeta { display: flex; flex-direction: column; gap: var(--e3); padding: var(--e4); border-radius: var(--radio); background: var(--color-superficie); }
+.tl-tarjeta .gran { font: 500 19px/1.25 var(--fuente-titulos); letter-spacing: -.01em; }
+.tl-ciclo { height: 3px; border-radius: 2px; background: var(--color-bloque); }
+.tl-ciclo span { display: block; height: 100%; border-radius: 2px; background: var(--color-texto); }
+.tl-acciones { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e4); }
+
+/* Botones de la app: uno solo de acción, el resto sin relleno */
+.tl-b { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; padding: 0 var(--e4); border: 0; border-radius: var(--radio);
+  background: var(--color-accion); color: var(--color-sobre-accion); font: 500 16px/1 var(--fuente-texto); cursor: pointer; }
+.tl-b2 { display: inline-flex; align-items: center; gap: var(--e2); min-height: 44px; padding: 0; border: 0; background: none;
+  color: var(--color-texto); font: 500 15px/1.2 var(--fuente-texto); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; cursor: pointer; }
+.tl-b3 { display: flex; align-items: center; justify-content: center; gap: var(--e2); width: 100%; min-height: 48px; border: 1px solid var(--color-borde-campo);
+  border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto); font: 500 16px/1 var(--fuente-texto); cursor: pointer; }
+
+/* Fotos del corte */
+.tl-fotos { display: flex; gap: var(--e2); flex-wrap: wrap; }
+.tl-fotos img, .tl-fotos video { display: block; width: 64px; height: 64px; max-width: 100%; object-fit: cover; border-radius: var(--radio-peq); background: var(--color-bloque); }
+.tl-mas { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 64px; height: 64px; border: 1px dashed var(--color-borde-campo);
+  border-radius: var(--radio-peq); background: none; color: var(--color-suave); font: 400 11px/1.1 var(--fuente-texto); cursor: pointer; }
+.tl-mas svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Día y hora */
+.tl-dias { display: flex; gap: var(--e2); overflow-x: auto; margin: 0 0 var(--e4); padding-bottom: 2px; scrollbar-width: none; }
+.tl-dias::-webkit-scrollbar { display: none; }
+.tl-dia { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 52px; padding: var(--e2) 0; border: 0; border-radius: var(--radio);
+  background: var(--color-superficie); color: var(--color-texto); font: inherit; cursor: pointer; }
+.tl-dia .dn { font-size: 12px; color: var(--color-suave); }
+.tl-dia .dd { font: 500 18px/1.1 var(--fuente-texto); }
+.tl-dia[aria-pressed=true] { background: var(--color-texto); color: var(--color-superficie); }
+.tl-dia[aria-pressed=true] .dn { color: var(--color-superficie); }
+.tl-dia:disabled { opacity: .4; cursor: default; }
+.tl-horas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e2); }
+.tl-hora { min-height: 44px; border: 0; border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto);
+  font: 400 15px/1 var(--fuente-texto); cursor: pointer; }
+.tl-hora:active { background: var(--color-texto); color: var(--color-superficie); }
+
+/* Formularios dentro de la app */
+.tl-campos .tl-fila { padding-block: var(--e1); }
+.tl-campos label { width: 64px; flex: none; font-size: 15px; }
+.u .tl-campos input:not([type=checkbox]) { flex: 1; min-width: 0; min-height: 44px; padding: 0; border: 0; border-radius: 0; background: none; font: 400 16px/1 var(--fuente-texto); }
+.u .tl-campos input:not([type=checkbox]):focus-visible { outline: none; }
+.tl-campos .tl-fila:focus-within { box-shadow: inset 2px 0 0 var(--color-texto); }
+.tl-check { display: flex; gap: var(--e3); align-items: flex-start; margin: var(--e3) var(--e1); font-size: 13px; color: var(--color-suave); }
+.tl-check input { margin-top: 1px; flex: none; }
+.tl-app .tl-error { margin: var(--e3) var(--e1) 0; font-size: 14px; color: var(--color-error); }
+.tl-o { display: flex; align-items: center; gap: var(--e3); margin: var(--e4) 0; font-size: 13px; color: var(--color-suave); }
+.tl-o::before, .tl-o::after { content: ""; flex: 1; height: 1px; background: var(--color-linea); }
+.tl-pegado { position: sticky; bottom: 0; margin: var(--e4) calc(-1 * max(16px, env(safe-area-inset-right, 0px))) 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+  padding: var(--e3) max(16px, env(safe-area-inset-right, 0px)); background: var(--color-fondo); }
+
+/* Cita reservada */
+.tl-hecho { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-top: var(--e4); border-radius: 50%; background: var(--color-texto); }
+.tl-hecho svg { width: 22px; height: 22px; stroke: var(--color-superficie); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Barra de secciones de la app */
 .tl-tabs { position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(4, 1fr);
-  padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  padding: 4px env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
   background: var(--color-superficie); border-top: 1px solid var(--color-linea); }
-.tl-tabs button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 58px;
-  border: 0; border-top: 3px solid transparent; background: none; color: var(--color-suave); font: 700 12px/1.2 var(--fuente-texto); cursor: pointer; }
-.tl-tabs button[aria-current=page] { color: var(--color-principal-oscuro); border-top-color: var(--color-principal); }
-.tl-tabs svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.tl-tabs button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 50px; border: 0; background: none;
+  color: var(--color-suave); font: 500 11px/1.2 var(--fuente-texto); cursor: pointer; }
+.tl-tabs button[aria-current=page] { color: var(--color-texto); }
+.tl-tabs svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .tl-tabs[hidden] { display: none; }
-body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
+body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
 @media (min-width: 980px) {
-  .tl-tabs { position: sticky; flex: none; padding: 0; }
+  .tl-tabs { position: sticky; flex: none; padding: 4px 0 22px; }
   body[data-lado] .tl-pantalla { padding-bottom: 0; }
 }
 
-/* Tarjetas que se trabajan por separado: la próxima cita, «ya te toca» y cada corte */
-.tl-tarjeta { display: flex; flex-direction: column; gap: var(--e3); padding: var(--e4); border: 1px solid var(--color-linea);
-  border-radius: var(--radio); background: var(--color-superficie); }
-.tl-tarjeta.destaca { border-color: var(--color-principal); border-width: 1.5px; }
-.tl-grande { font: 500 64px/0.95 var(--fuente-titulos); letter-spacing: -.04em; color: var(--color-principal); }
-.tl-dia-grande { font: 600 22px/1.1 var(--fuente-titulos); }
-.tl-ciclo { display: flex; flex-direction: column; gap: var(--e1); }
-.tl-ciclo .barra { height: 3px; background: var(--color-bloque); }
-.tl-ciclo .barra span { display: block; height: 100%; background: var(--color-principal); }
-.tl-ciclo .n { display: flex; justify-content: space-between; font-size: 12px; color: var(--color-suave); }
-.tl-botones { display: flex; flex-wrap: wrap; gap: var(--e2); }
-.tl-botones .u-btn-accion { flex: 1 1 100%; min-height: 52px; }
-.tl-saludo { display: flex; align-items: center; gap: var(--e3); margin-bottom: var(--e4); }
-.tl-ini { display: flex; align-items: center; justify-content: center; flex: none; width: 48px; height: 48px; border-radius: var(--radio);
-  background: var(--color-bloque); color: var(--color-principal); font: 600 28px/1 var(--fuente-titulos); }
-.tl-info { display: grid; grid-template-columns: max-content 1fr; gap: var(--e2) var(--e4); margin: 0; font-size: 14px; }
-.tl-info dt { font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .04em; }
-.tl-info dd { margin: 0; }
-
-/* Un corte del historial */
-.tl-corte-cab { display: flex; justify-content: space-between; align-items: baseline; gap: var(--e3); }
-.tl-corte-cab .eur { font: 600 22px/1 var(--fuente-titulos); color: var(--color-principal); font-variant-numeric: tabular-nums; }
-.tl-nota { font-size: 14px; color: var(--color-suave); }
-.tl-fotos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e1); }
-.tl-fotos img, .tl-fotos video { display: block; width: 100%; max-width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radio-peq); background: var(--color-bloque); }
-.tl-sinfoto { padding: var(--e3); border: 1px dashed var(--color-borde-campo); border-radius: var(--radio-peq); font-size: 13px; color: var(--color-suave); }
-
-/* Servicios: baldosas que se tocan */
-.tl-servicios { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e2); }
-.tl-serv { display: flex; flex-direction: column; justify-content: space-between; gap: var(--e3); min-height: 120px; padding: var(--e4);
-  border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto);
-  font: inherit; text-align: left; cursor: pointer; transition: border-color 150ms; }
-.tl-serv:hover, .tl-barb:hover { border-color: var(--color-principal); }
-.tl-serv:last-child:nth-child(odd) { grid-column: 1 / -1; min-height: 88px; }
-.tl-serv .nom { font: 600 22px/1 var(--fuente-titulos); letter-spacing: -.02em; }
-.tl-serv .det { font-size: 13px; color: var(--color-suave); }
-.tl-serv .pie { display: flex; align-items: baseline; justify-content: space-between; gap: var(--e2); }
-.tl-serv .eur { font: 600 30px/1 var(--fuente-titulos); color: var(--color-principal); font-variant-numeric: tabular-nums; }
-.tl-siempre { width: 100%; margin-bottom: var(--e3); }
-
-/* Barberos */
-.tl-barberos { display: flex; flex-direction: column; gap: var(--e2); }
-.tl-barb { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: var(--e1) var(--e4); align-items: center; padding: var(--e3);
-  border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto);
-  font: inherit; text-align: left; cursor: pointer; transition: border-color 150ms; }
-.tl-barb.tuyo { border-color: var(--color-principal); }
-.tl-mono { grid-row: 1 / span 3; display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; padding: var(--e1) var(--e2);
-  border-radius: var(--radio); background: var(--color-bloque); color: var(--color-principal); font: 600 20px/1 var(--fuente-titulos); }
-.tl-mono.todos { color: var(--color-texto); }
-.tl-barb .nom { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); font: 600 22px/1 var(--fuente-titulos); }
-.tl-barb .nom .u-chip { font-family: var(--fuente-texto); text-transform: none; }
-.tl-barb .det { font-size: 13px; color: var(--color-suave); }
-.tl-barb .hueco { font-size: 13px; font-weight: 700; color: var(--color-principal-oscuro); }
-
-/* Día y hora */
-.tl-dias { display: flex; gap: var(--e2); overflow-x: auto; padding-bottom: var(--e2); margin-bottom: var(--e4); scrollbar-width: none; }
-.tl-dias::-webkit-scrollbar { display: none; }
-.tl-dia { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 68px; padding: var(--e2) 0;
-  border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto); font: inherit; cursor: pointer; }
-.tl-dia .dn { font: 700 12px/1.2 var(--fuente-texto); text-transform: uppercase; letter-spacing: .06em; }
-.tl-dia .dd { font: 600 28px/1 var(--fuente-titulos); font-variant-numeric: tabular-nums; }
-.tl-dia .dh { font-size: 12px; color: var(--color-suave); }
-.tl-dia[aria-pressed=true] { background: var(--color-principal); border-color: var(--color-principal); color: var(--color-sobre-principal); }
-.tl-dia[aria-pressed=true] .dh { color: var(--color-sobre-principal); }
-.tl-franja { margin: 0 0 var(--e2) !important; }
-.tl-horas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e2); margin-bottom: var(--e5); }
-.tl-hora { min-height: 44px; border: 1px solid var(--color-principal-oscuro); border-radius: var(--radio); background: transparent;
-  color: var(--color-principal-oscuro); font: 700 15px/1 var(--fuente-texto); font-variant-numeric: tabular-nums; cursor: pointer; }
-.tl-hora:hover { background: var(--color-bloque); }
-.tl-resumen { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e2); margin: 0 0 var(--e4) !important; }
-
-/* Confirmar y datos */
-.tl-form { display: flex; flex-direction: column; gap: var(--e4); }
-.tl-form input:not([type=checkbox]) { width: 100%; }
-.tl-check { display: flex; gap: var(--e3); align-items: flex-start; font-size: 14px; }
-.tl-check input { margin-top: 2px; flex: none; }
-.tl-form .u-btn-accion { width: 100%; min-height: 52px; }
-.tl-o { display: flex; align-items: center; gap: var(--e3); font-size: 13px; color: var(--color-suave); }
-.tl-o::before, .tl-o::after { content: ""; flex: 1; height: 1px; background: var(--color-linea); }
-.tl-google { width: 100%; }
-
-/* Resguardo de la cita */
-.tl-ticket { position: relative; margin: var(--e4) 0; border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); }
-.tl-ticket-a { padding: var(--e4); }
-.tl-ticket-a .num { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--color-suave); }
-.tl-ticket-a .tl-grande { margin-top: var(--e2); font-size: 76px; }
-.tl-ticket-a .tl-dia-grande { margin-top: var(--e1); }
-.tl-ticket-b { padding: var(--e4); border-top: 1px solid var(--color-linea); }
-.tl-ticket dl, .tl-resumen-cita { display: grid; grid-template-columns: max-content 1fr; gap: var(--e2) var(--e4); margin: 0; }
-.tl-ticket dt, .tl-resumen-cita dt { font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .04em; }
-.tl-ticket dd, .tl-resumen-cita dd { margin: 0; font-weight: 700; }
-
-/* Aviso que llega al móvil (flota: lleva la sombra) */
+/* Aviso que llega al móvil, como el de iOS (flota: lleva la sombra) */
 .tl-noti { position: fixed; z-index: 80; top: calc(var(--e2) + env(safe-area-inset-top, 0px));
   left: calc(var(--e2) + env(safe-area-inset-left, 0px)); right: calc(var(--e2) + env(safe-area-inset-right, 0px));
-  max-width: 440px; margin: 0 auto; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: var(--e1) var(--e3); align-items: start;
-  padding: var(--e3); border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-bloque);
+  max-width: 420px; margin: 0 auto; display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 0 var(--e3); align-items: center;
+  padding: var(--e3) var(--e4) var(--e3) var(--e3); border: 0; border-radius: 22px; background: var(--color-superficie);
   color: var(--color-texto); box-shadow: var(--sombra-flota); font: inherit; text-align: left; cursor: pointer;
   transform: translateY(calc(-100% - 24px)); transition: transform 200ms ease-out; }
 .tl-noti.on { transform: none; }
 .tl-noti[hidden] { display: none; }
-@media (min-width: 980px) { .tl-noti { position: absolute; top: 40px; } }
-.tl-noti .app { grid-row: 1 / span 2; }
-.tl-noti .tit { display: flex; justify-content: space-between; gap: var(--e2); font-size: 13px; }
-.tl-noti .tit span { color: var(--color-suave); }
+@media (min-width: 980px) { .tl-noti { position: absolute; top: 56px; left: 10px; right: 10px; } }
+.tl-noti .app { grid-row: 1 / span 2; width: 38px; height: 38px; border-radius: 9px; }
+.tl-noti .tit { display: flex; justify-content: space-between; gap: var(--e2); font-size: 14px; font-weight: 600; }
+.tl-noti .tit span { font-weight: 400; font-size: 13px; color: var(--color-suave); }
 .tl-noti .txt { font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.tl-av { display: flex; align-items: center; justify-content: center; flex: none; width: 40px; height: 40px; border-radius: var(--radio);
-  background: var(--color-principal); color: var(--color-sobre-principal); font: 600 24px/1 var(--fuente-titulos); }
+.tl-av { display: flex; align-items: center; justify-content: center; flex: none; width: 36px; height: 36px; border-radius: 50%;
+  background: var(--color-texto); color: var(--color-superficie); font: 600 16px/1 var(--fuente-titulos); }
 
-/* Chat simulado: neutro, sin la marca ni los colores de ninguna app de mensajería */
-.tl-chat { min-height: 100%; display: flex; flex-direction: column; background: var(--color-bloque); }
-.tl-pantalla.en-chat { background: var(--color-bloque); }
-.tl-chat-cab { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: var(--e3);
-  padding: calc(var(--e2) + env(safe-area-inset-top, 0px)) var(--e3) var(--e2); background: var(--color-superficie); border-bottom: 1px solid var(--color-linea); }
-.tl-chat-cab strong { display: block; }
-.tl-chat-cab div span { font-size: 13px; color: var(--color-suave); }
-.tl-msgs { flex: 1; display: flex; flex-direction: column; gap: var(--e3); padding: var(--e4) var(--e3); }
-.tl-sis { align-self: center; max-width: 92%; margin: var(--e2) 0 0; padding: var(--e1) var(--e3); border-radius: var(--radio-peq);
-  background: var(--color-fondo); color: var(--color-suave); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; text-align: center; }
-.tl-msg { max-width: 86%; padding: var(--e2) var(--e3); border-radius: var(--radio); font-size: 15px; white-space: pre-line; }
-.tl-msg time { display: block; margin-top: var(--e1); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; color: var(--color-suave); }
-.tl-msg.neg { align-self: flex-start; background: var(--color-superficie); }
-.tl-msg.cli { align-self: flex-end; background: var(--color-principal); color: var(--color-sobre-principal); font-weight: 700; }
-.tl-msg.cli time { color: var(--color-sobre-principal); }
-.tl-msg img, .tl-msg video { display: block; width: 180px; max-width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radio-peq); }
-.tl-msg .u-btn { margin-top: var(--e2); white-space: normal; }
-.tl-msg.entra { animation: tl-entra 200ms ease-out; }
-@keyframes tl-entra { from { opacity: 0; transform: translateY(6px); } }
-.tl-resp { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; gap: var(--e2); padding: var(--e3);
-  padding-bottom: calc(var(--e3) + env(safe-area-inset-bottom, 0px)); background: var(--color-superficie); border-top: 1px solid var(--color-linea); }
-.tl-resp p { flex: 1 0 100%; margin: 0; }
-.tl-resp .u-btn { flex: 1 1 0; padding: 0 var(--e2); }
+/* ---------- Chat: la forma de WhatsApp (burbujas con pico, marcas de leído, botones bajo el mensaje), sin su marca ---------- */
+.tl-pantalla.en-chat { background: var(--fondo-chat); }
+.tl-chat { min-height: 100%; display: flex; flex-direction: column; background: var(--fondo-chat); }
+@media (max-width: 979px) { .tl-chat { min-height: 100vh; min-height: 100dvh; } }
+.tl-chat-cab { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: var(--e2);
+  padding: calc(var(--e1) + env(safe-area-inset-top, 0px)) var(--e3) var(--e1) var(--e1); background: var(--color-superficie); border-bottom: 1px solid var(--color-linea); }
+@media (min-width: 980px) { .tl-chat-cab { padding-top: var(--e1); } }
+.tl-chat-cab .q { flex: 1; min-width: 0; }
+.tl-chat-cab strong { display: block; font-size: 16px; font-weight: 500; }
+.tl-chat-cab .q span { font-size: 12px; color: var(--color-suave); }
+.tl-msgs { flex: 1; display: flex; flex-direction: column; gap: 3px; padding: var(--e3) var(--e3) var(--e4); }
+.tl-fecha-chat { align-self: center; margin: var(--e2) 0; padding: 3px 10px; border-radius: 8px; background: var(--color-superficie); font-size: 12px; color: var(--color-suave); }
+.tl-sis { align-self: center; max-width: 88%; margin: var(--e3) 0 var(--e2); padding: 4px 10px; border-radius: 8px;
+  background: color-mix(in srgb, var(--color-superficie) 70%, transparent); color: var(--color-suave); font-size: 12px; text-align: center; }
+.tl-msg { position: relative; max-width: 82%; padding: 6px 8px 5px 9px; border-radius: 8px; font-size: 15px; line-height: 1.35; white-space: pre-line; overflow-wrap: anywhere; }
+.tl-msg.neg { align-self: flex-start; margin-left: 8px; background: var(--color-superficie); border-top-left-radius: 0; }
+.tl-msg.cli { align-self: flex-end; margin-right: 8px; background: var(--burbuja-mia); border-top-right-radius: 0; }
+.tl-msg.neg::before, .tl-msg.cli::before { content: ""; position: absolute; top: 0; width: 0; height: 0; border-top: 9px solid var(--color-superficie); }
+.tl-msg.neg::before { left: -8px; border-left: 8px solid transparent; }
+.tl-msg.cli::before { right: -8px; border-right: 8px solid transparent; border-top-color: var(--burbuja-mia); }
+.tl-msg .meta { float: right; display: inline-flex; align-items: center; gap: 3px; margin: 6px 0 -4px 10px; font-size: 11px; line-height: 1;
+  color: var(--color-suave); white-space: nowrap; }
+.tl-msg .meta svg { width: 16px; height: 11px; stroke: var(--color-accion); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.tl-msg img, .tl-msg video { display: block; width: 200px; max-width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; margin: -2px -4px 4px -5px; }
+.tl-msg.entra { animation: tl-entra 180ms ease-out; }
+@keyframes tl-entra { from { opacity: 0; transform: translateY(4px); } }
+.tl-msg .neg-tit { display: block; margin-bottom: 2px; font-size: 13px; font-weight: 500; color: var(--color-accion); }
+/* Botones de respuesta rápida, pegados debajo del mensaje */
+.tl-wbtns { align-self: flex-start; display: grid; gap: 3px; width: min(82%, 300px); margin: 0 0 var(--e2) 8px; }
+.tl-wbtns button { display: flex; align-items: center; justify-content: center; gap: var(--e2); min-height: 40px; border: 0; border-radius: 8px;
+  background: var(--color-superficie); color: var(--color-accion); font: 500 15px/1.2 var(--fuente-texto); cursor: pointer; }
+.tl-wbtns button svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tl-wbtns button:disabled { color: var(--color-suave); cursor: default; }
+.tl-redactar { position: sticky; bottom: 0; display: flex; align-items: center; gap: var(--e2); padding: var(--e2) var(--e2) calc(var(--e2) + env(safe-area-inset-bottom, 0px));
+  background: var(--fondo-chat); }
+.tl-redactar span { flex: 1; min-height: 42px; display: flex; align-items: center; padding: 0 var(--e4); border-radius: 21px; background: var(--color-superficie);
+  font-size: 15px; color: var(--color-suave); }
+.tl-redactar i { display: flex; align-items: center; justify-content: center; flex: none; width: 42px; height: 42px; border-radius: 50%; background: var(--color-texto); }
+.tl-redactar i svg { width: 20px; height: 20px; stroke: var(--color-superficie); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+@media (min-width: 980px) { .tl-redactar { padding-bottom: 26px; } }
 
 /* ---------- El mostrador de la barbería ---------- */
-.tl-neg { padding: var(--e4) max(16px, env(safe-area-inset-right, 0px)) var(--e7) max(16px, env(safe-area-inset-left, 0px)); }
+.tl-neg { padding: var(--e4) max(16px, env(safe-area-inset-right, 0px)) var(--e7) max(16px, env(safe-area-inset-left, 0px)); font-size: 15px; }
 @media (min-width: 980px) { .tl-neg { padding: 0; } }
-.tl-ncab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e3); padding-bottom: var(--e3);
-  border-bottom: 1px solid var(--color-linea); }
+.tl-ncab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e3); padding-bottom: var(--e3); border-bottom: 1px solid var(--color-linea); }
 .tl-ncab .tl-logo { flex-direction: row; align-items: baseline; gap: var(--e2); }
-.tl-ncab .tl-logo-nom { font-size: 28px; }
-.tl-ncab .tl-logo-sub { margin: 0; color: var(--color-suave); }
-.tl-ndia { display: flex; align-items: center; gap: var(--e2); }
-.u .tl-ndia h1 { min-width: 0; font-size: 24px; color: var(--color-texto); text-align: center; }
-@media (min-width: 980px) { .u .tl-ndia h1 { min-width: 220px; } }
-
+.tl-ndia { display: flex; align-items: center; gap: var(--e1); }
+.u .tl-ndia h1 { min-width: 0; margin: 0 var(--e2); font: 500 17px/1.2 var(--fuente-texto); color: var(--color-texto); text-align: center; }
+@media (min-width: 980px) { .u .tl-ndia h1 { min-width: 160px; } }
+.tl-ndia .u-btn { border-color: var(--color-linea); }
 .tl-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: var(--e4) 0 var(--e2);
-  background: var(--color-linea); border: 1px solid var(--color-linea); border-radius: var(--radio); overflow: hidden; }
+  background: var(--color-linea); border-radius: var(--radio); overflow: hidden; }
 @media (min-width: 640px) { .tl-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.tl-kpi { padding: var(--e3); background: var(--color-superficie); display: flex; flex-direction: column; gap: var(--e1); min-width: 0; }
-.tl-kpi .v { font: 600 34px/1 var(--fuente-titulos); font-variant-numeric: tabular-nums; }
-.tl-kpi .v.cifra { text-decoration: underline; text-decoration-color: var(--color-destacado); text-decoration-thickness: 4px; text-underline-offset: 6px; }
-.tl-kpi .barra { height: 4px; margin-top: var(--e1); background: var(--color-bloque); }
-.tl-kpi .barra span { display: block; height: 100%; background: var(--color-principal); transition: width 200ms; }
-.tl-kpi .n { font-size: 12px; color: var(--color-suave); }
+.tl-kpi { padding: var(--e3) var(--e4); background: var(--color-superficie); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tl-kpi .l { font-size: 13px; color: var(--color-suave); }
+.tl-kpi .v { font: 500 24px/1.2 var(--fuente-titulos); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.tl-kpi .v.cifra { text-decoration: underline; text-decoration-color: var(--color-destacado); text-decoration-thickness: 2px; text-underline-offset: 5px; }
+.tl-kpi .barra { height: 3px; margin-top: var(--e1); border-radius: 2px; background: var(--color-bloque); }
+.tl-kpi .barra span { display: block; height: 100%; border-radius: 2px; background: var(--color-texto); transition: width 200ms; }
 .tl-mes { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e4); margin: 0 0 var(--e5); font-size: 13px; color: var(--color-suave); }
-.tl-mes strong { color: var(--color-texto); font-variant-numeric: tabular-nums; }
-.tl-mes .cambio, .tl-mes .cambio strong { color: var(--color-principal-oscuro); }
+.tl-mes b { font-weight: 500; color: var(--color-texto); font-variant-numeric: tabular-nums; }
+.tl-mes .cambio, .tl-mes .cambio b { color: var(--color-accion); }
 
 /* Cuadrante: una columna por barbero; cada cita mide lo que dura */
 .tl-cuad-cab { display: grid; grid-template-columns: 44px repeat(3, minmax(0, 1fr)); gap: var(--e2); align-items: end; padding-bottom: var(--e2);
   position: sticky; top: 0; z-index: 3; background: var(--color-fondo); }
-.tl-cuad-cab strong { font: 600 20px/1 var(--fuente-titulos); }
+.tl-cuad-cab strong { font: 500 15px/1.2 var(--fuente-texto); }
 .tl-cuad-cab span { display: block; font-size: 12px; color: var(--color-suave); }
 .tl-cuad { position: relative; display: grid; grid-template-columns: 44px repeat(3, minmax(0, 1fr)); gap: var(--e2); }
 .tl-eje { position: relative; }
-.tl-eje span { position: absolute; left: 0; font-size: 12px; font-weight: 700; color: var(--color-suave); font-variant-numeric: tabular-nums; transform: translateY(-50%); }
+.tl-eje span { position: absolute; left: 0; font-size: 12px; color: var(--color-suave); font-variant-numeric: tabular-nums; transform: translateY(-50%); }
 .tl-eje span:first-child { transform: none; }
-.tl-col { position: relative; background: var(--color-superficie); border-radius: var(--radio); }
+.tl-col { position: relative; background: var(--color-superficie); border-radius: var(--radio-peq); }
 .tl-linea { position: absolute; left: 0; right: 0; height: 1px; background: var(--color-linea); }
-.tl-blq { position: absolute; left: 3px; right: 3px; display: flex; flex-direction: column; justify-content: flex-start; gap: 1px; overflow: hidden;
-  padding: 3px var(--e2); border: 1px solid var(--color-linea); border-radius: var(--radio-peq); background: var(--color-bloque); color: var(--color-texto);
-  font: inherit; text-align: left; cursor: pointer; }
-.tl-blq .c { font-size: 13px; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tl-blq .s { font-size: 12px; line-height: 1.2; color: var(--color-suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tl-blq.pasada { opacity: .5; }
+.tl-blq { position: absolute; left: 3px; right: 3px; display: flex; flex-direction: column; justify-content: flex-start; gap: 0; overflow: hidden;
+  padding: 3px var(--e2); border: 0; border-radius: 4px; background: var(--color-bloque); color: var(--color-texto); font: inherit; text-align: left; cursor: pointer; }
+.tl-blq .c { font-size: 13px; font-weight: 500; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-blq .s { font-size: 12px; line-height: 1.25; color: var(--color-suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-blq.pasada { opacity: .45; }
 .tl-blq.corto { flex-direction: row; align-items: center; gap: var(--e2); padding-block: 0; }
 @media (max-width: 639px) { .tl-blq .hh { display: none; } }
-.tl-blq.mia { border: 2px solid var(--color-principal); background: var(--color-superficie); }
-.tl-blq.mia .s { color: var(--color-texto); }
+.tl-blq.mia { background: var(--color-superficie); box-shadow: inset 0 0 0 1.5px var(--color-texto); }
 .tl-blq.flash { animation: tl-flash 200ms ease-out 3; }
-@keyframes tl-flash { 50% { background: var(--color-principal); color: var(--color-sobre-principal); } }
-.tl-ahora { position: absolute; left: 52px; right: 0; height: 2px; background: var(--color-principal); z-index: 2; pointer-events: none; }
+@keyframes tl-flash { 50% { background: var(--color-texto); color: var(--color-superficie); } }
+.tl-ahora { position: absolute; left: 52px; right: 0; height: 1.5px; background: var(--color-accion); z-index: 2; pointer-events: none; }
 .tl-leyenda { display: flex; flex-wrap: wrap; gap: var(--e2) var(--e4); margin: var(--e4) 0 0; font-size: 13px; color: var(--color-suave); }
-.tl-leyenda i { display: inline-block; width: 12px; height: 12px; margin-right: var(--e1); vertical-align: -1px; border-radius: var(--radio-peq);
-  background: var(--color-bloque); border: 1px solid var(--color-linea); }
-.tl-leyenda i.mia { border: 2px solid var(--color-principal); background: var(--color-superficie); }
-.tl-leyenda i.ahora { height: 2px; border: 0; vertical-align: 3px; background: var(--color-principal); }
+.tl-leyenda i { display: inline-block; width: 12px; height: 12px; margin-right: var(--e1); vertical-align: -1px; border-radius: 3px; background: var(--color-bloque); }
+.tl-leyenda i.mia { background: var(--color-superficie); box-shadow: inset 0 0 0 1.5px var(--color-texto); }
+.tl-leyenda i.ahora { height: 2px; vertical-align: 3px; background: var(--color-accion); }
 
 /* Aviso del mostrador cuando entra o cambia una cita */
 .tl-toast { position: fixed; z-index: 70; left: 50%; transform: translateX(-50%); bottom: calc(var(--e5) + env(safe-area-inset-bottom, 0px));
   width: max-content; max-width: calc(100% - var(--e6)); display: flex; gap: var(--e3); align-items: center; padding: var(--e3) var(--e4);
-  border: 1px solid var(--color-principal); border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto);
-  box-shadow: var(--sombra-flota); font-size: 15px; }
+  border-radius: var(--radio); background: var(--color-texto); color: var(--color-superficie); box-shadow: var(--sombra-flota); font-size: 14px; }
 .tl-toast[hidden] { display: none; }
-.tl-toast strong { color: var(--color-principal); font: 600 18px/1 var(--fuente-titulos); white-space: nowrap; }
-@media (min-width: 980px) { .tl-toast { left: calc(50% + 220px); max-width: calc(100% - 520px); } }
+.tl-toast strong { font-weight: 600; white-space: nowrap; }
+@media (min-width: 980px) { .tl-toast { left: calc(50% + 230px); max-width: calc(100% - 540px); } }
 
 /* Ventanas: ficha del cliente, entrar con Google y menú de la demo */
-.tl-ficha, .tl-menu { padding: var(--e5) var(--e4); display: flex; flex-direction: column; gap: var(--e3); }
-.u .tl-ficha h2, .u .tl-menu h2 { font-size: 30px; color: var(--color-texto); }
+.tl-ficha, .tl-menu { padding: var(--e5) var(--e4); display: flex; flex-direction: column; gap: var(--e3); font-size: 15px; }
+.u .tl-ficha h2, .u .tl-menu h2 { font: 600 22px/1.2 var(--fuente-titulos); letter-spacing: -.02em; color: var(--color-texto); }
 .tl-ficha p, .tl-menu p { margin: 0; }
 .tl-ficha dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--e2) var(--e4); margin: 0; padding: var(--e3) 0; border-block: 1px solid var(--color-linea); }
-.tl-ficha dt { font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .04em; }
-.tl-ficha dd { margin: 0; font-weight: 700; }
+.tl-ficha dt { font-size: 13px; color: var(--color-suave); }
+.tl-ficha dd { margin: 0; }
 .tl-ficha table { width: 100%; border-collapse: collapse; font-size: 14px; }
-.tl-ficha th { text-align: left; font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .04em; padding: 0 0 var(--e1); }
+.tl-ficha th { text-align: left; font-size: 13px; font-weight: 400; color: var(--color-suave); padding: 0 0 var(--e1); }
 .tl-ficha td { padding: var(--e2) 0; border-top: 1px solid var(--color-linea); }
 .tl-ficha td.num, .tl-ficha th.num { text-align: right; font-variant-numeric: tabular-nums; }
-.tl-ficha .vueltas { display: flex; gap: var(--e3); align-items: baseline; }
-.tl-ficha .vueltas strong { font: 600 44px/1 var(--fuente-titulos); color: var(--color-principal); font-variant-numeric: tabular-nums; }
+.tl-ficha .vueltas { font-size: 14px; color: var(--color-suave); }
+.tl-ficha .vueltas b { font-weight: 500; color: var(--color-texto); }
+.tl-ficha .tl-fotos img, .tl-ficha .tl-fotos video { width: 96px; height: 96px; }
 .tl-ficha input { width: 100%; }
-.tl-ficha .u-btn-accion { width: 100%; min-height: 52px; }
-.tl-menu .u-btn, .tl-ficha .u-btn:not(.u-btn-accion) { width: 100%; justify-content: flex-start; }
+.tl-menu .u-btn, .tl-ficha .u-btn { width: 100%; justify-content: flex-start; font-weight: 500; border-color: var(--color-linea); }
 @media (min-width: 641px) { .u .u-velo { align-items: center; } .u .u-ventana { max-width: 440px; } }
 </style>
 </head>
@@ -313,38 +319,31 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
 
 <div class="tl-escena">
   <section class="tl-lado-cli" aria-label="La app del cliente">
-    <p class="u-etiqueta tl-lado-tit">La app del cliente, en su móvil</p>
-    <div class="tl-movil">
+    <p class="tl-lado-tit">La app del cliente, en su móvil</p>
+    <div class="tl-movil" id="movil">
+      <div class="tl-isla" aria-hidden="true"></div>
       <div class="tl-estado" aria-hidden="true"><span id="reloj">10:00</span>
-        <svg viewBox="0 0 34 12"><rect x="0" y="8" width="3" height="4"/><rect x="5" y="5" width="3" height="7"/><rect x="10" y="2" width="3" height="10"/><rect x="18" y="1" width="14" height="10" rx="2" fill="none" stroke="currentColor"/><rect x="20" y="3" width="10" height="6"/></svg></div>
-      <div class="tl-pantalla" id="pantalla">
-        <header class="tl-cab" id="cab">
-          <div class="tl-cab-in">
-            <button type="button" class="tl-logo" data-logo aria-label="Barbería Tallat, Sant Antoni. Pulsación larga: menú de la demo">
-              <span class="tl-logo-nom">tallat<i class="tl-punto">.</i></span>
-              <span class="tl-logo-sub">Barbería · Sant Antoni</span>
-            </button>
-            <p class="tl-abierto" id="abierto"></p>
-          </div>
-        </header>
+        <svg viewBox="0 0 66 13"><rect x="0" y="8" width="3" height="5" rx="1"/><rect x="5" y="5.5" width="3" height="7.5" rx="1"/><rect x="10" y="3" width="3" height="10" rx="1"/><rect x="15" y="0.5" width="3" height="12.5" rx="1"/><path d="M29 4.5a9 9 0 0 1 12 0l-1.6 1.7a6.6 6.6 0 0 0-8.8 0zM31.6 7.3a5.2 5.2 0 0 1 6.8 0L35 11z"/><rect x="45.5" y="1" width="18" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1"/><rect x="47.5" y="3" width="14" height="7" rx="1.5"/><rect x="64.3" y="4.5" width="1.5" height="4" rx=".7"/></svg></div>
+      <div class="tl-pantalla tl-app" id="pantalla">
         <main id="cli" class="tl-cli" aria-live="polite"></main>
         <nav class="tl-tabs" id="tabs" aria-label="Secciones de la app">
-          <button type="button" data-tab="inicio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inicio</button>
+          <button type="button" data-tab="inicio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.5L12 4l8.5 6.5V20h-5.5v-5.5h-6V20H3.5z"/></svg>Inicio</button>
           <button type="button" data-tab="reservar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M12 13v5M9.5 15.5h5"/></svg>Reservar</button>
-          <button type="button" data-tab="cortes"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="7" r="3"/><circle cx="6" cy="17" r="3"/><path d="M8.6 8.6L20 18M8.6 15.4L20 6"/></svg>Mis cortes</button>
-          <button type="button" data-tab="perfil"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"/></svg>Perfil</button>
+          <button type="button" data-tab="cortes"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="7" r="2.6"/><circle cx="6" cy="17" r="2.6"/><path d="M8.3 8.4L20 18M8.3 15.6L20 6"/></svg>Mis cortes</button>
+          <button type="button" data-tab="perfil"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg>Perfil</button>
         </nav>
       </div>
+      <div class="tl-home" aria-hidden="true"></div>
       <button type="button" class="tl-noti" id="noti" hidden>
-        <span class="tl-av app" aria-hidden="true">T</span>
-        <span class="tit"><strong>Barbería Tallat</strong><span>ahora</span></span>
+        <span class="tl-av app" aria-hidden="true">t</span>
+        <span class="tit"><span style="font-size:14px;font-weight:600;color:var(--color-texto)">Barbería Tallat</span><span>ahora</span></span>
         <span class="txt" id="noti-txt"></span>
       </button>
     </div>
   </section>
 
   <section class="tl-lado-neg" aria-label="Lo que ve la barbería">
-    <p class="u-etiqueta tl-lado-tit">Lo que ve la barbería, en el mostrador</p>
+    <p class="tl-lado-tit">Lo que ve la barbería, en el mostrador</p>
     <div id="neg" class="tl-neg"></div>
   </section>
 </div>
@@ -359,7 +358,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
 <div class="u-velo" id="menu" role="dialog" aria-modal="true" aria-labelledby="menu-tit">
   <div class="u-ventana tl-menu">
     <h2 id="menu-tit">Menú de la demo</h2>
-    <p class="u-nota">Solo lo ves tú. Se abre con una pulsación larga en el logo o con la tecla M.</p>
+    <p class="tl-sub">Solo lo ves tú. Se abre con una pulsación larga en el logo o con la tecla M.</p>
     <button type="button" class="u-btn" data-ir="habitual">Empezar como cliente habitual</button>
     <button type="button" class="u-btn" data-ir="nuevo">Empezar como cliente nuevo, sin cuenta</button>
     <button type="button" class="u-btn" data-ir="chat" id="menu-chat">Ver los WhatsApp que recibe el cliente</button>
@@ -394,14 +393,23 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
   var ABRE = 600, CIERRA = 1230, PASO = 30, PPM = 1.6;   // minutos desde las 00:00 (10:00 a 20:30) y píxeles por minuto
   var DIA_C = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
   var DIA_L = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  var MES_C = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
   var MES_BASE = { web: 64, avisos: 132, ausencias: 9, resenas: 17 };   // cifras de ejemplo del mes
   var DIRECCION = 'Carrer de Manso, Sant Antoni, Barcelona';
 
+  function svg(d, cls) { return '<svg class="' + (cls || 'ic') + '" viewBox="0 0 24 24" aria-hidden="true"><path d="' + d + '"/></svg>'; }
   var ICO = {
-    atras: '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
+    atras: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
+    ch: svg('M9 5l7 7-7 7', 'ch'),
     sig: '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>',
-    cal: '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M12 13v5M9.5 15.5h5"/></svg>',
-    foto: '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>'
+    ant: '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
+    cal: svg('M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M12 13v5M9.5 15.5h5'),
+    chat: svg('M4 5h16v11H9l-5 4z'),
+    foto: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+    resp: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 8L5 12l5 4M5 12h9a5 5 0 0 1 5 5v1"/></svg>',
+    ok: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    leido: '<svg viewBox="0 0 16 11" aria-hidden="true"><path d="M1 6l3 3 6-7M6 9l1 1 7-8"/></svg>',
+    mic: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3zM6 11a6 6 0 0 0 12 0M12 17v3"/></svg>'
   };
 
   /* ---------- Utilidades ---------- */
@@ -413,6 +421,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
   function ddmm(k) { var d = fecha(k); return dos(d.getDate()) + '/' + dos(d.getMonth() + 1); }
   function ddmmaaaa(k) { return ddmm(k) + '/' + fecha(k).getFullYear(); }
   function diaLargo(k) { return DIA_L[fecha(k).getDay()] + ' ' + ddmmaaaa(k); }
+  function diaCorto(k) { var d = fecha(k); return DIA_L[d.getDay()].replace(/^./, function (x) { return x.toUpperCase(); }) + ' ' + d.getDate() + ' ' + MES_C[d.getMonth()]; }
   function sumarDias(k, n) { var d = fecha(k); d.setDate(d.getDate() + n); return clave(d); }
   function diasEntre(a, b) { return Math.round((fecha(b) - fecha(a)) / 864e5); }
   function eur(n) { return n.toLocaleString('es-ES') + ' €'; }
@@ -427,7 +436,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
   }
   function otroDiaAbierto(k, paso) { var d = fecha(k); do { d.setDate(d.getDate() + paso); } while (!abierto(d)); return clave(d); }
   function abiertoAntes(n) { var k = sumarDias(hoy(), -n); return abierto(fecha(k)) ? k : otroDiaAbierto(k, -1); }
-  function cuando(k) { return k === hoy() ? 'hoy' : k === sumarDias(hoy(), 1) ? 'mañana' : DIA_C[fecha(k).getDay()] + ' ' + ddmm(k); }
+  function cuando(k) { return k === hoy() ? 'hoy' : k === sumarDias(hoy(), 1) ? 'mañana' : DIA_C[fecha(k).getDay()] + ' ' + fecha(k).getDate(); }
   function mascara(tel) { return tel.charAt(0) + '•• ••• ' + tel.slice(-3); }
   function enIframe() { try { return window.self !== window.top; } catch (e) { return true; } }
 
@@ -488,7 +497,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
   }
   function primerHueco(b, min) {
     var dias = diasAbiertos(6);
-    for (var i = 0; i < dias.length; i++) { var h = horasLibres(dias[i], b, min); if (h.length) return cuando(dias[i]) + ' a las ' + hhmm(h[0]); }
+    for (var i = 0; i < dias.length; i++) { var h = horasLibres(dias[i], b, min); if (h.length) return cuando(dias[i]) + ', ' + hhmm(h[0]); }
     return null;
   }
 
@@ -496,7 +505,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
   var st, tPost1 = null, tPost2 = null;
   function reiniciar(nuevo) {
     st = { lado: 'cli', vista: 'inicio', serv: null, barb: null, dia: null, ini: null, nombre: '', tel: '', error: '',
-      usuario: nuevo ? null : JSON.parse(JSON.stringify(HABITUAL)), historial: [], mias: [], chat: [], fase: null, actual: null,
+      usuario: nuevo ? null : JSON.parse(JSON.stringify(HABITUAL)), historial: [], mias: [], chat: [], actual: null,
       cambiando: null, fotoPara: null, agDia: null, flash: null, mes: { web: 0, avisos: 0, ausencias: 0, resenas: 0 }, cambioMes: null };
     if (!nuevo) st.historial = [
       { id: 'h1', dia: abiertoAntes(26), barbero: 'Toni', serv: 'cb', ini: 690, nota: 'Degradado bajo, arriba a tijera y barba perfilada', fotos: [] },
@@ -507,7 +516,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
     clearTimeout(tPost1); clearTimeout(tPost2);
   }
   function proximas() {
-    return st.mias.filter(function (c) { return c.estado !== 'anulada' && !c.hecha_ya && !pasada(c.dia, c.ini); })
+    return st.mias.filter(function (c) { return c.estado !== 'anulada' && !c.hechaYa && !pasada(c.dia, c.ini); })
       .sort(function (a, b) { return a.dia < b.dia ? -1 : a.dia > b.dia ? 1 : a.ini - b.ini; });
   }
   function barberoHabitual() {
@@ -535,201 +544,185 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
     a.download = 'cita-barberia-tallat.ics';
     document.body.appendChild(a); a.click(); a.remove();
   }
-  function botonesCalendario(c) {
-    return '<a class="u-btn" href="' + enlaceGoogle(c) + '" target="_blank" rel="noopener">' + ICO.cal + 'Añadir a Google Calendar</a>' +
-      (enIframe() ? '' : '<button type="button" class="u-btn" data-ics="' + c.id + '">' + ICO.cal + 'Calendario del móvil</button>');
-  }
 
-  /* ---------- Pantallas de la app del cliente ---------- */
+  /* ---------- Piezas de la app ---------- */
   var cliEl = document.getElementById('cli'), negEl = document.getElementById('neg');
-  var pantalla = document.getElementById('pantalla'), cab = document.getElementById('cab'), tabs = document.getElementById('tabs');
+  var pantalla = document.getElementById('pantalla'), tabs = document.getElementById('tabs'), movil = document.getElementById('movil');
 
   function estadoAbierto() {
     var k = hoy(), m = ahoraMin();
-    if (abierto(fecha(k)) && m >= ABRE && m < CIERRA) return '<strong>Abierto ahora</strong>hasta las 20:30';
+    if (abierto(fecha(k)) && m >= ABRE && m < CIERRA) return 'Abierto · cierra a las 20:30';
     var sig = abierto(fecha(k)) && m < ABRE ? k : otroDiaAbierto(k, 1);
-    return '<strong>Cerrado</strong>abre ' + (sig === k ? 'hoy' : sig === sumarDias(k, 1) ? 'mañana' : 'el ' + DIA_C[fecha(sig).getDay()]) + ', 10:00';
+    return 'Cerrado · abre ' + (sig === k ? 'hoy' : sig === sumarDias(k, 1) ? 'mañana' : 'el ' + DIA_L[fecha(sig).getDay()]) + ' a las 10:00';
   }
-  function cabeza(paso, titulo) {
+  function nav(titulo, paso) {
     var barras = '';
-    for (var i = 1; i <= 4; i++) barras += '<span' + (i <= paso ? ' class="on"' : '') + '></span>';
-    return '<div class="tl-cabeza"><button type="button" class="u-btn u-btn-texto tl-atras" data-accion="atras">' + ICO.atras + 'Atrás</button>' +
-      '<div class="tl-pasos" aria-hidden="true">' + barras + '</div>' +
-      '<p class="u-etiqueta">Paso ' + paso + ' de 4' + (st.cambiando ? ' · cambiando tu cita' : '') + '</p><h1>' + titulo + '</h1></div>';
+    if (paso) for (var i = 1; i <= 4; i++) barras += '<span' + (i <= paso ? ' class="on"' : '') + '></span>';
+    return '<div class="tl-nav"><button type="button" class="tl-volver" data-accion="atras">' + ICO.atras + 'Atrás</button><h1>' + titulo + '</h1></div>' +
+      (paso ? '<div class="tl-progreso" aria-label="Paso ' + paso + ' de 4">' + barras + '</div>' : '');
   }
-  function resumen() {
-    var p = [];
-    if (st.serv) p.push(serv(st.serv).nom + ' · ' + eur(serv(st.serv).eur));
-    if (st.barb) p.push(st.barb === '*' ? 'El primero libre' : 'Con ' + st.barb);
-    if (st.dia && st.ini != null) p.push(cuando(st.dia) + ' · ' + hhmm(st.ini));
-    return p.length ? '<p class="tl-resumen">' + p.map(function (x) { return '<span class="u-chip">' + esc(x) + '</span>'; }).join('') + '</p>' : '';
+  function marca() {
+    return '<div class="tl-marca"><button type="button" class="tl-logo" data-logo aria-label="Barbería Tallat. Pulsación larga: menú de la demo">' +
+      '<span class="tl-logo-nom">tallat<i class="tl-punto">.</i></span><span class="tl-logo-sub">Barbería · Sant Antoni</span></button>' +
+      '<p class="tl-abierto">' + estadoAbierto() + '</p></div>';
   }
-  var pie = '<p class="u-nota tl-pie">Demo de Utilo. La barbería y los datos son inventados; no se guarda ni se envía nada.</p>';
-
-  function tarjetaCita(c, conTitulo) {
+  function fila(t, sub, v, attrs, extra) {
+    var tag = attrs ? 'button type="button" ' + attrs : 'div';
+    return '<li><' + tag + ' class="tl-fila">' + (extra || '') + '<span class="t">' + t + (sub ? '<small>' + sub + '</small>' : '') + '</span>' +
+      (v != null ? '<span class="v">' + v + '</span>' : '') + (attrs ? ICO.ch : '') + '</' + (attrs ? 'button' : 'div') + '></li>';
+  }
+  function fotos(h, grande) {
+    return '<div class="tl-fotos">' + h.fotos.map(function (f) {
+      return f.video ? '<video src="' + f.url + '" muted playsinline loop autoplay></video>' : '<img src="' + f.url + '" alt="Foto del corte del ' + ddmmaaaa(h.dia) + '">';
+    }).join('') + (grande ? '' : '<button type="button" class="tl-mas" data-foto="' + h.id + '">' + ICO.foto + 'Añadir</button>') + '</div>';
+  }
+  function grupoCita(c) {
     var s = serv(c.serv);
-    return '<div class="tl-tarjeta destaca">' + (conTitulo ? '<p class="u-etiqueta">Tu próxima cita</p>' : '') +
-      '<div><p class="tl-grande">' + hhmm(c.ini) + '</p><p class="tl-dia-grande">' + diaLargo(c.dia) + '</p></div>' +
-      '<p>' + s.nom + ' con ' + esc(c.barbero) + ' · ' + eur(s.eur) + (c.estado === 'confirmada' ? ' · confirmada' : '') + '</p>' +
-      '<div class="tl-botones">' + botonesCalendario(c) + '<button type="button" class="u-btn u-btn-texto" data-cambiar="' + c.id + '">Cambiar hora</button>' +
-      '<button type="button" class="u-btn u-btn-texto" data-anular="' + c.id + '">Anular</button></div></div>';
+    return '<ul class="tl-grupo">' + fila(diaCorto(c.dia) + ', ' + hhmm(c.ini), s.nom + ' con ' + esc(c.barbero) + (c.estado === 'confirmada' ? ' · confirmada' : ''), eur(s.eur)) +
+      '<li><a class="tl-fila" href="' + enlaceGoogle(c) + '" target="_blank" rel="noopener">' + ICO.cal + '<span class="t">Añadir a Google Calendar</span>' + ICO.ch + '</a></li>' +
+      (enIframe() ? '' : fila('Añadir al calendario del móvil', null, null, 'data-ics="' + c.id + '"', ICO.cal)) +
+      fila('Cambiar la hora', null, null, 'data-cambiar="' + c.id + '"') + fila('Anular la cita', null, null, 'data-anular="' + c.id + '"') + '</ul>';
   }
-  function tarjetaCorte(h, compacta) {
-    var s = serv(h.serv);
-    var fotos = h.fotos.length
-      ? '<div class="tl-fotos">' + h.fotos.map(function (f) { return f.video ? '<video src="' + f.url + '" muted playsinline loop autoplay></video>' : '<img src="' + f.url + '" alt="Foto del corte del ' + ddmmaaaa(h.dia) + '">'; }).join('') + '</div>'
-      : '<p class="tl-sinfoto">Sin fotos. Añade una al salir y la próxima vez ' + esc(h.barbero) + ' sabrá qué te hizo.</p>';
-    return '<div class="tl-tarjeta"><div class="tl-corte-cab"><div><p class="u-etiqueta">' + diaLargo(h.dia) + '</p><h2>' + s.nom + ' con ' + esc(h.barbero) + '</h2></div>' +
-      '<span class="eur">' + eur(s.eur) + '</span></div>' + (h.nota ? '<p class="tl-nota">«' + esc(h.nota) + '»</p>' : '') + fotos +
-      '<div class="tl-botones"><button type="button" class="u-btn" data-foto="' + h.id + '">' + ICO.foto + 'Añadir fotos o vídeo</button>' +
-      (compacta ? '' : '<button type="button" class="u-btn u-btn-texto" data-repetir="' + h.id + '">Repetir este corte</button>') + '</div></div>';
-  }
+  var pie = '<p class="tl-pie">Demo de Utilo. La barbería y los datos son inventados; no se guarda ni se envía nada.</p>';
 
+  /* ---------- Pantallas de la app ---------- */
   function vInicio() {
     var u = st.usuario, prox = proximas()[0], ult = st.historial[0];
-    var info = '<div class="tl-seccion"><h2>La barbería</h2><dl class="tl-info"><dt>Dónde</dt><dd>' + DIRECCION + '</dd>' +
-      '<dt>Horario</dt><dd>Martes a sábado, de 10:00 a 20:30</dd><dt>Pago</dt><dd>En la barbería, con tarjeta o en efectivo</dd></dl></div>';
+    var barberia = '<p class="tl-sec">La barbería</p><ul class="tl-grupo">' + fila('Carrer de Manso', 'Sant Antoni, Barcelona') +
+      fila('Martes a sábado', 'De 10:00 a 20:30') + fila('Pago en la barbería', 'Tarjeta o efectivo') + '</ul>';
     if (!u) {
-      return '<div class="tl-cabeza"><p class="u-etiqueta">Pide cita en un minuto</p><h1>Tu barbería en Sant Antoni</h1></div>' +
-        '<p>Elige servicio, barbero, día y hora. Te confirmamos por WhatsApp y te recordamos la cita el día antes.</p>' +
-        '<div class="tl-botones" style="margin-top:var(--e4)"><button type="button" class="u-btn u-btn-accion" data-tab="reservar">Pedir cita</button>' +
-        '<button type="button" class="u-btn tl-google" data-accion="google">Entrar con Google y ver mis cortes</button></div>' + info + pie;
+      return marca() + '<h2 class="tl-titulo">Pide cita</h2>' +
+        '<div class="tl-tarjeta"><p>Elige servicio, barbero y hora. Te confirmamos por WhatsApp y te lo recordamos el día antes.</p>' +
+        '<button type="button" class="tl-b" data-tab="reservar">Reservar</button>' +
+        '<button type="button" class="tl-b2" data-accion="google">Entrar con Google</button></div>' + barberia + pie;
     }
-    var html = '<div class="tl-saludo"><span class="tl-ini" aria-hidden="true">' + esc(u.nombre.charAt(0)) + '</span><div><p class="u-etiqueta">Hola</p><h1>' + esc(u.nombre) + '</h1></div></div>';
-    if (prox) html += tarjetaCita(prox, true);
+    var html = marca() + '<h2 class="tl-titulo">Hola, ' + esc(u.nombre) + '</h2>';
+    if (prox) html += '<p class="tl-sec" style="margin-top:0">Tu próxima cita</p>' + grupoCita(prox);
     else if (ult) {
-      var dias = diasEntre(ult.dia, hoy()), b = barberoHabitual() || ult.barbero, s = serv(ult.serv);
-      html += '<div class="tl-tarjeta destaca"><p class="u-etiqueta">Ya te toca</p><h2>Hace ' + dias + ' días de tu último corte</h2>' +
-        '<div class="tl-ciclo"><span class="barra"><span style="width:' + Math.min(100, Math.round(dias / 28 * 100)) + '%"></span></span>' +
-        '<span class="n"><span>Último: ' + ddmm(ult.dia) + '</span><span>Sueles venir cada 4 semanas</span></span></div>' +
-        '<div class="tl-botones"><button type="button" class="u-btn u-btn-accion" data-repetir="' + ult.id + '">Repetir con ' + esc(b) + '</button>' +
-        '<button type="button" class="u-btn" data-tab="reservar">Pedir otra cita</button></div>' +
-        '<p class="u-nota">' + s.nom + ' · ' + s.min + ' min · ' + eur(s.eur) + '. Primer hueco con ' + esc(b) + ': ' + (primerHueco(b, s.min) || 'sin huecos esta semana') + '.</p></div>';
-    } else html += '<div class="tl-tarjeta"><h2>Tu primera cita</h2><p>Reserva y aquí verás tus cortes, con sus fotos.</p>' +
-      '<div class="tl-botones"><button type="button" class="u-btn u-btn-accion" data-tab="reservar">Pedir cita</button></div></div>';
-    if (ult) html += '<div class="tl-seccion"><div class="tl-seccion-cab"><h2>Tu último corte</h2><button type="button" class="u-btn u-btn-texto" data-tab="cortes">Ver todos</button></div>' + tarjetaCorte(ult, true) + '</div>';
-    return html + info + pie;
+      var dias = diasEntre(ult.dia, hoy()), b = barberoHabitual() || ult.barbero, s = serv(ult.serv), h = primerHueco(b, s.min);
+      html += '<div class="tl-tarjeta"><p class="tl-sub">Tu último corte fue hace ' + dias + ' días</p>' +
+        '<p class="gran">¿Repetimos con ' + esc(b) + '?</p>' +
+        '<div class="tl-ciclo" aria-hidden="true"><span style="width:' + Math.min(100, Math.round(dias / 28 * 100)) + '%"></span></div>' +
+        '<p class="tl-sub">' + s.nom + ' · ' + s.min + ' min · ' + eur(s.eur) + (h ? ' · primer hueco ' + h : '') + '</p>' +
+        '<button type="button" class="tl-b" data-repetir="' + ult.id + '">Reservar con ' + esc(b) + '</button>' +
+        '<button type="button" class="tl-b2" data-tab="reservar">Otro servicio o barbero</button></div>';
+    } else html += '<div class="tl-tarjeta"><p>Reserva tu primera cita y aquí verás tus cortes.</p><button type="button" class="tl-b" data-tab="reservar">Reservar</button></div>';
+    if (ult) html += '<div class="tl-sec-fila"><p class="tl-sec">Tu último corte</p><button type="button" class="tl-b2" data-tab="cortes" style="min-height:0;font-size:13px">Ver todos</button></div>' +
+      '<ul class="tl-grupo">' + fila(serv(ult.serv).nom + ' con ' + esc(ult.barbero), diaCorto(ult.dia), eur(serv(ult.serv).eur)) +
+      (ult.nota ? fila('<span class="tl-sub" style="font-size:14px">«' + esc(ult.nota) + '»</span>') : '') +
+      '<li><div class="tl-fila">' + fotos(ult) + '</div></li></ul>';
+    return html + barberia + pie;
   }
   function vServicio() {
-    var ult = st.usuario && st.historial[0];
-    return '<div class="tl-cabeza"><p class="u-etiqueta">Pedir cita · paso 1 de 4' + (st.cambiando ? ' · cambiando tu cita' : '') + '</p><h1>¿Qué te hacemos?</h1></div>' +
-      (ult ? '<button type="button" class="u-btn tl-siempre" data-repetir="' + ult.id + '">Lo de siempre: ' + serv(ult.serv).nom.toLowerCase() + ' con ' + esc(barberoHabitual() || ult.barbero) + '</button>' : '') +
-      '<div class="tl-servicios">' + SERV.map(function (s) {
-        return '<button type="button" class="tl-serv" data-serv="' + s.id + '"><span class="nom">' + s.nom + '</span>' +
-          '<span class="pie"><span class="det">' + s.min + ' min</span><span class="eur">' + s.eur + ' €</span></span></button>';
-      }).join('') + '</div>';
+    var ult = st.usuario && st.historial[0], b = ult && (barberoHabitual() || ult.barbero);
+    return nav(st.cambiando ? 'Cambiar cita' : 'Reservar', 1) + '<h2 class="tl-titulo">¿Qué te hacemos?</h2>' +
+      (ult ? '<p class="tl-sec" style="margin-top:0">Lo de siempre</p><ul class="tl-grupo">' +
+        fila(serv(ult.serv).nom + ' con ' + esc(b), serv(ult.serv).min + ' min', eur(serv(ult.serv).eur), 'data-repetir="' + ult.id + '"') + '</ul><p class="tl-sec">Servicios</p>' : '') +
+      '<ul class="tl-grupo">' + SERV.map(function (s) { return fila(s.nom, s.min + ' min', eur(s.eur), 'data-serv="' + s.id + '"'); }).join('') + '</ul>';
   }
   function vBarbero() {
     var min = serv(st.serv).min, tuyo = st.usuario && barberoHabitual();
     var orden = BARB.slice().sort(function (a, b) { return (b.id === tuyo) - (a.id === tuyo); });
-    var filas = orden.map(function (b) {
+    return nav('Barbero', 2) + '<h2 class="tl-titulo">¿Con quién?</h2><ul class="tl-grupo">' + orden.map(function (b) {
       var h = primerHueco(b.id, min);
-      return '<button type="button" class="tl-barb' + (b.id === tuyo ? ' tuyo' : '') + '" data-barb="' + b.id + '"><span class="tl-mono" aria-hidden="true">' + b.id.slice(0, 2) + '</span>' +
-        '<span class="nom">' + b.id + (b.id === tuyo ? '<span class="u-chip">Tu barbero</span>' : '') + '</span><span class="det">' + b.det + '</span>' +
-        '<span class="hueco">' + (h ? 'Primer hueco: ' + h : 'Sin huecos esta semana') + '</span></button>';
-    }).join('');
-    var h = primerHueco('*', min);
-    filas += '<button type="button" class="tl-barb" data-barb="*"><span class="tl-mono todos" aria-hidden="true">3</span>' +
-      '<span class="nom">Me da igual</span><span class="det">Te damos la primera hora libre de los tres</span>' +
-      '<span class="hueco">' + (h ? 'Primer hueco: ' + h : '') + '</span></button>';
-    return cabeza(2, '¿Con quién?') + resumen() + '<div class="tl-barberos">' + filas + '</div>';
+      return fila(b.id + (b.id === tuyo ? '<span class="tl-et">Tu barbero</span>' : ''), b.det, h || 'Lleno', 'data-barb="' + b.id + '"', '<span class="tl-av-p" aria-hidden="true">' + b.id.charAt(0) + '</span>');
+    }).join('') + fila('Me da igual', 'La primera hora libre de los tres', primerHueco('*', min) || '', 'data-barb="*"', '<span class="tl-av-p" aria-hidden="true">3</span>') + '</ul>';
   }
   function vHora() {
-    var dias = diasAbiertos(7), min = serv(st.serv).min;
+    var dias = diasAbiertos(10), min = serv(st.serv).min;
     if (!st.dia || dias.indexOf(st.dia) < 0) st.dia = dias.filter(function (k) { return horasLibres(k, st.barb, min).length; })[0] || dias[0];
     var libres = horasLibres(st.dia, st.barb, min), man = libres.filter(function (t) { return t < 840; }), tar = libres.filter(function (t) { return t >= 840; });
     function botones(l) { return '<div class="tl-horas">' + l.map(function (t) { return '<button type="button" class="tl-hora" data-hora="' + t + '">' + hhmm(t) + '</button>'; }).join('') + '</div>'; }
-    var horas = !libres.length
-      ? '<p class="u-vacio">No quedan horas libres este día' + (st.barb !== '*' ? ' con ' + esc(st.barb) : '') + '. Prueba con otro día o vuelve atrás y elige «Me da igual».</p>'
-      : (man.length ? '<p class="u-etiqueta tl-franja">Mañana</p>' + botones(man) : '') + (tar.length ? '<p class="u-etiqueta tl-franja">Tarde</p>' + botones(tar) : '');
-    return cabeza(3, '¿Qué día te va bien?') + resumen() +
+    var horas = !libres.length ? '<p class="tl-sub">No quedan horas este día. Prueba otro o vuelve atrás y elige «Me da igual».</p>'
+      : (man.length ? '<p class="tl-sec" style="margin:0 0 var(--e2)">Mañana</p>' + botones(man) : '') + (tar.length ? '<p class="tl-sec" style="margin:var(--e4) 0 var(--e2)">Tarde</p>' + botones(tar) : '');
+    var s = serv(st.serv);
+    return nav('Día y hora', 3) + '<h2 class="tl-titulo">¿Cuándo te va bien?</h2>' +
+      '<p class="tl-sub" style="margin:-8px 0 var(--e4)">' + s.nom + ' · ' + (st.barb === '*' ? 'el primero libre' : 'con ' + esc(st.barb)) + '</p>' +
       '<div class="tl-dias" role="group" aria-label="Día">' + dias.map(function (k) {
         var d = fecha(k), n = horasLibres(k, st.barb, min).length;
-        return '<button type="button" class="tl-dia" data-dia="' + k + '" aria-pressed="' + (k === st.dia) + '">' +
-          '<span class="dn">' + (k === hoy() ? 'hoy' : DIA_C[d.getDay()]) + '</span><span class="dd">' + d.getDate() + '</span>' +
-          '<span class="dh">' + (n ? n + ' libres' : 'lleno') + '</span></button>';
+        return '<button type="button" class="tl-dia" data-dia="' + k + '" aria-pressed="' + (k === st.dia) + '"' + (n ? '' : ' disabled') + '>' +
+          '<span class="dn">' + (k === hoy() ? 'hoy' : DIA_C[d.getDay()]) + '</span><span class="dd">' + d.getDate() + '</span></button>';
       }).join('') + '</div>' + horas;
   }
   function vConfirmar() {
     var s = serv(st.serv), u = st.usuario;
-    var res = '<dl class="tl-resumen-cita"><dt>Servicio</dt><dd>' + s.nom + ' · ' + s.min + ' min</dd><dt>Barbero</dt><dd>' + (st.barb === '*' ? 'El primero libre' : esc(st.barb)) + '</dd>' +
-      '<dt>Día</dt><dd>' + diaLargo(st.dia) + '</dd><dt>Hora</dt><dd>' + hhmm(st.ini) + '</dd><dt>Precio</dt><dd>' + eur(s.eur) + ', en la barbería</dd></dl>';
-    var err = st.error ? '<p class="u-error" role="alert">' + esc(st.error) + '</p>' : '';
-    var boton = '<button type="submit" class="u-btn u-btn-accion">' + (st.cambiando ? 'Cambiar la cita' : 'Reservar cita · ' + eur(s.eur)) + '</button>';
-    var permiso = '<label class="tl-check" for="f-ok"><input type="checkbox" id="f-ok">' +
-      '<span>Acepto que Barbería Tallat guarde mi nombre y mi móvil para gestionar mis citas y avisarme por WhatsApp.</span></label>';
+    var res = '<ul class="tl-grupo">' + fila(diaCorto(st.dia) + ', ' + hhmm(st.ini), s.nom + ' · ' + s.min + ' min', eur(s.eur)) +
+      fila('Barbero', null, st.barb === '*' ? 'El primero libre' : esc(st.barb)) + fila('Dónde', null, 'Carrer de Manso') + '</ul>';
+    var err = st.error ? '<p class="tl-error" role="alert">' + esc(st.error) + '</p>' : '';
+    var boton = '<div class="tl-pegado"><button type="submit" form="f-datos" class="tl-b">' + (st.cambiando ? 'Cambiar la cita' : 'Reservar · ' + eur(s.eur)) + '</button></div>';
+    var permiso = '<label class="tl-check" for="f-ok"><input type="checkbox" id="f-ok"><span>Acepto que Barbería Tallat guarde mi nombre y mi móvil para mis citas y los avisos por WhatsApp.</span></label>';
     if (u && u.tel && u.ok) {
-      return cabeza(4, 'Confírmalo') + '<form class="tl-form" id="f-datos" novalidate>' + res +
-        '<p class="u-nota">Te avisamos por WhatsApp al ' + mascara(u.tel) + '. Lo tienes guardado en tu perfil.</p>' + err + boton + '</form>';
+      return nav('Confirmar', 4) + '<h2 class="tl-titulo">Revisa tu cita</h2><form id="f-datos" novalidate>' + res +
+        '<p class="tl-sub" style="margin:var(--e3) var(--e1) 0">Te avisamos por WhatsApp al ' + mascara(u.tel) + '.</p>' + err + '</form>' + boton;
     }
     if (u) {
-      return cabeza(4, 'Hola, ' + esc(u.nombre)) + '<form class="tl-form" id="f-datos" novalidate>' + res +
-        '<label class="u-campo" for="f-tel"><span class="u-etiqueta">Tu móvil, para los avisos por WhatsApp</span>' +
-        '<input id="f-tel" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="9 cifras, sin prefijo" value="' + esc(st.tel) + '"></label>' +
-        '<p class="u-nota">Solo te lo pedimos esta vez.</p>' + permiso + err + boton + '</form>';
+      return nav('Confirmar', 4) + '<h2 class="tl-titulo">Hola, ' + esc(u.nombre) + '</h2><form id="f-datos" novalidate>' + res +
+        '<p class="tl-sec">Para los avisos por WhatsApp (solo esta vez)</p><ul class="tl-grupo tl-campos"><li><div class="tl-fila"><label for="f-tel">Móvil</label>' +
+        '<input id="f-tel" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="600 000 000" value="' + esc(st.tel) + '"></div></li></ul>' +
+        permiso + err + '</form>' + boton;
     }
-    return cabeza(4, '¿Quién eres?') + resumen() +
-      '<div class="tl-form"><button type="button" class="u-btn tl-google" data-accion="google">Continuar con Google</button>' +
-      '<p class="u-nota">Así no tendrás que escribir tus datos la próxima vez y verás tus cortes.</p><p class="tl-o">o sin cuenta</p></div>' +
-      '<form class="tl-form" id="f-datos" novalidate style="margin-top:var(--e4)">' +
-      '<label class="u-campo" for="f-nombre"><span class="u-etiqueta">Nombre</span>' +
-      '<input id="f-nombre" autocomplete="given-name" placeholder="Cómo te llamamos" value="' + esc(st.nombre) + '"></label>' +
-      '<label class="u-campo" for="f-tel"><span class="u-etiqueta">Móvil</span>' +
-      '<input id="f-tel" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="9 cifras, sin prefijo" value="' + esc(st.tel) + '"></label>' +
-      permiso + err + boton + '</form>';
+    return nav('Confirmar', 4) + '<h2 class="tl-titulo">¿Quién eres?</h2>' + res +
+      '<div style="margin-top:var(--e4)"><button type="button" class="tl-b3" data-accion="google">Continuar con Google</button></div>' +
+      '<p class="tl-o">o sin cuenta</p><form id="f-datos" novalidate><ul class="tl-grupo tl-campos">' +
+      '<li><div class="tl-fila"><label for="f-nombre">Nombre</label><input id="f-nombre" autocomplete="given-name" placeholder="Cómo te llamamos" value="' + esc(st.nombre) + '"></div></li>' +
+      '<li><div class="tl-fila"><label for="f-tel">Móvil</label><input id="f-tel" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="600 000 000" value="' + esc(st.tel) + '"></div></li></ul>' +
+      permiso + err + '</form>' + boton;
   }
   function vReservada() {
     var r = cita(st.actual), s = serv(r.serv);
-    return '<div class="tl-cabeza"><p class="u-etiqueta">' + (r.cambio ? 'Cita cambiada' : 'Cita reservada') + '</p><h1>Te esperamos, ' + esc(r.cliente) + '</h1></div>' +
-      '<p>Te llega ahora la confirmación por WhatsApp al ' + mascara(r.tel) + '. ' + (r.dia === hoy() ? 'Dos horas antes' : 'El día antes, a las 19:00,') + ' te recordamos la cita.</p>' +
-      '<div class="tl-ticket"><div class="tl-ticket-a"><p class="num"><span>Barbería Tallat</span><span>Nº ' + (400 + hash(r.id) % 500) + '</span></p>' +
-      '<p class="tl-grande">' + hhmm(r.ini) + '</p><p class="tl-dia-grande">' + diaLargo(r.dia) + '</p></div>' +
-      '<div class="tl-ticket-b"><dl><dt>Servicio</dt><dd>' + s.nom + ' · ' + s.min + ' min</dd><dt>Barbero</dt><dd>' + esc(r.barbero) + '</dd>' +
-      '<dt>Precio</dt><dd>' + eur(s.eur) + ', en la barbería</dd><dt>Dónde</dt><dd>Carrer de Manso, Sant Antoni</dd></dl></div></div>' +
-      '<div class="tl-botones">' + botonesCalendario(r) + '<button type="button" class="u-btn" data-accion="ver-chat">Ver el WhatsApp</button></div>' + pie;
+    return '<div class="tl-hecho" aria-hidden="true">' + ICO.ok + '</div><h2 class="tl-titulo" style="margin-top:var(--e3)">' + (r.cambio ? 'Cita cambiada' : 'Cita reservada') + '</h2>' +
+      '<p class="tl-sub" style="font-size:15px;margin-top:-8px">Te hemos enviado la confirmación por WhatsApp al ' + mascara(r.tel) + '.</p>' +
+      '<p class="tl-sec">Tu cita</p>' + '<ul class="tl-grupo">' + fila(diaCorto(r.dia) + ', ' + hhmm(r.ini), s.nom + ' con ' + esc(r.barbero) + ' · ' + s.min + ' min', eur(s.eur)) +
+      fila('Carrer de Manso', 'Sant Antoni, Barcelona') + '</ul>' +
+      '<p class="tl-sec">Que no se te olvide</p><ul class="tl-grupo">' +
+      '<li><a class="tl-fila" href="' + enlaceGoogle(r) + '" target="_blank" rel="noopener">' + ICO.cal + '<span class="t">Añadir a Google Calendar</span>' + ICO.ch + '</a></li>' +
+      (enIframe() ? '' : fila('Añadir al calendario del móvil', null, null, 'data-ics="' + r.id + '"', ICO.cal)) +
+      fila('Ver el WhatsApp de confirmación', null, null, 'data-accion="ver-chat"', ICO.chat) + '</ul>' +
+      '<div style="margin-top:var(--e4)"><button type="button" class="tl-b2" data-tab="inicio">Volver al inicio</button></div>';
   }
   function vCortes() {
     var prox = proximas();
-    if (!st.usuario) return '<div class="tl-cabeza"><p class="u-etiqueta">Mis cortes</p><h1>Guarda tus cortes</h1></div>' +
-      '<p>Entra con tu cuenta y aquí tendrás cada visita, con quién fue y las fotos de cómo te quedó. La próxima vez solo tienes que enseñarlas.</p>' +
-      '<div class="tl-botones" style="margin-top:var(--e4)"><button type="button" class="u-btn tl-google" data-accion="google">Entrar con Google</button></div>';
-    var html = '<div class="tl-cabeza"><p class="u-etiqueta">Mis cortes</p><h1>' + st.historial.length + (st.historial.length === 1 ? ' visita' : ' visitas') + '</h1></div>';
-    if (prox.length) html += '<div class="tl-seccion" style="margin-top:0"><h2>Próximas</h2>' + prox.map(function (c) { return tarjetaCita(c, false); }).join('') + '</div>';
-    html += '<div class="tl-seccion"><h2>Hechos</h2>' + (st.historial.length ? st.historial.map(function (h) { return tarjetaCorte(h, false); }).join('')
-      : '<p class="u-vacio">Todavía no hay cortes. Después de tu primera visita aparecerá aquí, y podrás añadir fotos.</p>') + '</div>';
+    if (!st.usuario) return '<h2 class="tl-titulo">Guarda tus cortes</h2>' +
+      '<div class="tl-tarjeta"><p>Entra con tu cuenta y aquí tendrás cada visita, con quién fue y fotos de cómo te quedó, para enseñarlas la próxima vez.</p>' +
+      '<button type="button" class="tl-b3" data-accion="google">Entrar con Google</button></div>';
+    var html = '<h2 class="tl-titulo">Mis cortes</h2>';
+    if (prox.length) html += '<p class="tl-sec" style="margin-top:0">Próxima</p>' + prox.map(grupoCita).join('<div style="height:8px"></div>');
+    html += st.historial.map(function (h) {
+      var s = serv(h.serv);
+      return '<p class="tl-sec">' + diaCorto(h.dia) + '</p><ul class="tl-grupo">' + fila(s.nom + ' con ' + esc(h.barbero), s.min + ' min', eur(s.eur)) +
+        (h.nota ? fila('<span class="tl-sub" style="font-size:14px">«' + esc(h.nota) + '»</span>') : '') +
+        '<li><div class="tl-fila">' + fotos(h) + '</div></li>' + fila('Repetir este corte', null, null, 'data-repetir="' + h.id + '"') + '</ul>';
+    }).join('') || '<p class="tl-sub">Después de tu primera visita la verás aquí, y podrás añadirle fotos.</p>';
     return html;
   }
   function vPerfil() {
     var u = st.usuario;
-    if (!u) return '<div class="tl-cabeza"><p class="u-etiqueta">Perfil</p><h1>Sin cuenta</h1></div><p>Entra para no tener que escribir tus datos en cada reserva.</p>' +
-      '<div class="tl-botones" style="margin-top:var(--e4)"><button type="button" class="u-btn tl-google" data-accion="google">Entrar con Google</button></div>';
-    return '<div class="tl-saludo"><span class="tl-ini" aria-hidden="true">' + esc(u.nombre.charAt(0)) + '</span><div><p class="u-etiqueta">Perfil</p><h1>' + esc(u.nombre) + '</h1></div></div>' +
-      '<dl class="tl-info"><dt>Cuenta</dt><dd>' + (u.google ? 'Google (simulada en la demo)' : 'Sin cuenta, con nombre y móvil') + '</dd>' +
-      '<dt>Móvil</dt><dd>' + (u.tel ? mascara(u.tel) : 'Sin guardar') + '</dd><dt>Avisos</dt><dd>WhatsApp: confirmación, recordatorio y «ya te toca»</dd>' +
-      '<dt>Barbero</dt><dd>' + (barberoHabitual() || 'Todavía ninguno') + '</dd><dt>Tus datos</dt><dd>Solo los ve la barbería. Puedes pedir que los borre cuando quieras.</dd></dl>' +
-      '<div class="tl-botones" style="margin-top:var(--e5)"><button type="button" class="u-btn" data-accion="salir">Cerrar sesión</button></div>' + pie;
+    if (!u) return '<h2 class="tl-titulo">Sin cuenta</h2>' +
+      '<div class="tl-tarjeta"><p>Entra para no escribir tus datos en cada reserva y guardar tus cortes.</p><button type="button" class="tl-b3" data-accion="google">Entrar con Google</button></div>';
+    return '<h2 class="tl-titulo">' + esc(u.nombre) + '</h2>' +
+      '<ul class="tl-grupo">' + fila('Cuenta', null, u.google ? 'Google (simulada)' : 'Sin cuenta') + fila('Móvil', null, u.tel ? mascara(u.tel) : 'Sin guardar') +
+      fila('Barbero habitual', null, barberoHabitual() || '—') + fila('Avisos por WhatsApp', 'Confirmación, recordatorio y «ya te toca»', 'Activados') + '</ul>' +
+      '<p class="tl-sec">Tus datos solo los ve la barbería. Puedes pedir que los borre cuando quieras.</p>' +
+      '<ul class="tl-grupo">' + fila('Cerrar sesión', null, null, 'data-accion="salir"') + '</ul>' + pie;
   }
   function vChat() {
-    if (!st.actual) return '<div class="tl-cabeza"><h1>Todavía no hay avisos</h1></div><p class="u-vacio">Los WhatsApp llegan cuando alguien reserva. Haz una reserva de prueba y vuelve aquí.</p>' +
-      '<button type="button" class="u-btn" data-tab="reservar">Pedir cita</button>';
-    var botones = '';
-    if (st.fase === 'recordatorio') botones = '<p class="u-etiqueta">Contesta al recordatorio como el cliente</p>' +
-      '<button type="button" class="u-btn" data-resp="SÍ">SÍ</button><button type="button" class="u-btn" data-resp="CAMBIAR">CAMBIAR</button>' +
-      '<button type="button" class="u-btn" data-resp="ANULAR">ANULAR</button>';
-    if (st.fase === 'vuelta') botones = '<p class="u-etiqueta">Contesta como el cliente</p>' +
-      '<button type="button" class="u-btn" data-resp="GUARDAR">SÍ, GUÁRDAMELA</button><button type="button" class="u-btn" data-resp="OTRO">OTRO DÍA</button>';
+    if (!st.actual) return '<h2 class="tl-titulo">Todavía no hay mensajes</h2>' +
+      '<p class="tl-sub">Llegan cuando alguien reserva. Haz una reserva de prueba y vuelve aquí.</p>';
     return '<div class="tl-chat">' +
-      '<div class="tl-chat-cab"><button type="button" class="u-btn u-btn-icono u-btn-texto" data-accion="atras" aria-label="Volver">' + ICO.atras + '</button>' +
-      '<span class="tl-av" aria-hidden="true">T</span><div><strong>Barbería Tallat</strong><span>Cuenta de empresa</span></div></div>' +
-      '<div class="tl-msgs" id="msgs"><p class="tl-sis">Simulación de los WhatsApp que recibe el cliente</p>' +
-      st.chat.map(function (m) {
+      '<div class="tl-chat-cab"><button type="button" class="tl-volver" data-accion="atras" aria-label="Volver">' + ICO.atras + '</button>' +
+      '<span class="tl-av" aria-hidden="true">t</span><div class="q"><strong>Barbería Tallat</strong><span>Cuenta de empresa</span></div></div>' +
+      '<div class="tl-msgs" id="msgs"><p class="tl-fecha-chat">Simulación del WhatsApp que recibe el cliente</p>' +
+      st.chat.map(function (m, i) {
         if (m.de === 'sis') return '<p class="tl-sis">' + esc(m.txt) + '</p>';
-        return '<div class="tl-msg ' + m.de + (m.nuevo ? ' entra' : '') + '">' +
-          (m.media ? (m.media.video ? '<video src="' + m.media.url + '" muted playsinline loop autoplay></video>' : '<img src="' + m.media.url + '" alt="Foto del corte">') : '') + esc(m.txt) +
-          (m.boton ? '<br><button type="button" class="u-btn" data-accion="' + m.boton.accion + '">' + m.boton.txt + '</button>' : '') +
-          '<time>' + m.hora + '</time></div>';
+        var html = '<div class="tl-msg ' + m.de + (m.nuevo ? ' entra' : '') + '">' +
+          (m.media ? (m.media.video ? '<video src="' + m.media.url + '" muted playsinline loop autoplay></video>' : '<img src="' + m.media.url + '" alt="Foto del corte">') : '') +
+          esc(m.txt) + '<span class="meta">' + m.hora + (m.de === 'cli' ? ICO.leido : '') + '</span></div>';
+        if (m.botones) html += '<div class="tl-wbtns">' + m.botones.map(function (b) {
+          return '<button type="button" data-msg="' + i + '" data-r="' + b.r + '"' + (m.usado ? ' disabled' : '') + '>' + (b.foto ? ICO.foto : ICO.resp) + b.txt + '</button>';
+        }).join('') + '</div>';
+        return html;
       }).join('') + '</div>' +
-      (botones ? '<div class="tl-resp" role="group" aria-label="Respuestas">' + botones + '</div>' : '') + '</div>';
+      '<div class="tl-redactar" aria-hidden="true"><span>Mensaje</span><i>' + ICO.mic + '</i></div></div>';
   }
 
   /* ---------- Mostrador de la barbería ---------- */
@@ -745,16 +738,16 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
   function vNegocio() {
     if (!st.agDia) st.agDia = diasAbiertos(2).filter(function (k) { return k !== hoy() || ahoraMin() < CIERRA - 60; })[0];
     var k = st.agDia, citas = citasDe(k), total = citas.reduce(function (a, c) { return a + serv(c.serv).eur; }, 0), oc = ocupacion(k);
-    var titulo = k === hoy() ? 'Hoy · ' + ddmm(k) : DIA_C[fecha(k).getDay()] + ' ' + ddmm(k);
+    var titulo = (k === hoy() ? 'Hoy, ' : '') + diaCorto(k);
     var m = st.mes, cm = st.cambioMes;
-    function dato(c, txt) { return '<span' + (cm === c ? ' class="cambio"' : '') + '><strong>' + (MES_BASE[c] + m[c]) + '</strong> ' + txt + '</span>'; }
+    function dato(c, txt) { return '<span' + (cm === c ? ' class="cambio"' : '') + '><b>' + (MES_BASE[c] + m[c]) + '</b> ' + txt + '</span>'; }
     var alto = (CIERRA - ABRE) * PPM, eje = '', lineas = '';
     for (var t = ABRE; t < CIERRA; t += 60) eje += '<span style="top:' + ((t - ABRE) * PPM) + 'px">' + hhmm(t) + '</span>';
     for (var u = ABRE + 30; u < CIERRA; u += 30) lineas += '<div class="tl-linea" style="top:' + ((u - ABRE) * PPM) + 'px"></div>';
     var cols = BARB.map(function (b) {
       return '<div class="tl-col" style="height:' + alto + 'px">' + lineas + citas.filter(function (c) { return c.barbero === b.id; }).map(function (c) {
         var s = serv(c.serv), cls = 'tl-blq' + (s.min * PPM < 40 ? ' corto' : '') + (c.mia ? ' mia' : '') + (pasada(c.dia, c.ini + s.min - 16) ? ' pasada' : '') + (st.flash === c.id ? ' flash' : '');
-        var etiqueta = c.mia ? (c.estado === 'confirmada' ? 'Confirmada' : 'Nueva · app') : s.corto;
+        var etiqueta = c.mia ? (c.estado === 'confirmada' ? 'Confirmada' : 'Nueva, desde la app') : s.corto;
         return '<button type="button" class="' + cls + '" data-cita="' + c.id + '" style="top:' + ((c.ini - ABRE) * PPM + 1) + 'px;height:' + (s.min * PPM - 2) + 'px">' +
           '<span class="c">' + esc(c.cliente) + '</span><span class="s"><span class="hh">' + hhmm(c.ini) + ' · </span>' + etiqueta + '</span></button>';
       }).join('') + '</div>';
@@ -763,13 +756,13 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
     var ahora = hayAhora ? '<div class="tl-ahora" style="top:' + ((ahoraMin() - ABRE) * PPM) + 'px"></div>' : '';
     return '<div class="tl-ncab"><button type="button" class="tl-logo" data-logo aria-label="Barbería Tallat. Pulsación larga: menú de la demo">' +
       '<span class="tl-logo-nom">tallat<i class="tl-punto">.</i></span><span class="tl-logo-sub">Mostrador</span></button>' +
-      '<div class="tl-ndia"><button type="button" class="u-btn u-btn-icono" data-agdia="-1" aria-label="Día anterior">' + ICO.atras + '</button>' +
+      '<div class="tl-ndia"><button type="button" class="u-btn u-btn-icono" data-agdia="-1" aria-label="Día anterior">' + ICO.ant + '</button>' +
       '<h1>' + titulo + '</h1><button type="button" class="u-btn u-btn-icono" data-agdia="1" aria-label="Día siguiente">' + ICO.sig + '</button></div></div>' +
       '<div class="tl-kpis">' +
-      '<div class="tl-kpi"><span class="u-etiqueta">Citas</span><span class="v">' + citas.length + '</span><span class="n">' + diaLargo(k) + '</span></div>' +
-      '<div class="tl-kpi"><span class="u-etiqueta">Ocupación</span><span class="v">' + oc + ' %</span><span class="barra"><span style="width:' + oc + '%"></span></span></div>' +
-      '<div class="tl-kpi"><span class="u-etiqueta">Previsto</span><span class="v cifra">' + eur(total) + '</span><span class="n">se cobra en la barbería</span></div>' +
-      '<div class="tl-kpi"><span class="u-etiqueta">Huecos libres</span><span class="v">' + huecos(k) + '</span><span class="n">de media hora</span></div></div>' +
+      '<div class="tl-kpi"><span class="l">Citas</span><span class="v">' + citas.length + '</span></div>' +
+      '<div class="tl-kpi"><span class="l">Ocupación</span><span class="v">' + oc + ' %</span><span class="barra"><span style="width:' + oc + '%"></span></span></div>' +
+      '<div class="tl-kpi"><span class="l">Previsto</span><span class="v cifra">' + eur(total) + '</span></div>' +
+      '<div class="tl-kpi"><span class="l">Huecos libres</span><span class="v">' + huecos(k) + '</span></div></div>' +
       '<p class="tl-mes"><span>Este mes (ejemplo):</span>' + dato('web', 'reservas sin llamar') + dato('avisos', 'WhatsApp enviados') +
       dato('ausencias', 'ausencias evitadas') + dato('resenas', 'reseñas pedidas') + '</p>' +
       '<div class="tl-cuad-cab"><span></span>' + BARB.map(function (b) {
@@ -794,14 +787,13 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
     if (c.mia) {
       var hist = st.historial.filter(function (h) { return h.id !== c.id; }), conFotos = st.historial.filter(function (h) { return h.fotos.length; })[0];
       var filas = hist.slice(0, 3).map(function (h) { var sv = serv(h.serv); return '<tr><td>' + ddmmaaaa(h.dia) + '</td><td>' + sv.nom + ' · ' + esc(h.barbero) + '</td><td class="num">' + eur(sv.eur) + '</td></tr>'; }).join('');
-      html = '<p class="u-etiqueta">Ficha del cliente</p><h2 id="ficha-tit">' + esc(c.cliente) + '</h2>' +
-        (hist.length ? '<p class="vueltas"><strong>' + hist.length + '</strong><span>visitas · casi siempre con ' + (barberoHabitual() || c.barbero) + '</span></p>' : '<p>Cliente nuevo.</p>') +
-        '<dl><dt>Cita</dt><dd>' + diaLargo(c.dia) + ' · ' + hhmm(c.ini) + '</dd><dt>Servicio</dt><dd>' + s.nom + ' · ' + eur(s.eur) + ' · con ' + c.barbero + '</dd>' +
+      html = '<p class="tl-sub">Ficha del cliente</p><h2 id="ficha-tit">' + esc(c.cliente) + '</h2>' +
+        (hist.length ? '<p class="vueltas"><b>' + hist.length + ' visitas</b>, casi siempre con ' + (barberoHabitual() || c.barbero) + '</p>' : '<p class="vueltas">Cliente nuevo</p>') +
+        '<dl><dt>Cita</dt><dd>' + diaCorto(c.dia) + ', ' + hhmm(c.ini) + '</dd><dt>Servicio</dt><dd>' + s.nom + ' con ' + c.barbero + ' · ' + eur(s.eur) + '</dd>' +
         '<dt>Reservó</dt><dd>' + (c.origen === 'whatsapp' ? 'Contestando al WhatsApp de «ya te toca»' : 'Desde la app a las ' + c.hecha) + ', sin llamar</dd>' +
         '<dt>Estado</dt><dd>' + (c.estado === 'confirmada' ? 'Confirmada por WhatsApp' : 'Pendiente de confirmar') + '</dd><dt>Móvil</dt><dd>' + mascara(c.tel) + '</dd>' +
         (hist[0] && hist[0].nota ? '<dt>Quiere</dt><dd>«' + esc(hist[0].nota) + '»</dd>' : '') + '</dl>' +
-        (conFotos ? '<p class="u-etiqueta">Fotos de su corte del ' + ddmm(conFotos.dia) + '</p><div class="tl-fotos">' + conFotos.fotos.map(function (f) {
-          return f.video ? '<video src="' + f.url + '" muted playsinline loop autoplay></video>' : '<img src="' + f.url + '" alt="Foto del corte">'; }).join('') + '</div>' : '') +
+        (conFotos ? '<p class="tl-sub">Fotos de su corte del ' + ddmm(conFotos.dia) + '</p>' + fotos(conFotos, true) : '') +
         (filas ? '<table><thead><tr><th>Visitas</th><th>Servicio</th><th class="num">Importe</th></tr></thead><tbody>' + filas + '</tbody></table>' : '');
     } else {
       var r = azar(hash(c.cliente + c.barbero)), visitas = 2 + Math.floor(r() * 14), cada = 3 + Math.floor(r() * 4), f2 = '', gasto = 0;
@@ -810,22 +802,22 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
         f2 += '<tr><td>' + ddmmaaaa(k) + '</td><td>' + sv.nom + '</td><td class="num">' + eur(sv.eur) + '</td></tr>';
       }
       for (var j = 0; j < visitas; j++) gasto += j % 3 === 2 ? 22 : 16;
-      html = '<p class="u-etiqueta">Ficha del cliente</p><h2 id="ficha-tit">' + esc(c.cliente) + '</h2>' +
-        '<p class="vueltas"><strong>' + visitas + '</strong><span>visitas · viene cada ' + cada + ' semanas, casi siempre con ' + c.barbero + '</span></p>' +
-        '<dl><dt>Cita</dt><dd>' + cuando(c.dia) + ' · ' + hhmm(c.ini) + ' · ' + s.nom + '</dd><dt>Gastado</dt><dd>' + eur(gasto) + ' en total</dd>' +
+      html = '<p class="tl-sub">Ficha del cliente</p><h2 id="ficha-tit">' + esc(c.cliente) + '</h2>' +
+        '<p class="vueltas"><b>' + visitas + ' visitas</b>, viene cada ' + cada + ' semanas, casi siempre con ' + c.barbero + '</p>' +
+        '<dl><dt>Cita</dt><dd>' + cuando(c.dia) + ', ' + hhmm(c.ini) + ' · ' + s.nom + '</dd><dt>Gastado</dt><dd>' + eur(gasto) + ' en total</dd>' +
         '<dt>Avisos</dt><dd>Recordatorio enviado y confirmado</dd></dl>' +
         '<table><thead><tr><th>Últimas visitas</th><th>Servicio</th><th class="num">Importe</th></tr></thead><tbody>' + f2 + '</tbody></table>';
     }
-    abrirVentana(html + '<p class="u-nota">Datos de ejemplo.</p><button type="button" class="u-btn" data-cerrar>Cerrar la ficha</button>');
+    abrirVentana(html + '<p class="tl-sub">Datos de ejemplo.</p><button type="button" class="u-btn" data-cerrar>Cerrar la ficha</button>');
   }
   /* Entrar con Google, simulado: sin logos de Google y sin pedir contraseña */
   function abrirGoogle() {
-    abrirVentana('<p class="u-etiqueta">Simulación</p><h2 id="ficha-tit">Entrar con Google</h2>' +
-      '<p>En la app de verdad se abre la ventana de Google, eliges tu cuenta y listo: la app recibe tu nombre y tu correo. Nunca ve tu contraseña.</p>' +
-      '<form class="tl-form" id="f-google" novalidate><label class="u-campo" for="g-nombre"><span class="u-etiqueta">Nombre de tu cuenta</span>' +
+    abrirVentana('<p class="tl-sub">Simulación</p><h2 id="ficha-tit">Entrar con Google</h2>' +
+      '<p>En la app de verdad se abre la ventana de Google, eliges tu cuenta y listo: la app recibe tu nombre y tu correo, nunca tu contraseña.</p>' +
+      '<form id="f-google" novalidate style="display:flex;flex-direction:column;gap:var(--e3)"><label class="u-campo" for="g-nombre"><span class="tl-sub">Nombre de tu cuenta</span>' +
       '<input id="g-nombre" autocomplete="given-name" placeholder="Cómo te llamas"></label>' +
-      '<p class="u-error" id="g-error" role="alert" hidden>Escribe tu nombre para entrar.</p>' +
-      '<button type="submit" class="u-btn u-btn-accion">Entrar</button></form>' +
+      '<p class="tl-error" id="g-error" role="alert" hidden>Escribe tu nombre para entrar.</p>' +
+      '<button type="submit" class="tl-b">Entrar</button></form>' +
       '<button type="button" class="u-btn u-btn-texto" data-cerrar>Ahora no</button>', '#g-nombre');
   }
   fichaEl.addEventListener('click', function (e) { if (e.target === fichaEl || e.target.closest('[data-cerrar]')) cerrarVentana(); });
@@ -840,17 +832,17 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
   /* ---------- Pintar ---------- */
   var VISTAS = { inicio: vInicio, servicio: vServicio, barbero: vBarbero, hora: vHora, confirmar: vConfirmar, reservada: vReservada, cortes: vCortes, perfil: vPerfil, chat: vChat };
   var TAB = { inicio: 'inicio', servicio: 'reservar', barbero: 'reservar', hora: 'reservar', confirmar: 'reservar', reservada: 'reservar', cortes: 'cortes', perfil: 'perfil' };
-  var ATRAS = { barbero: 'servicio', hora: 'barbero', confirmar: 'hora' };
+  var ATRAS = { servicio: 'inicio', barbero: 'servicio', hora: 'barbero', confirmar: 'hora', chat: 'reservada' };
   /* Al volver atrás se borra lo que se eligió en el paso al que se vuelve: no se queda nada marcado */
   var DESHACER = { barbero: function () { st.serv = null; }, hora: function () { st.barb = null; st.dia = null; st.ini = null; }, confirmar: function () { st.ini = null; st.error = ''; } };
 
   function escritorio() { return window.matchMedia('(min-width: 980px)').matches; }
   function pintarCli(arriba) {
     var esChat = st.vista === 'chat' && st.actual;
-    cab.hidden = !!esChat; tabs.hidden = !!esChat;
+    tabs.hidden = !!esChat;
+    movil.classList.toggle('chat', !!esChat);
     cliEl.className = esChat ? '' : 'tl-cli';
     pantalla.classList.toggle('en-chat', !!esChat);
-    document.getElementById('abierto').innerHTML = estadoAbierto();
     cliEl.innerHTML = VISTAS[st.vista]();
     tabs.querySelectorAll('button').forEach(function (b) { if (b.dataset.tab === TAB[st.vista]) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     st.chat.forEach(function (m) { m.nuevo = false; });
@@ -889,24 +881,19 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
   var noti = document.getElementById('noti'), notiTimer = null;
   function textoConfirmacion(r) {
     var s = serv(r.serv);
-    return 'Hola ' + r.cliente + '. Tu cita en Barbería Tallat está ' + (r.cambio ? 'cambiada' : 'confirmada') + ':\n' + s.nom + ' con ' + r.barbero + '\n' +
-      DIA_L[fecha(r.dia).getDay()] + ' ' + ddmm(r.dia) + ' a las ' + hhmm(r.ini) + '\n' + eur(s.eur) + ', se paga en la barbería.\n' +
-      'Carrer de Manso, Sant Antoni.\nSi no puedes venir, responde CAMBIAR o ANULAR y dejamos el hueco a otro cliente.';
-  }
-  function textoRecordatorio(r) {
-    return 'Hola ' + r.cliente + ', te recordamos tu cita de ' + (r.dia === hoy() ? 'hoy' : 'mañana') + ' a las ' + hhmm(r.ini) + ' con ' + r.barbero +
-      '. Responde SÍ para confirmarla, o CAMBIAR o ANULAR si no puedes venir.';
+    return 'Hola ' + r.cliente + ', tu cita está ' + (r.cambio ? 'cambiada' : 'confirmada') + '.\n\n' + diaCorto(r.dia) + ', ' + hhmm(r.ini) + '\n' + s.nom + ' con ' + r.barbero + ' · ' + eur(s.eur) +
+      '\nCarrer de Manso, Sant Antoni';
   }
   function mostrarNoti() {
     if (!st.actual) return;
-    document.getElementById('noti-txt').textContent = textoConfirmacion(cita(st.actual));
+    document.getElementById('noti-txt').textContent = textoConfirmacion(cita(st.actual)).replace(/\n+/g, ' · ');
     noti.hidden = false;
     requestAnimationFrame(function () { requestAnimationFrame(function () { noti.classList.add('on'); }); });
   }
   function ocultarNoti() { clearTimeout(notiTimer); noti.classList.remove('on'); noti.hidden = true; }
   noti.addEventListener('click', function () { ocultarNoti(); ir('chat'); });
 
-  function msg(de, txt, hora, boton, media) { st.chat.push({ de: de, txt: txt, hora: hora || hhmm(ahoraMin()), boton: boton, media: media, nuevo: true }); }
+  function msg(de, txt, hora, botones, media) { st.chat.push({ de: de, txt: txt, hora: hora || hhmm(ahoraMin()), botones: botones, media: media, nuevo: true }); }
   function sumarMes(c, n) { st.mes[c] += n || 1; st.cambioMes = c; }
   function nuevaCita(k, barbero, ini, sv, cliente, tel, origen) {
     var c = { id: k + '-m' + (st.mias.length + 1), dia: k, barbero: barbero, ini: ini, serv: sv, cliente: cliente, tel: tel,
@@ -919,53 +906,53 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
     if (motivo === 'anular') { sumarMes('ausencias'); avisoMostrador('Ausencia evitada', r.cliente + ' ha anulado: las ' + hhmm(r.ini) + ' con ' + r.barbero + ' vuelven a estar libres.'); }
   }
 
-  function responder(txt) {
-    var r = cita(st.actual), s = serv(r.serv);
-    if (txt === 'SÍ') {
-      msg('cli', 'SÍ');
+  /* Respuestas a los botones del chat */
+  function responder(i, rsp) {
+    var m = st.chat[i], r = cita(st.actual), s = serv(r.serv);
+    if (m) m.usado = true;
+    var etiqueta = m && m.botones.filter(function (b) { return b.r === rsp; })[0];
+    if (rsp === 'foto') { pedirFoto(corteDeCita(r).id, true); return; }
+    if (rsp === 'resena') { msg('sis', 'Aquí se abriría vuestra ficha de Google para dejar la reseña'); pintar(false); return; }
+    if (rsp === 'otra') { st.cambiando = r.id; empezarReserva(r.serv, r.barbero); return; }
+    msg('cli', etiqueta ? etiqueta.txt : rsp);
+    if (rsp === 'si') {
       r.estado = 'confirmada';
       msg('neg', 'Perfecto, ' + r.cliente + '. Te esperamos el ' + DIA_L[fecha(r.dia).getDay()] + ' a las ' + hhmm(r.ini) + '.');
-      st.fase = null; st.agDia = r.dia; st.flash = r.id;
+      st.agDia = r.dia; st.flash = r.id;
       avisoMostrador('Confirmada', r.cliente + ' ha confirmado su cita de las ' + hhmm(r.ini) + ' con ' + r.barbero + '.');
       /* Lo que llega después del corte: la foto, la reseña y, a las 4 semanas, «ya te toca» */
       tPost1 = setTimeout(function () {
-        msg('sis', 'El mismo día, una hora después del corte');
-        msg('neg', '¿Qué tal el ' + s.nom.toLowerCase() + ' con ' + r.barbero + ', ' + r.cliente + '? Hazte una foto o un vídeo de cómo te ha quedado: lo guardamos en tus cortes y la próxima vez ' + r.barbero + ' sabrá qué hacerte.', hhmm(Math.min(r.ini + s.min + 60, 1439)), { accion: 'foto-cita', txt: 'Añadir foto o vídeo' });
-        msg('neg', 'Y si te ha gustado, nos ayudas mucho con una reseña en Google. Es un minuto: [enlace a vuestra ficha de Google]', hhmm(Math.min(r.ini + s.min + 61, 1439)));
+        msg('sis', 'Una hora después del corte');
+        msg('neg', '¿Qué tal con ' + r.barbero + '? Mándanos una foto o un vídeo de cómo te ha quedado: lo guardamos en tus cortes para la próxima vez.',
+          hhmm(Math.min(r.ini + s.min + 60, 1439)), [{ txt: 'Añadir foto o vídeo', r: 'foto', foto: true }]);
+        msg('neg', 'Y si te ha gustado, nos ayudas mucho con una reseña en Google.', hhmm(Math.min(r.ini + s.min + 61, 1439)), [{ txt: 'Escribir reseña', r: 'resena' }]);
         sumarMes('avisos'); sumarMes('resenas'); pintar(false);
       }, 1200);
       tPost2 = setTimeout(function () {
         var vuelta = sumarDias(r.dia, 28);
         msg('sis', '4 semanas después');
-        msg('neg', 'Hola ' + r.cliente + ', hace 4 semanas de tu ' + s.nom.toLowerCase() + ' con ' + r.barbero + '. ¿Te guardo el ' + DIA_L[fecha(vuelta).getDay()] + ' ' + ddmm(vuelta) + ' a las ' + hhmm(r.ini) + ', como la otra vez?', '11:00');
-        st.fase = 'vuelta'; sumarMes('avisos'); pintar(false);
+        msg('neg', 'Hola ' + r.cliente + ', ya hace 4 semanas de tu último corte con ' + r.barbero + '. ¿Te guardo el ' + DIA_L[fecha(vuelta).getDay()] + ' ' + fecha(vuelta).getDate() + ' a las ' + hhmm(r.ini) + ', como la otra vez?',
+          '11:00', [{ txt: 'Sí, guárdamela', r: 'guardar' }, { txt: 'Otro día', r: 'otro' }]);
+        sumarMes('avisos'); pintar(false);
       }, 2600);
-    } else if (txt === 'CAMBIAR') {
-      msg('cli', 'CAMBIAR');
-      msg('neg', 'Sin problema, ' + r.cliente + '. Elige otra hora y te la cambiamos.', null, { accion: 'otra-hora', txt: 'Elegir otra hora' });
-      st.fase = null;
-    } else if (txt === 'ANULAR') {
-      msg('cli', 'ANULAR');
+    } else if (rsp === 'cambiar') {
+      msg('neg', 'Sin problema, ' + r.cliente + '. Elige otra hora y te la cambiamos.', null, [{ txt: 'Elegir otra hora', r: 'otra' }]);
+    } else if (rsp === 'anular') {
       anular(r, 'anular');
       msg('neg', 'Cita anulada. Hemos dejado libre el hueco de las ' + hhmm(r.ini) + ' para otro cliente. Gracias por avisar, ' + r.cliente + '.');
-      st.fase = null;
-    } else if (txt === 'GUARDAR') {
-      msg('cli', 'SÍ, GUÁRDAMELA');
+    } else if (rsp === 'guardar') {
       /* La misma hora y el mismo barbero si están libres; si no, la hora más cercana con él o con otro */
       var k = sumarDias(r.dia, 28), hueco = horaCercana(k, r.barbero, r.ini, s.min) || horaCercana(k, '*', r.ini, s.min);
       if (hueco) {
         var quien = libreQuien(k, hueco.b, hueco.t, s.min), n = nuevaCita(k, quien, hueco.t, r.serv, r.cliente, r.tel, 'whatsapp');
         n.estado = 'confirmada';
-        msg('neg', 'Hecho, ' + r.cliente + '. Te esperamos el ' + DIA_L[fecha(k).getDay()] + ' ' + ddmm(k) + ' a las ' + hhmm(hueco.t) + ' con ' + quien +
-          (hueco.t !== r.ini || quien !== r.barbero ? ' (a las ' + hhmm(r.ini) + (quien !== r.barbero ? ' ' + r.barbero + ' ya lo tenía cogido' : ' ya estaba cogido') + ').' : '.'));
+        msg('neg', 'Hecho. Te esperamos el ' + diaCorto(k).toLowerCase() + ' a las ' + hhmm(hueco.t) + ' con ' + quien +
+          (hueco.t !== r.ini || quien !== r.barbero ? ' (a las ' + hhmm(r.ini) + ' ya estaba cogido).' : '.'));
         st.agDia = k; st.flash = n.id; sumarMes('web');
-        avisoMostrador('Vuelve', r.cliente + ' repite el ' + DIA_C[fecha(k).getDay()] + ' ' + ddmm(k) + ' a las ' + hhmm(hueco.t) + ' con ' + quien + '. Sin llamadas.');
-      } else msg('neg', 'Ese día ya está lleno. Elige otro y te lo guardamos.', null, { accion: 'otra-hora', txt: 'Elegir día y hora' });
-      st.fase = null;
-    } else if (txt === 'OTRO') {
-      msg('cli', 'OTRO DÍA');
-      msg('neg', 'Sin problema. Cuando te vaya bien, elige día y hora en la app.', null, { accion: 'otra-hora', txt: 'Elegir día y hora' });
-      st.fase = null;
+        avisoMostrador('Vuelve', r.cliente + ' repite el ' + cuando(k) + ' a las ' + hhmm(hueco.t) + ' con ' + quien + '. Sin llamadas.');
+      } else msg('neg', 'Ese día ya está lleno. Elige otro y te lo guardamos.', null, [{ txt: 'Elegir día y hora', r: 'otra' }]);
+    } else if (rsp === 'otro') {
+      msg('neg', 'Sin problema. Cuando te vaya bien, elige día y hora.', null, [{ txt: 'Elegir día y hora', r: 'otra' }]);
     }
     pintar(false); mostrarFlash();
   }
@@ -979,13 +966,13 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
     var nuevas = Array.prototype.map.call(inputFoto.files, function (f) { return { url: URL.createObjectURL(f), video: /^video\//.test(f.type) }; });
     h.fotos = h.fotos.concat(nuevas);
     if (p.chat) {
-      /* La foto va justo después de la petición de foto y de reseña, no al final del chat */
-      var i = st.chat.findIndex(function (m) { return m.boton && m.boton.accion === 'foto-cita'; });
+      /* La foto va justo después de la petición de foto, no al final del chat */
+      var i = st.chat.findIndex(function (m) { return m.botones && m.botones[0].r === 'foto'; });
       var hora = i >= 0 ? st.chat[i].hora : hhmm(ahoraMin());
       var nuevos = [{ de: 'cli', txt: nuevas.length > 1 ? nuevas.length + ' archivos' : '', hora: hora, media: nuevas[0], nuevo: true },
-        { de: 'neg', txt: 'Guardado en tus cortes. La próxima vez ' + h.barbero + ' lo tendrá delante antes de empezar.', hora: hora, nuevo: true }];
-      if (i >= 0) { st.chat[i].boton = null; st.chat.splice.apply(st.chat, [i + 2, 0].concat(nuevos)); } else st.chat = st.chat.concat(nuevos);
-      var r = cita(h.id); if (r) r.hecha_ya = true;   // en la demo, subir la foto equivale a haber ido ya
+        { de: 'neg', txt: 'Guardado en tus cortes. La próxima vez ' + h.barbero + ' lo tendrá delante.', hora: hora, nuevo: true }];
+      if (i >= 0) st.chat.splice.apply(st.chat, [i + 1, 0].concat(nuevos)); else st.chat = st.chat.concat(nuevos);
+      var r = cita(h.id); if (r) r.hechaYa = true;   // en la demo, mandar la foto equivale a haber ido ya
     }
     avisoMostrador('Fotos', (st.usuario ? st.usuario.nombre : 'El cliente') + ' ha añadido ' + (nuevas.length > 1 ? nuevas.length + ' fotos' : 'una foto') + ' a su corte con ' + h.barbero + '.');
     pintar(false);
@@ -1000,10 +987,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
   document.addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b || b.closest('#menu') || b.closest('#ficha') || b.hasAttribute('data-logo') || b.id === 'noti') return;
     var d = b.dataset;
-    if (d.tab) {
-      ocultarNoti();
-      if (d.tab === 'reservar') { st.cambiando = null; empezarReserva(); } else ir(d.tab);
-    }
+    if (d.tab) { ocultarNoti(); if (d.tab === 'reservar') { st.cambiando = null; empezarReserva(); } else ir(d.tab); }
     else if (d.serv) empezarReserva(d.serv);
     else if (d.barb) { st.barb = d.barb; st.dia = null; st.ini = null; ir('hora'); }
     else if (d.dia) { st.dia = d.dia; st.ini = null; pintarCli(false); }
@@ -1013,27 +997,25 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
     else if (d.ics) bajarIcs(cita(d.ics));
     else if (d.cambiar) { var c = cita(d.cambiar); st.cambiando = c.id; empezarReserva(c.serv, c.barbero); }
     else if (d.anular) { anular(cita(d.anular), 'anular'); pintar(false); }
-    else if (d.resp) responder(d.resp);
+    else if (d.r) responder(+d.msg, d.r);
     else if (d.agdia) { st.agDia = otroDiaAbierto(st.agDia, +d.agdia); st.cambioMes = null; pintarNeg(); }
     else if (d.cita) abrirFicha(d.cita);
     else if (d.accion === 'atras') {
-      if (st.vista === 'chat') { ocultarNoti(); ir('reservada'); return; }
-      if (st.vista === 'servicio') { ir('inicio'); return; }
-      var a = ATRAS[st.vista];
+      if (st.vista === 'chat') ocultarNoti();
+      var a = ATRAS[st.vista] || 'inicio';
       if (DESHACER[st.vista]) DESHACER[st.vista]();
-      ir(a || 'inicio');
+      ir(a);
     }
     else if (d.accion === 'google') abrirGoogle();
     else if (d.accion === 'salir') { st.usuario = null; st.historial = []; ir('inicio'); }
     else if (d.accion === 'ver-chat') { ocultarNoti(); ir('chat'); }
-    else if (d.accion === 'otra-hora') { var r = cita(st.actual); st.cambiando = r.id; empezarReserva(r.serv, r.barbero); }
-    else if (d.accion === 'foto-cita') { var rc = cita(st.actual); pedirFoto(corteDeCita(rc).id, true); }
   });
   cliEl.addEventListener('input', function (e) {
     if (e.target.id === 'f-nombre') st.nombre = e.target.value;
     if (e.target.id === 'f-tel') st.tel = e.target.value;
   });
-  cliEl.addEventListener('submit', function (e) {
+  document.addEventListener('submit', function (e) {
+    if (e.target.id !== 'f-datos') return;
     e.preventDefault();
     var u = st.usuario, nombre = u ? u.nombre : st.nombre.trim().replace(/\s+/g, ' ');
     var tel = u && u.tel ? u.tel : st.tel.replace(/[\s.-]/g, '').replace(/^(\+34|0034)/, '');
@@ -1042,7 +1024,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
     else if (!/^[67]\d{8}$/.test(tel)) st.error = 'Revisa el móvil: son 9 cifras y empieza por 6 o 7.';
     else if (ok && !ok.checked) st.error = 'Marca la casilla para que podamos guardar la cita y avisarte.';
     else st.error = '';
-    if (st.error) { pintarCli(false); var el = cliEl.querySelector('.u-error'); if (el) el.scrollIntoView({ block: 'center' }); return; }
+    if (st.error) { pintarCli(false); var el = cliEl.querySelector('.tl-error'); if (el) el.scrollIntoView({ block: 'center' }); return; }
     var min = serv(st.serv).min, quien = libreQuien(st.dia, st.barb, st.ini, min);
     if (!quien) { st.error = 'Esa hora se acaba de ocupar. Vuelve atrás y elige otra.'; pintarCli(false); return; }
     if (u) { u.tel = tel; u.ok = true; } else st.usuario = { nombre: nombre.split(' ')[0], tel: tel, google: false, ok: true };
@@ -1055,13 +1037,14 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
     st.chat = [];
     msg('neg', textoConfirmacion(r));
     msg('sis', r.dia === hoy() ? 'Dos horas antes de la cita' : 'El día antes, a las 19:00');
-    msg('neg', textoRecordatorio(r), r.dia === hoy() ? hhmm(Math.max(r.ini - 120, ahoraMin())) : '19:00');
-    st.fase = 'recordatorio';
+    msg('neg', 'Hola ' + r.cliente + ', te recordamos tu cita de ' + (r.dia === hoy() ? 'hoy' : 'mañana') + ' a las ' + hhmm(r.ini) + ' con ' + r.barbero + '. ¿Vienes?',
+      r.dia === hoy() ? hhmm(Math.max(r.ini - 120, ahoraMin())) : '19:00',
+      [{ txt: 'Sí, ahí estaré', r: 'si' }, { txt: 'Cambiar la hora', r: 'cambiar' }, { txt: 'Anular la cita', r: 'anular' }]);
     st.agDia = r.dia; st.flash = r.id;
     sumarMes('avisos', 2); if (!vieja) sumarMes('web');
     ir('reservada');
     mostrarFlash();
-    avisoMostrador(vieja ? 'Cita cambiada' : 'Nueva cita', r.cliente + ' · ' + cuando(r.dia) + ' a las ' + hhmm(r.ini) + ' con ' + quien + (vieja ? ' (antes ' + cuando(vieja.dia) + ' a las ' + hhmm(vieja.ini) + ').' : '. WhatsApp de confirmación enviado.'));
+    avisoMostrador(vieja ? 'Cita cambiada' : 'Nueva cita', r.cliente + ', ' + cuando(r.dia) + ' a las ' + hhmm(r.ini) + ' con ' + quien + (vieja ? ' (antes ' + cuando(vieja.dia) + ' a las ' + hhmm(vieja.ini) + ').' : '. WhatsApp enviado.'));
     notiTimer = setTimeout(mostrarNoti, 1800);
   });
 
@@ -1078,7 +1061,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(60px + env(safe-area-ins
   document.addEventListener('click', function (e) {
     var l = e.target.closest('[data-logo]'); if (!l) return;
     if (largo) { largo = false; return; }
-    if (l.closest('#cab')) { st.cambiando = null; ir('inicio'); }
+    if (l.closest('#cli')) { st.cambiando = null; ir('inicio'); }
   });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') { cerrarMenu(); cerrarVentana(); }

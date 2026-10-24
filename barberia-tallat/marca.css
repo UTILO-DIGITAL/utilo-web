@@ -25,7 +25,7 @@
   --fuente-texto: 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif;
   --peso-titulos: 600;
 
-  /* Forma: esquinas suaves y discretas */
-  --radio: 8px;
-  --radio-peq: 4px;
+  /* Forma: esquinas de app del móvil, suaves y discretas */
+  --radio: 12px;
+  --radio-peq: 6px;
 }
