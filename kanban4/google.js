@@ -154,7 +154,7 @@
           UG.entrar().then(function (t) { v.remove(); ok(t); }, function (e) { v.remove(); ko(e); });
         };
         v.appendChild(b);
-        document.body.appendChild(v);
+        capa().appendChild(v); // T0208: dentro de una sección, en #sx-panel (lo demás está oculto)
         b.focus();
       });
     },
@@ -253,6 +253,8 @@
       b.focus();
     });
   }
+  /** T0208: dónde se pintan los avisos: en una sección, kanban4 oculta todo lo que cuelga de la página salvo #sx-panel. */
+  function capa() { return document.getElementById('sx-panel') || document.body; }
 
   /** Carga la ventana de Google para elegir archivos y la abre con la vista que da hacerVista(P): el archivo elegido. */
   function picker(hacerVista, titulo, cancelado) {
@@ -320,7 +322,7 @@
           v.style.display = 'flex'; si.disabled = false; var x = v.querySelector('[data-e]'); x.textContent = e.message; x.hidden = false;
         });
       };
-      (document.getElementById('sx-panel') || document.body).appendChild(v);
+      capa().appendChild(v);
       si.focus();
     });
   }
