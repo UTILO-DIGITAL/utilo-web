@@ -336,7 +336,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
       <div class="tl-home" aria-hidden="true"></div>
       <button type="button" class="tl-noti" id="noti" hidden>
         <span class="tl-av app" aria-hidden="true">t</span>
-        <span class="tit"><span style="font-size:14px;font-weight:600;color:var(--color-texto)">Barbería Tallat</span><span>ahora</span></span>
+        <span class="tit"><span id="noti-neg" style="font-size:14px;font-weight:600;color:var(--color-texto)"></span><span>ahora</span></span>
         <span class="txt" id="noti-txt"></span>
       </button>
     </div>
@@ -367,35 +367,44 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
   </div>
 </div>
 
+<script src="ajustes.js"></script>
 <script>
 (function () {
   'use strict';
 
-  /* ---------- Datos de la barbería (inventados) ---------- */
-  var SERV = [
-    { id: 'corte',  nom: 'Corte',          corto: 'Corte',       min: 30, eur: 16 },
-    { id: 'cb',     nom: 'Corte y barba',  corto: 'Corte+barba', min: 45, eur: 22 },
-    { id: 'barba',  nom: 'Barba',          corto: 'Barba',       min: 20, eur: 10 },
-    { id: 'rapado', nom: 'Rapado',         corto: 'Rapado',      min: 20, eur: 12 },
-    { id: 'inf',    nom: 'Corte infantil', corto: 'Infantil',    min: 30, eur: 13 }
-  ];
-  var BARB = [
-    { id: 'Toni',    det: 'Cortes clásicos y a tijera' },
-    { id: 'Marc',    det: 'Barba y afeitado a navaja' },
-    { id: 'Yassine', det: 'Degradados y diseños' }
-  ];
+  /* ---------- Datos de la barbería: salen de ajustes.js (inventados) ---------- */
+  var A = window.AJUSTES;
+  function minutos(h) { var p = String(h).split(':'); return +p[0] * 60 + (+p[1] || 0); }
+  var DIA_C = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  var DIA_L = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  var MES_C = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  var SERV = A.servicios.map(function (x, i) { return { id: 's' + i, nom: x.nombre, corto: x.corto || x.nombre, min: +x.minutos, eur: +x.precio }; });
+  var BARB = A.barberos.map(function (b) { return { id: b.nombre, det: b.especialidad }; });
+  /* Nombres para las citas de ejemplo del mostrador */
   var NOMBRES = ['Oriol', 'Pau', 'Arnau', 'Àlex', 'Karim', 'Sergi', 'Iker', 'Bilal', 'Dani', 'Nil', 'Adrià', 'Youssef',
     'Víctor', 'Joan', 'Marcel', 'Hugo', 'Ricard', 'Pol', 'Aleix', 'Hamza', 'Enric', 'Lucas', 'Biel', 'Gerard', 'Xavi',
     'Rubén', 'Imran', 'Quim', 'Mateo', 'Albert', 'Eric', 'Martí', 'Abdel', 'Roger', 'Ivan', 'Jan', 'Samir', 'Carles',
     'Luis', 'Guillem'];
-  /* El cliente habitual de la demo: viene cada 4 semanas con Toni */
-  var HABITUAL = { nombre: 'Jordi', tel: '612345218', google: true, ok: true };
-  var ABRE = 600, CIERRA = 1230, PASO = 30, PPM = 1.6;   // minutos desde las 00:00 (10:00 a 20:30) y píxeles por minuto
-  var DIA_C = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
-  var DIA_L = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
-  var MES_C = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-  var MES_BASE = { web: 64, avisos: 132, ausencias: 9, resenas: 17 };   // cifras de ejemplo del mes
-  var DIRECCION = 'Carrer de Manso, Sant Antoni, Barcelona';
+  var C = A.clienteHabitual;
+  var HABITUAL = { nombre: C.nombre, tel: String(C.movil).replace(/\D/g, ''), google: true, ok: true };
+  var CICLO = (+C.cadaSemanas || 4) * 7;   // días entre corte y corte
+  var ABRE = minutos(A.horario.abre), CIERRA = minutos(A.horario.cierra), PASO = 30, PPM = 1.6;   // minutos desde las 00:00 y píxeles por minuto
+  var DIAS_ABRE = A.horario.dias.map(function (d) { return DIA_L.indexOf(String(d).toLowerCase().trim()); });
+  var MES_BASE = { web: +A.cifrasDelMes.reservasSinLlamar, avisos: +A.cifrasDelMes.whatsappEnviados,
+    ausencias: +A.cifrasDelMes.ausenciasEvitadas, resenas: +A.cifrasDelMes.resenasPedidas };
+  var DIRECCION = A.calle + ', ' + A.barrio + ', ' + A.ciudad;
+  function servPorNombre(n) { return SERV.filter(function (x) { return x.nom === n; })[0] || SERV[0]; }
+  /* Un mensaje de ajustes.js con sus {huecos} rellenos */
+  function texto(clave, v) {
+    var base = { negocio: A.negocio, calle: A.calle, barrio: A.barrio, semanas: +C.cadaSemanas || 4 };
+    return String(A.mensajes[clave] || '').replace(/\{(\w+)\}/g, function (m, k) { return v && v[k] != null ? v[k] : base[k] != null ? base[k] : m; });
+  }
+  function huecosDe(r, extra) {
+    var x = serv(r.serv), d = fecha(r.dia), v = { cliente: r.cliente, barbero: r.barbero, servicio: x.nom, precio: eur(x.eur), dia: diaCorto(r.dia),
+      diaSemana: DIA_L[d.getDay()], diaMes: d.getDate(), hora: hhmm(r.ini), cuando: r.dia === hoy() ? 'hoy' : 'mañana' };
+    for (var k in extra) v[k] = extra[k];
+    return v;
+  }
 
   function svg(d, cls) { return '<svg class="' + (cls || 'ic') + '" viewBox="0 0 24 24" aria-hidden="true"><path d="' + d + '"/></svg>'; }
   var ICO = {
@@ -428,7 +437,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
   function serv(id) { return SERV.filter(function (s) { return s.id === id; })[0]; }
   function ahoraMin() { var d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
   function hoy() { return clave(new Date()); }
-  function abierto(d) { return d.getDay() >= 2 && d.getDay() <= 6; }
+  function abierto(d) { return DIAS_ABRE.indexOf(d.getDay()) >= 0; }
   function diasAbiertos(n) {
     var out = [], d = new Date(); d.setHours(12, 0, 0, 0);
     for (var i = 0; out.length < n && i < 21; i++) { if (abierto(d)) out.push(clave(d)); d.setDate(d.getDate() + 1); }
@@ -459,7 +468,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
       while (t < CIERRA) {
         var p = sab ? 0.55 : (t < 750 || t >= 1050 ? 0.5 : 0.3);
         if (r() < p) {
-          var x = r(), s = x < 0.45 ? SERV[0] : x < 0.7 ? SERV[1] : x < 0.8 ? SERV[2] : x < 0.9 ? SERV[3] : SERV[4];
+          var x = r(), s = SERV[Math.min(SERV.length - 1, x < 0.45 ? 0 : x < 0.7 ? 1 : 2 + Math.floor((x - 0.7) / 0.3 * Math.max(1, SERV.length - 2)))];
           if (t + s.min <= CIERRA) {
             out.push({ id: k + b.id + t, dia: k, barbero: b.id, ini: t, serv: s.id, cliente: nombre() });
             t += Math.ceil(s.min / PASO) * PASO; continue;
@@ -507,11 +516,9 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
     st = { lado: 'cli', vista: 'inicio', serv: null, barb: null, dia: null, ini: null, nombre: '', tel: '', error: '',
       usuario: nuevo ? null : JSON.parse(JSON.stringify(HABITUAL)), historial: [], mias: [], chat: [], actual: null,
       cambiando: null, fotoPara: null, agDia: null, flash: null, mes: { web: 0, avisos: 0, ausencias: 0, resenas: 0 }, cambioMes: null };
-    if (!nuevo) st.historial = [
-      { id: 'h1', dia: abiertoAntes(26), barbero: 'Toni', serv: 'cb', ini: 690, nota: 'Degradado bajo, arriba a tijera y barba perfilada', fotos: [] },
-      { id: 'h2', dia: abiertoAntes(54), barbero: 'Toni', serv: 'cb', ini: 1080, nota: 'Igual que la otra vez, un poco más corto de lados', fotos: [] },
-      { id: 'h3', dia: abiertoAntes(83), barbero: 'Marc', serv: 'corte', ini: 1020, nota: 'Primera visita', fotos: [] }
-    ];
+    if (!nuevo) st.historial = C.cortes.map(function (c, n) {
+      return { id: 'h' + (n + 1), dia: abiertoAntes(+c.haceDias), barbero: c.barbero, serv: servPorNombre(c.servicio).id, ini: minutos(c.hora), nota: c.nota || '', fotos: [] };
+    });
     ocultarNoti();
     clearTimeout(tPost1); clearTimeout(tPost2);
   }
@@ -529,7 +536,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
   function fechaCal(k, m) { return k.replace(/-/g, '') + 'T' + dos(Math.floor(m / 60)) + dos(m % 60) + '00'; }
   function enlaceGoogle(c) {
     var s = serv(c.serv);
-    return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + encodeURIComponent('Barbería Tallat · ' + s.nom + ' con ' + c.barbero) +
+    return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + encodeURIComponent(A.negocio + ' · ' + s.nom + ' con ' + c.barbero) +
       '&dates=' + fechaCal(c.dia, c.ini) + '/' + fechaCal(c.dia, c.ini + s.min) + '&ctz=Europe/Madrid' +
       '&location=' + encodeURIComponent(DIRECCION) + '&details=' + encodeURIComponent('Para cambiarla o anularla, responde al WhatsApp de la barbería.');
   }
@@ -537,8 +544,8 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
     var s = serv(c.serv);
     var ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Barberia Tallat//Demo Utilo//ES', 'BEGIN:VEVENT', 'UID:' + c.id + '@demo-tallat',
       'DTSTAMP:' + fechaCal(hoy(), ahoraMin()), 'DTSTART;TZID=Europe/Madrid:' + fechaCal(c.dia, c.ini), 'DTEND;TZID=Europe/Madrid:' + fechaCal(c.dia, c.ini + s.min),
-      'SUMMARY:Barbería Tallat · ' + s.nom + ' con ' + c.barbero, 'LOCATION:' + DIRECCION.replace(/,/g, '\\,'),
-      'BEGIN:VALARM', 'TRIGGER:-PT2H', 'ACTION:DISPLAY', 'DESCRIPTION:Cita en Barbería Tallat', 'END:VALARM', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+      'SUMMARY:' + A.negocio + ' · ' + s.nom + ' con ' + c.barbero, 'LOCATION:' + DIRECCION.replace(/,/g, '\\,'),
+      'BEGIN:VALARM', 'TRIGGER:-PT2H', 'ACTION:DISPLAY', 'DESCRIPTION:Cita en ' + A.negocio, 'END:VALARM', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
     var a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
     a.download = 'cita-barberia-tallat.ics';
@@ -551,9 +558,9 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
 
   function estadoAbierto() {
     var k = hoy(), m = ahoraMin();
-    if (abierto(fecha(k)) && m >= ABRE && m < CIERRA) return 'Abierto · cierra a las 20:30';
+    if (abierto(fecha(k)) && m >= ABRE && m < CIERRA) return 'Abierto · cierra a las ' + A.horario.cierra;
     var sig = abierto(fecha(k)) && m < ABRE ? k : otroDiaAbierto(k, 1);
-    return 'Cerrado · abre ' + (sig === k ? 'hoy' : sig === sumarDias(k, 1) ? 'mañana' : 'el ' + DIA_L[fecha(sig).getDay()]) + ' a las 10:00';
+    return 'Cerrado · abre ' + (sig === k ? 'hoy' : sig === sumarDias(k, 1) ? 'mañana' : 'el ' + DIA_L[fecha(sig).getDay()]) + ' a las ' + A.horario.abre;
   }
   function nav(titulo, paso) {
     var barras = '';
@@ -562,8 +569,8 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
       (paso ? '<div class="tl-progreso" aria-label="Paso ' + paso + ' de 4">' + barras + '</div>' : '');
   }
   function marca() {
-    return '<div class="tl-marca"><button type="button" class="tl-logo" data-logo aria-label="Barbería Tallat. Pulsación larga: menú de la demo">' +
-      '<span class="tl-logo-nom">tallat<i class="tl-punto">.</i></span><span class="tl-logo-sub">Barbería · Sant Antoni</span></button>' +
+    return '<div class="tl-marca"><button type="button" class="tl-logo" data-logo aria-label="' + esc(A.negocio) + '. Pulsación larga: menú de la demo">' +
+      '<span class="tl-logo-nom">' + esc(A.logo) + '<i class="tl-punto">.</i></span><span class="tl-logo-sub">' + esc(A.tipo + ' · ' + A.barrio) + '</span></button>' +
       '<p class="tl-abierto">' + estadoAbierto() + '</p></div>';
   }
   function fila(t, sub, v, attrs, extra) {
@@ -588,8 +595,8 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
   /* ---------- Pantallas de la app ---------- */
   function vInicio() {
     var u = st.usuario, prox = proximas()[0], ult = st.historial[0];
-    var barberia = '<p class="tl-sec">La barbería</p><ul class="tl-grupo">' + fila('Carrer de Manso', 'Sant Antoni, Barcelona') +
-      fila('Martes a sábado', 'De 10:00 a 20:30') + fila('Pago en la barbería', 'Tarjeta o efectivo') + '</ul>';
+    var barberia = '<p class="tl-sec">La barbería</p><ul class="tl-grupo">' + fila(esc(A.calle), esc(A.barrio + ', ' + A.ciudad)) +
+      fila(esc(A.horario.texto), 'De ' + A.horario.abre + ' a ' + A.horario.cierra) + fila('Pago', esc(A.pago)) + '</ul>';
     if (!u) {
       return marca() + '<h2 class="tl-titulo">Pide cita</h2>' +
         '<div class="tl-tarjeta"><p>Elige servicio, barbero y hora. Te confirmamos por WhatsApp y te lo recordamos el día antes.</p>' +
@@ -602,7 +609,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
       var dias = diasEntre(ult.dia, hoy()), b = barberoHabitual() || ult.barbero, s = serv(ult.serv), h = primerHueco(b, s.min);
       html += '<div class="tl-tarjeta"><p class="tl-sub">Tu último corte fue hace ' + dias + ' días</p>' +
         '<p class="gran">¿Repetimos con ' + esc(b) + '?</p>' +
-        '<div class="tl-ciclo" aria-hidden="true"><span style="width:' + Math.min(100, Math.round(dias / 28 * 100)) + '%"></span></div>' +
+        '<div class="tl-ciclo" aria-hidden="true"><span style="width:' + Math.min(100, Math.round(dias / CICLO * 100)) + '%"></span></div>' +
         '<p class="tl-sub">' + s.nom + ' · ' + s.min + ' min · ' + eur(s.eur) + (h ? ' · primer hueco ' + h : '') + '</p>' +
         '<button type="button" class="tl-b" data-repetir="' + ult.id + '">Reservar con ' + esc(b) + '</button>' +
         '<button type="button" class="tl-b2" data-tab="reservar">Otro servicio o barbero</button></div>';
@@ -647,10 +654,10 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
   function vConfirmar() {
     var s = serv(st.serv), u = st.usuario;
     var res = '<ul class="tl-grupo">' + fila(diaCorto(st.dia) + ', ' + hhmm(st.ini), s.nom + ' · ' + s.min + ' min', eur(s.eur)) +
-      fila('Barbero', null, st.barb === '*' ? 'El primero libre' : esc(st.barb)) + fila('Dónde', null, 'Carrer de Manso') + '</ul>';
+      fila('Barbero', null, st.barb === '*' ? 'El primero libre' : esc(st.barb)) + fila('Dónde', null, esc(A.calle)) + '</ul>';
     var err = st.error ? '<p class="tl-error" role="alert">' + esc(st.error) + '</p>' : '';
     var boton = '<div class="tl-pegado"><button type="submit" form="f-datos" class="tl-b">' + (st.cambiando ? 'Cambiar la cita' : 'Reservar · ' + eur(s.eur)) + '</button></div>';
-    var permiso = '<label class="tl-check" for="f-ok"><input type="checkbox" id="f-ok"><span>Acepto que Barbería Tallat guarde mi nombre y mi móvil para mis citas y los avisos por WhatsApp.</span></label>';
+    var permiso = '<label class="tl-check" for="f-ok"><input type="checkbox" id="f-ok"><span>Acepto que ' + esc(A.negocio) + ' guarde mi nombre y mi móvil para mis citas y los avisos por WhatsApp.</span></label>';
     if (u && u.tel && u.ok) {
       return nav('Confirmar', 4) + '<h2 class="tl-titulo">Revisa tu cita</h2><form id="f-datos" novalidate>' + res +
         '<p class="tl-sub" style="margin:var(--e3) var(--e1) 0">Te avisamos por WhatsApp al ' + mascara(u.tel) + '.</p>' + err + '</form>' + boton;
@@ -673,7 +680,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
     return '<div class="tl-hecho" aria-hidden="true">' + ICO.ok + '</div><h2 class="tl-titulo" style="margin-top:var(--e3)">' + (r.cambio ? 'Cita cambiada' : 'Cita reservada') + '</h2>' +
       '<p class="tl-sub" style="font-size:15px;margin-top:-8px">Te hemos enviado la confirmación por WhatsApp al ' + mascara(r.tel) + '.</p>' +
       '<p class="tl-sec">Tu cita</p>' + '<ul class="tl-grupo">' + fila(diaCorto(r.dia) + ', ' + hhmm(r.ini), s.nom + ' con ' + esc(r.barbero) + ' · ' + s.min + ' min', eur(s.eur)) +
-      fila('Carrer de Manso', 'Sant Antoni, Barcelona') + '</ul>' +
+      fila(esc(A.calle), esc(A.barrio + ', ' + A.ciudad)) + '</ul>' +
       '<p class="tl-sec">Que no se te olvide</p><ul class="tl-grupo">' +
       '<li><a class="tl-fila" href="' + enlaceGoogle(r) + '" target="_blank" rel="noopener">' + ICO.cal + '<span class="t">Añadir a Google Calendar</span>' + ICO.ch + '</a></li>' +
       (enIframe() ? '' : fila('Añadir al calendario del móvil', null, null, 'data-ics="' + r.id + '"', ICO.cal)) +
@@ -710,7 +717,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
       '<p class="tl-sub">Llegan cuando alguien reserva. Haz una reserva de prueba y vuelve aquí.</p>';
     return '<div class="tl-chat">' +
       '<div class="tl-chat-cab"><button type="button" class="tl-volver" data-accion="atras" aria-label="Volver">' + ICO.atras + '</button>' +
-      '<span class="tl-av" aria-hidden="true">t</span><div class="q"><strong>Barbería Tallat</strong><span>Cuenta de empresa</span></div></div>' +
+      '<span class="tl-av" aria-hidden="true">t</span><div class="q"><strong>' + esc(A.negocio) + '</strong><span>Cuenta de empresa</span></div></div>' +
       '<div class="tl-msgs" id="msgs"><p class="tl-fecha-chat">Simulación del WhatsApp que recibe el cliente</p>' +
       st.chat.map(function (m, i) {
         if (m.de === 'sis') return '<p class="tl-sis">' + esc(m.txt) + '</p>';
@@ -752,10 +759,11 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
           '<span class="c">' + esc(c.cliente) + '</span><span class="s"><span class="hh">' + hhmm(c.ini) + ' · </span>' + etiqueta + '</span></button>';
       }).join('') + '</div>';
     }).join('');
+    var cols3 = 'grid-template-columns: 44px repeat(' + BARB.length + ', minmax(0, 1fr))';   // una columna por barbero
     var hayAhora = k === hoy() && ahoraMin() >= ABRE && ahoraMin() < CIERRA;
     var ahora = hayAhora ? '<div class="tl-ahora" style="top:' + ((ahoraMin() - ABRE) * PPM) + 'px"></div>' : '';
-    return '<div class="tl-ncab"><button type="button" class="tl-logo" data-logo aria-label="Barbería Tallat. Pulsación larga: menú de la demo">' +
-      '<span class="tl-logo-nom">tallat<i class="tl-punto">.</i></span><span class="tl-logo-sub">Mostrador</span></button>' +
+    return '<div class="tl-ncab"><button type="button" class="tl-logo" data-logo aria-label="' + esc(A.negocio) + '. Pulsación larga: menú de la demo">' +
+      '<span class="tl-logo-nom">' + esc(A.logo) + '<i class="tl-punto">.</i></span><span class="tl-logo-sub">Mostrador</span></button>' +
       '<div class="tl-ndia"><button type="button" class="u-btn u-btn-icono" data-agdia="-1" aria-label="Día anterior">' + ICO.ant + '</button>' +
       '<h1>' + titulo + '</h1><button type="button" class="u-btn u-btn-icono" data-agdia="1" aria-label="Día siguiente">' + ICO.sig + '</button></div></div>' +
       '<div class="tl-kpis">' +
@@ -765,10 +773,10 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
       '<div class="tl-kpi"><span class="l">Huecos libres</span><span class="v">' + huecos(k) + '</span></div></div>' +
       '<p class="tl-mes"><span>Este mes (ejemplo):</span>' + dato('web', 'reservas sin llamar') + dato('avisos', 'WhatsApp enviados') +
       dato('ausencias', 'ausencias evitadas') + dato('resenas', 'reseñas pedidas') + '</p>' +
-      '<div class="tl-cuad-cab"><span></span>' + BARB.map(function (b) {
+      '<div class="tl-cuad-cab" style="' + cols3 + '"><span></span>' + BARB.map(function (b) {
         return '<div><strong>' + b.id + '</strong><span>' + citas.filter(function (c) { return c.barbero === b.id; }).length + ' citas</span></div>';
       }).join('') + '</div>' +
-      '<div class="tl-cuad"><div class="tl-eje" style="height:' + alto + 'px">' + eje + '</div>' + cols + ahora + '</div>' +
+      '<div class="tl-cuad" style="' + cols3 + '"><div class="tl-eje" style="height:' + alto + 'px">' + eje + '</div>' + cols + ahora + '</div>' +
       '<p class="tl-leyenda"><span><i></i>Cita de ejemplo</span><span><i class="mia"></i>Reservada en la demo</span>' +
       (hayAhora ? '<span><i class="ahora"></i>Ahora</span>' : '') + '<span>Toca una cita para ver la ficha del cliente</span></p>';
   }
@@ -798,7 +806,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
     } else {
       var r = azar(hash(c.cliente + c.barbero)), visitas = 2 + Math.floor(r() * 14), cada = 3 + Math.floor(r() * 4), f2 = '', gasto = 0;
       for (var i = 1; i <= 3; i++) {
-        var k = sumarDias(c.dia, -7 * cada * i), sv = i === 1 ? s : SERV[Math.floor(r() * 2)];
+        var k = sumarDias(c.dia, -7 * cada * i), sv = i === 1 ? s : SERV[Math.floor(r() * Math.min(2, SERV.length))];
         f2 += '<tr><td>' + ddmmaaaa(k) + '</td><td>' + sv.nom + '</td><td class="num">' + eur(sv.eur) + '</td></tr>';
       }
       for (var j = 0; j < visitas; j++) gasto += j % 3 === 2 ? 22 : 16;
@@ -879,11 +887,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
 
   /* ---------- Aviso en el móvil y chat ---------- */
   var noti = document.getElementById('noti'), notiTimer = null;
-  function textoConfirmacion(r) {
-    var s = serv(r.serv);
-    return 'Hola ' + r.cliente + ', tu cita está ' + (r.cambio ? 'cambiada' : 'confirmada') + '.\n\n' + diaCorto(r.dia) + ', ' + hhmm(r.ini) + '\n' + s.nom + ' con ' + r.barbero + ' · ' + eur(s.eur) +
-      '\nCarrer de Manso, Sant Antoni';
-  }
+  function textoConfirmacion(r) { return texto(r.cambio ? 'cambiada' : 'confirmacion', huecosDe(r)); }
   function mostrarNoti() {
     if (!st.actual) return;
     document.getElementById('noti-txt').textContent = textoConfirmacion(cita(st.actual)).replace(/\n+/g, ' · ');
@@ -917,42 +921,41 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
     msg('cli', etiqueta ? etiqueta.txt : rsp);
     if (rsp === 'si') {
       r.estado = 'confirmada';
-      msg('neg', 'Perfecto, ' + r.cliente + '. Te esperamos el ' + DIA_L[fecha(r.dia).getDay()] + ' a las ' + hhmm(r.ini) + '.');
+      msg('neg', texto('confirmada', huecosDe(r)));
       st.agDia = r.dia; st.flash = r.id;
       avisoMostrador('Confirmada', r.cliente + ' ha confirmado su cita de las ' + hhmm(r.ini) + ' con ' + r.barbero + '.');
       /* Lo que llega después del corte: la foto, la reseña y, a las 4 semanas, «ya te toca» */
       tPost1 = setTimeout(function () {
         msg('sis', 'Una hora después del corte');
-        msg('neg', '¿Qué tal con ' + r.barbero + '? Mándanos una foto o un vídeo de cómo te ha quedado: lo guardamos en tus cortes para la próxima vez.',
-          hhmm(Math.min(r.ini + s.min + 60, 1439)), [{ txt: 'Añadir foto o vídeo', r: 'foto', foto: true }]);
-        msg('neg', 'Y si te ha gustado, nos ayudas mucho con una reseña en Google.', hhmm(Math.min(r.ini + s.min + 61, 1439)), [{ txt: 'Escribir reseña', r: 'resena' }]);
+        msg('neg', texto('pedirFoto', huecosDe(r)), hhmm(Math.min(r.ini + s.min + 60, 1439)), [{ txt: A.mensajes.botonFoto, r: 'foto', foto: true }]);
+        msg('neg', texto('pedirResena', huecosDe(r)), hhmm(Math.min(r.ini + s.min + 61, 1439)), [{ txt: A.mensajes.botonResena, r: 'resena' }]);
         sumarMes('avisos'); sumarMes('resenas'); pintar(false);
       }, 1200);
       tPost2 = setTimeout(function () {
-        var vuelta = sumarDias(r.dia, 28);
-        msg('sis', '4 semanas después');
-        msg('neg', 'Hola ' + r.cliente + ', ya hace 4 semanas de tu último corte con ' + r.barbero + '. ¿Te guardo el ' + DIA_L[fecha(vuelta).getDay()] + ' ' + fecha(vuelta).getDate() + ' a las ' + hhmm(r.ini) + ', como la otra vez?',
-          '11:00', [{ txt: 'Sí, guárdamela', r: 'guardar' }, { txt: 'Otro día', r: 'otro' }]);
+        var vuelta = sumarDias(r.dia, CICLO);
+        msg('sis', (+C.cadaSemanas || 4) + ' semanas después');
+        msg('neg', texto('yaTeToca', huecosDe(r, { diaSemana: DIA_L[fecha(vuelta).getDay()], diaMes: fecha(vuelta).getDate() })),
+          '11:00', [{ txt: A.mensajes.botonesYaTeToca[0], r: 'guardar' }, { txt: A.mensajes.botonesYaTeToca[1], r: 'otro' }]);
         sumarMes('avisos'); pintar(false);
       }, 2600);
     } else if (rsp === 'cambiar') {
-      msg('neg', 'Sin problema, ' + r.cliente + '. Elige otra hora y te la cambiamos.', null, [{ txt: 'Elegir otra hora', r: 'otra' }]);
+      msg('neg', texto('cambiar', huecosDe(r)), null, [{ txt: 'Elegir otra hora', r: 'otra' }]);
     } else if (rsp === 'anular') {
       anular(r, 'anular');
-      msg('neg', 'Cita anulada. Hemos dejado libre el hueco de las ' + hhmm(r.ini) + ' para otro cliente. Gracias por avisar, ' + r.cliente + '.');
+      msg('neg', texto('anulada', huecosDe(r)));
     } else if (rsp === 'guardar') {
       /* La misma hora y el mismo barbero si están libres; si no, la hora más cercana con él o con otro */
-      var k = sumarDias(r.dia, 28), hueco = horaCercana(k, r.barbero, r.ini, s.min) || horaCercana(k, '*', r.ini, s.min);
+      var k = sumarDias(r.dia, CICLO), hueco = horaCercana(k, r.barbero, r.ini, s.min) || horaCercana(k, '*', r.ini, s.min);
       if (hueco) {
         var quien = libreQuien(k, hueco.b, hueco.t, s.min), n = nuevaCita(k, quien, hueco.t, r.serv, r.cliente, r.tel, 'whatsapp');
         n.estado = 'confirmada';
-        msg('neg', 'Hecho. Te esperamos el ' + diaCorto(k).toLowerCase() + ' a las ' + hhmm(hueco.t) + ' con ' + quien +
-          (hueco.t !== r.ini || quien !== r.barbero ? ' (a las ' + hhmm(r.ini) + ' ya estaba cogido).' : '.'));
+        msg('neg', texto('vuelta', huecosDe(n, { dia: diaCorto(k).toLowerCase() })) +
+          (hueco.t !== r.ini || quien !== r.barbero ? ' A las ' + hhmm(r.ini) + ' ya estaba cogido.' : ''));
         st.agDia = k; st.flash = n.id; sumarMes('web');
         avisoMostrador('Vuelve', r.cliente + ' repite el ' + cuando(k) + ' a las ' + hhmm(hueco.t) + ' con ' + quien + '. Sin llamadas.');
       } else msg('neg', 'Ese día ya está lleno. Elige otro y te lo guardamos.', null, [{ txt: 'Elegir día y hora', r: 'otra' }]);
     } else if (rsp === 'otro') {
-      msg('neg', 'Sin problema. Cuando te vaya bien, elige día y hora.', null, [{ txt: 'Elegir día y hora', r: 'otra' }]);
+      msg('neg', texto('otroDia', huecosDe(r)), null, [{ txt: 'Elegir día y hora', r: 'otra' }]);
     }
     pintar(false); mostrarFlash();
   }
@@ -970,7 +973,7 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
       var i = st.chat.findIndex(function (m) { return m.botones && m.botones[0].r === 'foto'; });
       var hora = i >= 0 ? st.chat[i].hora : hhmm(ahoraMin());
       var nuevos = [{ de: 'cli', txt: nuevas.length > 1 ? nuevas.length + ' archivos' : '', hora: hora, media: nuevas[0], nuevo: true },
-        { de: 'neg', txt: 'Guardado en tus cortes. La próxima vez ' + h.barbero + ' lo tendrá delante.', hora: hora, nuevo: true }];
+        { de: 'neg', txt: texto('fotoGuardada', { barbero: h.barbero }), hora: hora, nuevo: true }];
       if (i >= 0) st.chat.splice.apply(st.chat, [i + 1, 0].concat(nuevos)); else st.chat = st.chat.concat(nuevos);
       var r = cita(h.id); if (r) r.hechaYa = true;   // en la demo, mandar la foto equivale a haber ido ya
     }
@@ -1037,9 +1040,9 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
     st.chat = [];
     msg('neg', textoConfirmacion(r));
     msg('sis', r.dia === hoy() ? 'Dos horas antes de la cita' : 'El día antes, a las 19:00');
-    msg('neg', 'Hola ' + r.cliente + ', te recordamos tu cita de ' + (r.dia === hoy() ? 'hoy' : 'mañana') + ' a las ' + hhmm(r.ini) + ' con ' + r.barbero + '. ¿Vienes?',
+    msg('neg', texto('recordatorio', huecosDe(r)),
       r.dia === hoy() ? hhmm(Math.max(r.ini - 120, ahoraMin())) : '19:00',
-      [{ txt: 'Sí, ahí estaré', r: 'si' }, { txt: 'Cambiar la hora', r: 'cambiar' }, { txt: 'Anular la cita', r: 'anular' }]);
+      [{ txt: A.mensajes.botonesRecordatorio[0], r: 'si' }, { txt: A.mensajes.botonesRecordatorio[1], r: 'cambiar' }, { txt: A.mensajes.botonesRecordatorio[2], r: 'anular' }]);
     st.agDia = r.dia; st.flash = r.id;
     sumarMes('avisos', 2); if (!vieja) sumarMes('web');
     ir('reservada');
@@ -1083,6 +1086,8 @@ body[data-lado=cli] .tl-pantalla { padding-bottom: calc(56px + env(safe-area-ins
   setInterval(function () { document.getElementById('reloj').textContent = hhmm(ahoraMin()); if (!fichaEl.classList.contains('abierto')) pintarNeg(); }, 60000);
 
   /* Enlace directo al mostrador: #mostrador */
+  document.title = A.negocio;
+  document.getElementById('noti-neg').textContent = A.negocio;
   reiniciar(false);
   if (location.hash === '#mostrador') st.lado = 'neg';
   pintar();
