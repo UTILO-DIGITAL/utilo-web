@@ -8,6 +8,9 @@
  * T0201: la llave lleva también el permiso «solo los archivos que crea o abre esta web» (drive.file): con él, el motor
  * lee y escribe el Excel del negocio en nombre de la persona. La primera vez, la persona conecta ese Excel con la
  * ventana de Google para elegir archivos (UG.conectar); Utilo no tiene acceso propio a los Excel.
+ * T0207: lo mismo con cada Excel de un módulo (ECONOMIA, GESTION) y con las carpetas de facturas: UG.conectar acepta
+ * un Excel o una carpeta, y UG.seccion (la llamada de los módulos de sección) pide conectarlo dentro de la sección y
+ * vuelve a probar. UG.elegir abre la ventana de Google en una carpeta para escoger un archivo que ya está en Drive.
  */
 (function () {
   'use strict';
@@ -61,28 +64,36 @@
     },
     /** Apunta el correo de la persona (lo devuelve el motor al entrar) para no preguntar la cuenta la próxima vez. */
     recordarCorreo: function (correo) { var o = leer(); if (o) { o.correo = correo || ''; guardar(o); } },
-    /** T0201: ventana de Google para conectar el Excel del negocio (id) con la web. Hay que llamarla desde un clic. */
-    conectar: function (id) {
-      var t = UG.llave();
-      if (!t) return Promise.reject(new Error('Tu sesión de Google ha caducado. Vuelve a entrar.'));
-      return new Promise(function (ok, ko) {
-        var listo = function () {
-          window.gapi.load('picker', function () {
-            var P = window.google.picker;
-            var vista = new P.DocsView(P.ViewId.SPREADSHEETS).setFileIds(id).setMode(P.DocsViewMode.LIST);
-            new P.PickerBuilder().addView(vista).setOAuthToken(t).setDeveloperKey(C.clavePicker).setAppId(C.proyecto)
-              .setTitle('Elige el Excel del negocio').setCallback(function (d) {
-                if (d.action === P.Action.PICKED) ok();
-                else if (d.action === P.Action.CANCEL) ko(new Error('Has cerrado la ventana sin elegir el Excel.'));
-              }).build().setVisible(true);
-          });
-        };
-        if (window.gapi) return listo();
-        var s = document.createElement('script');
-        s.src = 'https://apis.google.com/js/api.js';
-        s.onload = listo;
-        s.onerror = function () { ko(new Error('No se ha podido cargar la ventana de Google. Comprueba la conexión.')); };
-        document.head.appendChild(s);
+    /**
+     * T0201: ventana de Google para conectar con la web el Excel del negocio (id). Hay que llamarla desde un clic.
+     * T0207: también el Excel de un módulo o, con carpeta, una carpeta (la de facturas o la de tickets).
+     */
+    conectar: function (id, carpeta) {
+      return picker(function (P) {
+        var v = carpeta ? new P.DocsView(P.ViewId.FOLDERS).setIncludeFolders(true).setSelectFolderEnabled(true) : new P.DocsView(P.ViewId.SPREADSHEETS);
+        return v.setFileIds(id).setMode(P.DocsViewMode.LIST);
+      }, carpeta ? 'Elige la carpeta' : 'Elige el Excel del negocio',
+      carpeta ? 'Has cerrado la ventana sin elegir la carpeta.' : 'Has cerrado la ventana sin elegir el Excel.').then(function () {});
+    },
+    /** T0207: ventana de Google abierta en una carpeta para elegir una imagen o un PDF que ya está en Drive: { id, nombre }. */
+    elegir: function (carpeta, titulo) {
+      return picker(function (P) {
+        return new P.DocsView().setParent(carpeta).setMimeTypes('image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf').setMode(P.DocsViewMode.LIST);
+      }, titulo || 'Elige el archivo', 'Has cerrado la ventana sin elegir ningún archivo.').then(function (d) {
+        return { id: d.id, nombre: d.name };
+      });
+    },
+    /**
+     * T0207: llamada de un módulo de sección (economia.js, gestion.js). Si falta conectar un Excel o una carpeta
+     * («CONECTAR:id: …»), lo pide con un aviso dentro de la página, lo conecta y vuelve a llamar. Si se acaba la sesión,
+     * borra la de este dispositivo (clave) y recarga para volver a entrar.
+     */
+    seccion: function (api, cuerpo, clave) {
+      return UG.llamar(api, cuerpo).catch(function (e) {
+        var m = /^CONECTAR:([^:]+):\s*(.*)$/.exec(e.message);
+        if (m) return avisoConectar(m[1], m[2]).then(function () { return UG.seccion(api, cuerpo, clave); });
+        if (e.acceso) { try { localStorage.removeItem(clave); } catch (x) {} location.reload(); }
+        throw new Error(String(e.message || 'Error').replace(/^(SECCION|ACCESO):\s*/, ''));
       });
     },
     /** Cierra la sesión y quita el permiso de la llave. */
@@ -136,5 +147,53 @@
       });
     }
   };
+  /** Carga la ventana de Google para elegir archivos y la abre con la vista que da hacerVista(P): el archivo elegido. */
+  function picker(hacerVista, titulo, cancelado) {
+    var t = UG.llave();
+    if (!t) return Promise.reject(new Error('Tu sesión de Google ha caducado. Vuelve a entrar.'));
+    return new Promise(function (ok, ko) {
+      var listo = function () {
+        window.gapi.load('picker', function () {
+          var P = window.google.picker;
+          new P.PickerBuilder().addView(hacerVista(P)).setOAuthToken(t).setDeveloperKey(C.clavePicker).setAppId(C.proyecto)
+            .setTitle(titulo).setCallback(function (d) {
+              if (d.action === P.Action.PICKED) ok((d.docs || [])[0] || {});
+              else if (d.action === P.Action.CANCEL) ko(new Error(cancelado));
+            }).build().setVisible(true);
+        });
+      };
+      if (window.gapi) return listo();
+      var s = document.createElement('script');
+      s.src = 'https://apis.google.com/js/api.js';
+      s.onload = listo;
+      s.onerror = function () { ko(new Error('No se ha podido cargar la ventana de Google. Comprueba la conexión.')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  /** T0207: aviso dentro de la página para conectar un Excel o una carpeta (Google pide un clic). Se cumple al conectarlo. */
+  function avisoConectar(id, msg) {
+    return new Promise(function (ok, ko) {
+      var v = document.createElement('div');
+      v.setAttribute('role', 'alertdialog');
+      v.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+      v.innerHTML = '<div style="background:#fff;color:#1C2B26;border-radius:14px;padding:20px;max-width:380px;width:100%;font:15px/1.45 system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.25)">' +
+        '<p style="margin:0 0 14px"></p><p data-e style="margin:0 0 12px;color:#B3261E" hidden></p>' +
+        '<div style="display:flex;gap:10px;justify-content:flex-end"><button type="button" data-no style="border:1px solid #ccc;background:#fff;color:#1C2B26;border-radius:8px;padding:9px 14px;font:600 15px system-ui,sans-serif;cursor:pointer">Ahora no</button>' +
+        '<button type="button" data-si style="border:0;background:#1C2B26;color:#fff;border-radius:8px;padding:9px 14px;font:600 15px system-ui,sans-serif;cursor:pointer">Conectar</button></div></div>';
+      v.querySelector('p').textContent = String(msg || 'Para seguir, conecta este archivo con la web (solo hace falta una vez).').replace(/^\w/, function (c) { return c.toUpperCase(); });
+      var si = v.querySelector('[data-si]');
+      v.querySelector('[data-no]').onclick = function () { v.remove(); ko(new Error('Sin conectar no se puede seguir. Vuelve a probar cuando quieras.')); };
+      si.onclick = function () {
+        si.disabled = true;
+        UG.conectar(id, /carpeta/i.test(msg)).then(function () { v.remove(); ok(); }, function (e) {
+          si.disabled = false; var x = v.querySelector('[data-e]'); x.textContent = e.message; x.hidden = false;
+        });
+      };
+      document.body.appendChild(v);
+      si.focus();
+    });
+  }
+
   window.UG = UG;
 })();
