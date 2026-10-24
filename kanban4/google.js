@@ -155,10 +155,14 @@
       var listo = function () {
         window.gapi.load('picker', function () {
           var P = window.google.picker;
+          // T0208: dentro de una sección, kanban4 oculta lo que cuelga de la página (body.sx-otra): mientras la ventana está abierta, no.
+          var b = document.body, otra = b.classList.contains('sx-otra');
+          var vuelve = function () { if (otra) b.classList.add('sx-otra'); };
+          if (otra) b.classList.remove('sx-otra');
           new P.PickerBuilder().addView(hacerVista(P)).setOAuthToken(t).setDeveloperKey(C.clavePicker).setAppId(C.proyecto)
             .setTitle(titulo).setCallback(function (d) {
-              if (d.action === P.Action.PICKED) ok((d.docs || [])[0] || {});
-              else if (d.action === P.Action.CANCEL) ko(new Error(cancelado));
+              if (d.action === P.Action.PICKED) { vuelve(); ok((d.docs || [])[0] || {}); }
+              else if (d.action === P.Action.CANCEL) { vuelve(); ko(new Error(cancelado)); }
             }).build().setVisible(true);
         });
       };
