@@ -160,4 +160,5 @@ body.u-con-barra { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px))
   body.u-con-barra #alta-aviso, body.u-con-barra #estado-aviso { bottom: calc(136px + env(safe-area-inset-bottom, 0px)) !important; }
 }
 /* Al abrir otra sección se oculta el tablero (las ventanas de versión y de peticiones siguen disponibles) */
-body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.ver-velo):not(.sol-velo) { display: none !important; }
+/* T0208: la ventana de Google para elegir archivos (.picker-dialog) también se ve dentro de una sección. */
+body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.ver-velo):not(.sol-velo):not(.picker-dialog):not(.picker-dialog-bg) { display: none !important; }

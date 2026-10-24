@@ -14,7 +14,7 @@
   var CLAVE = 'kanban_' + (C.clave || 'negocio');
   // T0133: carpeta de este archivo (…/kanban/), para cargar los módulos de las secciones (economia.js…).
   var BASE = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/[^/]*$/, '') : '../kanban/'; })();
-  var VERSION_MODULOS = '14'; // T0207 · T0208
+  var VERSION_MODULOS = '15'; // T0207 · T0208
   // T0150: diseño de PROTOCOLO DISEÑO UTILO. Solo para los negocios que tienen su marca.css (index.html con marca: '…').
   // Los demás (Konamigas hasta T0149) siguen exactamente como antes.
   var MARCA = String(C.marca || '').replace(/[^a-z0-9_-]/gi, '');
@@ -242,7 +242,7 @@
       '#alta-aviso,#estado-aviso{bottom:calc(140px + env(safe-area-inset-bottom,0px))!important}' +
       '#sx-panel{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:#1A1A40}' +
       // T0135: las ventanas de versión y de «Pedir algo a Utilo» del kanban se pueden abrir desde cualquier sección.
-      'body.sx-otra>*:not(.sx):not(#sx-panel):not(script):not(style):not(.ver-velo):not(.sol-velo){display:none!important}' +
+      'body.sx-otra>*:not(.sx):not(#sx-panel):not(script):not(style):not(.ver-velo):not(.sol-velo):not(.picker-dialog):not(.picker-dialog-bg){display:none!important}' + // T0208: ventana de Google
       '@media(min-width:900px){.sx{position:sticky;top:0;bottom:auto;border-top:0;border-bottom:1px solid #e3e3ee;box-shadow:none;padding-bottom:0}' +
       '.sx-in{max-width:none;margin:0;padding:0 10px;gap:2px}' +
       '.sx a{flex:0 0 auto;flex-direction:row;gap:7px;min-height:46px;padding:0 14px;font-size:14px;border-top:0;border-bottom:3px solid transparent}' +
