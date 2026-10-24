@@ -11,6 +11,9 @@
  * T0207: lo mismo con cada Excel de un módulo (ECONOMIA, GESTION) y con las carpetas de facturas: UG.conectar acepta
  * un Excel o una carpeta, y UG.seccion (la llamada de los módulos de sección) pide conectarlo dentro de la sección y
  * vuelve a probar. UG.elegir abre la ventana de Google en una carpeta para escoger un archivo que ya está en Drive.
+ * T0209: sesión larga. Si el motor la tiene («inicio» · sesionLarga, que guarda UG.configurar), al entrar se pide a Google
+ * un código y el motor devuelve la llave de una hora y la de renovación cifrada, que se guarda aquí («sesion»). Cuando la
+ * llave caduca se renueva sola (fn «renovar»), sin clics. Solo si Google ya no acepta la renovación se pide entrar otra vez.
  */
 (function () {
   'use strict';
@@ -21,6 +24,14 @@
   function leer() { try { return JSON.parse(localStorage.getItem(K) || 'null'); } catch (e) { return null; } }
   function guardar(o) { try { localStorage.setItem(K, JSON.stringify(o)); } catch (e) {} }
   function borrar() { try { localStorage.removeItem(K); } catch (e) {} }
+  // T0209: ¿tiene el motor la sesión larga? (lo dice «inicio»; se guarda para las páginas que no lo preguntan)
+  function largo() { try { return localStorage.getItem(K + '_largo') === '1'; } catch (e) { return false; } }
+  function postMotor(cuerpo) {
+    return fetch(C.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(cuerpo) })
+      .then(function (r) { if (!r.ok) throw new Error('No hay conexión con el DAILY (' + r.status + ').'); return r.json(); })
+      .then(function (o) { if (!o.ok) throw new Error(String(o.error || 'Error').replace(/^(ACCESO|SESION):\s*/, '')); return o.r; });
+  }
+  var renovando = null;
 
   /** Carga la librería de Google la primera vez que hace falta. */
   function cargarGoogle() {
@@ -41,9 +52,32 @@
       return o && o.token && o.exp - Date.now() > 120000 ? o.token : null;
     },
     correo: function () { return (leer() || {}).correo || ''; },
+    /** T0209: ¿hay sesión larga guardada en este dispositivo? */
+    tieneSesion: function () { return !!(leer() || {}).sesion; },
+    /** T0209: lo que dice «inicio» del motor: si tiene sesión larga, la próxima entrada pide un código. */
+    configurar: function (o) { try { localStorage.setItem(K + '_largo', o && o.sesionLarga ? '1' : '0'); } catch (e) {} },
+    /** T0209: llave válida; si ha caducado y hay sesión larga, la renueva sin clics. Si no se puede, falla. */
+    asegurar: function () {
+      var t = UG.llave();
+      if (t) return Promise.resolve(t);
+      var o = leer();
+      if (!o || !o.sesion) return Promise.reject(new Error('Tu sesión de Google ha caducado.'));
+      if (renovando) return renovando;
+      renovando = postMotor({ fn: 'renovar', sesion: o.sesion }).then(function (r) {
+        var g = leer() || o;
+        g.token = r.token; g.exp = Date.now() + (Number(r.exp) || 3600) * 1000;
+        guardar(g); renovando = null;
+        return r.token;
+      }, function (e) {
+        var g = leer(); if (g) { delete g.sesion; g.exp = 0; guardar(g); } // ya no vale: la próxima entrada pide otra
+        renovando = null; throw e;
+      });
+      return renovando;
+    },
     /** Abre la ventana de Google. Hay que llamarla desde un clic de la persona. */
     entrar: function () {
       var antes = leer();
+      if (largo()) return entrarLargo(antes, false);
       return cargarGoogle().then(function () {
         return new Promise(function (ok, ko) {
           google.accounts.oauth2.initTokenClient({
@@ -127,7 +161,8 @@
     /** Llamada al motor con la llave de la persona. Si ha caducado, pide el clic y lo intenta otra vez. */
     llamar: function (api, cuerpo, otraVez) {
       var t = UG.llave();
-      return (t ? Promise.resolve(t) : UG.pedirClic()).then(function (tok) {
+      // T0209: con sesión larga, la llave caducada se renueva sola; solo si eso falla se pide el clic.
+      return (t ? Promise.resolve(t) : UG.asegurar().catch(function () { return UG.pedirClic(); })).then(function (tok) {
         var c = {};
         for (var k in cuerpo) if (Object.prototype.hasOwnProperty.call(cuerpo, k)) c[k] = cuerpo[k];
         c.token = tok;
@@ -170,6 +205,54 @@
     d.style.setProperty('top', Math.max(8, Math.round((window.innerHeight - alto) / 2)) + 'px', 'important');
   }
 
+  /**
+   * T0209: entrar con sesión larga. Google da un código; el motor lo cambia por la llave de una hora y la de renovación
+   * cifrada. Si la persona ya había dado permiso con la llave corta, Google no da la de renovación: el motor quita ese
+   * permiso y se pide otra vez (un clic más, solo la primera vez).
+   */
+  function entrarLargo(antes, otraVez) {
+    return cargarGoogle().then(function () {
+      return new Promise(function (ok, ko) {
+        google.accounts.oauth2.initCodeClient({
+          client_id: C.google,
+          scope: ALCANCE,
+          ux_mode: 'popup',
+          login_hint: (antes && antes.correo) || '',
+          select_account: !(antes && antes.correo),
+          callback: function (r) {
+            if (r.error) return ko(new Error('Google no ha dado permiso (' + r.error + ').'));
+            postMotor({ fn: 'sesion', code: r.code }).then(function (s) {
+              if (s.repetir) {
+                if (otraVez) throw new Error('Google no ha dado la sesión larga. Vuelve a entrar.');
+                return unClicMas().then(function () { return entrarLargo(antes, true); });
+              }
+              guardar({ token: s.token, exp: Date.now() + (Number(s.exp) || 3600) * 1000, correo: s.correo || (antes && antes.correo) || '', sesion: s.sesion });
+              return s.token;
+            }).then(ok, ko);
+          },
+          error_callback: function (e) {
+            ko(new Error(e && e.type === 'popup_closed' ? 'Has cerrado la ventana de Google sin entrar.' : 'No se ha podido abrir la ventana de Google. Revisa que el navegador no bloquee ventanas.'));
+          }
+        }).requestCode();
+      });
+    });
+  }
+
+  /** T0209: Google necesita otro clic para abrir su ventana por segunda vez. */
+  function unClicMas() {
+    return new Promise(function (ok) {
+      var v = document.createElement('div');
+      v.setAttribute('role', 'alertdialog');
+      v.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+      v.innerHTML = '<div style="background:#fff;color:#1C2B26;border-radius:14px;padding:20px;max-width:380px;width:100%;font:15px/1.45 system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.25)">' +
+        '<p style="margin:0 0 14px">Un paso más: Google tiene que confirmar que esta web puede mantener tu sesión abierta en este dispositivo.</p>' +
+        '<div style="display:flex;justify-content:flex-end"><button type="button" style="border:0;background:#1C2B26;color:#fff;border-radius:8px;padding:9px 14px;font:600 15px system-ui,sans-serif;cursor:pointer">Continuar</button></div></div>';
+      var b = v.querySelector('button');
+      b.onclick = function () { v.remove(); ok(); };
+      (document.getElementById('sx-panel') || document.body).appendChild(v);
+      b.focus();
+    });
+  }
   /** T0208: dónde se pintan los avisos: en una sección, kanban4 oculta todo lo que cuelga de la página salvo #sx-panel. */
   function capa() { return document.getElementById('sx-panel') || document.body; }
 
