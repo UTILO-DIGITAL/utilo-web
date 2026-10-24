@@ -14,7 +14,7 @@
   var CLAVE = 'kanban_' + (C.clave || 'negocio');
   // T0133: carpeta de este archivo (…/kanban/), para cargar los módulos de las secciones (economia.js…).
   var BASE = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/[^/]*$/, '') : '../kanban/'; })();
-  var VERSION_MODULOS = '16'; // T0207 · T0208
+  var VERSION_MODULOS = '17'; // T0207 · T0208
   // T0150: diseño de PROTOCOLO DISEÑO UTILO. Solo para los negocios que tienen su marca.css (index.html con marca: '…').
   // Los demás (Konamigas hasta T0149) siguen exactamente como antes.
   var MARCA = String(C.marca || '').replace(/[^a-z0-9_-]/gi, '');
