@@ -149,16 +149,25 @@
   };
   /**
    * T0208: la ventana de Google se coloca sola con medidas de la página, que dentro de una sección (todo lo demás oculto)
-   * salen mal: queda descentrada y sin fondo. Se centra en la pantalla, con su fondo, sin tocar lo de dentro.
+   * salen mal: queda descentrada y sin fondo. Su fondo pasa a cubrir la pantalla y, cuando ya está pintada, se mide y se
+   * centra (la caja exterior no tiene ancho propio, así que no vale centrarla solo con CSS).
    */
   function estiloPicker() {
     if (document.getElementById('ug-picker')) return;
     var st = document.createElement('style');
     st.id = 'ug-picker';
-    st.textContent = '.picker-dialog-bg{position:fixed!important;top:0!important;left:0!important;width:100%!important;height:100%!important;' +
-      'background:rgba(0,0,0,.45)!important;opacity:1!important;z-index:100001!important}' +
-      '.picker-dialog{position:fixed!important;top:50%!important;left:50%!important;transform:translate(-50%,-50%)!important;z-index:100002!important}';
+    st.textContent = '.picker-dialog-bg{position:fixed!important;top:0!important;left:0!important;width:100%!important;height:100%!important;z-index:100001!important}' +
+      'div.picker-dialog-bg{background:#000!important;opacity:.45!important}' +
+      '.picker-dialog{position:fixed!important;z-index:100002!important}';
     document.head.appendChild(st);
+  }
+  function centrarPicker(n) {
+    var d = document.querySelector('.picker-dialog'), c = d && d.querySelector('.picker-dialog-content');
+    var r = c && c.getBoundingClientRect();
+    if (!r || !r.width) { if ((n || 0) < 40) setTimeout(function () { centrarPicker((n || 0) + 1); }, 100); return; }
+    var alto = d.getBoundingClientRect().height || r.height;
+    d.style.setProperty('left', Math.max(8, Math.round((window.innerWidth - r.width) / 2)) + 'px', 'important');
+    d.style.setProperty('top', Math.max(8, Math.round((window.innerHeight - alto) / 2)) + 'px', 'important');
   }
 
   /** Carga la ventana de Google para elegir archivos y la abre con la vista que da hacerVista(P): el archivo elegido. */
@@ -176,8 +185,9 @@
           var vuelve = function () { if (otra) b.classList.add('sx-otra'); otra = false; };
           setTimeout(function () {
             var d = document.querySelector('.picker-dialog');
-            if (b.classList.contains('sx-otra') && (!d || !d.offsetParent)) { otra = true; b.classList.remove('sx-otra'); }
+            if (b.classList.contains('sx-otra') && (!d || getComputedStyle(d).display === 'none')) { otra = true; b.classList.remove('sx-otra'); }
           }, 600);
+          setTimeout(centrarPicker, 50);
           new P.PickerBuilder().addView(hacerVista(P)).setOAuthToken(t).setDeveloperKey(C.clavePicker).setAppId(C.proyecto)
             .setTitle(titulo).setCallback(function (d) {
               if (d.action === P.Action.PICKED) { vuelve(); ok((d.docs || [])[0] || {}); }
