@@ -5,12 +5,15 @@
  * La llave se guarda en este dispositivo hasta que caduca (una hora). Para pedir otra, Google exige un clic de
  * la persona: si caduca, sale un aviso con el botón «Continuar» y la llamada sigue sola después.
  * Lo usa kanban4/app.js, en la página principal y dentro del tablero (el «puente» de google.script.run).
+ * T0201: la llave lleva también el permiso «solo los archivos que crea o abre esta web» (drive.file): con él, el motor
+ * lee y escribe el Excel del negocio en nombre de la persona. La primera vez, la persona conecta ese Excel con la
+ * ventana de Google para elegir archivos (UG.conectar); Utilo no tiene acceso propio a los Excel.
  */
 (function () {
   'use strict';
   var C = window.KANBAN || {};
   var K = 'kanban_' + (C.clave || 'negocio') + '_google';
-  var ALCANCE = 'openid email';
+  var ALCANCE = 'openid email https://www.googleapis.com/auth/drive.file';
 
   function leer() { try { return JSON.parse(localStorage.getItem(K) || 'null'); } catch (e) { return null; } }
   function guardar(o) { try { localStorage.setItem(K, JSON.stringify(o)); } catch (e) {} }
@@ -58,6 +61,30 @@
     },
     /** Apunta el correo de la persona (lo devuelve el motor al entrar) para no preguntar la cuenta la próxima vez. */
     recordarCorreo: function (correo) { var o = leer(); if (o) { o.correo = correo || ''; guardar(o); } },
+    /** T0201: ventana de Google para conectar el Excel del negocio (id) con la web. Hay que llamarla desde un clic. */
+    conectar: function (id) {
+      var t = UG.llave();
+      if (!t) return Promise.reject(new Error('Tu sesión de Google ha caducado. Vuelve a entrar.'));
+      return new Promise(function (ok, ko) {
+        var listo = function () {
+          window.gapi.load('picker', function () {
+            var P = window.google.picker;
+            var vista = new P.DocsView(P.ViewId.SPREADSHEETS).setFileIds(id).setMode(P.DocsViewMode.LIST);
+            new P.PickerBuilder().addView(vista).setOAuthToken(t).setDeveloperKey(C.clavePicker).setAppId(C.proyecto)
+              .setTitle('Elige el Excel del negocio').setCallback(function (d) {
+                if (d.action === P.Action.PICKED) ok();
+                else if (d.action === P.Action.CANCEL) ko(new Error('Has cerrado la ventana sin elegir el Excel.'));
+              }).build().setVisible(true);
+          });
+        };
+        if (window.gapi) return listo();
+        var s = document.createElement('script');
+        s.src = 'https://apis.google.com/js/api.js';
+        s.onload = listo;
+        s.onerror = function () { ko(new Error('No se ha podido cargar la ventana de Google. Comprueba la conexión.')); };
+        document.head.appendChild(s);
+      });
+    },
     /** Cierra la sesión y quita el permiso de la llave. */
     salir: function () {
       var o = leer();
