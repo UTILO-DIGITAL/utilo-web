@@ -147,8 +147,23 @@
       });
     }
   };
+  /**
+   * T0208: la ventana de Google se coloca sola con medidas de la página, que dentro de una sección (todo lo demás oculto)
+   * salen mal: queda descentrada y sin fondo. Se centra en la pantalla, con su fondo, sin tocar lo de dentro.
+   */
+  function estiloPicker() {
+    if (document.getElementById('ug-picker')) return;
+    var st = document.createElement('style');
+    st.id = 'ug-picker';
+    st.textContent = '.picker-dialog-bg{position:fixed!important;top:0!important;left:0!important;width:100%!important;height:100%!important;' +
+      'background:rgba(0,0,0,.45)!important;opacity:1!important;z-index:100001!important}' +
+      '.picker-dialog{position:fixed!important;top:50%!important;left:50%!important;transform:translate(-50%,-50%)!important;z-index:100002!important}';
+    document.head.appendChild(st);
+  }
+
   /** Carga la ventana de Google para elegir archivos y la abre con la vista que da hacerVista(P): el archivo elegido. */
   function picker(hacerVista, titulo, cancelado) {
+    estiloPicker();
     var t = UG.llave();
     if (!t) return Promise.reject(new Error('Tu sesión de Google ha caducado. Vuelve a entrar.'));
     return new Promise(function (ok, ko) {
