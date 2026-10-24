@@ -1,8 +1,8 @@
 /*
- * Sección Economía de la app (T0133 · Konamigas). La carga kanban/app.js cuando el perfil tiene ECONOMIA.
- * Lee ECONOMIA v2 a través de la API del DAILY (funciones economia* del script fino, KANBAN_CORE v27)
+ * Sección Economía de la app (T0133 · Konamigas). La carga kanban4/app.js cuando el perfil tiene ECONOMIA.
+ * Lee ECONOMIA v2 a través del motor del negocio (módulo privado economia de UTILO_CORE, T0206), con la llave de la persona
  * y permite apuntar un movimiento. Contrato con app.js:
- *   window.SX_CTX = { api, persona, pin, clave, color, accion }
+ *   window.SX_CTX = { api, persona, clave, color, accion }   (T0207 · kanban4: sin PIN; la llave de Google la pone google.js)
  *   window.SX_MOD.ECONOMIA.abrir(elemento)  → pinta la sección dentro del elemento.
  * Lo ya cargado se guarda en memoria: volver a la sección es instantáneo; ↻ vuelve a pedirlo.
  * Resumen: cada partida y subpartida dice si queda margen o te has pasado (y cuánto); al tocar una subpartida se ven
@@ -12,6 +12,8 @@
  * T0137: pestaña Movimientos (ver, buscar, editar y borrar; los borrados quedan en el Excel y todo cambio va a HISTORIAL).
  * T0138: factura o ticket de un movimiento: foto o PDF que se sube a Drive, o uno que ya está en Drive.
  * T0145: la factura o el ticket se ve dentro de la app («👁 Ver»), con la vista previa de Drive (economiaArchivo).
+ * T0207: con la llave de la persona, la web solo ve en Drive lo que ha subido o elegido con ella: una factura que ya está
+ *   en Drive se elige con la ventana de Google (UG.elegir) y lo que no se puede previsualizar se abre en Drive.
  * Resumen: desplegable discreto «Beneficio y reparto» de la temporada elegida (beneficio, reparto a socios, resultado) y pestaña Presupuesto
  * (T0134): avisos para afinar el presupuesto y de dónde sale cada partida (CONFIG · ORIGEN DEL PRESUPUESTO).
  */
@@ -29,21 +31,10 @@
   function norm(s) { return String(s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
   function vacio(t) { t = String(t || '').trim(); return !t || t === '—' || t === '-'; }
 
+  /** T0207 · UTILO_CORE: con la llave de Google de la persona (google.js · UG.seccion), que pide conectar el Excel si falta. */
   function llamar(fn, args) {
     var c = ctx();
-    return fetch(c.api, {
-      method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ fn: fn, args: args || [], persona: c.persona, pin: c.pin })
-    }).then(function (r) {
-      if (!r.ok) throw new Error('No hay conexión (' + r.status + '). Prueba otra vez.');
-      return r.json();
-    }).then(function (o) {
-      if (!o.ok) {
-        if (/^ACCESO:/.test(o.error)) { try { localStorage.removeItem(c.clave); } catch (e) {} location.reload(); }
-        throw new Error(String(o.error || 'Error').replace(/^(SECCION|ACCESO):\s*/, ''));
-      }
-      return o.r;
-    });
+    return window.UG.seccion(c.api, { fn: fn, args: args || [] }, c.clave);
   }
 
   /* ---------- estilos (T0135: mismas fuentes, tamaños, botones y ventanas que el kanban) ---------- */
@@ -767,10 +758,18 @@
     q('#ec-fdrive').onclick = function () {
       q('#ec-flista').innerHTML = cargando('Buscando en ' + (st.tipo === 'T' ? 'TICKETS' : 'FACTURAS') + '…'); q('#ec-ferr2').hidden = true;
       llamar('economiaArchivos', [st.tipo]).then(function (r) {
+        // T0207: la lista solo trae lo subido o elegido con la web; para cualquier otro, la ventana de Google en la carpeta.
+        var otro = '<button type="button" class="ec-b2" id="ec-felegir" style="width:100%;margin-top:10px">🔎 Buscar otro en ' + (st.tipo === 'T' ? 'TICKETS' : 'FACTURAS') + '</button>';
         q('#ec-flista').innerHTML = '<div class="ec-lista ec-flist">' + (r.lista.length ? r.lista.map(function (f) {
           return '<button type="button" class="ec-item" data-ec-fid="' + esc(f.id) + '"><div><div class="ec-t">' + esc(f.nombre) + '</div><div class="ec-s">Subido el ' + esc(f.fecha) + '</div></div>' +
             '<a class="ec-a" href="' + esc(f.url) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Ver ↗</a></button>';
-        }).join('') : '<div class="ec-vacio">La carpeta está vacía.</div>') + '</div>';
+        }).join('') : '<div class="ec-vacio">Aún no hay archivos subidos o elegidos desde la app.</div>') + '</div>' + otro;
+        q('#ec-felegir').onclick = function () {
+          window.UG.elegir(r.carpeta, 'Elige ' + (st.tipo === 'T' ? 'el ticket' : 'la factura')).then(function (d) {
+            q('#ec-flista').innerHTML = cargando('Enlazando ' + d.nombre + '…');
+            return llamar('economiaAdjuntar', [m.id, { tipo: st.tipo, fileId: d.id }]);
+          }).then(hecho, function (e) { err(e); });
+        };
         [].forEach.call(v.el.querySelectorAll('[data-ec-fid]'), function (b) {
           b.onclick = function () {
             q('#ec-flista').innerHTML = cargando('Enlazando…');
@@ -787,7 +786,7 @@
     var pie = '<div class="ec-acc"><a class="ec-b2" href="' + esc(url) + '" target="_blank" rel="noopener">Abrir en Drive ↗</a></div>';
     llamar('economiaArchivo', [url]).then(function (a) {
       v.el.querySelector('#ec-visor').innerHTML = (a.img ? '<img alt="' + esc(a.nombre) + '" src="' + a.img + '" style="display:block;max-width:100%;max-height:70vh;margin:0 auto;border-radius:10px;background:var(--ec-f)">' :
-        '<p>Este archivo no se puede ver aquí.</p>') + (/pdf/.test(a.mime) ? '<p class="ec-s" style="font-size:12.5px;color:var(--ec-g);text-align:center">Es un PDF: se ve su primera página.</p>' : '') + pie;
+        '<p>' + (a.abrir ? 'Este archivo no se subió ni se eligió desde la app: ábrelo en Drive.' : 'Este archivo no se puede ver aquí.') + '</p>') + (/pdf/.test(a.mime) ? '<p class="ec-s" style="font-size:12.5px;color:var(--ec-g);text-align:center">Es un PDF: se ve su primera página.</p>' : '') + pie;
     }, function (e) { v.el.querySelector('#ec-visor').innerHTML = errorHtml(e) + pie; });
   }
 

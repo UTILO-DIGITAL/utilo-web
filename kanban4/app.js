@@ -5,7 +5,8 @@
  * Cada negocio tiene su carpeta con un index.html que define window.KANBAN = { api, clave, google }
  * y carga google.js y este archivo. El kanban y la ficha los genera el motor del negocio (UTILO_CORE) y
  * aquí se pintan; google.script.run se sustituye por llamadas a la API con la llave de Google de la persona.
- * Las secciones con módulo propio (economia.js, gestion.js) aún no están en kanban4: llegan con Konamigas (T0161).
+ * T0207: las secciones con módulo propio (economia.js, gestion.js, de Konamigas) están en kanban4/ y llaman con la
+ * llave de Google (google.js · UG.seccion), que pide conectar su Excel dentro de la sección si falta.
  */
 (function () {
   'use strict';
@@ -13,7 +14,7 @@
   var CLAVE = 'kanban_' + (C.clave || 'negocio');
   // T0133: carpeta de este archivo (…/kanban/), para cargar los módulos de las secciones (economia.js…).
   var BASE = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/[^/]*$/, '') : '../kanban/'; })();
-  var VERSION_MODULOS = '12';
+  var VERSION_MODULOS = '13'; // T0207
   // T0150: diseño de PROTOCOLO DISEÑO UTILO. Solo para los negocios que tienen su marca.css (index.html con marca: '…').
   // Los demás (Konamigas hasta T0149) siguen exactamente como antes.
   var MARCA = String(C.marca || '').replace(/[^a-z0-9_-]/gi, '');
@@ -267,7 +268,7 @@
 
   /** T0133: datos que necesitan los módulos de sección (economia.js…) para llamar a la API. */
   function ctxModulos(cred) {
-    return { api: C.api, persona: cred.persona, clave: CLAVE, color: C.color || '', accion: C.accion || '' }; // T0190: sin PIN; los módulos se adaptan en T0161
+    return { api: C.api, persona: cred.persona, clave: CLAVE, color: C.color || '', accion: C.accion || '' }; // T0190: sin PIN · T0207: la llave la pone google.js
   }
 
   /** T0133: scripts de los módulos de las secciones de la persona (se cargan una vez). */

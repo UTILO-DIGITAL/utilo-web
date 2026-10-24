@@ -1,8 +1,9 @@
 /*
- * Sección Gestión de la app (T0139 · Konamigas). La carga kanban/app.js cuando el perfil tiene GESTION (solo socios).
- * Lee y edita el Excel GESTION a través de la API del DAILY (funciones gestion* de GESTION_WEB.gs, KANBAN_CORE v27).
+ * Sección Gestión de la app (T0139 · Konamigas). La carga kanban4/app.js cuando el perfil tiene GESTION (solo socios).
+ * Lee y edita el Excel GESTION a través del motor del negocio (módulo privado gestion de UTILO_CORE, T0206), con la llave de la persona.
+ * T0207: las fotos que no se subieron ni se eligieron desde la app no se pueden previsualizar: se abren en Drive.
  * Contrato con app.js (igual que Economía):
- *   window.SX_CTX = { api, persona, pin, clave, color, accion }
+ *   window.SX_CTX = { api, persona, clave, color, accion }   (T0207 · kanban4: sin PIN; la llave de Google la pone google.js)
  *   window.SX_MOD.GESTION.abrir(elemento)  → pinta la sección dentro del elemento.
  * Se carga una TEMPORADA entera (todas sus competiciones) y se filtra por competición y liga.
  * Resumen: como la hoja RESUMEN, por día y liga (desplegables, con el gestor y su WhatsApp): equipos por nivel, color, capitana,
@@ -27,21 +28,10 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function norm(s) { return String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
 
+  /** T0207 · UTILO_CORE: con la llave de Google de la persona (google.js · UG.seccion), que pide conectar el Excel si falta. */
   function llamar(fn, args) {
     var c = ctx();
-    return fetch(c.api, {
-      method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ fn: fn, args: args || [], persona: c.persona, pin: c.pin })
-    }).then(function (r) {
-      if (!r.ok) throw new Error('No hay conexión (' + r.status + '). Prueba otra vez.');
-      return r.json();
-    }).then(function (o) {
-      if (!o.ok) {
-        if (/^ACCESO:/.test(o.error)) { try { localStorage.removeItem(c.clave); } catch (e) {} location.reload(); }
-        throw new Error(String(o.error || 'Error').replace(/^(SECCION|ACCESO):\s*/, ''));
-      }
-      return o.r;
-    });
+    return window.UG.seccion(c.api, { fn: fn, args: args || [] }, c.clave);
   }
 
   /* ---------- estilos: los de Economía (economia.js) con el prefijo gs- ---------- */
@@ -284,7 +274,7 @@
   function visor(url, titulo) {
     var v = ventana(titulo || 'Archivo', '<div class="gs-visor">' + cargando('Abriendo el archivo…') + '</div>');
     llamar('gestionArchivo', [url]).then(function (a) {
-      v.el.querySelector('.gs-visor').innerHTML = (a.img ? '<img alt="' + esc(a.nombre) + '" src="' + a.img + '">' : '<p>Este archivo no se puede ver aquí.</p>') +
+      v.el.querySelector('.gs-visor').innerHTML = (a.img ? '<img alt="' + esc(a.nombre) + '" src="' + a.img + '">' : '<p>' + (a.abrir ? 'Este archivo no se subió ni se eligió desde la app: ábrelo en Drive.' : 'Este archivo no se puede ver aquí.') + '</p>') +
         '<div class="gs-acc"><a class="gs-b2" href="' + esc(a.url || url) + '" target="_blank" rel="noopener">Abrir en Drive ↗</a></div>';
     }, function (e) { v.el.querySelector('.gs-visor').innerHTML = errorHtml(e) + '<div class="gs-acc"><a class="gs-b2" href="' + esc(url) + '" target="_blank" rel="noopener">Abrir en Drive ↗</a></div>'; });
   }
