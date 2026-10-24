@@ -87,6 +87,7 @@
           guardar(cred); abrir(cred);
         }, function (e) {
           if (/^CONECTAR:/.test(e.message)) { pedirConectar(e); return; } // T0201
+          if (/^CREAR:/.test(e.message)) { pedirCrear(); return; } // T0191
           b.disabled = false; b.textContent = ant.persona ? 'Continuar con Google' : 'Entrar con Google';
           $('kz-aviso').textContent = e.message.replace(/^ACCESO:\s*/, '');
         });
@@ -104,7 +105,7 @@
     // y sin pisar window.google, que es también donde está la librería de Google.
     return '(function(){var API=' + JSON.stringify(C.api) + ',K=' + JSON.stringify(CLAVE) + ';' +
       'function llamar(fn,args){return window.UG.llamar(API,{fn:fn,args:args}).catch(function(e){' +
-      'if(e.acceso||/^CONECTAR:/.test(e.message)){if(e.acceso){try{localStorage.removeItem(K)}catch(x){}}location.reload();}throw e;});}' +
+      'if(e.acceso||/^(CONECTAR|CREAR):/.test(e.message)){if(e.acceso){try{localStorage.removeItem(K)}catch(x){}}location.reload();}throw e;});}' +
       'function run(s,f,u){return new Proxy({},{get:function(_,k){' +
       'if(k==="withSuccessHandler")return function(h){return run(h,f,u)};' +
       'if(k==="withFailureHandler")return function(h){return run(s,h,u)};' +
@@ -337,7 +338,23 @@
     b.focus();
   }
 
+  /** T0191: el negocio aún no tiene su Excel y ha entrado quien administra: la web lo crea en su Drive. */
+  function pedirCrear() {
+    pantalla('<div class="kz-caja" id="kz-crear"><h1>' + texto(C.nombreApp || 'Kanban') + '</h1>' +
+      '<p class="kz-ayuda">' + texto('Todavía no hay Excel del negocio. La web lo crea ahora en tu Google Drive, en «Mi unidad». Después puedes moverlo a la carpeta que quieras y compartirlo con tu equipo.') + '</p>' +
+      boton('Crear el Excel', 'u-btn-accion', 'button') + '<p class="kz-aviso" id="kz-aviso"></p></div>');
+    var b = $('kz-crear').querySelector('button');
+    b.onclick = function () {
+      b.disabled = true; b.textContent = 'Creando el Excel…';
+      llamar({ fn: 'crearExcel' }).then(function () { location.reload(); }, function (x) {
+        b.disabled = false; b.textContent = 'Crear el Excel'; $('kz-aviso').textContent = x.message.replace(/^ACCESO:\s*/, '');
+      });
+    };
+    b.focus();
+  }
+
   function error(e) {
+    if (/^CREAR:/.test(e.message)) { pedirCrear(); return; }
     if (/^CONECTAR:/.test(e.message)) { pedirConectar(e); return; }
     if (e.acceso) { borrar(); acceso(e.message.replace(/^ACCESO:\s*/, '')); return; }
     pantalla('<div class="kz-caja"><p>' + texto(e.message.replace(/^SECCION:\s*/, '')) +
