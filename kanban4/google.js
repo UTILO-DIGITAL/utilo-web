@@ -171,8 +171,20 @@
     });
   }
 
-  /** T0207: aviso dentro de la página para conectar un Excel o una carpeta (Google pide un clic). Se cumple al conectarlo. */
+  /**
+   * T0207: aviso dentro de la página para conectar un Excel o una carpeta (Google pide un clic). Se cumple al conectarlo.
+   * T0208: un solo aviso por archivo aunque lo pidan varias llamadas a la vez (Gestión pide opciones y datos juntos), y
+   * dentro de #sx-panel cuando lo hay: en una sección, kanban4 oculta todo lo demás que cuelga de la página.
+   */
+  var conectando = {};
   function avisoConectar(id, msg) {
+    if (conectando[id]) return conectando[id];
+    var p = conectando[id] = avisoConectarUno(id, msg);
+    var fin = function () { delete conectando[id]; };
+    p.then(fin, fin);
+    return p;
+  }
+  function avisoConectarUno(id, msg) {
     return new Promise(function (ok, ko) {
       var v = document.createElement('div');
       v.setAttribute('role', 'alertdialog');
@@ -190,7 +202,7 @@
           si.disabled = false; var x = v.querySelector('[data-e]'); x.textContent = e.message; x.hidden = false;
         });
       };
-      document.body.appendChild(v);
+      (document.getElementById('sx-panel') || document.body).appendChild(v);
       si.focus();
     });
   }
