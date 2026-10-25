@@ -388,7 +388,7 @@
   function irTab(t) {
     S.tab = t;
     [].forEach.call(S.el.querySelectorAll('[data-gs-tab]'), function (x) { x.setAttribute('aria-selected', x.getAttribute('data-gs-tab') === t); });
-    window.scrollTo(0, 0);
+    window.scrollTo(0, 0); document.body.scrollTop = 0; // T0224: en el móvil el scroll es del body
     pintar();
   }
 

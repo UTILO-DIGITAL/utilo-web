@@ -35,12 +35,17 @@
 
   /* Espacios en múltiplos de 4 */
   --e1: 4px; --e2: 8px; --e3: 12px; --e4: 16px; --e5: 24px; --e6: 32px; --e7: 48px;
+
+  /* T0224: alto de la barra de secciones del móvil sin la zona segura (56 px de botón + 1 px de borde) */
+  --alto-barra: 57px;
 }
 
 /* ---------- Página ---------- */
 .u, .u * { box-sizing: border-box; }
 body.u { margin: 0; background: var(--color-fondo); color: var(--color-texto);
-  font: 400 15px/1.45 var(--fuente-texto); -webkit-text-size-adjust: 100%; }
+  font: 400 15px/1.45 var(--fuente-texto); -webkit-text-size-adjust: 100%;
+  /* T0224: sin zoom con doble toque (el pellizco lo quita kanban4/app.js) y nada bajo el notch con el móvil en horizontal */
+  touch-action: manipulation; padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
 .u h1, .u h2, .u h3 { font-family: var(--fuente-titulos); font-weight: var(--peso-titulos); line-height: 1.2; margin: 0; }
 .u a { color: var(--color-principal-oscuro); }
 .u :focus-visible { outline: 3px solid var(--color-principal-oscuro); outline-offset: 2px; }
@@ -117,9 +122,12 @@ body.u { margin: 0; background: var(--color-fondo); color: var(--color-texto);
 .u .kz-ayuda { margin: 0; font-size: 14px; color: var(--color-suave); }
 .u .kz-caja p { margin: 0; }
 
-/* ---------- Barra de secciones: abajo en el móvil, arriba en el ordenador ---------- */
+/* ---------- Barra de secciones: abajo en el móvil, arriba en el ordenador ----------
+ * T0224: los botones quedan por encima de la zona segura (barra de inicio y esquinas del iPhone); el fondo de la barra
+ * sí llega hasta abajo. Necesita viewport-fit=cover en el viewport: sin él, iOS da 0 en env(safe-area-inset-*). */
 .u .sx, .sx.u-sx { position: fixed; left: 0; right: 0; bottom: 0; z-index: 45; background: var(--color-fondo);
-  border-top: 1px solid var(--color-linea); padding-bottom: env(safe-area-inset-bottom, 0px);
+  border-top: 1px solid var(--color-linea);
+  padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
   font-family: var(--fuente-texto); }
 .sx.u-sx .sx-in { display: flex; align-items: stretch; max-width: 640px; margin: 0 auto; }
 .sx.u-sx a { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
@@ -131,9 +139,15 @@ body.u { margin: 0; background: var(--color-fondo); color: var(--color-texto);
 /* T0218: el contador de Nuevas de la Bandeja va en su sección de la barra (lo mueve BANDEJA_WEB del motor) */
 .sx.u-sx a[data-sx=BANDEJA] { position: relative; }
 .sx.u-sx a .bj-n { position: absolute; top: 4px; left: calc(50% + 6px); min-width: 18px; margin: 0; padding: 0 5px; font-size: 11px; line-height: 18px; }
-body.u-con-barra { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important; }
+body.u-con-barra { padding-bottom: calc(var(--alto-barra) + var(--e1) + env(safe-area-inset-bottom, 0px)) !important; }
+/* T0224: en el móvil la página (html) no se mueve y el scroll lo hace el body. Así iOS no desplaza la barra fija con el
+   rebote ni al esconder sus barras, y lo que va debajo de la barra nunca se queda a la vista. */
+@media (max-width: 899px) {
+  html:has(> body.u-con-barra) { height: 100%; overflow: hidden; }
+  body.u-con-barra { height: 100%; overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
+}
 @media (min-width: 900px) {
-  .u .sx, .sx.u-sx { position: sticky; top: 0; bottom: auto; border-top: 0; border-bottom: 1px solid var(--color-linea); padding-bottom: 0; }
+  .u .sx, .sx.u-sx { position: sticky; top: 0; bottom: auto; border-top: 0; border-bottom: 1px solid var(--color-linea); padding: 0; }
   .sx.u-sx .sx-in { max-width: none; margin: 0; padding: 0 var(--e3); gap: 2px; }
   .sx.u-sx a { flex: 0 0 auto; flex-direction: row; gap: var(--e2); min-height: 48px; padding: 0 var(--e4); font-size: 15px;
     border-top: 0; border-bottom: 3px solid transparent; }

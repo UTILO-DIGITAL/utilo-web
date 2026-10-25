@@ -14,12 +14,22 @@
   var CLAVE = 'kanban_' + (C.clave || 'negocio');
   // T0133: carpeta de este archivo (…/kanban/), para cargar los módulos de las secciones (economia.js…).
   var BASE = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/[^/]*$/, '') : '../kanban/'; })();
-  var VERSION_MODULOS = '23'; // T0207 · T0208 · T0149 · T0213 · T0218
+  var VERSION_MODULOS = '24'; // T0207 · T0208 · T0149 · T0213 · T0218 · T0224
   var VERSION_ICONO = '2'; // T0222: el ?v= de los iconos del index.html de cada negocio (sube con ellos)
   // T0150: diseño de PROTOCOLO DISEÑO UTILO. Solo para los negocios que tienen su marca.css (index.html con marca: '…').
   // Los demás (Konamigas hasta T0149) siguen exactamente como antes.
   var MARCA = String(C.marca || '').replace(/[^a-z0-9_-]/gi, '');
   var RAIZ = BASE.replace(/kanban4?\/$/, '');
+  // T0224: la web se ve como una app: ocupa toda la pantalla (viewport-fit=cover, para que env(safe-area-inset-*)
+  // funcione en el iPhone) y sin zoom. Es el mismo que el de los index.html de cada negocio.
+  var VIEWPORT = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
+  // T0224: iOS no hace caso de user-scalable=no: el pellizco se quita aquí y el doble toque con touch-action (base.css).
+  function sinZoom() {
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (t) {
+      document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+    });
+  }
+  sinZoom();
   function linksEstilos() {
     if (!MARCA) return '';
     return '<link rel="stylesheet" href="' + RAIZ + MARCA + '/marca.css?v=' + VERSION_MODULOS + '">' +
@@ -118,7 +128,8 @@
   }
 
   function cabecera(cred) {
-    return '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
+    return '<meta charset="utf-8"><meta name="viewport" content="' + VIEWPORT + '">' +
+      '<script>(' + sinZoom + ')();<\/script>' + // T0224: document.open() quita los escuchadores de la página anterior
       // T0222: el icono que guarda el iPhone al «Añadir a pantalla de inicio» es el de esta cabecera (sustituye a la del index.html)
       '<link rel="manifest" href="manifest.webmanifest?v=' + VERSION_ICONO + '"><link rel="apple-touch-icon" href="icono-180.png?v=' + VERSION_ICONO + '">' +
       '<link rel="icon" href="icono-192.png?v=' + VERSION_ICONO + '"><meta name="apple-mobile-web-app-capable" content="yes">' +
@@ -318,7 +329,7 @@
       'else{p.innerHTML=P[s];document.body.classList.add("sx-otra");document.title=T[s]+" · "+N;' +
       'var m=p.querySelector("[data-sx-mod]");if(m){var k=m.getAttribute("data-sx-mod"),X=window.SX_MOD||{};' +
       'if(X[k])X[k].abrir(m);else{var t=setInterval(function(){if((window.SX_MOD||{})[k]&&document.body.contains(m)){clearInterval(t);window.SX_MOD[k].abrir(m);}},100);setTimeout(function(){clearInterval(t);},15000);}}}' +
-      'window.scrollTo(0,0);if(push)history.pushState({sx:s},"",location.pathname+"?s="+s.toLowerCase());}' +
+      'window.scrollTo(0,0);document.body.scrollTop=0;if(push)history.pushState({sx:s},"",location.pathname+"?s="+s.toLowerCase());}' +
       'document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[data-sx]");' +
       'if(!a||e.metaKey||e.ctrlKey||e.shiftKey||e.button)return;e.preventDefault();ir(a.getAttribute("data-sx"),true);});' +
       'window.addEventListener("popstate",function(){var s=(new URLSearchParams(location.search).get("s")||"KANBAN").toUpperCase();ir(P[s]||TB[s]?s:"KANBAN",false);});' +
@@ -406,7 +417,8 @@
     cargando(pedida && pedida !== 'KANBAN' ? 'Cargando…' : 'Cargando el kanban…');
     llamar({ fn: 'pagina', id: id }).then(function (p) {
       recordarSecciones(cred, p.secciones, p.perfil);
-      var html = String(p.html || '');
+      // T0224: fuera el viewport del motor, que no lleva viewport-fit=cover: manda el de la cabecera.
+      var html = String(p.html || '').replace(/<meta[^>]*name=["']?viewport["']?[^>]*>/gi, '');
       var cab = cabecera(cred);
       if (/<head[^>]*>/i.test(html)) html = html.replace(/<head[^>]*>/i, function (m) { return m + cab; });
       else html = '<!DOCTYPE html><html><head>' + cab + '</head><body>' + html + '</body></html>';
