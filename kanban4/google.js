@@ -141,14 +141,14 @@
       return new Promise(function (ok, ko) {
         var v = document.createElement('div');
         v.setAttribute('role', 'alertdialog');
-        v.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:100000;background:#1C2B26;color:#fff;' +
+        v.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:100000;background:var(--color-texto);color:var(--color-superficie);' +
           'padding:12px 14px;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.25);display:flex;gap:12px;align-items:center;' +
           'font:15px/1.35 system-ui,sans-serif;max-width:calc(100vw - 32px)';
         v.innerHTML = '<span>Tu sesión de Google ha caducado.</span>';
         var b = document.createElement('button');
         b.type = 'button';
         b.textContent = 'Continuar';
-        b.style.cssText = 'border:0;border-radius:8px;padding:8px 14px;font:600 15px system-ui,sans-serif;background:#fff;color:#1C2B26;cursor:pointer';
+        b.style.cssText = 'border:0;border-radius:8px;padding:8px 14px;font:600 15px system-ui,sans-serif;background:var(--color-superficie);color:var(--color-texto);cursor:pointer';
         b.onclick = function () {
           b.disabled = true;
           UG.entrar().then(function (t) { v.remove(); ok(t); }, function (e) { v.remove(); ko(e); });
@@ -244,9 +244,9 @@
       var v = document.createElement('div');
       v.setAttribute('role', 'alertdialog');
       v.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
-      v.innerHTML = '<div style="background:#fff;color:#1C2B26;border-radius:14px;padding:20px;max-width:380px;width:100%;font:15px/1.45 system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.25)">' +
+      v.innerHTML = '<div style="background:var(--color-superficie);color:var(--color-texto);border-radius:14px;padding:20px;max-width:380px;width:100%;font:15px/1.45 system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.25)">' +
         '<p style="margin:0 0 14px">Un paso más: Google tiene que confirmar que esta web puede mantener tu sesión abierta en este dispositivo.</p>' +
-        '<div style="display:flex;justify-content:flex-end"><button type="button" style="border:0;background:#1C2B26;color:#fff;border-radius:8px;padding:9px 14px;font:600 15px system-ui,sans-serif;cursor:pointer">Continuar</button></div></div>';
+        '<div style="display:flex;justify-content:flex-end"><button type="button" style="border:0;background:var(--color-texto);color:var(--color-superficie);border-radius:8px;padding:9px 14px;font:600 15px system-ui,sans-serif;cursor:pointer">Continuar</button></div></div>';
       var b = v.querySelector('button');
       b.onclick = function () { v.remove(); ok(); };
       (document.getElementById('sx-panel') || document.body).appendChild(v);
@@ -308,10 +308,10 @@
       var v = document.createElement('div');
       v.setAttribute('role', 'alertdialog');
       v.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
-      v.innerHTML = '<div style="background:#fff;color:#1C2B26;border-radius:14px;padding:20px;max-width:380px;width:100%;font:15px/1.45 system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.25)">' +
+      v.innerHTML = '<div style="background:var(--color-superficie);color:var(--color-texto);border-radius:14px;padding:20px;max-width:380px;width:100%;font:15px/1.45 system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.25)">' +
         '<p style="margin:0 0 14px"></p><p data-e style="margin:0 0 12px;color:#B3261E" hidden></p>' +
-        '<div style="display:flex;gap:10px;justify-content:flex-end"><button type="button" data-no style="border:1px solid #ccc;background:#fff;color:#1C2B26;border-radius:8px;padding:9px 14px;font:600 15px system-ui,sans-serif;cursor:pointer">Ahora no</button>' +
-        '<button type="button" data-si style="border:0;background:#1C2B26;color:#fff;border-radius:8px;padding:9px 14px;font:600 15px system-ui,sans-serif;cursor:pointer">Conectar</button></div></div>';
+        '<div style="display:flex;gap:10px;justify-content:flex-end"><button type="button" data-no style="border:1px solid #ccc;background:var(--color-superficie);color:var(--color-texto);border-radius:8px;padding:9px 14px;font:600 15px system-ui,sans-serif;cursor:pointer">Ahora no</button>' +
+        '<button type="button" data-si style="border:0;background:var(--color-texto);color:var(--color-superficie);border-radius:8px;padding:9px 14px;font:600 15px system-ui,sans-serif;cursor:pointer">Conectar</button></div></div>';
       v.querySelector('p').textContent = String(msg || 'Para seguir, conecta este archivo con la web (solo hace falta una vez).').replace(/^\w/, function (c) { return c.toUpperCase(); });
       var si = v.querySelector('[data-si]');
       v.querySelector('[data-no]').onclick = function () { v.remove(); ko(new Error('Sin conectar no se puede seguir. Vuelve a probar cuando quieras.')); };

@@ -14,7 +14,7 @@
   var CLAVE = 'kanban_' + (C.clave || 'negocio');
   // T0133: carpeta de este archivo (…/kanban/), para cargar los módulos de las secciones (economia.js…).
   var BASE = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/[^/]*$/, '') : '../kanban/'; })();
-  var VERSION_MODULOS = '20'; // T0207 · T0208
+  var VERSION_MODULOS = '21'; // T0207 · T0208 · T0149
   // T0150: diseño de PROTOCOLO DISEÑO UTILO. Solo para los negocios que tienen su marca.css (index.html con marca: '…').
   // Los demás (Konamigas hasta T0149) siguen exactamente como antes.
   var MARCA = String(C.marca || '').replace(/[^a-z0-9_-]/gi, '');
@@ -216,7 +216,8 @@
         '<p><strong>Esta sección todavía no está lista.</strong></p>' +
         '<p class="u-nota">Mientras tanto, lo que necesites de aquí pídelo desde el tablero.</p></main></div>';
     }
-    if (infoSeccion(s).js) return '<div data-sx-mod="' + texto(s) + '"><div style="padding:60px 18px;text-align:center;opacity:.7">Cargando…</div></div>';
+    if (infoSeccion(s).js) return '<div data-sx-mod="' + texto(s) + '">' + (MARCA ? '<div class="kz-caja kz-centro" role="status" style="margin:48px auto"><div class="u-carga"></div><p>Cargando…</p></div>' : // T0149
+      '<div style="padding:60px 18px;text-align:center;opacity:.7">Cargando…</div>') + '</div>';
     var f = infoSeccion(s), color = C.color || '#0E8A7A';
     return '<header style="background:' + texto(color) + ';color:#fff;padding:14px 18px"><h1 style="margin:0;font-size:24px;letter-spacing:.5px;color:#fff">' +
       texto(f.t.toUpperCase()) + '</h1></header>' +

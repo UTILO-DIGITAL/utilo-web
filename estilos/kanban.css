@@ -58,9 +58,10 @@
 .u .col h2 { display: flex; align-items: center; gap: var(--e2); margin: 0; padding: var(--e2) var(--e1) var(--e2);
   font: var(--peso-titulos) 16px/1.2 var(--fuente-titulos); color: var(--color-texto); background: none;
   border-bottom: 3px solid var(--estado); letter-spacing: 0; text-transform: none; }
-/* Recurso propio: el anillo con punto de la o, del color del estado */
-.u .col h2::before { content: ""; flex: none; width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid var(--estado);
-  padding: 3px; background: var(--estado); background-clip: content-box; }
+/* Recurso propio: el anillo con punto de la o, del color del estado.
+   T0149: la forma la puede cambiar cada marca (--radio-punto y --hueco-punto, ver base.css); sin ellas, la de Utilo. */
+.u .col h2::before { content: ""; flex: none; width: 16px; height: 16px; border-radius: var(--radio-punto, 50%); border: 2.5px solid var(--estado);
+  padding: var(--hueco-punto, 3px); background: var(--estado); background-clip: content-box; }
 .u .col h2 .n { margin-left: auto; font: 700 14px/1 var(--fuente-texto); color: var(--color-suave); font-variant-numeric: tabular-nums; }
 .u .col h2.ch { cursor: pointer; user-select: none; -webkit-user-select: none; min-height: 44px; }
 .u .col h2.ch .fl { order: 3; width: 10px; height: 10px; border-right: 2px solid var(--color-suave); border-bottom: 2px solid var(--color-suave);

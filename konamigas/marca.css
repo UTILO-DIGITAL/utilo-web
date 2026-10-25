@@ -1,0 +1,38 @@
+/*
+ * Marca de Konamigas en pantalla · T0149
+ * Variables de MARCA_Konamigas (06_CLIENTES/Konamigas) y de su ficha de estilo («Su estilo» de su ficha de cliente).
+ * Es el único sitio con los colores de Konamigas: las vistas solo usan var(--…). Cambiar aquí cambia todas.
+ * Orden de carga: marca.css → ../estilos/base.css → ../estilos/kanban.css
+ * Versión clara (decidido en T0149): fondo blanco, azul marino en cabeceras y texto, rosa solo en el botón de acción
+ * y lima solo sobre el azul. Titulares en Montserrat (Riking no tiene versión web), textos en Poppins (la alternativa
+ * web de Azo Sans) y Permanent Marker para una palabra por pantalla.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&family=Poppins:wght@400;600;700;800&family=Permanent+Marker&display=swap');
+
+:root {
+  /* Paleta de MARCA_Konamigas */
+  --color-fondo: #FFFFFF;            /* blanco · fondo general */
+  --color-principal: #020252;        /* azul marino · cabeceras, barra y titulares */
+  --color-principal-oscuro: #020252; /* azul marino · enlaces, etiquetas y botones con contorno */
+  --color-accion: #FF1B8C;           /* rosa · solo el botón principal */
+  --color-destacado: #EAFF59;        /* lima · solo sobre el azul (pestaña elegida, cifra clave, palabra pintada) */
+  --color-bloque: #FFE8F3;           /* rosa al 10 % sobre blanco · bloques y etiquetas suaves */
+  --color-texto: #020252;            /* azul marino · texto corrido */
+  --color-sobre-principal: #FFFFFF;  /* texto sobre el azul */
+  --color-sobre-accion: #020252;     /* texto sobre el rosa: azul marino (blanco sobre rosa no llega, 3,6:1) */
+  --color-superficie: #FFFFFF;       /* tarjetas y campos */
+
+  /* Letras */
+  --fuente-titulos: 'Montserrat', 'Poppins', sans-serif;
+  --fuente-texto: 'Poppins', sans-serif;
+  --fuente-destacar: 'Permanent Marker', 'Montserrat', cursive; /* una palabra por pantalla, como pintada */
+  --peso-titulos: 800;
+
+  /* Forma: esquinas poco redondeadas, 6 px (estilo.esquinas de MARCA_Konamigas; 2 px se veía demasiado duro) */
+  --radio: 6px;
+  --radio-peq: 3px;
+
+  /* Indicador de carga y cabeceras de estado: cuadrados macizos, como una insignia, en lugar del anillo con punto de Utilo */
+  --radio-punto: 1px;
+  --hueco-punto: 0px;
+}
