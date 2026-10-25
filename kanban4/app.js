@@ -14,7 +14,7 @@
   var CLAVE = 'kanban_' + (C.clave || 'negocio');
   // T0133: carpeta de este archivo (…/kanban/), para cargar los módulos de las secciones (economia.js…).
   var BASE = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/[^/]*$/, '') : '../kanban/'; })();
-  var VERSION_MODULOS = '25'; // T0207 · T0208 · T0149 · T0213 · T0218 · T0224 · T0225
+  var VERSION_MODULOS = '26'; // T0207 · T0208 · T0149 · T0213 · T0218 · T0224 · T0225 (también el ?v= de las hojas del tablero)
   var VERSION_ICONO = '2'; // T0222: el ?v= de los iconos del index.html de cada negocio (sube con ellos)
   // T0150: diseño de PROTOCOLO DISEÑO UTILO. Solo para los negocios que tienen su marca.css (index.html con marca: '…').
   // Los demás (Konamigas hasta T0149) siguen exactamente como antes.
@@ -434,6 +434,9 @@
       recordarSecciones(cred, p.secciones, p.perfil);
       // T0224: fuera el viewport del motor, que no lleva viewport-fit=cover: manda el de la cabecera.
       var html = String(p.html || '').replace(/<meta[^>]*name=["']?viewport["']?[^>]*>/gi, '');
+      // T0225: las hojas de estilos (marca.css, base.css, kanban.css) son de utilo-web: el motor las pide con su versión (?v=KC_VERSION),
+      // que no cambia al cambiar los estilos, y el navegador se quedaba con las de antes. Se piden con la versión de este archivo.
+      html = html.replace(/(\/(?:marca|base|kanban)\.css)\?v=[\w.-]+/g, '$1?v=' + VERSION_MODULOS);
       var cab = cabecera(cred);
       if (/<head[^>]*>/i.test(html)) html = html.replace(/<head[^>]*>/i, function (m) { return m + cab; });
       else html = '<!DOCTYPE html><html><head>' + cab + '</head><body>' + html + '</body></html>';
