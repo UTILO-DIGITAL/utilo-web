@@ -28,9 +28,9 @@
   --fuente-destacar: 'Permanent Marker', 'Montserrat', cursive; /* una palabra por pantalla, como pintada */
   --peso-titulos: 800;
 
-  /* Forma: esquinas casi rectas, de cartel deportivo (estilo.esquinas de MARCA_Konamigas) */
-  --radio: 2px;
-  --radio-peq: 1px;
+  /* Forma: esquinas poco redondeadas, 6 px (estilo.esquinas de MARCA_Konamigas; 2 px se veía demasiado duro) */
+  --radio: 6px;
+  --radio-peq: 3px;
 
   /* Indicador de carga y cabeceras de estado: cuadrados macizos, como una insignia, en lugar del anillo con punto de Utilo */
   --radio-punto: 1px;
