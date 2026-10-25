@@ -57,6 +57,12 @@
       '.gs-tabs button{flex:0 0 auto;min-height:44px;background:transparent;border:0;color:var(--color-sobre-principal);opacity:.75;font:700 14px/1 var(--fuente-texto);padding:0 var(--e3);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}' +
       '.gs-tabs button[aria-selected=true]{opacity:1;border-bottom-color:var(--color-destacado)}' +
       '.gs-tabs .gs-n{display:inline-block;min-width:20px;padding:2px var(--e1);margin-left:var(--e1);border-radius:var(--radio-peq);background:var(--color-destacado);color:var(--color-texto);font-size:12px;text-align:center;font-variant-numeric:tabular-nums}' +
+      // T0225: junto al menú del ordenador, la cabecera va sobre el fondo de la página (el color de la marca es el menú, base.css).
+      '@media(min-width:900px){body.u-con-barra .gs-cab{background:var(--color-fondo);color:var(--color-texto);border-bottom:1px solid var(--color-linea)}' +
+      'body.u-con-barra .gs-cab h1,body.u-con-barra .gs-pint{color:var(--color-principal-oscuro)}body.u-con-barra .gs-cab>p{color:var(--color-suave)}' +
+      'body.u-con-barra .gs-ver,body.u-con-barra .gs-sol{background:transparent;border:1.5px solid var(--color-principal-oscuro)}' +
+      'body.u-con-barra .gs-tabs button{color:var(--color-suave);opacity:1}body.u-con-barra .gs-tabs button[aria-selected=true]{color:var(--color-principal-oscuro);border-bottom-color:var(--color-principal-oscuro)}' +
+      'body.u-con-barra .gs-tabs .gs-n{background:var(--color-bloque)}}' +
       '.gs-main{max-width:760px;margin:0 auto;padding:var(--e4) var(--e4) 120px}' +
       '.gs-fila{display:flex;gap:var(--e2);flex-wrap:wrap;align-items:center}' +
       // Campos: los de base.css (.u input, .u select). Aquí solo el ancho.
@@ -160,8 +166,16 @@
       'border-radius:var(--radio);padding:var(--e3) var(--e4);font:600 15px/1.4 var(--fuente-texto);max-width:calc(100% - var(--e6));box-shadow:var(--sombra-flota)}' +
       '@media(min-width:620px){.gs-kpis{grid-template-columns:repeat(3,1fr)}.gs-kpi.gs-grande{grid-column:auto}}' +
       '@media(max-width:640px){.gs-velo{padding:0}.gs-hoja{border-radius:0;min-height:100%;max-width:none;margin:0}}' +
-      '@media(min-width:900px){.gs-fab{bottom:var(--e4)}.gs-aviso{bottom:84px}.gs-main{padding-bottom:var(--e7)}}';
+      '@media(min-width:900px){.gs-fab{bottom:var(--e4)}.gs-aviso{bottom:84px}.gs-main{padding-bottom:var(--e7)}}' +
+      // T0225: en el ordenador, todo el ancho junto al menú; las listas que se comparan van en tabla (base.css · u-tabla).
+      '.gs-aviso{left:calc(50% + var(--medio-menu, 0px))}' +
+      '@media(min-width:900px){.gs-cab{padding-left:var(--e5);padding-right:var(--e5)}.gs-tabs{margin:0 calc(-1 * var(--e5));padding:0 var(--e3)}' +
+      '.gs-main{max-width:1280px;margin:0;padding:var(--e5) var(--e5) var(--e7)}.gs-filtros,.gs-main>.gs-fila{max-width:760px}' +
+      '.gs-tabla{margin-top:var(--e3)}.gs-tabla .gs-tags{margin-top:0}.gs-tabla .gs-color{margin-right:var(--e2)}}';
   }
+  /** T0225: en el ordenador (desde 900 px) las listas van en tabla; en el móvil, la lista de siempre. */
+  var ANCHO = window.matchMedia ? matchMedia('(min-width:900px)') : { matches: false };
+  function ancho() { return ANCHO.matches; }
 
   /** T0149: icono de «Pedir algo a Utilo» (bocadillo), del mismo juego que la barra de secciones. */
   var ICONO_SOL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>';
@@ -208,6 +222,7 @@
       '.gs-alt-i{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px var(--e2);width:100%;background:none;border:0;border-top:1px solid var(--gs-l);padding:var(--e2) 0;text-align:left;color:inherit;cursor:pointer;font-size:14px}' +
       '.gs-alt-i b{display:flex;align-items:center;min-width:0}.gs-alt-i b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gs-alt-i small{grid-column:1/-1;color:var(--gs-g);font-size:13px}.gs-alt-i .gs-pag{font-size:13px;font-weight:700;white-space:nowrap}' +
       '.gs-dia-h{font:var(--peso-titulos) 20px/1.2 var(--fuente-titulos);color:var(--color-principal-oscuro);margin:var(--e5) 0 0}' +
+      '@media(min-width:900px){.gs-ligas{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:var(--e3);align-items:start;margin-top:var(--e3)}.gs-ligas>.gs-card{margin-top:0}}' + // T0225
       '.gs-fotos{display:flex;gap:var(--e2);flex-wrap:wrap}.gs-fotos button{font-size:14px}' +
       '.gs-visor img{display:block;max-width:100%;max-height:70vh;margin:0 auto;border-radius:var(--radio);background:var(--gs-f)}';
   }
@@ -382,8 +397,13 @@
     $('#gs-re').onclick = function () { olvidar(); S.opciones = null; pintar(true); };
     if ($('#gs-ver')) $('#gs-ver').onclick = function () { var b = document.querySelector('header.cab .ver-btn'); if (b) b.click(); };
     if ($('#gs-sol')) $('#gs-sol').onclick = function () { var b = document.querySelector('header.cab .sol-btn'); if (b) b.click(); };
+    // T0225: en las tablas, Intro o espacio sobre una fila abre su ficha
+    el.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[tabindex]'); if (tr && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); tr.click(); } });
     pintar();
   }
+
+  // T0225: al pasar de móvil a ordenador (o al revés) cambia lista por tabla
+  if (ANCHO.addEventListener) ANCHO.addEventListener('change', function () { if (S.el && document.body.contains(S.el) && S.tab !== 'resumen') pintar(); });
 
   function irTab(t) {
     S.tab = t;
@@ -489,7 +509,7 @@
           return '<button type="button" class="gs-chip" data-gs-dia="' + esc(d) + '" aria-pressed="' + (d === (S.dia || '')) + '">' + esc(d ? nomDia(d) : 'Todos los días') + '</button>';
         }).join('') + '<button type="button" class="gs-chip" id="gs-todas">' + (Object.keys(S.abiertas).some(function (k) { return S.abiertas[k]; }) ? 'Cerrar todas' : 'Abrir todas') + '</button></div>';
       ordenDias.filter(function (d) { return !S.dia || d === S.dia; }).forEach(function (d) {
-        h += '<div class="gs-dia-h">' + esc(nomDia(d)) + '</div>';
+        h += '<div class="gs-dia-h">' + esc(nomDia(d)) + '</div><div class="gs-ligas">';
         dias[d].sort().forEach(function (k) {
           var lista = grupos[k].slice().sort(function (a, b) { return (b.nivel || 0) - (a.nivel || 0) || a.equipo.localeCompare(b.equipo); });
           var jug = lista.reduce(function (a, e) { return a + (e.jugadoras || 0); }, 0);
@@ -506,6 +526,7 @@
                 '<small>' + esc([e.capi, e.jugadoras ? e.jugadoras + ' jugadoras' : 'sin jugadoras', edad1(e.edad) ? edad1(e.edad) + ' años' : ''].filter(String).join(' · ')) + '</small></button>';
             }).join('') + '</details>';
         });
+        h += '</div>';
       });
       if (!ordenDias.length) h += '<div class="gs-vacio">No hay equipos con estos filtros.</div>';
       main.innerHTML = h;
@@ -596,22 +617,15 @@
         $('#gs-eqlista').innerHTML = (q ? '<p class="gs-aviso-b">Buscando en toda la temporada ' + esc(S.temp) + ', también en las inscripciones con ERROR.</p>' : '') +
           (esCorreo(f.q) ? '<p style="margin:8px 0 0"><button type="button" class="gs-b2" id="gs-eqcorreo">Ver todo lo de este correo</button></p>' : '') +
           '<p class="gs-s" style="margin:12px 2px 0;font-size:13px;color:var(--gs-g)">' + lista.length + (lista.length === 1 ? ' inscripción' : ' inscripciones') + '</p>' +
+          (lista.length && ancho() ? tablaEquipos(lista, r) : // T0225
           '<div class="gs-card"><div class="gs-lista">' + (lista.length ? lista.map(function (e) {
-            var t = [];
-            if (e.error) t.push(tag('ERROR', 'gs-tag-r'));
-            if (e.buscan && !e.error) t.push(tag('Busca equipo', 'gs-tag-g'));
-            if (!e.error && !e.buscan && !e.liga) t.push(tag('Sin liga'));
-            if (!e.error && !e.buscan && !e.ps) t.push(tag('Sin paga y señal', 'gs-tag-a'));
-            if (!e.error && e.pendiente > 0.005) t.push(tag('Faltan ' + eur(e.pendiente), 'gs-tag-a'));
-            if (e.ocupado) t.push(tag('Nombre repetido ×' + e.ocupado, 'gs-tag-r'));
-            if (e.revisar) t.push(tag(e.revisar, 'gs-tag-a'));
-            if (!e.error && !e.buscan && !e.xporty) t.push(tag('Sin Xporty', 'gs-tag-g'));
+            var t = tagsEquipo(e);
             return '<button type="button" class="gs-item" data-gs-i="' + r.lista.indexOf(e) + '"><div style="min-width:0">' +
               '<div class="gs-t">' + punto(e.color) + esc(e.equipo || '(sin nombre)') + '</div>' +
               '<div class="gs-s">' + esc([S.fComp ? '' : compCorta(e.comp), e.liga ? ligaCorta(e.liga) : (e.dispo ? 'Quiere: ' + e.dispo : ''), e.capi, e.jugadoras ? e.jugadoras + ' jugadoras' : ''].filter(String).join(' · ')) + '</div>' +
               (t.length ? '<div class="gs-tags">' + t.join('') + '</div>' : '') +
               '</div><div class="gs-d">' + (e.nivel ? 'Nivel ' + esc(e.nivel) : '') + '</div></button>';
-          }).join('') : '<div class="gs-vacio">No hay inscripciones con este filtro.</div>') + '</div></div>';
+          }).join('') : '<div class="gs-vacio">No hay inscripciones con este filtro.</div>') + '</div></div>');
         [].forEach.call(main.querySelectorAll('[data-gs-i]'), function (b) { b.onclick = function () { fichaEquipo(r.lista[Number(b.getAttribute('data-gs-i'))], o, r); }; });
         var bc = $('#gs-eqcorreo'); if (bc) bc.onclick = function () { verCorreo(f.q.trim()); };
       };
@@ -622,6 +636,30 @@
     });
   }
 
+  function tagsEquipo(e) {
+    var t = [];
+    if (e.error) t.push(tag('ERROR', 'gs-tag-r'));
+    if (e.buscan && !e.error) t.push(tag('Busca equipo', 'gs-tag-g'));
+    if (!e.error && !e.buscan && !e.liga) t.push(tag('Sin liga'));
+    if (!e.error && !e.buscan && !e.ps) t.push(tag('Sin paga y señal', 'gs-tag-a'));
+    if (!e.error && e.pendiente > 0.005) t.push(tag('Faltan ' + eur(e.pendiente), 'gs-tag-a'));
+    if (e.ocupado) t.push(tag('Nombre repetido ×' + e.ocupado, 'gs-tag-r'));
+    if (e.revisar) t.push(tag(e.revisar, 'gs-tag-a'));
+    if (!e.error && !e.buscan && !e.xporty) t.push(tag('Sin Xporty', 'gs-tag-g'));
+    return t;
+  }
+  /** T0225: Equipos en el ordenador. Cada fila abre la ficha del equipo, como en el móvil. */
+  function tablaEquipos(lista, r) {
+    return '<table class="u-tabla gs-tabla"><thead><tr><th>Equipo</th>' + (S.fComp ? '' : '<th>Competición</th>') +
+      '<th>Liga</th><th>Capitana</th><th class="num">Jugadoras</th><th class="num">Nivel</th><th>Avisos</th></tr></thead><tbody>' +
+      lista.map(function (e) {
+        return '<tr tabindex="0" data-gs-i="' + r.lista.indexOf(e) + '"><td class="u-tabla-t">' + punto(e.color) + esc(e.equipo || '(sin nombre)') + '</td>' +
+          (S.fComp ? '' : '<td>' + esc(compCorta(e.comp)) + '</td>') +
+          '<td>' + (e.liga ? esc(ligaCorta(e.liga)) : e.dispo ? '<span class="gs-opc">Quiere: ' + esc(e.dispo) + '</span>' : '') + '</td>' +
+          '<td>' + esc(e.capi) + '</td><td class="num">' + (e.jugadoras || '') + '</td><td class="num">' + esc(e.nivel || '') + '</td>' +
+          '<td><div class="gs-tags">' + tagsEquipo(e).join('') + '</div></td></tr>';
+      }).join('') + '</tbody></table>';
+  }
   function fichaEquipo(e, o, r) {
     var ligas = o.ligas.filter(function (l) { return l.comp === e.comp; });
     var campos = [
@@ -698,13 +736,28 @@
   };
   var MAX_LISTA = 250;
 
-  function itemJugadora(j, i, conEquipo) {
+  function tagsJugadora(j) {
     var t = [];
     if (j.error) t.push(tag('ERROR', 'gs-tag-r'));
     if (j.porDni) t.push(tag('Mismo DNI, otro correo', 'gs-tag-a'));
     if (j.alerta) t.push(tag(j.alerta.split('·')[0].trim().slice(0, 60), 'gs-tag-a'));
     if (!j.error && !j.xporty) t.push(tag('Sin Xporty', 'gs-tag-g'));
     if (!j.error && j.incluida === '🚫') t.push(tag('Cami personalizada', 'gs-tag-g'));
+    return t;
+  }
+  /** T0225: Jugadoras en el ordenador. Cada fila abre la ficha de la jugadora, como en el móvil. */
+  function tablaJugadoras(lista, r, conEquipo) {
+    return '<table class="u-tabla gs-tabla"><thead><tr><th>Jugadora</th>' + (conEquipo ? '<th>Equipo</th>' : '') +
+      '<th>Camiseta</th><th class="num">Edad</th><th>Avisos</th></tr></thead><tbody>' +
+      lista.map(function (j) {
+        return '<tr tabindex="0" data-gs-j="' + r.lista.indexOf(j) + '"><td class="u-tabla-t">' + esc(j.nombreCompleto || j.mail) + '</td>' +
+          (conEquipo ? '<td>' + punto(j.color) + esc(j.equipo) + (S.fComp ? '' : ' <span class="gs-opc">· ' + esc(compCorta(j.comp)) + '</span>') + '</td>' : '') +
+          '<td>' + esc(j.cami || (j.dorsal ? 'Dorsal ' + j.dorsal : '')) + '</td><td class="num">' + esc(edad1(j.edad, true)) + '</td>' +
+          '<td><div class="gs-tags">' + tagsJugadora(j).join('') + '</div></td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  function itemJugadora(j, i, conEquipo) {
+    var t = tagsJugadora(j);
     return '<button type="button" class="gs-item" data-gs-j="' + i + '"><div style="min-width:0">' +
       '<div class="gs-t">' + esc(j.nombreCompleto || j.mail) + '</div>' +
       '<div class="gs-s">' + esc([conEquipo ? compCorta(j.comp) + ' · ' + j.equipo : '', j.cami ? 'Camiseta ' + j.cami : (j.dorsal ? 'Dorsal ' + j.dorsal : ''), edad1(j.edad, true) ? edad1(j.edad, true) + ' años' : ''].filter(String).join(' · ')) +
@@ -735,9 +788,11 @@
         $('#gs-jlista').innerHTML = (q ? '<p class="gs-aviso-b">Buscando en toda la temporada ' + esc(S.temp) + ', también en las inscripciones con ERROR.</p>' : '') +
           (esCorreo(f.q) ? '<p style="margin:8px 0 0"><button type="button" class="gs-b2" id="gs-jcorreo">Ver todo lo de este correo (todas las temporadas)</button></p>' : '') +
           '<p class="gs-s" style="margin:12px 2px 0;font-size:13px;color:var(--gs-g)">' + lista.length + (lista.length === 1 ? ' inscripción' : ' inscripciones') + '</p>' +
+          (lista.length && ancho() ? tablaJugadoras(lista.slice(0, MAX_LISTA), r, q || !f.equipo) + // T0225
+            (lista.length > MAX_LISTA ? '<div class="gs-mas">Y ' + (lista.length - MAX_LISTA) + ' más: elige un equipo o busca.</div>' : '') :
           '<div class="gs-card"><div class="gs-lista">' + (lista.length ? lista.slice(0, MAX_LISTA).map(function (j) { return itemJugadora(j, r.lista.indexOf(j), q || !f.equipo); }).join('') +
             (lista.length > MAX_LISTA ? '<div class="gs-mas">Y ' + (lista.length - MAX_LISTA) + ' más: elige un equipo o busca.</div>' : '')
-            : '<div class="gs-vacio">No hay jugadoras con este filtro.</div>') + '</div></div>';
+            : '<div class="gs-vacio">No hay jugadoras con este filtro.</div>') + '</div></div>');
         [].forEach.call(main.querySelectorAll('[data-gs-j]'), function (b) { b.onclick = function () { fichaJugadora(r.lista[Number(b.getAttribute('data-gs-j'))], o, r, equipos); }; });
         var bc = $('#gs-jcorreo'); if (bc) bc.onclick = function () { verCorreo(f.q.trim()); };
       };

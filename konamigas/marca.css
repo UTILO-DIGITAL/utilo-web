@@ -35,4 +35,8 @@
   /* Indicador de carga y cabeceras de estado: cuadrados macizos, como una insignia, en lugar del anillo con punto de Utilo */
   --radio-punto: 1px;
   --hueco-punto: 0px;
+
+  /* T0225: sección abierta del menú del ordenador, en lima sobre el azul (como la pestaña elegida) */
+  --color-menu-elegido: var(--color-destacado);
+  --color-sobre-menu-elegido: var(--color-principal-oscuro);
 }

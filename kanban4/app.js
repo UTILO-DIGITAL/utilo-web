@@ -14,7 +14,7 @@
   var CLAVE = 'kanban_' + (C.clave || 'negocio');
   // T0133: carpeta de este archivo (…/kanban/), para cargar los módulos de las secciones (economia.js…).
   var BASE = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/[^/]*$/, '') : '../kanban/'; })();
-  var VERSION_MODULOS = '24'; // T0207 · T0208 · T0149 · T0213 · T0218 · T0224
+  var VERSION_MODULOS = '25'; // T0207 · T0208 · T0149 · T0213 · T0218 · T0224 · T0225
   var VERSION_ICONO = '2'; // T0222: el ?v= de los iconos del index.html de cada negocio (sube con ellos)
   // T0150: diseño de PROTOCOLO DISEÑO UTILO. Solo para los negocios que tienen su marca.css (index.html con marca: '…').
   // Los demás (Konamigas hasta T0149) siguen exactamente como antes.
@@ -269,13 +269,27 @@
       'body{padding-bottom:0!important}#alta-btn{bottom:20px!important}#alta-aviso,#estado-aviso{bottom:84px!important}}';
   }
 
-  function barra(secs, actual) {
+  /* T0225: menú del ordenador plegado (clase u-menu-plegado del body), guardado en el dispositivo. MENU_INICIO lo aplica al
+   * pintar la página del tablero; pintarSeccion, que no ejecuta scripts, lo aplica con menuPlegado(). */
+  var MENU_CLAVE = 'kanbanMenuPlegado';
+  var MENU_PLEGAR = "var p=document.body.classList.toggle('u-menu-plegado');this.setAttribute('aria-label',p?'Desplegar el menú':'Plegar el menú');" +
+    "this.title=this.getAttribute('aria-label');try{if(p)localStorage.setItem('" + MENU_CLAVE + "','1');else localStorage.removeItem('" + MENU_CLAVE + "');}catch(e){}";
+  var MENU_INICIO = "try{if(localStorage.getItem('" + MENU_CLAVE + "')==='1'){document.body.classList.add('u-menu-plegado');var b=document.querySelector('.sx-plegar');" +
+    "if(b){b.setAttribute('aria-label','Desplegar el menú');b.title='Desplegar el menú';}}}catch(e){}";
+  function menuPlegado() { try { new Function(MENU_INICIO)(); } catch (e) {} }
+
+  function barra(secs, actual, cred) {
     if (!secs || secs.length < 2) return '';
     if (MARCA) { // T0150: estilos en estilos/base.css, iconos SVG
-      return '<nav class="sx u-sx" aria-label="Secciones"><div class="sx-in">' + secs.map(function (s) {
-        return '<a href="' + texto(urlSeccion(s)) + '" target="_top" data-sx="' + texto(s) + '"' + (s === actual ? ' aria-current="page"' : '') + '>' +
-          icono(s) + '<span>' + texto(infoSeccion(s).t) + '</span></a>';
-      }).join('') + '</div></nav>';
+      // T0225: en el ordenador es un menú a la izquierda, con el nombre de la app arriba y quién ha entrado en Perfil (en el móvil no salen)
+      // El menú se pliega a una franja con los iconos (botón «Plegar el menú»); cada dispositivo recuerda cómo se dejó.
+      var quien = cred && cred.persona ? '<span class="sx-quien">' + texto(cred.persona) + '</span>' : '';
+      return '<nav class="sx u-sx" aria-label="Secciones"><div class="sx-in"><div class="sx-cab"><span class="sx-marca">' + texto(C.nombreApp || '') + '</span>' +
+        '<button type="button" class="sx-plegar" onclick="' + MENU_PLEGAR + '" aria-label="Plegar el menú" title="Plegar el menú">' +
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button></div>' + secs.map(function (s) {
+        return '<a href="' + texto(urlSeccion(s)) + '" target="_top" data-sx="' + texto(s) + '" title="' + texto(infoSeccion(s).t) + '"' + (s === actual ? ' aria-current="page"' : '') + '>' +
+          icono(s) + '<span>' + texto(infoSeccion(s).t) + (s === 'PERFIL' ? quien : '') + '</span></a>';
+      }).join('') + '</div></nav><script>' + MENU_INICIO + '<\/script>';
     }
     var as = secs.map(function (s) {
       var f = infoSeccion(s);
@@ -341,7 +355,8 @@
   function pintarSeccion(cred, secs, s) {
     document.title = infoSeccion(s).t + ' · ' + (C.nombreApp || 'App');
     if (MARCA) document.body.className = 'u u-con-barra'; // T0150
-    document.body.innerHTML = barra(seccionesBarra(secs, cred.perfil), s) + '<div id="sx-panel">' + htmlSeccion(s, cred) + '</div>';
+    document.body.innerHTML = barra(seccionesBarra(secs, cred.perfil), s, cred) + '<div id="sx-panel">' + htmlSeccion(s, cred) + '</div>';
+    menuPlegado(); // T0225
     window.SX_CTX = ctxModulos(cred); // T0133
     abrirModulo(document.getElementById('sx-panel'));
   }
@@ -425,7 +440,7 @@
       if (!/<!DOCTYPE/i.test(html)) html = '<!DOCTYPE html>' + html;
       if (!id) { // T0132: barra de secciones encima del tablero (solo si la persona tiene más de una)
         var sb = seccionesBarra(p.secciones, p.perfil);
-        var nav = barra(sb, 'KANBAN');
+        var nav = barra(sb, 'KANBAN', cred);
         if (nav) {
           html = html.replace(/<body[^>]*>/i, function (m) {
             if (MARCA) m = /class="/i.test(m) ? m.replace(/class="/i, 'class="u-con-barra ') : m.replace(/>$/, ' class="u-con-barra">'); // T0150

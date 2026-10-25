@@ -93,6 +93,25 @@
   .u .filtros > label, .u .k-mas > label { flex: 1 1 140px; }
   .u .filtros > label select, .u .filtros > label input, .u .k-mas > label select, .u .k-mas > label input { width: 100%; }
 }
+/* T0225: en el ordenador las columnas se reparten el ancho (sin barra de desplazamiento mientras quepan), una columna
+ * plegada se queda en una franja estrecha con el nombre en vertical y los filtros están siempre a la vista. */
+@media (min-width: 900px) {
+  .u .tablero { padding-left: var(--e5); padding-right: var(--e5); }
+  .u .col { flex: 1 1 0; min-width: 200px; }
+  .u .col.plegada { flex: 0 0 auto; min-width: 0; }
+  .u .col.plegada h2.ch { writing-mode: vertical-rl; min-height: 0; min-width: 44px; padding: var(--e3) var(--e2);
+    border-bottom: 0; border-left: 3px solid var(--estado); }
+  .u .col.plegada h2.ch .n { margin: var(--e2) 0 0; }
+  .u .col.plegada h2.ch .fl { display: none; }
+  .u .filtros { padding-left: var(--e5); padding-right: var(--e5); }
+  .u .filtros .k-fil { display: none; }
+  .u .filtros .k-mas[hidden] { display: contents; }
+  .u.k-tablero .cab { padding-left: var(--e5); padding-right: var(--e5); }
+  /* Junto al menú, la cabecera va sobre el fondo de la página: el color de la marca es el menú (base.css) */
+  body.u-con-barra .cab { background: var(--color-fondo); color: var(--color-texto); border-bottom: 1px solid var(--color-linea); }
+  body.u-con-barra .cab h1 { color: var(--color-principal-oscuro); }
+  body.u-con-barra .cab .ver-btn, body.u-con-barra .cab .sol-btn { background: transparent; border: 1.5px solid var(--color-principal-oscuro); }
+}
 /* Sitio para «Añadir tarea» debajo de la última tarjeta (botón de 52px + aire), también con la barra de secciones */
 .u .tablero { padding-bottom: calc(52px + var(--e6) + env(safe-area-inset-bottom, 0px)); }
 
