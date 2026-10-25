@@ -61,6 +61,12 @@
       '.ec-tabs button{flex:0 0 auto;min-height:44px;background:transparent;border:0;color:var(--color-sobre-principal);opacity:.75;font:700 14px/1 var(--fuente-texto);padding:0 var(--e3);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}' +
       '.ec-tabs button[aria-selected=true]{opacity:1;border-bottom-color:var(--color-destacado)}' +
       '.ec-tabs .ec-n{display:inline-block;min-width:20px;padding:2px var(--e1);margin-left:var(--e1);border-radius:var(--radio-peq);background:var(--color-destacado);color:var(--color-texto);font-size:12px;text-align:center;font-variant-numeric:tabular-nums}' +
+      // T0225: junto al menú del ordenador, la cabecera va sobre el fondo de la página (el color de la marca es el menú, base.css).
+      '@media(min-width:900px){body.u-con-barra .ec-cab{background:var(--color-fondo);color:var(--color-texto);border-bottom:1px solid var(--color-linea)}' +
+      'body.u-con-barra .ec-cab h1,body.u-con-barra .ec-pint{color:var(--color-principal-oscuro)}body.u-con-barra .ec-cab>p{color:var(--color-suave)}' +
+      'body.u-con-barra .ec-ver,body.u-con-barra .ec-sol{background:transparent;border:1.5px solid var(--color-principal-oscuro)}' +
+      'body.u-con-barra .ec-tabs button{color:var(--color-suave);opacity:1}body.u-con-barra .ec-tabs button[aria-selected=true]{color:var(--color-principal-oscuro);border-bottom-color:var(--color-principal-oscuro)}' +
+      'body.u-con-barra .ec-tabs .ec-n{background:var(--color-bloque)}}' +
       '.ec-main{max-width:760px;margin:0 auto;padding:var(--e4) var(--e4) 120px}' +
       '.ec-fila{display:flex;gap:var(--e2);flex-wrap:wrap;align-items:center}' +
       // Campos: los de base.css (.u input, .u select). Aquí solo el ancho.
@@ -164,8 +170,17 @@
       'border-radius:var(--radio);padding:var(--e3) var(--e4);font:600 15px/1.4 var(--fuente-texto);max-width:calc(100% - var(--e6));box-shadow:var(--sombra-flota)}' +
       '@media(min-width:620px){.ec-kpis{grid-template-columns:repeat(3,1fr)}.ec-kpi.ec-grande{grid-column:auto}}' +
       '@media(max-width:640px){.ec-velo{padding:0}.ec-hoja{border-radius:0;min-height:100%;max-width:none;margin:0}}' +
-      '@media(min-width:900px){.ec-fab{bottom:var(--e4)}.ec-aviso{bottom:84px}.ec-main{padding-bottom:var(--e7)}}';
+      '@media(min-width:900px){.ec-fab{bottom:var(--e4)}.ec-aviso{bottom:84px}.ec-main{padding-bottom:var(--e7)}}' +
+      // T0225: en el ordenador, todo el ancho junto al menú; las listas que se comparan van en tabla (base.css · u-tabla).
+      '.ec-aviso{left:calc(50% + var(--medio-menu, 0px))}' +
+      '@media(min-width:900px){.ec-cab{padding-left:var(--e5);padding-right:var(--e5)}.ec-tabs{margin:0 calc(-1 * var(--e5));padding:0 var(--e3)}' +
+      '.ec-main{max-width:1280px;margin:0;padding:var(--e5) var(--e5) var(--e7)}.ec-main>.ec-fila{max-width:760px}' +
+      '.ec-tabla{margin-top:var(--e3)}.ec-tabla .ec-tag{white-space:nowrap}.ec-tabla .ec-borrado td{text-decoration:line-through;opacity:.6}' +
+      '.ec-tabla td.ec-pos,.ec-tabla td.ec-neg{font-weight:700}}';
   }
+  /** T0225: en el ordenador (desde 900 px) las listas van en tabla; en el móvil, la lista de siempre. */
+  var ANCHO = window.matchMedia ? matchMedia('(min-width:900px)') : { matches: false };
+  function ancho() { return ANCHO.matches; }
 
   /** T0149: icono de «Pedir algo a Utilo» (bocadillo), del mismo juego que la barra de secciones. */
   var ICONO_SOL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>';
@@ -234,6 +249,8 @@
     $('#ec-fab').onclick = function () { formulario(); };
     if ($('#ec-ver')) $('#ec-ver').onclick = function () { var b = document.querySelector('header.cab .ver-btn'); if (b) b.click(); };
     if ($('#ec-sol')) $('#ec-sol').onclick = function () { var b = document.querySelector('header.cab .sol-btn'); if (b) b.click(); };
+    // T0225: en las tablas, Intro o espacio sobre una fila abre su movimiento
+    el.addEventListener('keydown', function (e) { var tr = e.target.closest && e.target.closest('tr[tabindex]'); if (tr && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); tr.click(); } });
     pintar();
     // El contador de pendientes, en segundo plano.
     if (!S.datos.pendientes) dato('pendientes', 'economiaPendientes').then(contadorPendientes, function () {});
@@ -499,21 +516,33 @@
         '<span class="ec-sub">' + esc(T.resultadoEq) + ' por equipo · margen ' + esc(T.pct) + '</span></div>' +
         '<div class="ec-kpi"><b>Ingresos</b><span class="ec-val">' + esc(T.ingresos) + '</span><span class="ec-sub">' + esc(T.equipos) + ' equipos · ' + esc(T.partidos) + ' partidos</span></div>' +
         '<div class="ec-kpi"><b>Margen directo</b><span class="ec-val">' + esc(T.margen) + '</span><span class="ec-sub">tras campos ' + esc(T.campos) + ', árbitros ' + esc(T.arbitros) + ' y gestión ' + esc(T.gestion) + '</span></div></div>' +
-        '<h2 class="ec-h2">Cada liga · de más a menos rentable por equipo</h2><div class="ec-card">';
+        '<h2 class="ec-h2">Cada liga · de más a menos rentable por equipo</h2>' + (ancho() ? '' : '<div class="ec-card">');
       var ligas = t.ligas.filter(function (l) { return !vacio(l.ingresos) || !vacio(l.resultado); });
       var sin = t.ligas.length - ligas.length;
-      h += ligas.map(function (l, i) {
+      if (ancho()) h += tablaLigas(ligas); // T0225: en el ordenador, tabla
+      else h += ligas.map(function (l, i) {
         return '<div class="ec-grupo ec-liga" style="padding:11px 0"><div class="ec-gl"><b>' + esc(l.liga) + '</b><span class="ec-num ' + signo(l.resultadoEqN) + '">' + esc(l.resultadoEq) + ' / equipo</span></div>' +
           '<div class="ec-gs"><span>' + esc(l.comp) + ' · ' + esc(l.dia) + '</span><span>margen ' + esc(l.pct) + '</span></div>' +
           barra(l.pctN, l.pctN != null && l.pctN < 0) +
           '<div class="ec-cifras"><div><b>' + esc(l.equipos) + '</b>equipos</div><div><b>' + esc(l.ingresos) + '</b>ingresos</div>' +
           '<div><b>' + esc(l.margen) + '</b>margen directo</div><div><b class="' + signo(l.resultadoN) + '">' + esc(l.resultado) + '</b>resultado</div></div></div>';
       }).join('');
-      h += '</div>' + (sin ? '<p class="ec-s" style="margin:10px 2px;color:var(--ec-g);font-size:12.5px">' + sin + (sin === 1 ? ' liga aún sin datos.' : ' ligas aún sin datos.') + '</p>' : '') +
+      h += (ancho() ? '' : '</div>') + (sin ? '<p class="ec-s" style="margin:10px 2px;color:var(--ec-g);font-size:12.5px">' + sin + (sin === 1 ? ' liga aún sin datos.' : ' ligas aún sin datos.') + '</p>' : '') +
         '<p class="ec-s" style="margin:10px 2px;color:var(--ec-g);font-size:12.5px">Margen directo = ingresos − campos, árbitros y gestión. El resultado reparte además el resto de gastos de la competición y los generales. Se recalcula cada hora.</p>';
       main.innerHTML = h;
       $('#ec-ltemp').onchange = function () { S.ligasTemp = this.value; pintar(); };
     });
+  }
+
+  /** T0225: Ligas en el ordenador: una fila por liga, de más a menos rentable por equipo. */
+  function tablaLigas(ligas) {
+    return '<table class="u-tabla ec-tabla"><thead><tr><th>Liga</th><th>Competición</th><th class="num">Equipos</th><th class="num">Ingresos</th>' +
+      '<th class="num">Margen directo</th><th class="num">Margen</th><th class="num">Resultado</th><th class="num">Por equipo</th></tr></thead><tbody>' +
+      ligas.map(function (l) {
+        return '<tr><td class="u-tabla-t">' + esc(l.liga) + '</td><td>' + esc(l.comp) + ' · ' + esc(l.dia) + '</td><td class="num">' + esc(l.equipos) + '</td>' +
+          '<td class="num">' + esc(l.ingresos) + '</td><td class="num">' + esc(l.margen) + '</td><td class="num">' + esc(l.pct) + '</td>' +
+          '<td class="num ' + signo(l.resultadoN) + '">' + esc(l.resultado) + '</td><td class="num ' + signo(l.resultadoEqN) + '">' + esc(l.resultadoEq) + '</td></tr>';
+      }).join('') + '</tbody></table>';
   }
 
   /* ---------- PENDIENTES ---------- */
@@ -528,6 +557,7 @@
       var h = '<p class="ec-s" style="margin:0 2px;color:var(--ec-g);font-size:13px">Movimientos con algún dato por completar. Ábrelos para corregirlos o añadir la factura; cuando están completos, desaparecen de aquí.</p>' +
         '<div class="ec-chips" style="margin-top:10px"><button type="button" class="ec-chip" data-ec-f="" aria-pressed="' + !f + '">Todos · ' + r.lista.length + '</button>' +
         conts.map(function (c) { var k = clave(c.n); return '<button type="button" class="ec-chip" data-ec-f="' + esc(k) + '" aria-pressed="' + (f === k) + '">' + esc((c.n.charAt(0) + c.n.slice(1).toLowerCase()).replace(/\biva\b/, 'IVA')) + ' · ' + c.c + '</button>'; }).join('') + '</div>' +
+        (lista.length && ancho() ? tablaPendientes(lista) : // T0225
         '<div class="ec-card"><ul class="ec-lista">' + (lista.length ? lista.map(function (x) {
           return '<li class="ec-item"><div style="min-width:0"><div class="ec-t">' + esc(x.concepto) + '</div>' +
             '<div class="ec-s">' + esc(x.fecha) + ' · ' + esc(x.comp) + (x.categoria ? ' · ' + esc(x.categoria) : '') + ' · ' + esc(x.emite) + ' → ' + esc(x.recibe) + '</div>' +
@@ -535,7 +565,7 @@
             '<button type="button" class="ec-a" data-ec-ver="' + esc(x.id) + '" data-ec-vc="' + esc(x.comp) + '" style="background:none;border:0;padding:0;cursor:pointer">Ver o corregir ›</button>' +
             (x.url ? '<a class="ec-a" href="' + esc(x.url) + '" target="_blank" rel="noopener">Excel ↗</a>' : '') + '</div></div>' +
             '<div class="ec-d ' + (/^-/.test(x.importe) ? 'ec-neg' : 'ec-pos') + '">' + esc(x.importe) + '<div class="ec-s">ID ' + esc(x.id) + '</div></div></li>';
-        }).join('') : '<li class="ec-vacio">Nada con este filtro.</li>') + '</ul></div>';
+        }).join('') : '<li class="ec-vacio">Nada con este filtro.</li>') + '</ul></div>');
       main.innerHTML = h;
       [].forEach.call(main.querySelectorAll('[data-ec-f]'), function (b) {
         b.onclick = function () { S.pendFiltro = b.getAttribute('data-ec-f'); pintar(); };
@@ -544,6 +574,18 @@
         b.onclick = function () { verMovimiento(b.getAttribute('data-ec-ver'), b.getAttribute('data-ec-vc')); };
       });
     });
+  }
+
+  /** T0225: Pendientes en el ordenador. «Ver o corregir» abre el movimiento, como en el móvil. */
+  function tablaPendientes(lista) {
+    return '<table class="u-tabla ec-tabla"><thead><tr><th>Fecha</th><th>Concepto</th><th>Competición</th><th>De → a</th><th>Falta</th><th class="num">Importe</th><th></th></tr></thead><tbody>' +
+      lista.map(function (x) {
+        return '<tr><td class="num" style="text-align:left">' + esc(x.fecha) + '</td><td><span class="u-tabla-t">' + esc(x.concepto) + '</span>' + (x.categoria ? '<div class="ec-s">' + esc(x.categoria) + '</div>' : '') + '</td>' +
+          '<td>' + esc(x.comp) + '</td><td>' + esc(x.emite) + ' → ' + esc(x.recibe) + '</td><td><span class="ec-tag">' + esc(x.falta) + '</span></td>' +
+          '<td class="num ' + (/^-/.test(x.importe) ? 'ec-neg' : 'ec-pos') + '">' + esc(x.importe) + '</td>' +
+          '<td style="white-space:nowrap"><button type="button" class="ec-a" data-ec-ver="' + esc(x.id) + '" data-ec-vc="' + esc(x.comp) + '" style="background:none;border:0;padding:0;cursor:pointer">Ver o corregir ›</button>' +
+          (x.url ? ' <a class="ec-a" href="' + esc(x.url) + '" target="_blank" rel="noopener">Excel ↗</a>' : '') + '</td></tr>';
+      }).join('') + '</tbody></table>';
   }
 
   /* ---------- MOVIMIENTOS (T0137): lista, detalle, editar y borrar ---------- */
@@ -598,6 +640,7 @@
         var suma = lista.reduce(function (a, m) { return a + (m.eliminado ? 0 : m.total); }, 0);
         $('#ec-mlista').innerHTML = '<p class="ec-s" style="margin:12px 2px 0;font-size:13px;color:var(--ec-g)">' + lista.length + (lista.length === 1 ? ' movimiento' : ' movimientos') +
           (r.total > r.lista.length ? ' (los ' + r.lista.length + ' más recientes de ' + r.total + ')' : '') + ' · suman <b class="' + signo(suma) + '">' + (suma < 0 ? '−' : '') + eur(suma) + '</b></p>' +
+          (lista.length && ancho() ? tablaMovimientos(lista) : // T0225
           '<div class="ec-card"><div class="ec-lista">' + (lista.length ? lista.map(function (m) {
             var eq = esIns(m.categoria) ? nombreEquipo(m.equipo, m.comp) : '';
             var falta = /^⚠/.test(m.estado) ? m.estado.replace(/^⚠️?\s*/, '') : '';
@@ -607,7 +650,7 @@
               (falta || m.link || m.eliminado ? '<div style="margin-top:5px;display:flex;gap:6px;flex-wrap:wrap">' + (m.eliminado ? '<span class="ec-tag ec-tag-g">Borrado</span>' : '') +
                 (falta && !m.eliminado ? '<span class="ec-tag">Falta: ' + esc(falta) + '</span>' : '') + (m.link ? '<span class="ec-tag ec-tag-g"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5l-7.8 7.8a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4L15 6.9"/></svg>' + esc(m.link) + '</span>' : '') + '</div>' : '') +
               '</div><div class="ec-d ' + signo(m.total) + '">' + esc(m.totalTxt) + '</div></button>';
-          }).join('') : '<div class="ec-vacio">No hay movimientos con estos filtros.</div>') + '</div></div>';
+          }).join('') : '<div class="ec-vacio">No hay movimientos con estos filtros.</div>') + '</div></div>');
         [].forEach.call(main.querySelectorAll('[data-ec-m]'), function (b) {
           b.onclick = function () { var id = b.getAttribute('data-ec-m'); detalle(r.lista.filter(function (m) { return String(m.id) === id; })[0]); };
         });
@@ -623,6 +666,24 @@
       if (S.tab === tab) main.innerHTML = errorHtml(e);
     });
   }
+
+  /** T0225: Movimientos en el ordenador. Cada fila abre el movimiento, como en el móvil. */
+  function tablaMovimientos(lista) {
+    return '<table class="u-tabla ec-tabla"><thead><tr><th>Fecha</th><th>Movimiento</th><th>Categoría</th><th>Competición</th><th>De → a</th><th>Avisos</th><th class="num">Importe</th></tr></thead><tbody>' +
+      lista.map(function (m) {
+        var eq = esIns(m.categoria) ? nombreEquipo(m.equipo, m.comp) : '';
+        var falta = /^⚠/.test(m.estado) ? m.estado.replace(/^⚠️?\s*/, '') : '';
+        return '<tr tabindex="0" data-ec-m="' + esc(m.id) + '"' + (m.eliminado ? ' class="ec-borrado"' : '') + '><td class="num" style="text-align:left">' + esc(m.fechaTxt) + '</td>' +
+          '<td class="u-tabla-t">' + esc(eq ? tipoIns(m.categoria) + ' · ' + eq : (m.titulo || m.concepto || m.categoria)) + '</td>' +
+          '<td>' + esc(m.categoria || (m.interno ? 'Traspaso interno' : 'Sin categoría')) + '</td><td>' + esc(compCorta(m.comp)) + '</td><td>' + deA(m.emite, m.recibe, eq) + '</td>' +
+          '<td>' + (m.eliminado ? '<span class="ec-tag ec-tag-g">Borrado</span> ' : '') + (falta && !m.eliminado ? '<span class="ec-tag">Falta: ' + esc(falta) + '</span> ' : '') +
+          (m.link ? '<span class="ec-tag ec-tag-g">' + esc(m.link) + '</span>' : '') + '</td>' +
+          '<td class="num ' + signo(m.total) + '">' + esc(m.totalTxt) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  // T0225: al pasar de móvil a ordenador (o al revés) cambia lista por tabla
+  if (ANCHO.addEventListener) ANCHO.addEventListener('change', function () { if (S.el && document.body.contains(S.el)) pintar(); });
 
   function irTab(t) {
     S.tab = t;
