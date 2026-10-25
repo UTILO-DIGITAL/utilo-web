@@ -11,20 +11,26 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Kanban Konamigas">
 <meta name="theme-color" content="#020252">
-<link rel="stylesheet" href="../kanban/estilo.css">
-<style>:root{--kz-color:#020252;--kz-accion:#FF1B8C;--kz-fondo:#FFFFFF;--kz-texto:#1A1A40}</style>
+<!-- T0149: estilos comunes (PROTOCOLO DISEÑO UTILO). Los colores solo están en marca.css. -->
+<link rel="stylesheet" href="marca.css?v=21">
+<link rel="stylesheet" href="../estilos/base.css?v=21">
 <script>
   window.KANBAN = {
     clave: 'konamigas',
+    marca: 'konamigas', // T0149: usa konamigas/marca.css y estilos/base.css
     nombreApp: 'Kanban Konamigas',
     color: '#020252',
-    accion: '#FF1B8C',
-    api: 'https://script.google.com/macros/s/AKfycbzdtIES9pW1f_L8Ee5HlJb2YJvQo7HrGg8_tj5GHL2a6FYosEkvPpMTUm-KV4ODDIcRDg/exec'
+    // T0161: UTILO_CORE 4.1 (entrar con Google), proyecto de Konamigas en utilo.digital. Antes: la API del script fino del DAILY con PIN y la librería KANBAN_CORE 27 (AKfycbzdtIES…), que sigue existiendo para volver atrás.
+    google: '405319382307-oido241fdeknsvv2mub9u9e6qh9tao6h.apps.googleusercontent.com',
+    proyecto: '405319382307',
+    clavePicker: 'AIzaSyAZXmBAdcHLu2mdYeljY_WMe5w6iVn6hLg',
+    api: 'https://script.google.com/macros/s/AKfycbzu2b5-nNuqKHAmj3vKPEBTcU0Q_yuFXi66hXJtuomOEH46-auv8K91Srm-7n8LxY7Q/exec'
   };
 </script>
 </head>
-<body>
-<div class="kz"><div class="kz-caja"><div class="kz-giro"></div><p>Cargando…</p></div></div>
-<script src="../kanban/app.js"></script>
+<body class="u">
+<div class="kz"><div class="kz-caja kz-centro" role="status"><div class="u-carga"></div><p>Cargando…</p></div></div>
+<script src="../kanban4/google.js?v=21"></script>
+<script src="../kanban4/app.js?v=21"></script>
 </body>
 </html>
