@@ -11,7 +11,7 @@
  * T0135: mismas fuentes, tamaños, botones y ventanas que el kanban; versión y «Pedir algo a Utilo» también aquí.
  * T0137: pestaña Movimientos (ver, buscar, editar y borrar; los borrados quedan en el Excel y todo cambio va a HISTORIAL).
  * T0138: factura o ticket de un movimiento: foto o PDF que se sube a Drive, o uno que ya está en Drive.
- * T0145: la factura o el ticket se ve dentro de la app («👁 Ver»), con la vista previa de Drive (economiaArchivo).
+ * T0145: la factura o el ticket se ve dentro de la app («Ver»), con la vista previa de Drive (economiaArchivo).
  * T0207: con la llave de la persona, la web solo ve en Drive lo que ha subido o elegido con ella: una factura que ya está
  *   en Drive se elige con la ventana de Google (UG.elegir) y lo que no se puede previsualizar se abre en Drive.
  * Resumen: desplegable discreto «Beneficio y reparto» de la temporada elegida (beneficio, reparto a socios, resultado) y pestaña Presupuesto
@@ -37,143 +37,143 @@
     return window.UG.seccion(c.api, { fn: fn, args: args || [] }, c.clave);
   }
 
-  /* ---------- estilos (T0135: mismas fuentes, tamaños, botones y ventanas que el kanban) ---------- */
-  function tema() {
-    // Se copia del kanban de la misma página (cabecera .cab): fuentes y color de los títulos.
-    var t = { titulos: 'Montserrat, Lato, Arial, sans-serif', texto: 'Lato, Arial, sans-serif', destacado: '#ffffff' };
-    try {
-      var h1 = document.querySelector('header.cab h1');
-      if (h1) { var c = getComputedStyle(h1); t.titulos = c.fontFamily; t.destacado = c.color; }
-      t.texto = getComputedStyle(document.body).fontFamily || t.texto;
-    } catch (e) {}
-    if (!/Lato|Montserrat/i.test(t.texto + t.titulos) || !document.querySelector('link[href*="fonts.googleapis.com"]')) {
-      if (!document.querySelector('link[data-ec-fuentes]')) {
-        var l = document.createElement('link'); l.rel = 'stylesheet'; l.setAttribute('data-ec-fuentes', '1');
-        l.href = 'https://fonts.googleapis.com/css2?family=Montserrat:wght@500&family=Lato:wght@400;600;700&display=swap';
-        document.head.appendChild(l);
-      }
-      if (!/Lato/i.test(t.texto)) t.texto = 'Lato, Arial, sans-serif';
-      if (!/Montserrat/i.test(t.titulos)) t.titulos = 'Montserrat, Lato, Arial, sans-serif';
-    }
-    return t;
-  }
-
+  /* ---------- estilos (T0149 · PROTOCOLO DISEÑO UTILO) ----------
+   * Solo variables de [negocio]/marca.css y estilos/base.css: ningún color, letra ni radio escrito aquí.
+   * Los botones, campos y ventanas se ven como los del tablero (estilos/kanban.css); los campos los pone base.css.
+   * Los alias --ec-* siguen para los estilos que van en el propio HTML. */
   function css() {
-    var c = ctx(), col = c.color || '#020252', acc = c.accion || '#FF1B8C', T = tema();
-    return '.ec{--ec-c:' + col + ';--ec-a:' + acc + ';--ec-v:#0f8a4b;--ec-r:#c62828;--ec-g:#6b6b85;--ec-l:#ececf4;--ec-f:#f6f6fa;--ec-d:' + T.destacado + ';' +
-      '--ec-ft:' + T.texto + ';--ec-fh:' + T.titulos + ';font-family:var(--ec-ft);color:#1A1A40;font-size:14px;line-height:1.4}' +
-      '.ec *{box-sizing:border-box}.ec button,.ec input,.ec select,.ec textarea{font-family:var(--ec-ft)}' +
+    return '.ec{--ec-c:var(--color-principal);--ec-a:var(--color-accion);--ec-v:var(--color-bien);--ec-r:var(--color-error);' +
+      '--ec-g:var(--color-suave);--ec-l:var(--color-linea);--ec-f:var(--color-bloque);--ec-am:var(--estado-pr);' +
+      'font:400 14px/1.45 var(--fuente-texto);color:var(--color-texto)}' +
+      '.ec *{box-sizing:border-box}.ec button{font-family:var(--fuente-texto)}' +
       'html.ec-sin-scroll,html.ec-sin-scroll body{overflow:hidden}' +
-      // Cabecera como la del kanban: título en Montserrat del color destacado, versión y «Pedir algo a Utilo» a la derecha.
-      '.ec-cab{position:relative;background:var(--ec-c);color:#fff;padding:14px 18px 0}' +
-      '.ec-cab h1{margin:0;padding-right:110px;font-family:var(--ec-fh);font-size:26px;font-weight:500;color:var(--ec-d);letter-spacing:0}' +
-      '.ec-cab>p{margin:4px 0 0;font-size:13px;color:#fff;display:flex;align-items:center;gap:8px}' +
-      '.ec-re{background:transparent;border:0;color:#fff;opacity:.85;font-size:15px;padding:0 4px;cursor:pointer}.ec-re:disabled{opacity:.4}' +
-      '.ec-ver{position:absolute;top:18px;right:58px;background:transparent;border:0;color:#fff;font-size:11px;font-weight:700;padding:4px 6px;border-radius:999px;cursor:pointer}' +
-      '.ec-sol{position:absolute;top:10px;right:12px;width:38px;height:38px;border-radius:50%;border:0;background:rgba(255,252,247,.16);color:#fff;font-size:18px;cursor:pointer}' +
-      '.ec-tabs{display:flex;gap:2px;margin:10px -18px 0;padding:0 10px;overflow-x:auto;scrollbar-width:none}.ec-tabs::-webkit-scrollbar{display:none}' +
-      '.ec-tabs button{flex:0 0 auto;background:transparent;border:0;color:#fff;opacity:.7;font-size:14px;font-weight:700;padding:10px 10px 12px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}' +
-      '.ec-tabs button[aria-selected=true]{opacity:1;border-bottom-color:var(--ec-a)}' +
-      '.ec-tabs .ec-n{display:inline-block;min-width:20px;padding:2px 6px;margin-left:5px;border-radius:999px;background:var(--ec-a);color:#fff;font-size:11px}' +
-      '.ec-main{max-width:760px;margin:0 auto;padding:16px 14px 120px}' +
-      '.ec-fila{display:flex;gap:10px;flex-wrap:wrap;align-items:center}' +
-      // Campos como los del kanban.
-      '.ec select,.ec input[type=text],.ec input[type=search],.ec input[type=date],.ec input[inputmode],.ec textarea{font-size:15px;padding:8px 10px;border:1px solid #cfd8d4;border-radius:8px;background:#fff;color:inherit;min-width:0;max-width:100%}' +
-      '.ec input[type=date]{-webkit-appearance:none;appearance:none;min-height:40px;width:100%}' +
-      '.ec select:focus,.ec input:focus,.ec textarea:focus{outline:2px solid var(--ec-c);outline-offset:0;border-color:transparent}' +
-      '.ec textarea{width:100%;resize:vertical}' +
+      // Cabecera como la del tablero: título, versión y «Pedir algo a Utilo» en una línea; debajo, la hora y las pestañas.
+      '.ec-cab{background:var(--color-principal);color:var(--color-sobre-principal);padding:var(--e3) var(--e4) 0;display:flex;flex-wrap:wrap;align-items:center;gap:var(--e2) var(--e3)}' +
+      '.ec-cab h1{order:-1;flex:1 1 auto;min-width:0;margin:0;font:var(--peso-titulos) 24px/1.2 var(--fuente-titulos);color:var(--color-sobre-principal);display:flex;align-items:baseline;flex-wrap:wrap;gap:0 var(--e3)}' +
+      '.ec-pint{font:400 22px/1.1 var(--fuente-destacar,var(--fuente-titulos));color:var(--color-destacado);transform:rotate(-3deg);display:inline-block}' +
+      '.ec-cab>p{flex:1 1 100%;margin:0;font-size:13px;display:flex;align-items:center;gap:var(--e2);font-variant-numeric:tabular-nums}' +
+      '.ec-re{min-width:44px;min-height:36px;background:transparent;border:0;color:inherit;font-size:18px;padding:0;cursor:pointer}.ec-re:disabled{opacity:.5;cursor:wait}' +
+      '.ec-ver,.ec-sol{min-height:36px;padding:0 var(--e3);border:0;border-radius:var(--radio);background:var(--color-fondo);color:var(--color-principal-oscuro);' +
+      'font:700 14px/1 var(--fuente-texto);cursor:pointer;display:inline-flex;align-items:center;gap:var(--e2);font-variant-numeric:tabular-nums}' +
+      '.ec-sol{width:44px;padding:0;justify-content:center}.ec-sol svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}' +
+      '.ec-tabs{flex:1 1 100%;display:flex;gap:2px;margin:0 calc(-1 * var(--e4));padding:0 var(--e2);overflow-x:auto;scrollbar-width:none}.ec-tabs::-webkit-scrollbar{display:none}' +
+      '.ec-tabs button{flex:0 0 auto;min-height:44px;background:transparent;border:0;color:var(--color-sobre-principal);opacity:.75;font:700 14px/1 var(--fuente-texto);padding:0 var(--e3);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}' +
+      '.ec-tabs button[aria-selected=true]{opacity:1;border-bottom-color:var(--color-destacado)}' +
+      '.ec-tabs .ec-n{display:inline-block;min-width:20px;padding:2px var(--e1);margin-left:var(--e1);border-radius:var(--radio-peq);background:var(--color-destacado);color:var(--color-texto);font-size:12px;text-align:center;font-variant-numeric:tabular-nums}' +
+      '.ec-main{max-width:760px;margin:0 auto;padding:var(--e4) var(--e4) 120px}' +
+      '.ec-fila{display:flex;gap:var(--e2);flex-wrap:wrap;align-items:center}' +
+      // Campos: los de base.css (.u input, .u select). Aquí solo el ancho.
+      '.ec input[type=date]{-webkit-appearance:none;appearance:none;width:100%}' +
+      '.ec textarea{width:100%}' +
       '.ec-sel{flex:1 1 140px}' +
-      '.ec-card{background:#fff;border:1px solid var(--ec-l);border-radius:14px;padding:14px 16px;margin-top:12px}' +
-      '.ec-av{margin-top:14px}.ec-av-t{display:flex;justify-content:space-between;font-size:13px;color:var(--ec-g);font-weight:600}' +
-      '.ec-barra{height:8px;border-radius:999px;background:var(--ec-l);overflow:hidden;margin-top:6px}.ec-barra i{display:block;height:100%;background:var(--ec-c);border-radius:999px}' +
-      '.ec-kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}' +
-      '.ec-kpi{background:var(--ec-f);border-radius:14px;padding:12px 14px}.ec-kpi.ec-grande{grid-column:1/-1;background:var(--ec-c);color:#fff}' +
-      '.ec-kpi b{display:block;font-size:11px;letter-spacing:.4px;text-transform:uppercase;opacity:.75;font-weight:700}' +
-      '.ec-kpi .ec-val{display:block;font-family:var(--ec-fh);font-weight:500;font-size:22px;margin-top:3px;font-variant-numeric:tabular-nums}.ec-kpi.ec-grande .ec-val{font-size:30px;color:var(--ec-d)}' +
-      '.ec-kpi span.ec-sub{display:block;font-size:12.5px;margin-top:3px;opacity:.85}' +
-      '.ec-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}' +
-      '.ec-mini button,.ec-mini div{background:var(--ec-f);border:0;border-radius:12px;padding:10px;text-align:center;color:inherit}' +
-      '.ec-mini b{display:block;font-family:var(--ec-fh);font-weight:500;font-size:19px;font-variant-numeric:tabular-nums}.ec-mini small{font-size:12px;color:var(--ec-g);font-weight:600}' +
-      '.ec-mini button{cursor:pointer}.ec-mini button.ec-alerta b{color:var(--ec-a)}' +
-      '.ec-h2{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--ec-c);margin:24px 2px 4px;font-weight:700}' +
-      '.ec-pos{color:var(--ec-v)}.ec-neg{color:var(--ec-r)}.ec-kpi.ec-grande .ec-pos,.ec-kpi.ec-grande .ec-neg{color:#fff}' +
+      '.ec-card{background:var(--color-superficie);border:1px solid var(--ec-l);border-radius:var(--radio);padding:var(--e3) var(--e4);margin-top:var(--e3)}' +
+      '.ec-av{margin-top:var(--e4)}.ec-av-t{display:flex;justify-content:space-between;gap:var(--e2);font-size:13px;color:var(--ec-g);font-weight:600}' +
+      '.ec-barra{height:8px;border-radius:var(--radio-peq);background:var(--ec-l);overflow:hidden;margin-top:var(--e2)}.ec-barra i{display:block;height:100%;background:var(--ec-c)}' +
+      '.ec-kpis{display:grid;grid-template-columns:1fr 1fr;gap:var(--e2);margin-top:var(--e4)}' +
+      '.ec-kpi{background:var(--ec-f);border-radius:var(--radio);padding:var(--e3) var(--e4)}' +
+      '.ec-kpi.ec-grande{grid-column:1/-1;background:var(--ec-c);color:var(--color-sobre-principal)}' +
+      '.ec-kpi b{display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;font-weight:700;color:var(--ec-g)}.ec-kpi.ec-grande b{color:inherit}' +
+      '.ec-kpi .ec-val{display:block;font:var(--peso-titulos) 22px/1.2 var(--fuente-titulos);margin-top:var(--e1);font-variant-numeric:tabular-nums}' +
+      '.ec-kpi.ec-grande .ec-val{font-size:30px;color:var(--color-destacado)}' +
+      '.ec-kpi span.ec-sub{display:block;font-size:13px;margin-top:var(--e1)}' +
+      '.ec-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--e2);margin-top:var(--e2)}' +
+      '.ec-mini button,.ec-mini div{background:var(--ec-f);border:0;border-radius:var(--radio);padding:var(--e2);text-align:center;color:inherit}' +
+      '.ec-mini b{display:block;font:var(--peso-titulos) 20px/1.2 var(--fuente-titulos);font-variant-numeric:tabular-nums}.ec-mini small{font-size:12px;color:var(--ec-g);font-weight:600}' +
+      '.ec-mini button{cursor:pointer;min-height:44px}.ec-mini button.ec-alerta b{color:var(--ec-r)}' +
+      '.ec .ec-h2{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--color-principal-oscuro);margin:var(--e5) 0 var(--e1);font-weight:700;font-family:var(--fuente-texto)}' +
+      '.ec-pos{color:var(--ec-v)}.ec-neg{color:var(--ec-r)}.ec-amb{color:var(--ec-am)}.ec-kpi.ec-grande .ec-pos,.ec-kpi.ec-grande .ec-neg{color:inherit}' +
       '.ec-grupo{border-top:1px solid var(--ec-l)}.ec-grupo:first-of-type{border-top:0}' +
-      '.ec-gb{display:block;width:100%;background:none;border:0;color:inherit;text-align:left;padding:11px 0;cursor:pointer;font-size:14px}' +
-      '.ec-gl{display:flex;justify-content:space-between;gap:10px;align-items:baseline}.ec-gl b{font-size:15px;font-weight:700}' +
-      '.ec-gl .ec-num{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}' +
-      '.ec-gs{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--ec-g);margin-top:3px}' +
+      '.ec-gb{display:block;width:100%;background:none;border:0;color:inherit;text-align:left;padding:var(--e3) 0;cursor:pointer;font-size:14px}' +
+      '.ec-gl{display:flex;justify-content:space-between;gap:var(--e2);align-items:baseline}.ec-gl b{font-size:15px;font-weight:700}' +
+      '.ec-gl .ec-num{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}' +
+      '.ec-gs{display:flex;justify-content:space-between;gap:var(--e2);font-size:13px;color:var(--ec-g);margin-top:var(--e1)}' +
       '.ec-gb .ec-barra{height:6px}.ec-barra i.ec-mal{background:var(--ec-r)}' +
       '.ec-flecha{display:inline-block;width:14px;color:var(--ec-g);transition:transform .15s}.ec-gb[aria-expanded=true] .ec-flecha{transform:rotate(90deg)}' +
-      '.ec-lineas{padding:0 0 10px 14px}' +
-      '.ec-linea{display:block;width:100%;background:none;border:0;border-top:1px dashed var(--ec-l);color:inherit;text-align:left;font-size:13.5px;padding:8px 0;cursor:pointer}' +
-      '.ec-linea .ec-gl b{font-size:13.5px;font-weight:600}.ec-linea .ec-barra{height:4px;margin-top:5px}.ec-linea .ec-gs{font-size:12px}.ec-linea .ec-ir{color:var(--ec-c);font-weight:700}' +
+      '.ec-lineas{padding:0 0 var(--e2) var(--e4)}' +
+      '.ec-linea{display:block;width:100%;background:none;border:0;border-top:1px solid var(--ec-l);color:inherit;text-align:left;font-size:14px;padding:var(--e2) 0;cursor:pointer}' +
+      '.ec-linea .ec-gl b{font-size:14px;font-weight:600}.ec-linea .ec-barra{height:4px;margin-top:var(--e1)}.ec-linea .ec-gs{font-size:12px}.ec-linea .ec-ir{color:var(--color-principal-oscuro);font-weight:700}' +
       '.ec-gs b{font-weight:700}' +
       '.ec-avd summary{list-style:none;cursor:pointer}.ec-avd summary::-webkit-details-marker{display:none}.ec-avd[open] summary .ec-flecha{transform:rotate(90deg)}' +
-      '.ec-avc{margin:10px 0 0 18px}.ec-avc .ec-av-t{font-size:12.5px}.ec-avc .ec-barra{height:5px;margin-top:4px}' +
-      '.ec-socio{display:flex;justify-content:space-between;gap:10px;padding:5px 0 5px 14px;font-size:13px;color:var(--ec-g)}.ec-socio span:last-child{font-variant-numeric:tabular-nums}' +
-      '.ec-rep{padding:0 16px}.ec-rep summary{list-style:none;cursor:pointer;padding:12px 0;display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:14px}' +
-      '.ec-rep summary::-webkit-details-marker{display:none}.ec-rep summary b{font-weight:700}.ec-rep summary .ec-flecha{transition:transform .15s}.ec-rep[open] summary .ec-flecha{transform:rotate(90deg)}' +
+      '.ec-avc{margin:var(--e2) 0 0 var(--e4)}.ec-avc .ec-av-t{font-size:13px}.ec-avc .ec-barra{height:5px;margin-top:var(--e1)}' +
+      '.ec-socio{display:flex;justify-content:space-between;gap:var(--e2);padding:var(--e1) 0 var(--e1) var(--e4);font-size:13px;color:var(--ec-g)}.ec-socio span:last-child{font-variant-numeric:tabular-nums}' +
+      '.ec-rep{padding:0 var(--e4)}.ec-rep summary{list-style:none;cursor:pointer;padding:var(--e3) 0;display:flex;justify-content:space-between;gap:var(--e2);align-items:center;font-size:14px}' +
+      '.ec-rep summary::-webkit-details-marker{display:none}.ec-rep summary b{font-weight:700}.ec-rep[open] summary .ec-flecha{transform:rotate(90deg)}' +
       '.ec-rep summary span:last-child{color:var(--ec-g);font-size:13px;white-space:nowrap}' +
-      '.ec-rf{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--ec-l);font-size:14px}.ec-rf span:last-child{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}' +
+      '.ec-rf{display:flex;justify-content:space-between;gap:var(--e2);padding:var(--e2) 0;border-top:1px solid var(--ec-l);font-size:14px}.ec-rf span:last-child{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}' +
       '.ec-rf.ec-tot{font-weight:700}.ec-rf small{display:block;color:var(--ec-g);font-size:12px;font-weight:400}' +
-      '.ec-av2{border-left:4px solid var(--ec-r);padding:10px 12px;background:#fff;border-radius:10px;margin-top:10px;box-shadow:0 0 0 1px var(--ec-l) inset}' +
-      '.ec-av2.ec-amb{border-left-color:#d98a00}.ec-av2.ec-inf{border-left-color:var(--ec-c)}' +
-      '.ec-av2 b{display:block;font-size:14.5px}.ec-av2 p{margin:4px 0 0;font-size:13.5px}.ec-av2 .ec-a{display:inline-block;margin-top:6px}' +
-      '.ec-pl{padding:9px 0;border-top:1px dashed var(--ec-l)}.ec-pl:first-child{border-top:0}.ec-pl .ec-gs{font-size:12px}' +
-      '.ec-pl .ec-org{font-size:12px;color:var(--ec-g);margin-top:3px}' +
-      '.ec-lista{list-style:none;margin:0;padding:0}.ec-item{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-top:1px solid var(--ec-l);align-items:center}' +
-      '.ec-item:first-child{border-top:0}.ec-item .ec-t{font-weight:700;font-size:14.5px}.ec-item .ec-s{font-size:12.5px;color:var(--ec-g);margin-top:2px}' +
+      // Avisos: franja de 4 px con el color del aviso, sin sombra.
+      '.ec-av2{border:1px solid var(--ec-l);border-left:4px solid var(--ec-r);padding:var(--e3);background:var(--color-superficie);border-radius:var(--radio);margin-top:var(--e2)}' +
+      '.ec-av2.ec-amb{border-left-color:var(--ec-am);color:inherit}.ec-av2.ec-inf{border-left-color:var(--ec-c)}' +
+      '.ec-av2 b{display:block;font-size:15px}.ec-av2 p{margin:var(--e1) 0 0;font-size:14px}.ec-av2 .ec-a{display:inline-block;margin-top:var(--e2)}' +
+      '.ec-pl{padding:var(--e2) 0;border-top:1px solid var(--ec-l)}.ec-pl:first-child{border-top:0}.ec-pl .ec-gs{font-size:12px}' +
+      '.ec-pl .ec-org{font-size:12px;color:var(--ec-g);margin-top:var(--e1)}' +
+      // Listas: filas separadas por una línea, cifras alineadas a la derecha.
+      '.ec-lista{list-style:none;margin:0;padding:0}.ec-item{display:flex;justify-content:space-between;gap:var(--e3);padding:var(--e3) 0;border-top:1px solid var(--ec-l);align-items:center}' +
+      '.ec-item:first-child{border-top:0}.ec-item .ec-t{font-weight:700;font-size:15px}.ec-item .ec-s{font-size:13px;color:var(--ec-g);margin-top:2px}' +
       '.ec-item .ec-d{text-align:right;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}' +
       'button.ec-item{width:100%;background:none;border:0;border-top:1px solid var(--ec-l);color:inherit;text-align:left;cursor:pointer}' +
-      '.ec-borrado .ec-t,.ec-borrado .ec-d{text-decoration:line-through;opacity:.55}' +
-      '.ec-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}.ec-chip{border:1px solid #cfd8d4;background:#fff;border-radius:999px;padding:7px 12px;font-size:13.5px;font-weight:600;color:inherit;cursor:pointer}' +
-      '.ec-chip[aria-pressed=true]{background:var(--ec-c);border-color:var(--ec-c);color:#fff}' +
-      '.ec-tag{display:inline-block;padding:3px 8px;border-radius:999px;background:color-mix(in srgb,var(--ec-a) 14%,#fff);color:var(--ec-a);font-size:12px;font-weight:700}' +
-      '.ec-tag-g{background:var(--ec-f);color:var(--ec-g)}' +
-      '.ec-a{color:var(--ec-c);font-weight:700;font-size:13px}' +
-      '.ec-volver{background:none;border:0;color:var(--ec-c);font-size:15px;font-weight:700;padding:6px 0 10px;cursor:pointer}' +
-      '.ec-liga .ec-gl b{font-size:15.5px}.ec-liga .ec-cifras{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px;font-size:12px;color:var(--ec-g)}' +
-      '.ec-liga .ec-cifras b{display:block;color:#1A1A40;font-size:14px;font-variant-numeric:tabular-nums}' +
-      '.ec-vacio{text-align:center;color:var(--ec-g);padding:30px 10px}' +
-      '.ec-cargando{text-align:center;color:var(--ec-g);padding:40px 10px}.ec-giro{width:30px;height:30px;border:3px solid var(--ec-l);border-top-color:var(--ec-c);border-radius:50%;margin:0 auto 12px;animation:ecg 0.8s linear infinite}@keyframes ecg{to{transform:rotate(360deg)}}' +
-      '.ec-error{background:#fdecec;color:var(--ec-r);border-radius:10px;padding:10px 12px;margin-top:12px}' +
-      // Botón de añadir: igual que «+ Nueva tarea» del kanban.
-      '.ec-fab{position:fixed;right:20px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:44;background:var(--ec-a);color:#fff;border:0;border-radius:10px;padding:13.44px 23.52px;font-size:16.8px;font-weight:700;box-shadow:0 4px 14px rgba(28,43,38,.25);cursor:pointer}' +
-      '.ec-fab:focus-visible,.ec button:focus-visible{outline:3px solid var(--ec-c);outline-offset:2px}' +
-      // Ventanas: como «Nueva tarea» del kanban (tarjeta centrada arriba, velo oscuro).
-      '.ec-velo{position:fixed;inset:0;z-index:60;background:rgba(28,43,38,.45);display:flex;align-items:flex-start;justify-content:center;padding:24px 12px;overflow-y:auto;-webkit-overflow-scrolling:touch}' +
-      '.ec-hoja{background:#fff;width:100%;max-width:560px;border-radius:14px;padding:22px 22px 18px;font-size:15px;margin-bottom:24px}' +
-      '.ec-hoja h2{margin:0 0 14px;font-family:var(--ec-fh);font-weight:500;font-size:24px;color:var(--ec-c);display:flex;justify-content:space-between;align-items:flex-start;gap:10px;line-height:1.2}' +
-      '.ec-x{background:none;border:0;font-size:28px;line-height:1;cursor:pointer;color:var(--ec-g);padding:0 2px}' +
-      '.ec-sw{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--ec-f);padding:4px;border-radius:10px}' +
-      '.ec-sw button{border:0;border-radius:8px;padding:10px;font-size:15px;font-weight:700;background:transparent;color:var(--ec-g);cursor:pointer}' +
-      '.ec-sw button[aria-pressed=true]{background:#fff;color:#1A1A40;box-shadow:0 1px 4px rgba(0,0,0,.12)}' +
+      '.ec-borrado .ec-t,.ec-borrado .ec-d{text-decoration:line-through;opacity:.6}' +
+      // Filtros en botones (como los del tablero) y etiquetas pequeñas.
+      '.ec-chips{display:flex;gap:var(--e2);flex-wrap:wrap;margin-top:var(--e1)}' +
+      '.ec-chip{min-height:40px;border:1.5px solid var(--color-borde-campo);background:var(--color-superficie);border-radius:var(--radio);padding:0 var(--e3);font:600 14px/1 var(--fuente-texto);color:inherit;cursor:pointer;font-variant-numeric:tabular-nums}' +
+      '.ec-chip[aria-pressed=true]{background:var(--ec-c);border-color:var(--ec-c);color:var(--color-sobre-principal)}' +
+      '.ec-tag{display:inline-flex;align-items:center;gap:var(--e1);padding:1px var(--e2);border-radius:var(--radio-peq);background:var(--ec-f);color:var(--color-texto);font:700 12px/1.6 var(--fuente-texto)}' +
+      '.ec-tag svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
+      '.ec-tag-g{background:transparent;border:1px solid var(--ec-l);color:var(--ec-g)}' +
+      '.ec-a{color:var(--color-principal-oscuro);font-weight:700;font-size:13px}' +
+      '.ec-volver{background:none;border:0;color:var(--color-principal-oscuro);font:700 15px/1 var(--fuente-texto);min-height:44px;padding:0;cursor:pointer}' +
+      '.ec-liga .ec-gl b{font-size:15px}.ec-liga .ec-cifras{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--e2);margin-top:var(--e2);font-size:12px;color:var(--ec-g)}' +
+      '.ec-liga .ec-cifras b{display:block;color:var(--color-texto);font-size:14px;font-variant-numeric:tabular-nums}' +
+      '.ec-vacio{color:var(--ec-g);padding:var(--e6) var(--e2);text-align:center}' +
+      '.ec-cargando{text-align:center;color:var(--ec-g);padding:var(--e7) var(--e2);display:flex;flex-direction:column;gap:var(--e3)}' +
+      '.ec-error{border:1px solid var(--ec-r);border-left-width:4px;color:var(--ec-r);background:var(--color-superficie);font-weight:700;border-radius:var(--radio);padding:var(--e3);margin-top:var(--e3)}' +
+      // Botón de añadir: el mismo que «Añadir tarea» del tablero (lo único que flota, con sombra).
+      '.ec-fab{position:fixed;right:var(--e4);bottom:calc(72px + env(safe-area-inset-bottom,0px));z-index:44;min-height:52px;padding:0 var(--e5);border:0;border-radius:var(--radio);' +
+      'background:var(--ec-a);color:var(--color-sobre-accion);font:800 19px/1 var(--fuente-texto);box-shadow:var(--sombra-flota);cursor:pointer}' +
+      // Ventanas: como «Nueva tarea» del tablero.
+      '.ec-velo{position:fixed;inset:0;z-index:60;background:var(--color-velo);display:flex;align-items:flex-start;justify-content:center;padding:6vh var(--e3);overflow-y:auto;-webkit-overflow-scrolling:touch}' +
+      '.ec-hoja{background:var(--color-fondo);color:var(--color-texto);width:100%;max-width:560px;border-radius:var(--radio);padding:var(--e5);font-size:15px;margin-bottom:var(--e5);box-shadow:var(--sombra-flota)}' +
+      '.ec-hoja h2{margin:0 0 var(--e3);font:var(--peso-titulos) 24px/1.2 var(--fuente-titulos);color:var(--color-principal-oscuro);display:flex;justify-content:space-between;align-items:flex-start;gap:var(--e2)}' +
+      '.ec-x{flex:none;width:44px;height:44px;margin:-10px -10px 0 0;background:none;border:0;font-size:28px;line-height:1;cursor:pointer;color:var(--ec-g);padding:0}' +
+      '.ec-sw{display:grid;grid-template-columns:1fr 1fr;gap:var(--e1);background:var(--ec-f);padding:var(--e1);border-radius:var(--radio)}' +
+      '.ec-sw button{min-height:44px;border:1px solid transparent;border-radius:var(--radio-peq);font:700 15px/1 var(--fuente-texto);background:transparent;color:var(--ec-g);cursor:pointer}' +
+      '.ec-sw button[aria-pressed=true]{background:var(--color-superficie);border-color:var(--ec-l);color:var(--color-texto)}' +
       '.ec-sw button[aria-pressed=true].ec-in{color:var(--ec-v)}.ec-sw button[aria-pressed=true].ec-out{color:var(--ec-r)}' +
-      '.ec-campo{display:block;margin-top:12px;font-size:15px;font-weight:600;color:#1A1A40;min-width:0}.ec-campo>select,.ec-campo>input,.ec-campo>textarea{display:block;width:100%;margin-top:4px;font-weight:400}' +
-      '.ec-opc{font-weight:400;color:var(--ec-g)}' +
-      '.ec-dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}' +
-      '.ec-check{display:flex;align-items:center;gap:8px;margin-top:12px;font-weight:600;font-size:14.5px}.ec-check input{width:20px;height:20px;flex:none}' +
-      '.ec-imp{font-size:24px!important;font-weight:700;text-align:right}' +
-      '.ec-acc{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px}' +
-      '.ec-b1,.ec-b2{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:10px;font-weight:700;cursor:pointer;text-decoration:none}' +
-      '.ec-b1{background:var(--ec-a);color:#fff;border:0;padding:13.44px 23.52px;font-size:16.8px}.ec-b1:disabled,.ec-b2:disabled{opacity:.6}' +
-      '.ec-b1r{background:var(--ec-r)}' +
-      '.ec-b2{background:transparent;color:var(--ec-c);border:2px solid var(--ec-c);padding:11.2px 19.2px;font-size:16px}.ec-b2r{color:var(--ec-r);border-color:var(--ec-r)}' +
-      '.ec-subir{display:flex;width:100%;margin-top:14px}' +
-      '.ec-flist{margin-top:10px;max-height:46vh;overflow:auto}' +
-      '.ec-dimp{font-family:var(--ec-fh);font-weight:500;font-size:30px;margin:-4px 0 10px;font-variant-numeric:tabular-nums}' +
-      '.ec-dl{border-top:1px solid var(--ec-l)}.ec-df{display:flex;justify-content:space-between;gap:14px;padding:8px 0;border-bottom:1px solid var(--ec-l);font-size:14px}' +
+      '.ec-campo{display:block;margin-top:var(--e3);font:700 12px/1.3 var(--fuente-texto);color:var(--color-principal-oscuro);text-transform:uppercase;letter-spacing:.02em;min-width:0}' +
+      '.ec-campo>select,.ec-campo>input,.ec-campo>textarea{display:block;width:100%;margin-top:var(--e1);text-transform:none;letter-spacing:0}' +
+      '.ec-opc{font-weight:400;color:var(--ec-g);text-transform:none;letter-spacing:0}' +
+      '.ec-dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--e3)}' +
+      '.ec-check{display:flex;align-items:center;gap:var(--e2);margin-top:var(--e3);font-weight:600;font-size:15px;min-height:32px}.ec-check input{flex:none}' +
+      '.ec .ec-imp{font-size:24px!important;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}' +
+      '.ec-acc{display:flex;justify-content:flex-end;gap:var(--e2);flex-wrap:wrap;margin-top:var(--e4)}' +
+      // Un solo botón con el color de acción por pantalla (-b1); los demás, con contorno (-b2).
+      '.ec-b1,.ec-b2{display:inline-flex;align-items:center;justify-content:center;gap:var(--e2);min-height:44px;border-radius:var(--radio);cursor:pointer;text-decoration:none}' +
+      '.ec-b1{background:var(--ec-a);color:var(--color-sobre-accion);border:0;padding:0 var(--e5);font:800 17px/1.2 var(--fuente-texto)}.ec-b1:disabled,.ec-b2:disabled{opacity:.6;cursor:default}' +
+      '.ec-b1r{background:var(--ec-r);color:var(--color-superficie)}' +
+      '.ec-b2{background:transparent;color:var(--color-principal-oscuro);border:1.5px solid var(--color-principal-oscuro);padding:0 var(--e4);font:700 15px/1.2 var(--fuente-texto)}.ec-b2r{color:var(--ec-r);border-color:var(--ec-r)}' +
+      '.ec-subir{display:flex;width:100%;margin-top:var(--e3)}' +
+      '.ec-flist{margin-top:var(--e2);max-height:46vh;overflow:auto}' +
+      '.ec-dimp{font:var(--peso-titulos) 30px/1.2 var(--fuente-titulos);margin:0 0 var(--e2);font-variant-numeric:tabular-nums}' +
+      '.ec-dl{border-top:1px solid var(--ec-l)}.ec-df{display:flex;justify-content:space-between;gap:var(--e3);padding:var(--e2) 0;border-bottom:1px solid var(--ec-l);font-size:14px}' +
       '.ec-df span:first-child{color:var(--ec-g);flex:none}.ec-df span:last-child{text-align:right;font-weight:600;word-break:break-word}' +
-      '.ec-dtx{margin-top:12px;font-size:14px}.ec-dtx p{margin:4px 0 0;white-space:pre-wrap}' +
-      '.ec-dhist{margin-top:12px}.ec-dhist summary{cursor:pointer;color:var(--ec-c);font-weight:700;font-size:14px}.ec-dhist pre{white-space:pre-wrap;font-family:var(--ec-ft);font-size:12.5px;color:var(--ec-g);margin:6px 0 0;background:var(--ec-f);padding:8px 10px;border-radius:8px}' +
-      '.ec-aviso{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(150px + env(safe-area-inset-bottom,0px));z-index:70;background:#1A1A40;color:#fff;border-radius:10px;padding:12px 16px;font-weight:600;max-width:calc(100% - 32px);box-shadow:0 6px 18px rgba(0,0,0,.25)}' +
-      '@media(min-width:620px){.ec-kpis{grid-template-columns:repeat(3,1fr)}.ec-kpi.ec-grande{grid-column:auto}.ec-velo{padding-top:48px}}' +
-      '@media(min-width:900px){.ec-fab{bottom:20px}.ec-aviso{bottom:84px}.ec-main{padding-bottom:70px}}';
+      '.ec-dtx{margin-top:var(--e3);font-size:14px}.ec-dtx p{margin:var(--e1) 0 0;white-space:pre-wrap}' +
+      '.ec-dhist{margin-top:var(--e3)}.ec-dhist summary{cursor:pointer;color:var(--color-principal-oscuro);font-weight:700;font-size:14px;min-height:32px}' +
+      '.ec-dhist pre{white-space:pre-wrap;font:400 13px/1.45 var(--fuente-texto);color:var(--ec-g);margin:var(--e1) 0 0;background:var(--ec-f);padding:var(--e2) var(--e3);border-radius:var(--radio-peq)}' +
+      '.ec-aviso{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(136px + env(safe-area-inset-bottom,0px));z-index:70;background:var(--color-texto);color:var(--color-fondo);' +
+      'border-radius:var(--radio);padding:var(--e3) var(--e4);font:600 15px/1.4 var(--fuente-texto);max-width:calc(100% - var(--e6));box-shadow:var(--sombra-flota)}' +
+      '@media(min-width:620px){.ec-kpis{grid-template-columns:repeat(3,1fr)}.ec-kpi.ec-grande{grid-column:auto}}' +
+      '@media(max-width:640px){.ec-velo{padding:0}.ec-hoja{border-radius:0;min-height:100%;max-width:none;margin:0}}' +
+      '@media(min-width:900px){.ec-fab{bottom:var(--e4)}.ec-aviso{bottom:84px}.ec-main{padding-bottom:var(--e7)}}';
   }
+
+  /** T0149: icono de «Pedir algo a Utilo» (bocadillo), del mismo juego que la barra de secciones. */
+  var ICONO_SOL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>';
+  /** T0149: palabra en Permanent Marker de la cabecera (recurso propio de la marca): la temporada. */
+  function pintada(t) { var x = S.el && S.el.querySelector('#ec-pint'); if (x && t) { x.textContent = t; x.hidden = false; } }
 
   /* ---------- utilidades de pintado ---------- */
   function signo(n) { return n == null ? '' : n > 0 ? 'ec-pos' : n < 0 ? 'ec-neg' : ''; }
-  function cargando(msg) { return '<div class="ec-cargando"><div class="ec-giro"></div>' + esc(msg || 'Cargando…') + '</div>'; }
+  function cargando(msg) { return '<div class="ec-cargando" role="status"><div class="u-carga"></div>' + esc(msg || 'Cargando…') + '</div>'; }
   function errorHtml(e) { return '<div class="ec-error" role="alert">' + esc(e && e.message || e) + '</div>'; }
   function barra(pct, mal) { var p = Math.max(0, Math.min(1, pct || 0)) * 100; return '<div class="ec-barra"><i' + (mal ? ' class="ec-mal"' : '') + ' style="width:' + p.toFixed(1) + '%"></i></div>'; }
   function $(s) { return S.el && S.el.querySelector(s); }
@@ -215,19 +215,20 @@
     var ver = document.querySelector('header.cab .ver-btn'), sol = document.querySelector('header.cab .sol-btn');
     el.innerHTML = '<div class="ec"><style>' + css() + '</style>' +
       '<header class="ec-cab">' + (ver ? '<button type="button" class="ec-ver" id="ec-ver" title="Versión y novedades">' + esc(ver.textContent.trim()) + '</button>' : '') +
-      (sol ? '<button type="button" class="ec-sol" id="ec-sol" title="Pide un cambio, cuéntanos un fallo o pregúntanos una duda" aria-label="Pedir algo a Utilo">💬</button>' : '') +
-      '<h1>ECONOMÍA</h1><p><span id="ec-hora">Cuentas de ECONOMIA v2</span><button class="ec-re" id="ec-re" type="button" aria-label="Actualizar" title="Actualizar">↻</button></p>' +
+      (sol ? '<button type="button" class="ec-sol" id="ec-sol" title="Pide un cambio, cuéntanos un fallo o pregúntanos una duda" aria-label="Pedir algo a Utilo">' + ICONO_SOL + '</button>' : '') +
+      '<h1>Economía <span class="ec-pint" id="ec-pint" hidden></span></h1><p><span id="ec-hora">Cuentas de ECONOMIA v2</span><button class="ec-re" id="ec-re" type="button" aria-label="Actualizar" title="Actualizar">↻</button></p>' +
       '<nav class="ec-tabs" role="tablist">' + TABS.map(function (t) {
         return '<button type="button" role="tab" data-ec-tab="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + t[1] +
           (t[0] === 'pendientes' ? '<span class="ec-n" id="ec-npend"' + (pend ? '' : ' hidden') + '>' + pend + '</span>' : '') + '</button>';
       }).join('') + '</nav></header>' +
       '<main class="ec-main" id="ec-main"></main>' +
-      '<button type="button" class="ec-fab" id="ec-fab">+ Nuevo movimiento</button></div>';
+      '<button type="button" class="ec-fab" id="ec-fab">Añadir movimiento</button></div>';
     el.querySelector('.ec-tabs').onclick = function (e) {
       var b = e.target.closest('[data-ec-tab]'); if (!b) return;
       if (b.getAttribute('data-ec-tab') === 'movimientos') S.mov.desde = '';
       irTab(b.getAttribute('data-ec-tab'));
     };
+    if (S.temp) pintada(S.temp);
     $('#ec-re').onclick = function () { olvidar(); pintar(true); };
     $('#ec-fab').onclick = function () { formulario(); };
     if ($('#ec-ver')) $('#ec-ver').onclick = function () { var b = document.querySelector('header.cab .ver-btn'); if (b) b.click(); };
@@ -268,7 +269,7 @@
   function pResumen(main, forzar) {
     var k = 'res_' + S.temp + '_' + S.comp;
     return cuando(main, k, 'economiaResumen', [S.temp, S.comp], forzar, 'Cargando la temporada…', function (r) {
-      S.temp = r.temporada; S.comp = r.competicion || 'TODAS';
+      S.temp = r.temporada; S.comp = r.competicion || 'TODAS'; pintada(r.temporada);
       S.datos['res_' + S.temp + '_' + S.comp] = r;
       var K = r.kpis, opT = (r.temporadas || [r.temporada]).map(function (t) { return '<option' + (t === r.temporada ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('');
       var opC = (r.competiciones || ['TODAS']).map(function (c) { return '<option value="' + esc(c) + '"' + (c === S.comp ? ' selected' : '') + '>' + esc(c === 'TODAS' ? 'Todas las competiciones' : c.slice(8)) + '</option>'; }).join('');
@@ -322,7 +323,7 @@
         }).join('') + '</ul></div>';
       }
       var sinCat = (r.resultado || []).filter(function (x) { return /Sin categor/.test(x.n); })[0];
-      if (sinCat && !/^0 /.test(sinCat.extra)) h += '<p class="ec-s" style="color:var(--ec-a);margin-top:12px">⚠️ ' + esc(sinCat.extra) + ' sin categoría no salen en estas cuentas.</p>';
+      if (sinCat && !/^0 /.test(sinCat.extra)) h += '<p class="ec-s ec-neg" style="margin-top:12px">' + esc(sinCat.extra) + ' sin categoría no salen en estas cuentas.</p>';
       main.innerHTML = h;
       $('#ec-temp').onchange = function () { S.temp = this.value; S.comp = 'TODAS'; pintar(); };
       $('#ec-comp').onchange = function () { S.comp = this.value; pintar(); };
@@ -438,7 +439,7 @@
       (eqA && eqP ? ' (' + eqA + ' equipos ahora, ' + eqP + ' entonces)' : '') + ', y dónde se cambia cada una. El presupuesto se cambia en GESTION; aquí solo se mira.</p>';
     h += '<h2 class="ec-h2">Avisos · ' + (avisos.length + (cal ? 1 : 0)) + '</h2>' + cal + (avisos.length ? avisos.map(function (a) {
       return '<div class="ec-av2' + a.c + '"><b>' + esc(a.n) + '</b><p>' + esc(a.t) + '</p><p style="color:var(--ec-g)">' + esc(a.s) + '</p>' + (a.a || '') + '</div>';
-    }).join('') : (cal ? '' : '<div class="ec-card ec-vacio">👌 Nada que afinar ahora mismo.</div>'));
+    }).join('') : (cal ? '' : '<div class="ec-card ec-vacio">Nada que afinar ahora mismo: lo real va en línea con el presupuesto.</div>'));
     var bloques = [['calendario', 'Se calculan solas con el calendario (DB_JORNADAS)'], ['partidos', 'Se calcula sola con los partidos'], ['equipos', 'Se calculan solas con los equipos'],
       ['mano', 'Se ponen a mano (DB_COMPETICIONES)'], ['sin', 'Sin presupuesto']];
     bloques.forEach(function (b) {
@@ -518,7 +519,7 @@
   function pPendientes(main, forzar) {
     return cuando(main, 'pendientes', 'economiaPendientes', [], forzar, 'Buscando lo que falta…', function (r) {
       contadorPendientes(r);
-      if (!r.lista.length) { main.innerHTML = '<div class="ec-vacio" style="font-size:17px">🎉 No hay nada pendiente.</div>'; return; }
+      if (!r.lista.length) { main.innerHTML = '<div class="ec-vacio">No hay movimientos pendientes. Los que tengan algún dato por completar aparecerán aquí.</div>'; return; }
       var conts = r.contadores.filter(function (c) { return c.c > 0 && !/^TOTAL$/i.test(c.n); });
       var clave = function (n) { return norm(n).replace(/^SIN\s+/, '').split('/')[0].trim(); };
       var f = S.pendFiltro;
@@ -602,8 +603,8 @@
             return '<button type="button" class="ec-item' + (m.eliminado ? ' ec-borrado' : '') + '" data-ec-m="' + esc(m.id) + '"><div style="min-width:0">' +
               '<div class="ec-t">' + esc(eq ? tipoIns(m.categoria) + ' · ' + eq : (m.titulo || m.concepto || m.categoria)) + '</div>' +
               '<div class="ec-s">' + esc(m.fechaTxt) + ' · ' + esc(m.categoria || (m.interno ? 'Traspaso interno' : 'Sin categoría')) + ' · ' + esc(compCorta(m.comp)) + ' · ' + deA(m.emite, m.recibe, eq) + '</div>' +
-              (falta || m.link || m.eliminado ? '<div style="margin-top:5px;display:flex;gap:6px;flex-wrap:wrap">' + (m.eliminado ? '<span class="ec-tag ec-tag-g">🗑️ Borrado</span>' : '') +
-                (falta && !m.eliminado ? '<span class="ec-tag">Falta: ' + esc(falta) + '</span>' : '') + (m.link ? '<span class="ec-tag ec-tag-g">📎 ' + esc(m.link) + '</span>' : '') + '</div>' : '') +
+              (falta || m.link || m.eliminado ? '<div style="margin-top:5px;display:flex;gap:6px;flex-wrap:wrap">' + (m.eliminado ? '<span class="ec-tag ec-tag-g">Borrado</span>' : '') +
+                (falta && !m.eliminado ? '<span class="ec-tag">Falta: ' + esc(falta) + '</span>' : '') + (m.link ? '<span class="ec-tag ec-tag-g"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5l-7.8 7.8a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4L15 6.9"/></svg>' + esc(m.link) + '</span>' : '') + '</div>' : '') +
               '</div><div class="ec-d ' + signo(m.total) + '">' + esc(m.totalTxt) + '</div></button>';
           }).join('') : '<div class="ec-vacio">No hay movimientos con estos filtros.</div>') + '</div></div>';
         [].forEach.call(main.querySelectorAll('[data-ec-m]'), function (b) {
@@ -665,20 +666,20 @@
     var ivaTxt = { '0,21': '21 %', '0,10': '10 %', '0': 'Sin IVA' }[m.iva] || 'Sin poner';
     var v = ventana(eq ? tipoIns(m.categoria) + ' · ' + eq : (m.titulo || m.concepto || 'Movimiento'),
       '<div class="ec-dimp ' + signo(m.total) + '">' + esc(m.totalTxt) + '</div>' +
-      (m.eliminado ? '<p class="ec-tag ec-tag-g" style="margin:0 0 8px">🗑️ Borrado: no cuenta en nada</p>' : falta ? '<p class="ec-tag" style="margin:0 0 8px">Falta: ' + esc(falta) + '</p>' : '') +
+      (m.eliminado ? '<p class="ec-tag ec-tag-g" style="margin:0 0 8px">Borrado: no cuenta en nada</p>' : falta ? '<p class="ec-tag" style="margin:0 0 8px">Falta: ' + esc(falta) + '</p>' : '') +
       '<div class="ec-dl">' +
       fila('ID', esc(m.id)) + fila('Fecha', esc(m.fechaTxt)) + (eq ? fila('Título', esc(m.titulo)) : '') +
       fila('Categoría', esc(m.categoria || (m.interno ? 'Traspaso interno' : '—'))) + fila('Competición', esc(compCorta(m.comp))) +
       fila('Paga → cobra', deA(m.emite, m.recibe, eq)) + (m.equipo ? fila('Equipo', esc(nombreEquipo(m.equipo, m.comp))) : '') +
       fila('Pago', m.efectivo ? 'Efectivo' : 'Banco') + fila('IVA', esc(ivaTxt)) +
-      fila('Factura o ticket', m.link ? (m.linkUrl ? '<button type="button" class="ec-a" id="ec-dver" style="background:none;border:0;padding:0;cursor:pointer">👁 Ver ' + esc(m.link) + '</button> · <a class="ec-a" href="' + esc(m.linkUrl) + '" target="_blank" rel="noopener">Drive ↗</a>' : '📎 ' + esc(m.link)) : (gasto && m.iva && m.iva !== '0' ? '<b class="ec-neg">Falta</b>' : 'No hace falta')) +
+      fila('Factura o ticket', m.link ? (m.linkUrl ? '<button type="button" class="ec-a" id="ec-dver" style="background:none;border:0;padding:0;cursor:pointer">Ver ' + esc(m.link) + '</button> · <a class="ec-a" href="' + esc(m.linkUrl) + '" target="_blank" rel="noopener">Drive ↗</a>' : esc(m.link)) : (gasto && m.iva && m.iva !== '0' ? '<b class="ec-neg">Falta</b>' : 'No hace falta')) +
       fila('Concepto del banco', esc(m.concepto)) + '</div>' +
       (m.detalles ? '<div class="ec-dtx"><b>Detalles</b><p>' + esc(m.detalles) + '</p></div>' : '') +
       (m.historial ? '<details class="ec-dhist"><summary>Historial de cambios</summary><pre>' + esc(m.historial) + '</pre></details>' : '') +
       '<div class="ec-acc">' +
       (m.eliminado ? '<button type="button" class="ec-b2" id="ec-drec">Recuperar</button>' :
         '<button type="button" class="ec-b2 ec-b2r" id="ec-dbor">Borrar</button>' +
-        '<button type="button" class="ec-b2" id="ec-dfac">📎 ' + (m.link ? 'Cambiar factura' : 'Factura o ticket') + '</button>' +
+        '<button type="button" class="ec-b2" id="ec-dfac">' + (m.link ? 'Cambiar factura' : 'Añadir factura o ticket') + '</button>' +
         '<button type="button" class="ec-b1" id="ec-ded">Editar</button>') + '</div>' +
       (url ? '<p style="text-align:center;margin:12px 0 0"><a class="ec-a" href="' + esc(url) + '" target="_blank" rel="noopener">Abrir en el Excel ↗</a></p>' : ''));
     var q = function (s) { return v.el.querySelector(s); };
@@ -736,8 +737,8 @@
     var v = ventana('Factura o ticket · ' + (m.titulo || 'ID ' + m.id),
       '<div class="ec-sw" role="group" aria-label="Tipo"><button type="button" data-ec-ft="F" aria-pressed="true">Factura</button><button type="button" data-ec-ft="T" aria-pressed="false">Ticket</button></div>' +
       '<p class="ec-s" style="margin:10px 0 0;font-size:13px;color:var(--ec-g)">Se guarda en la carpeta <b id="ec-fcarp">FACTURAS</b> del Drive con el número siguiente y queda enlazada en el movimiento.</p>' +
-      '<label class="ec-b1 ec-subir"><input type="file" id="ec-ffile" accept="image/*,application/pdf" hidden>📷 Hacer foto o subir archivo</label>' +
-      '<button type="button" class="ec-b2" id="ec-fdrive" style="width:100%;margin-top:10px">🗂️ Elegir uno que ya está en Drive</button>' +
+      '<label class="ec-b1 ec-subir"><input type="file" id="ec-ffile" accept="image/*,application/pdf" hidden>Hacer foto o subir archivo</label>' +
+      '<button type="button" class="ec-b2" id="ec-fdrive" style="width:100%;margin-top:10px">Elegir uno que ya está en Drive</button>' +
       '<div id="ec-flista"></div><p class="ec-error" id="ec-ferr2" hidden role="alert"></p>');
     var q = function (s) { return v.el.querySelector(s); };
     var err = function (e) { var x = q('#ec-ferr2'); x.textContent = e.message || e; x.hidden = false; };
@@ -759,7 +760,7 @@
       q('#ec-flista').innerHTML = cargando('Buscando en ' + (st.tipo === 'T' ? 'TICKETS' : 'FACTURAS') + '…'); q('#ec-ferr2').hidden = true;
       llamar('economiaArchivos', [st.tipo]).then(function (r) {
         // T0207: la lista solo trae lo subido o elegido con la web; para cualquier otro, la ventana de Google en la carpeta.
-        var otro = '<button type="button" class="ec-b2" id="ec-felegir" style="width:100%;margin-top:10px">🔎 Buscar otro en ' + (st.tipo === 'T' ? 'TICKETS' : 'FACTURAS') + '</button>';
+        var otro = '<button type="button" class="ec-b2" id="ec-felegir" style="width:100%;margin-top:10px">Buscar otro en ' + (st.tipo === 'T' ? 'TICKETS' : 'FACTURAS') + '</button>';
         q('#ec-flista').innerHTML = '<div class="ec-lista ec-flist">' + (r.lista.length ? r.lista.map(function (f) {
           return '<button type="button" class="ec-item" data-ec-fid="' + esc(f.id) + '"><div><div class="ec-t">' + esc(f.nombre) + '</div><div class="ec-s">Subido el ' + esc(f.fecha) + '</div></div>' +
             '<a class="ec-a" href="' + esc(f.url) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Ver ↗</a></button>';
@@ -896,7 +897,7 @@
       (ed ? llamar('economiaEditar', [m.id, mov]) : llamar('economiaApuntar', [mov])).then(function (r) {
         v.cerrar(); olvidar();
         if (ed) aviso(r.cambios ? 'Movimiento ' + m.id + ' guardado (' + r.cambios + (r.cambios === 1 ? ' cambio).' : ' cambios).') : 'No había nada que cambiar.');
-        else aviso('Apuntado con el ID ' + r.id + (r.estado && !/✅/.test(r.estado) ? ' · ' + r.estado : ' ✅'));
+        else aviso('Apuntado con el ID ' + r.id + (r.estado && !/✅/.test(r.estado) ? ' · ' + r.estado : ''));
         pintar();
         dato('pendientes', 'economiaPendientes').then(contadorPendientes, function () {});
         // Gasto con IVA recién apuntado: se ofrece añadir la factura o el ticket ya.

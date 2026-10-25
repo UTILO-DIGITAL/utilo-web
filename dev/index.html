@@ -6,12 +6,19 @@
 <title>Kanban DEV</title>
 <!-- T0190: web de DEV de UTILO_CORE 4.0 (entrar con Google). Llama a la implementación de DEV de utilo-apps
      (dev/subir.js la actualiza en cada subida). Los datos son los de ejemplo del Sheet DEV, nunca de un cliente. -->
-<link rel="stylesheet" href="../utilo/marca.css?v=20">
-<link rel="stylesheet" href="../estilos/base.css?v=20">
+<script>
+  // T0149: ?marca=konamigas prueba DEV con la marca de Konamigas (se recuerda en este dispositivo); ?marca=utilo vuelve a la de Utilo.
+  (function () {
+    var q = new URLSearchParams(location.search).get('marca'), m = q;
+    try { if (q) localStorage.setItem('dev_marca', q); m = localStorage.getItem('dev_marca'); } catch (e) {}
+    window.DEV_MARCA = /^(utilo|konamigas)$/.test(m || '') ? m : 'utilo';
+    document.write('<link rel="stylesheet" href="../' + window.DEV_MARCA + '/marca.css?v=21"><link rel="stylesheet" href="../estilos/base.css?v=21">');
+  })();
+</script>
 <script>
   window.KANBAN = {
     clave: 'dev',
-    marca: 'utilo',
+    marca: window.DEV_MARCA, // T0149
     nombreApp: 'Kanban DEV',
     color: '#0E8A7A',
     google: '405319382307-oido241fdeknsvv2mub9u9e6qh9tao6h.apps.googleusercontent.com',
@@ -23,7 +30,7 @@
 </head>
 <body class="u">
 <div class="kz"><div class="kz-caja kz-centro" role="status"><div class="u-carga"></div><p>Cargando…</p></div></div>
-<script src="../kanban4/google.js?v=20"></script>
-<script src="../kanban4/app.js?v=20"></script>
+<script src="../kanban4/google.js?v=21"></script>
+<script src="../kanban4/app.js?v=21"></script>
 </body>
 </html>

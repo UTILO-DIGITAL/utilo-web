@@ -34,182 +34,186 @@
     return window.UG.seccion(c.api, { fn: fn, args: args || [] }, c.clave);
   }
 
-  /* ---------- estilos: los de Economía (economia.js) con el prefijo gs- ---------- */
-  function tema() {
-    // Se copia del kanban de la misma página (cabecera .cab): fuentes y color de los títulos.
-    var t = { titulos: 'Montserrat, Lato, Arial, sans-serif', texto: 'Lato, Arial, sans-serif', destacado: '#ffffff' };
-    try {
-      var h1 = document.querySelector('header.cab h1');
-      if (h1) { var c = getComputedStyle(h1); t.titulos = c.fontFamily; t.destacado = c.color; }
-      t.texto = getComputedStyle(document.body).fontFamily || t.texto;
-    } catch (e) {}
-    if (!/Lato|Montserrat/i.test(t.texto + t.titulos) || !document.querySelector('link[href*="fonts.googleapis.com"]')) {
-      if (!document.querySelector('link[data-gs-fuentes]')) {
-        var l = document.createElement('link'); l.rel = 'stylesheet'; l.setAttribute('data-gs-fuentes', '1');
-        l.href = 'https://fonts.googleapis.com/css2?family=Montserrat:wght@500&family=Lato:wght@400;600;700&display=swap';
-        document.head.appendChild(l);
-      }
-      if (!/Lato/i.test(t.texto)) t.texto = 'Lato, Arial, sans-serif';
-      if (!/Montserrat/i.test(t.titulos)) t.titulos = 'Montserrat, Lato, Arial, sans-serif';
-    }
-    return t;
-  }
-
+  /* ---------- estilos (T0149 · PROTOCOLO DISEÑO UTILO) ----------
+   * Solo variables de [negocio]/marca.css y estilos/base.css: ningún color, letra ni radio escrito aquí.
+   * Los botones, campos y ventanas se ven como los del tablero (estilos/kanban.css); los campos los pone base.css.
+   * Los alias --gs-* siguen para los estilos que van en el propio HTML. */
   function css() {
-    var c = ctx(), col = c.color || '#020252', acc = c.accion || '#FF1B8C', T = tema();
-    return '.gs{--gs-c:' + col + ';--gs-a:' + acc + ';--gs-v:#0f8a4b;--gs-r:#c62828;--gs-g:#6b6b85;--gs-l:#ececf4;--gs-f:#f6f6fa;--gs-d:' + T.destacado + ';' +
-      '--gs-ft:' + T.texto + ';--gs-fh:' + T.titulos + ';font-family:var(--gs-ft);color:#1A1A40;font-size:14px;line-height:1.4}' +
-      '.gs *{box-sizing:border-box}.gs button,.gs input,.gs select,.gs textarea{font-family:var(--gs-ft)}' +
+    return '.gs{--gs-c:var(--color-principal);--gs-a:var(--color-accion);--gs-v:var(--color-bien);--gs-r:var(--color-error);' +
+      '--gs-g:var(--color-suave);--gs-l:var(--color-linea);--gs-f:var(--color-bloque);--gs-am:var(--estado-pr);' +
+      'font:400 14px/1.45 var(--fuente-texto);color:var(--color-texto)}' +
+      '.gs *{box-sizing:border-box}.gs button{font-family:var(--fuente-texto)}' +
       'html.gs-sin-scroll,html.gs-sin-scroll body{overflow:hidden}' +
-      // Cabecera como la del kanban: título en Montserrat del color destacado, versión y «Pedir algo a Utilo» a la derecha.
-      '.gs-cab{position:relative;background:var(--gs-c);color:#fff;padding:14px 18px 0}' +
-      '.gs-cab h1{margin:0;padding-right:110px;font-family:var(--gs-fh);font-size:26px;font-weight:500;color:var(--gs-d);letter-spacing:0}' +
-      '.gs-cab>p{margin:4px 0 0;font-size:13px;color:#fff;display:flex;align-items:center;gap:8px}' +
-      '.gs-re{background:transparent;border:0;color:#fff;opacity:.85;font-size:15px;padding:0 4px;cursor:pointer}.gs-re:disabled{opacity:.4}' +
-      '.gs-ver{position:absolute;top:18px;right:58px;background:transparent;border:0;color:#fff;font-size:11px;font-weight:700;padding:4px 6px;border-radius:999px;cursor:pointer}' +
-      '.gs-sol{position:absolute;top:10px;right:12px;width:38px;height:38px;border-radius:50%;border:0;background:rgba(255,252,247,.16);color:#fff;font-size:18px;cursor:pointer}' +
-      '.gs-tabs{display:flex;gap:2px;margin:10px -18px 0;padding:0 10px;overflow-x:auto;scrollbar-width:none}.gs-tabs::-webkit-scrollbar{display:none}' +
-      '.gs-tabs button{flex:0 0 auto;background:transparent;border:0;color:#fff;opacity:.7;font-size:14px;font-weight:700;padding:10px 10px 12px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}' +
-      '.gs-tabs button[aria-selected=true]{opacity:1;border-bottom-color:var(--gs-a)}' +
-      '.gs-tabs .gs-n{display:inline-block;min-width:20px;padding:2px 6px;margin-left:5px;border-radius:999px;background:var(--gs-a);color:#fff;font-size:11px}' +
-      '.gs-main{max-width:760px;margin:0 auto;padding:16px 14px 120px}' +
-      '.gs-fila{display:flex;gap:10px;flex-wrap:wrap;align-items:center}' +
-      // Campos como los del kanban.
-      '.gs select,.gs input[type=text],.gs input[type=search],.gs input[type=date],.gs input[inputmode],.gs textarea{font-size:15px;padding:8px 10px;border:1px solid #cfd8d4;border-radius:8px;background:#fff;color:inherit;min-width:0;max-width:100%}' +
-      '.gs input[type=date]{-webkit-appearance:none;appearance:none;min-height:40px;width:100%}' +
-      '.gs select:focus,.gs input:focus,.gs textarea:focus{outline:2px solid var(--gs-c);outline-offset:0;border-color:transparent}' +
-      '.gs textarea{width:100%;resize:vertical}' +
+      // Cabecera como la del tablero: título, versión y «Pedir algo a Utilo» en una línea; debajo, la hora y las pestañas.
+      '.gs-cab{background:var(--color-principal);color:var(--color-sobre-principal);padding:var(--e3) var(--e4) 0;display:flex;flex-wrap:wrap;align-items:center;gap:var(--e2) var(--e3)}' +
+      '.gs-cab h1{order:-1;flex:1 1 auto;min-width:0;margin:0;font:var(--peso-titulos) 24px/1.2 var(--fuente-titulos);color:var(--color-sobre-principal);display:flex;align-items:baseline;flex-wrap:wrap;gap:0 var(--e3)}' +
+      '.gs-pint{font:400 22px/1.1 var(--fuente-destacar,var(--fuente-titulos));color:var(--color-destacado);transform:rotate(-3deg);display:inline-block}' +
+      '.gs-cab>p{flex:1 1 100%;margin:0;font-size:13px;display:flex;align-items:center;gap:var(--e2);font-variant-numeric:tabular-nums}' +
+      '.gs-re{min-width:44px;min-height:36px;background:transparent;border:0;color:inherit;font-size:18px;padding:0;cursor:pointer}.gs-re:disabled{opacity:.5;cursor:wait}' +
+      '.gs-ver,.gs-sol{min-height:36px;padding:0 var(--e3);border:0;border-radius:var(--radio);background:var(--color-fondo);color:var(--color-principal-oscuro);' +
+      'font:700 14px/1 var(--fuente-texto);cursor:pointer;display:inline-flex;align-items:center;gap:var(--e2);font-variant-numeric:tabular-nums}' +
+      '.gs-sol{width:44px;padding:0;justify-content:center}.gs-sol svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}' +
+      '.gs-tabs{flex:1 1 100%;display:flex;gap:2px;margin:0 calc(-1 * var(--e4));padding:0 var(--e2);overflow-x:auto;scrollbar-width:none}.gs-tabs::-webkit-scrollbar{display:none}' +
+      '.gs-tabs button{flex:0 0 auto;min-height:44px;background:transparent;border:0;color:var(--color-sobre-principal);opacity:.75;font:700 14px/1 var(--fuente-texto);padding:0 var(--e3);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}' +
+      '.gs-tabs button[aria-selected=true]{opacity:1;border-bottom-color:var(--color-destacado)}' +
+      '.gs-tabs .gs-n{display:inline-block;min-width:20px;padding:2px var(--e1);margin-left:var(--e1);border-radius:var(--radio-peq);background:var(--color-destacado);color:var(--color-texto);font-size:12px;text-align:center;font-variant-numeric:tabular-nums}' +
+      '.gs-main{max-width:760px;margin:0 auto;padding:var(--e4) var(--e4) 120px}' +
+      '.gs-fila{display:flex;gap:var(--e2);flex-wrap:wrap;align-items:center}' +
+      // Campos: los de base.css (.u input, .u select). Aquí solo el ancho.
+      '.gs input[type=date]{-webkit-appearance:none;appearance:none;width:100%}' +
+      '.gs textarea{width:100%}' +
       '.gs-sel{flex:1 1 140px}' +
-      '.gs-card{background:#fff;border:1px solid var(--gs-l);border-radius:14px;padding:14px 16px;margin-top:12px}' +
-      '.gs-av{margin-top:14px}.gs-av-t{display:flex;justify-content:space-between;font-size:13px;color:var(--gs-g);font-weight:600}' +
-      '.gs-barra{height:8px;border-radius:999px;background:var(--gs-l);overflow:hidden;margin-top:6px}.gs-barra i{display:block;height:100%;background:var(--gs-c);border-radius:999px}' +
-      '.gs-kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}' +
-      '.gs-kpi{background:var(--gs-f);border-radius:14px;padding:12px 14px}.gs-kpi.gs-grande{grid-column:1/-1;background:var(--gs-c);color:#fff}' +
-      '.gs-kpi b{display:block;font-size:11px;letter-spacing:.4px;text-transform:uppercase;opacity:.75;font-weight:700}' +
-      '.gs-kpi .gs-val{display:block;font-family:var(--gs-fh);font-weight:500;font-size:22px;margin-top:3px;font-variant-numeric:tabular-nums}.gs-kpi.gs-grande .gs-val{font-size:30px;color:var(--gs-d)}' +
-      '.gs-kpi span.gs-sub{display:block;font-size:12.5px;margin-top:3px;opacity:.85}' +
-      '.gs-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}' +
-      '.gs-mini button,.gs-mini div{background:var(--gs-f);border:0;border-radius:12px;padding:10px;text-align:center;color:inherit}' +
-      '.gs-mini b{display:block;font-family:var(--gs-fh);font-weight:500;font-size:19px;font-variant-numeric:tabular-nums}.gs-mini small{font-size:12px;color:var(--gs-g);font-weight:600}' +
-      '.gs-mini button{cursor:pointer}.gs-mini button.gs-alerta b{color:var(--gs-a)}' +
-      '.gs-h2{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--gs-c);margin:24px 2px 4px;font-weight:700}' +
-      '.gs-pos{color:var(--gs-v)}.gs-neg{color:var(--gs-r)}.gs-kpi.gs-grande .gs-pos,.gs-kpi.gs-grande .gs-neg{color:#fff}' +
+      '.gs-card{background:var(--color-superficie);border:1px solid var(--gs-l);border-radius:var(--radio);padding:var(--e3) var(--e4);margin-top:var(--e3)}' +
+      '.gs-av{margin-top:var(--e4)}.gs-av-t{display:flex;justify-content:space-between;gap:var(--e2);font-size:13px;color:var(--gs-g);font-weight:600}' +
+      '.gs-barra{height:8px;border-radius:var(--radio-peq);background:var(--gs-l);overflow:hidden;margin-top:var(--e2)}.gs-barra i{display:block;height:100%;background:var(--gs-c)}' +
+      '.gs-kpis{display:grid;grid-template-columns:1fr 1fr;gap:var(--e2);margin-top:var(--e4)}' +
+      '.gs-kpi{background:var(--gs-f);border-radius:var(--radio);padding:var(--e3) var(--e4)}' +
+      '.gs-kpi.gs-grande{grid-column:1/-1;background:var(--gs-c);color:var(--color-sobre-principal)}' +
+      '.gs-kpi b{display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;font-weight:700;color:var(--gs-g)}.gs-kpi.gs-grande b{color:inherit}' +
+      '.gs-kpi .gs-val{display:block;font:var(--peso-titulos) 22px/1.2 var(--fuente-titulos);margin-top:var(--e1);font-variant-numeric:tabular-nums}' +
+      '.gs-kpi.gs-grande .gs-val{font-size:30px;color:var(--color-destacado)}' +
+      '.gs-kpi span.gs-sub{display:block;font-size:13px;margin-top:var(--e1)}' +
+      '.gs-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--e2);margin-top:var(--e2)}' +
+      '.gs-mini button,.gs-mini div{background:var(--gs-f);border:0;border-radius:var(--radio);padding:var(--e2);text-align:center;color:inherit}' +
+      '.gs-mini b{display:block;font:var(--peso-titulos) 20px/1.2 var(--fuente-titulos);font-variant-numeric:tabular-nums}.gs-mini small{font-size:12px;color:var(--gs-g);font-weight:600}' +
+      '.gs-mini button{cursor:pointer;min-height:44px}.gs-mini button.gs-alerta b{color:var(--gs-r)}' +
+      '.gs .gs-h2{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--color-principal-oscuro);margin:var(--e5) 0 var(--e1);font-weight:700;font-family:var(--fuente-texto)}' +
+      '.gs-pos{color:var(--gs-v)}.gs-neg{color:var(--gs-r)}.gs-amb{color:var(--gs-am)}.gs-kpi.gs-grande .gs-pos,.gs-kpi.gs-grande .gs-neg{color:inherit}' +
       '.gs-grupo{border-top:1px solid var(--gs-l)}.gs-grupo:first-of-type{border-top:0}' +
-      '.gs-gb{display:block;width:100%;background:none;border:0;color:inherit;text-align:left;padding:11px 0;cursor:pointer;font-size:14px}' +
-      '.gs-gl{display:flex;justify-content:space-between;gap:10px;align-items:baseline}.gs-gl b{font-size:15px;font-weight:700}' +
-      '.gs-gl .gs-num{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}' +
-      '.gs-gs{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--gs-g);margin-top:3px}' +
+      '.gs-gb{display:block;width:100%;background:none;border:0;color:inherit;text-align:left;padding:var(--e3) 0;cursor:pointer;font-size:14px}' +
+      '.gs-gl{display:flex;justify-content:space-between;gap:var(--e2);align-items:baseline}.gs-gl b{font-size:15px;font-weight:700}' +
+      '.gs-gl .gs-num{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}' +
+      '.gs-gs{display:flex;justify-content:space-between;gap:var(--e2);font-size:13px;color:var(--gs-g);margin-top:var(--e1)}' +
       '.gs-gb .gs-barra{height:6px}.gs-barra i.gs-mal{background:var(--gs-r)}' +
       '.gs-flecha{display:inline-block;width:14px;color:var(--gs-g);transition:transform .15s}.gs-gb[aria-expanded=true] .gs-flecha{transform:rotate(90deg)}' +
-      '.gs-lineas{padding:0 0 10px 14px}' +
-      '.gs-linea{display:block;width:100%;background:none;border:0;border-top:1px dashed var(--gs-l);color:inherit;text-align:left;font-size:13.5px;padding:8px 0;cursor:pointer}' +
-      '.gs-linea .gs-gl b{font-size:13.5px;font-weight:600}.gs-linea .gs-barra{height:4px;margin-top:5px}.gs-linea .gs-gs{font-size:12px}.gs-linea .gs-ir{color:var(--gs-c);font-weight:700}' +
+      '.gs-lineas{padding:0 0 var(--e2) var(--e4)}' +
+      '.gs-linea{display:block;width:100%;background:none;border:0;border-top:1px solid var(--gs-l);color:inherit;text-align:left;font-size:14px;padding:var(--e2) 0;cursor:pointer}' +
+      '.gs-linea .gs-gl b{font-size:14px;font-weight:600}.gs-linea .gs-barra{height:4px;margin-top:var(--e1)}.gs-linea .gs-gs{font-size:12px}.gs-linea .gs-ir{color:var(--color-principal-oscuro);font-weight:700}' +
       '.gs-gs b{font-weight:700}' +
       '.gs-avd summary{list-style:none;cursor:pointer}.gs-avd summary::-webkit-details-marker{display:none}.gs-avd[open] summary .gs-flecha{transform:rotate(90deg)}' +
-      '.gs-avc{margin:10px 0 0 18px}.gs-avc .gs-av-t{font-size:12.5px}.gs-avc .gs-barra{height:5px;margin-top:4px}' +
-      '.gs-socio{display:flex;justify-content:space-between;gap:10px;padding:5px 0 5px 14px;font-size:13px;color:var(--gs-g)}.gs-socio span:last-child{font-variant-numeric:tabular-nums}' +
-      '.gs-rep{padding:0 16px}.gs-rep summary{list-style:none;cursor:pointer;padding:12px 0;display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:14px}' +
-      '.gs-rep summary::-webkit-details-marker{display:none}.gs-rep summary b{font-weight:700}.gs-rep summary .gs-flecha{transition:transform .15s}.gs-rep[open] summary .gs-flecha{transform:rotate(90deg)}' +
+      '.gs-avc{margin:var(--e2) 0 0 var(--e4)}.gs-avc .gs-av-t{font-size:13px}.gs-avc .gs-barra{height:5px;margin-top:var(--e1)}' +
+      '.gs-socio{display:flex;justify-content:space-between;gap:var(--e2);padding:var(--e1) 0 var(--e1) var(--e4);font-size:13px;color:var(--gs-g)}.gs-socio span:last-child{font-variant-numeric:tabular-nums}' +
+      '.gs-rep{padding:0 var(--e4)}.gs-rep summary{list-style:none;cursor:pointer;padding:var(--e3) 0;display:flex;justify-content:space-between;gap:var(--e2);align-items:center;font-size:14px}' +
+      '.gs-rep summary::-webkit-details-marker{display:none}.gs-rep summary b{font-weight:700}.gs-rep[open] summary .gs-flecha{transform:rotate(90deg)}' +
       '.gs-rep summary span:last-child{color:var(--gs-g);font-size:13px;white-space:nowrap}' +
-      '.gs-rf{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--gs-l);font-size:14px}.gs-rf span:last-child{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}' +
+      '.gs-rf{display:flex;justify-content:space-between;gap:var(--e2);padding:var(--e2) 0;border-top:1px solid var(--gs-l);font-size:14px}.gs-rf span:last-child{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}' +
       '.gs-rf.gs-tot{font-weight:700}.gs-rf small{display:block;color:var(--gs-g);font-size:12px;font-weight:400}' +
-      '.gs-av2{border-left:4px solid var(--gs-r);padding:10px 12px;background:#fff;border-radius:10px;margin-top:10px;box-shadow:0 0 0 1px var(--gs-l) inset}' +
-      '.gs-av2.gs-amb{border-left-color:#d98a00}.gs-av2.gs-inf{border-left-color:var(--gs-c)}' +
-      '.gs-av2 b{display:block;font-size:14.5px}.gs-av2 p{margin:4px 0 0;font-size:13.5px}.gs-av2 .gs-a{display:inline-block;margin-top:6px}' +
-      '.gs-pl{padding:9px 0;border-top:1px dashed var(--gs-l)}.gs-pl:first-child{border-top:0}.gs-pl .gs-gs{font-size:12px}' +
-      '.gs-pl .gs-org{font-size:12px;color:var(--gs-g);margin-top:3px}' +
-      '.gs-lista{list-style:none;margin:0;padding:0}.gs-item{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-top:1px solid var(--gs-l);align-items:center}' +
-      '.gs-item:first-child{border-top:0}.gs-item .gs-t{font-weight:700;font-size:14.5px}.gs-item .gs-s{font-size:12.5px;color:var(--gs-g);margin-top:2px}' +
+      // Avisos: franja de 4 px con el color del aviso, sin sombra.
+      '.gs-av2{border:1px solid var(--gs-l);border-left:4px solid var(--gs-r);padding:var(--e3);background:var(--color-superficie);border-radius:var(--radio);margin-top:var(--e2)}' +
+      '.gs-av2.gs-amb{border-left-color:var(--gs-am);color:inherit}.gs-av2.gs-inf{border-left-color:var(--gs-c)}' +
+      '.gs-av2 b{display:block;font-size:15px}.gs-av2 p{margin:var(--e1) 0 0;font-size:14px}.gs-av2 .gs-a{display:inline-block;margin-top:var(--e2)}' +
+      '.gs-pl{padding:var(--e2) 0;border-top:1px solid var(--gs-l)}.gs-pl:first-child{border-top:0}.gs-pl .gs-gs{font-size:12px}' +
+      '.gs-pl .gs-org{font-size:12px;color:var(--gs-g);margin-top:var(--e1)}' +
+      // Listas: filas separadas por una línea, cifras alineadas a la derecha.
+      '.gs-lista{list-style:none;margin:0;padding:0}.gs-item{display:flex;justify-content:space-between;gap:var(--e3);padding:var(--e3) 0;border-top:1px solid var(--gs-l);align-items:center}' +
+      '.gs-item:first-child{border-top:0}.gs-item .gs-t{font-weight:700;font-size:15px}.gs-item .gs-s{font-size:13px;color:var(--gs-g);margin-top:2px}' +
       '.gs-item .gs-d{text-align:right;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}' +
       'button.gs-item{width:100%;background:none;border:0;border-top:1px solid var(--gs-l);color:inherit;text-align:left;cursor:pointer}' +
-      '.gs-borrado .gs-t,.gs-borrado .gs-d{text-decoration:line-through;opacity:.55}' +
-      '.gs-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}.gs-chip{border:1px solid #cfd8d4;background:#fff;border-radius:999px;padding:7px 12px;font-size:13.5px;font-weight:600;color:inherit;cursor:pointer}' +
-      '.gs-chip[aria-pressed=true]{background:var(--gs-c);border-color:var(--gs-c);color:#fff}' +
-      '.gs-tag{display:inline-block;padding:3px 8px;border-radius:999px;background:color-mix(in srgb,var(--gs-a) 14%,#fff);color:var(--gs-a);font-size:12px;font-weight:700}' +
-      '.gs-tag-g{background:var(--gs-f);color:var(--gs-g)}' +
-      '.gs-a{color:var(--gs-c);font-weight:700;font-size:13px}' +
-      '.gs-volver{background:none;border:0;color:var(--gs-c);font-size:15px;font-weight:700;padding:6px 0 10px;cursor:pointer}' +
-      '.gs-liga .gs-gl b{font-size:15.5px}.gs-liga .gs-cifras{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px;font-size:12px;color:var(--gs-g)}' +
-      '.gs-liga .gs-cifras b{display:block;color:#1A1A40;font-size:14px;font-variant-numeric:tabular-nums}' +
-      '.gs-vacio{text-align:center;color:var(--gs-g);padding:30px 10px}' +
-      '.gs-cargando{text-align:center;color:var(--gs-g);padding:40px 10px}.gs-giro{width:30px;height:30px;border:3px solid var(--gs-l);border-top-color:var(--gs-c);border-radius:50%;margin:0 auto 12px;animation:ecg 0.8s linear infinite}@keyframes ecg{to{transform:rotate(360deg)}}' +
-      '.gs-error{background:#fdecec;color:var(--gs-r);border-radius:10px;padding:10px 12px;margin-top:12px}' +
-      // Botón de añadir: igual que «+ Nueva tarea» del kanban.
-      '.gs-fab{position:fixed;right:20px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:44;background:var(--gs-a);color:#fff;border:0;border-radius:10px;padding:13.44px 23.52px;font-size:16.8px;font-weight:700;box-shadow:0 4px 14px rgba(28,43,38,.25);cursor:pointer}' +
-      '.gs-fab:focus-visible,.gs button:focus-visible{outline:3px solid var(--gs-c);outline-offset:2px}' +
-      // Ventanas: como «Nueva tarea» del kanban (tarjeta centrada arriba, velo oscuro).
-      '.gs-velo{position:fixed;inset:0;z-index:60;background:rgba(28,43,38,.45);display:flex;align-items:flex-start;justify-content:center;padding:24px 12px;overflow-y:auto;-webkit-overflow-scrolling:touch}' +
-      '.gs-hoja{background:#fff;width:100%;max-width:560px;border-radius:14px;padding:22px 22px 18px;font-size:15px;margin-bottom:24px}' +
-      '.gs-hoja h2{margin:0 0 14px;font-family:var(--gs-fh);font-weight:500;font-size:24px;color:var(--gs-c);display:flex;justify-content:space-between;align-items:flex-start;gap:10px;line-height:1.2}' +
-      '.gs-x{background:none;border:0;font-size:28px;line-height:1;cursor:pointer;color:var(--gs-g);padding:0 2px}' +
-      '.gs-sw{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--gs-f);padding:4px;border-radius:10px}' +
-      '.gs-sw button{border:0;border-radius:8px;padding:10px;font-size:15px;font-weight:700;background:transparent;color:var(--gs-g);cursor:pointer}' +
-      '.gs-sw button[aria-pressed=true]{background:#fff;color:#1A1A40;box-shadow:0 1px 4px rgba(0,0,0,.12)}' +
+      '.gs-borrado .gs-t,.gs-borrado .gs-d{text-decoration:line-through;opacity:.6}' +
+      // Filtros en botones (como los del tablero) y etiquetas pequeñas.
+      '.gs-chips{display:flex;gap:var(--e2);flex-wrap:wrap;margin-top:var(--e1)}' +
+      '.gs-chip{min-height:40px;border:1.5px solid var(--color-borde-campo);background:var(--color-superficie);border-radius:var(--radio);padding:0 var(--e3);font:600 14px/1 var(--fuente-texto);color:inherit;cursor:pointer;font-variant-numeric:tabular-nums}' +
+      '.gs-chip[aria-pressed=true]{background:var(--gs-c);border-color:var(--gs-c);color:var(--color-sobre-principal)}' +
+      '.gs-tag{display:inline-flex;align-items:center;gap:var(--e1);padding:1px var(--e2);border-radius:var(--radio-peq);background:var(--gs-f);color:var(--color-texto);font:700 12px/1.6 var(--fuente-texto)}' +
+      '.gs-tag svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
+      '.gs-tag-g{background:transparent;border:1px solid var(--gs-l);color:var(--gs-g)}' +
+      '.gs-a{color:var(--color-principal-oscuro);font-weight:700;font-size:13px}' +
+      '.gs-volver{background:none;border:0;color:var(--color-principal-oscuro);font:700 15px/1 var(--fuente-texto);min-height:44px;padding:0;cursor:pointer}' +
+      '.gs-liga .gs-gl b{font-size:15px}.gs-liga .gs-cifras{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--e2);margin-top:var(--e2);font-size:12px;color:var(--gs-g)}' +
+      '.gs-liga .gs-cifras b{display:block;color:var(--color-texto);font-size:14px;font-variant-numeric:tabular-nums}' +
+      '.gs-vacio{color:var(--gs-g);padding:var(--e6) var(--e2);text-align:center}' +
+      '.gs-cargando{text-align:center;color:var(--gs-g);padding:var(--e7) var(--e2);display:flex;flex-direction:column;gap:var(--e3)}' +
+      '.gs-error{border:1px solid var(--gs-r);border-left-width:4px;color:var(--gs-r);background:var(--color-superficie);font-weight:700;border-radius:var(--radio);padding:var(--e3);margin-top:var(--e3)}' +
+      // Botón de añadir: el mismo que «Añadir tarea» del tablero (lo único que flota, con sombra).
+      '.gs-fab{position:fixed;right:var(--e4);bottom:calc(72px + env(safe-area-inset-bottom,0px));z-index:44;min-height:52px;padding:0 var(--e5);border:0;border-radius:var(--radio);' +
+      'background:var(--gs-a);color:var(--color-sobre-accion);font:800 19px/1 var(--fuente-texto);box-shadow:var(--sombra-flota);cursor:pointer}' +
+      // Ventanas: como «Nueva tarea» del tablero.
+      '.gs-velo{position:fixed;inset:0;z-index:60;background:var(--color-velo);display:flex;align-items:flex-start;justify-content:center;padding:6vh var(--e3);overflow-y:auto;-webkit-overflow-scrolling:touch}' +
+      '.gs-hoja{background:var(--color-fondo);color:var(--color-texto);width:100%;max-width:560px;border-radius:var(--radio);padding:var(--e5);font-size:15px;margin-bottom:var(--e5);box-shadow:var(--sombra-flota)}' +
+      '.gs-hoja h2{margin:0 0 var(--e3);font:var(--peso-titulos) 24px/1.2 var(--fuente-titulos);color:var(--color-principal-oscuro);display:flex;justify-content:space-between;align-items:flex-start;gap:var(--e2)}' +
+      '.gs-x{flex:none;width:44px;height:44px;margin:-10px -10px 0 0;background:none;border:0;font-size:28px;line-height:1;cursor:pointer;color:var(--gs-g);padding:0}' +
+      '.gs-sw{display:grid;grid-template-columns:1fr 1fr;gap:var(--e1);background:var(--gs-f);padding:var(--e1);border-radius:var(--radio)}' +
+      '.gs-sw button{min-height:44px;border:1px solid transparent;border-radius:var(--radio-peq);font:700 15px/1 var(--fuente-texto);background:transparent;color:var(--gs-g);cursor:pointer}' +
+      '.gs-sw button[aria-pressed=true]{background:var(--color-superficie);border-color:var(--gs-l);color:var(--color-texto)}' +
       '.gs-sw button[aria-pressed=true].gs-in{color:var(--gs-v)}.gs-sw button[aria-pressed=true].gs-out{color:var(--gs-r)}' +
-      '.gs-campo{display:block;margin-top:12px;font-size:15px;font-weight:600;color:#1A1A40;min-width:0}.gs-campo>select,.gs-campo>input,.gs-campo>textarea{display:block;width:100%;margin-top:4px;font-weight:400}' +
-      '.gs-opc{font-weight:400;color:var(--gs-g)}' +
-      '.gs-dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}' +
-      '.gs-check{display:flex;align-items:center;gap:8px;margin-top:12px;font-weight:600;font-size:14.5px}.gs-check input{width:20px;height:20px;flex:none}' +
-      '.gs-imp{font-size:24px!important;font-weight:700;text-align:right}' +
-      '.gs-acc{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px}' +
-      '.gs-b1,.gs-b2{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:10px;font-weight:700;cursor:pointer;text-decoration:none}' +
-      '.gs-b1{background:var(--gs-a);color:#fff;border:0;padding:13.44px 23.52px;font-size:16.8px}.gs-b1:disabled,.gs-b2:disabled{opacity:.6}' +
-      '.gs-b1r{background:var(--gs-r)}' +
-      '.gs-b2{background:transparent;color:var(--gs-c);border:2px solid var(--gs-c);padding:11.2px 19.2px;font-size:16px}.gs-b2r{color:var(--gs-r);border-color:var(--gs-r)}' +
-      '.gs-subir{display:flex;width:100%;margin-top:14px}' +
-      '.gs-flist{margin-top:10px;max-height:46vh;overflow:auto}' +
-      '.gs-dimp{font-family:var(--gs-fh);font-weight:500;font-size:30px;margin:-4px 0 10px;font-variant-numeric:tabular-nums}' +
-      '.gs-dl{border-top:1px solid var(--gs-l)}.gs-df{display:flex;justify-content:space-between;gap:14px;padding:8px 0;border-bottom:1px solid var(--gs-l);font-size:14px}' +
+      '.gs-campo{display:block;margin-top:var(--e3);font:700 12px/1.3 var(--fuente-texto);color:var(--color-principal-oscuro);text-transform:uppercase;letter-spacing:.02em;min-width:0}' +
+      '.gs-campo>select,.gs-campo>input,.gs-campo>textarea{display:block;width:100%;margin-top:var(--e1);text-transform:none;letter-spacing:0}' +
+      '.gs-opc{font-weight:400;color:var(--gs-g);text-transform:none;letter-spacing:0}' +
+      '.gs-dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--e3)}' +
+      '.gs-check{display:flex;align-items:center;gap:var(--e2);margin-top:var(--e3);font-weight:600;font-size:15px;min-height:32px}.gs-check input{flex:none}' +
+      '.gs .gs-imp{font-size:24px!important;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}' +
+      '.gs-acc{display:flex;justify-content:flex-end;gap:var(--e2);flex-wrap:wrap;margin-top:var(--e4)}' +
+      // Un solo botón con el color de acción por pantalla (-b1); los demás, con contorno (-b2).
+      '.gs-b1,.gs-b2{display:inline-flex;align-items:center;justify-content:center;gap:var(--e2);min-height:44px;border-radius:var(--radio);cursor:pointer;text-decoration:none}' +
+      '.gs-b1{background:var(--gs-a);color:var(--color-sobre-accion);border:0;padding:0 var(--e5);font:800 17px/1.2 var(--fuente-texto)}.gs-b1:disabled,.gs-b2:disabled{opacity:.6;cursor:default}' +
+      '.gs-b1r{background:var(--gs-r);color:var(--color-superficie)}' +
+      '.gs-b2{background:transparent;color:var(--color-principal-oscuro);border:1.5px solid var(--color-principal-oscuro);padding:0 var(--e4);font:700 15px/1.2 var(--fuente-texto)}.gs-b2r{color:var(--gs-r);border-color:var(--gs-r)}' +
+      '.gs-subir{display:flex;width:100%;margin-top:var(--e3)}' +
+      '.gs-flist{margin-top:var(--e2);max-height:46vh;overflow:auto}' +
+      '.gs-dimp{font:var(--peso-titulos) 30px/1.2 var(--fuente-titulos);margin:0 0 var(--e2);font-variant-numeric:tabular-nums}' +
+      '.gs-dl{border-top:1px solid var(--gs-l)}.gs-df{display:flex;justify-content:space-between;gap:var(--e3);padding:var(--e2) 0;border-bottom:1px solid var(--gs-l);font-size:14px}' +
       '.gs-df span:first-child{color:var(--gs-g);flex:none}.gs-df span:last-child{text-align:right;font-weight:600;word-break:break-word}' +
-      '.gs-dtx{margin-top:12px;font-size:14px}.gs-dtx p{margin:4px 0 0;white-space:pre-wrap}' +
-      '.gs-dhist{margin-top:12px}.gs-dhist summary{cursor:pointer;color:var(--gs-c);font-weight:700;font-size:14px}.gs-dhist pre{white-space:pre-wrap;font-family:var(--gs-ft);font-size:12.5px;color:var(--gs-g);margin:6px 0 0;background:var(--gs-f);padding:8px 10px;border-radius:8px}' +
-      '.gs-aviso{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(150px + env(safe-area-inset-bottom,0px));z-index:70;background:#1A1A40;color:#fff;border-radius:10px;padding:12px 16px;font-weight:600;max-width:calc(100% - 32px);box-shadow:0 6px 18px rgba(0,0,0,.25)}' +
-      '@media(min-width:620px){.gs-kpis{grid-template-columns:repeat(3,1fr)}.gs-kpi.gs-grande{grid-column:auto}.gs-velo{padding-top:48px}}' +
-      '@media(min-width:900px){.gs-fab{bottom:20px}.gs-aviso{bottom:84px}.gs-main{padding-bottom:70px}}';
+      '.gs-dtx{margin-top:var(--e3);font-size:14px}.gs-dtx p{margin:var(--e1) 0 0;white-space:pre-wrap}' +
+      '.gs-dhist{margin-top:var(--e3)}.gs-dhist summary{cursor:pointer;color:var(--color-principal-oscuro);font-weight:700;font-size:14px;min-height:32px}' +
+      '.gs-dhist pre{white-space:pre-wrap;font:400 13px/1.45 var(--fuente-texto);color:var(--gs-g);margin:var(--e1) 0 0;background:var(--gs-f);padding:var(--e2) var(--e3);border-radius:var(--radio-peq)}' +
+      '.gs-aviso{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(136px + env(safe-area-inset-bottom,0px));z-index:70;background:var(--color-texto);color:var(--color-fondo);' +
+      'border-radius:var(--radio);padding:var(--e3) var(--e4);font:600 15px/1.4 var(--fuente-texto);max-width:calc(100% - var(--e6));box-shadow:var(--sombra-flota)}' +
+      '@media(min-width:620px){.gs-kpis{grid-template-columns:repeat(3,1fr)}.gs-kpi.gs-grande{grid-column:auto}}' +
+      '@media(max-width:640px){.gs-velo{padding:0}.gs-hoja{border-radius:0;min-height:100%;max-width:none;margin:0}}' +
+      '@media(min-width:900px){.gs-fab{bottom:var(--e4)}.gs-aviso{bottom:84px}.gs-main{padding-bottom:var(--e7)}}';
   }
 
+  /** T0149: icono de «Pedir algo a Utilo» (bocadillo), del mismo juego que la barra de secciones. */
+  var ICONO_SOL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>';
+  /** T0149: palabra en Permanent Marker de la cabecera (recurso propio de la marca): la temporada. */
+  function pintada(t) { var x = S.el && S.el.querySelector('#gs-pint'); if (x && t) { x.textContent = t; x.hidden = false; } }
 
+
+  /** Lo que solo tiene Gestión (resumen por día y liga, alertas, fichas de equipo y jugadora). Mismas reglas que css(). */
   function cssExtra() {
-    return '.gs-sec{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--gs-c);margin:18px 0 2px;font-weight:700}' +
-      '.gs-btns{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 6px}.gs-btns a,.gs-btns button{font-size:14px;padding:9px 13px;border-width:1.5px}' +
-      '.gs-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}' +
-      '.gs-tag-r{background:#fdecec;color:var(--gs-r)}.gs-tag-v{background:#e6f4ec;color:var(--gs-v)}.gs-tag-a{background:#fff4e0;color:#a35d00}' +
-      '.gs-al{border-left:4px solid #d98a00;background:#fff8ec;border-radius:10px;padding:10px 12px;margin:4px 0 8px;font-size:14px}' +
-      '.gs-al p{margin:0 0 6px}.gs-al p:last-child{margin:0}' +
-      '.gs-nota{font-size:12.5px;color:var(--gs-g);font-weight:400;margin-top:3px}' +
-      '.gs-mas{text-align:center;color:var(--gs-g);font-size:13px;padding:12px 0 2px}' +
-      '.gs-color{display:inline-block;width:13px;height:13px;border-radius:50%;border:1px solid rgba(0,0,0,.25);vertical-align:-2px;margin-right:6px;flex:none}' +
-      '.gs-pie{position:sticky;bottom:-18px;background:#fff;padding:12px 0 4px;margin-top:6px;border-top:1px solid var(--gs-l)}' +
-      '.gs-checks .gs-check{margin-top:9px}' +
-      '.gs-filtros{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.gs-filtros select{width:100%}' +
+    return '.gs-sec{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--color-principal-oscuro);margin:var(--e4) 0 2px;font-weight:700}' +
+      '.gs-btns{display:flex;gap:var(--e2);flex-wrap:wrap;margin:2px 0 var(--e2)}.gs-btns a,.gs-btns button{font-size:14px}' +
+      '.gs-tags{display:flex;gap:var(--e1);flex-wrap:wrap;margin-top:var(--e1)}' +
+      '.gs-tag-r{background:transparent;border:1px solid var(--gs-r);color:var(--gs-r)}.gs-tag-v{background:transparent;border:1px solid var(--gs-v);color:var(--gs-v)}' +
+      '.gs-tag-a{background:transparent;border:1px solid var(--gs-am);color:var(--gs-am)}' +
+      '.gs-al{border:1px solid var(--gs-l);border-left:4px solid var(--gs-am);background:var(--color-superficie);border-radius:var(--radio);padding:var(--e3);margin:var(--e1) 0 var(--e2);font-size:14px}' +
+      '.gs-al p{margin:0 0 var(--e1)}.gs-al p:last-child{margin:0}' +
+      '.gs-nota{font-size:13px;color:var(--gs-g);font-weight:400;margin-top:var(--e1);text-transform:none;letter-spacing:0}' +
+      '.gs-mas{text-align:center;color:var(--gs-g);font-size:13px;padding:var(--e3) 0 2px}' +
+      // Color de la camiseta del equipo: es un dato, no un adorno.
+      '.gs-color{display:inline-block;width:13px;height:13px;border-radius:50%;border:1px solid var(--color-borde-campo);vertical-align:-2px;margin-right:var(--e2);flex:none}' +
+      '.gs-pie{position:sticky;bottom:calc(-1 * var(--e5));background:var(--color-fondo);padding:var(--e3) 0 var(--e1);margin-top:var(--e2);border-top:1px solid var(--gs-l)}' +
+      '.gs-checks .gs-check{margin-top:var(--e2)}' +
+      '.gs-filtros{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--e2)}.gs-filtros select{width:100%}' +
       '@media(max-width:520px){.gs-filtros{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.gs-filtros select:first-child{grid-column:1/-1}}' +
-      '.gs-aviso-b{font-size:12.5px;color:var(--gs-g);margin:8px 2px 0}' +
-      '.gs-dias{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}' +
-      '.gs-liga-t{display:flex;justify-content:space-between;gap:10px;align-items:baseline}.gs-liga-t b{font-size:15.5px}.gs-liga-t span{font-size:12.5px;color:var(--gs-g)}' +
-      '.gs-eqr{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 8px;align-items:center;width:100%;background:none;border:0;border-top:1px dashed var(--gs-l);padding:9px 0;text-align:left;color:inherit;cursor:pointer;font-size:14px}' +
-      '.gs-eqr .gs-n{font-weight:700;font-size:12px;background:var(--gs-f);border-radius:6px;padding:2px 6px;text-align:center;min-width:24px}' +
+      '.gs-aviso-b{font-size:13px;color:var(--gs-g);margin:var(--e2) 0 0}' +
+      '.gs-dias{display:flex;gap:var(--e2);flex-wrap:wrap;margin-top:var(--e2)}' +
+      '.gs-liga-t{display:flex;justify-content:space-between;gap:var(--e2);align-items:baseline}.gs-liga-t b{font-size:15px}.gs-liga-t span{font-size:13px;color:var(--gs-g)}' +
+      '.gs-eqr{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--e1) var(--e2);align-items:center;width:100%;background:none;border:0;border-top:1px solid var(--gs-l);padding:var(--e2) 0;min-height:44px;text-align:left;color:inherit;cursor:pointer;font-size:14px}' +
+      '.gs-eqr .gs-n{font-weight:700;font-size:12px;background:var(--gs-f);border-radius:var(--radio-peq);padding:2px var(--e1);text-align:center;min-width:24px;font-variant-numeric:tabular-nums}' +
       '.gs-eqr b{display:flex;align-items:center;min-width:0}.gs-eqr b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-      '.gs-eqr small{grid-column:2/4;color:var(--gs-g);font-size:12.5px}' +
-      '.gs-eqr .gs-pag{font-size:12.5px;font-weight:700;white-space:nowrap}' +
+      '.gs-eqr small{grid-column:2/4;color:var(--gs-g);font-size:13px}' +
+      '.gs-eqr .gs-pag{font-size:13px;font-weight:700;white-space:nowrap}' +
       '.gs-liga summary{list-style:none;cursor:pointer;position:relative;padding-right:28px}.gs-liga summary::-webkit-details-marker{display:none}' +
-      '.gs-liga summary:after{content:"\\25BE";position:absolute;right:0;top:0;font-size:20px;color:var(--gs-g);transition:transform .2s}.gs-liga[open] summary:after{transform:rotate(180deg)}' +
-      '.gs-liga[open] summary{margin-bottom:6px}' +
-      '.gs-liga-n{font-family:var(--gs-fh);font-size:20px;font-weight:600;color:var(--gs-c);line-height:1.15}.gs-liga-n small{display:block;font-family:inherit;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--gs-g);font-weight:700;margin-bottom:2px}' +
-      '.gs-liga-g{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:13.5px}' +
-      '.gs-wa{font-size:12.5px;padding:4px 11px;border-radius:999px;background:#e6f6ec;color:#11713a;text-decoration:none;font-weight:700;border:1px solid #bfe6cd}' +
-      '.gs-liga-s{font-size:12.5px;color:var(--gs-g);margin-top:4px}' +
-      '.gs-alts{padding-top:10px;padding-bottom:6px}.gs-alts-t{font-weight:700;font-size:15px;margin-bottom:4px}' +
-      '.gs-alt{border-top:1px dashed var(--gs-l);padding:9px 0}.gs-alt summary{display:flex;justify-content:space-between;gap:10px;cursor:pointer;list-style:none;font-size:14.5px}' +
-      '.gs-alt summary::-webkit-details-marker{display:none}.gs-alt summary em{font-style:normal;font-weight:700}.gs-alt[data-gs-vacio] summary{cursor:default;color:var(--gs-g)}' +
-      '.gs-alt-i{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;width:100%;background:none;border:0;border-top:1px solid var(--gs-f);padding:8px 0;text-align:left;color:inherit;cursor:pointer;font-size:14px}' +
-      '.gs-alt-i b{display:flex;align-items:center;min-width:0}.gs-alt-i b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gs-alt-i small{grid-column:1/-1;color:var(--gs-g);font-size:12.5px}.gs-alt-i .gs-pag{font-size:12.5px;font-weight:700;white-space:nowrap}' +
-      '.gs-dia-h{font-family:var(--gs-fh);font-weight:500;font-size:20px;color:var(--gs-c);margin:22px 2px 0}' +
-      '.gs-fotos{display:flex;gap:8px;flex-wrap:wrap}.gs-fotos button{font-size:14px}' +
-      '.gs-visor img{display:block;max-width:100%;max-height:70vh;margin:0 auto;border-radius:10px;background:var(--gs-f)}';
+      '.gs-liga summary:after{content:"\\25BE";position:absolute;right:0;top:0;font-size:20px;color:var(--gs-g);transition:transform .15s}.gs-liga[open] summary:after{transform:rotate(180deg)}' +
+      '.gs-liga[open] summary{margin-bottom:var(--e2)}' +
+      '.gs-liga-n{font:var(--peso-titulos) 20px/1.2 var(--fuente-titulos);color:var(--color-principal-oscuro)}' +
+      '.gs-liga-n small{display:block;font:700 12px/1.3 var(--fuente-texto);letter-spacing:.04em;text-transform:uppercase;color:var(--gs-g);margin-bottom:2px}' +
+      '.gs-liga-g{display:flex;align-items:center;gap:var(--e2);flex-wrap:wrap;margin-top:var(--e2);font-size:14px}' +
+      '.gs-wa{display:inline-flex;align-items:center;min-height:36px;padding:0 var(--e3);border-radius:var(--radio);border:1.5px solid var(--color-principal-oscuro);color:var(--color-principal-oscuro);text-decoration:none;font:700 13px/1 var(--fuente-texto)}' +
+      '.gs-liga-s{font-size:13px;color:var(--gs-g);margin-top:var(--e1)}' +
+      '.gs-alts{padding-top:var(--e3);padding-bottom:var(--e2)}.gs-alts-t{font:var(--peso-titulos) 16px/1.2 var(--fuente-titulos);margin-bottom:var(--e1)}' +
+      '.gs-alt{border-top:1px solid var(--gs-l);padding:var(--e2) 0}.gs-alt summary{display:flex;justify-content:space-between;gap:var(--e2);cursor:pointer;list-style:none;font-size:15px;min-height:32px;align-items:center}' +
+      '.gs-alt summary::-webkit-details-marker{display:none}.gs-alt summary em{font-style:normal;font-weight:700;font-variant-numeric:tabular-nums}.gs-alt[data-gs-vacio] summary{cursor:default;color:var(--gs-g)}' +
+      '.gs-alt-i{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px var(--e2);width:100%;background:none;border:0;border-top:1px solid var(--gs-l);padding:var(--e2) 0;text-align:left;color:inherit;cursor:pointer;font-size:14px}' +
+      '.gs-alt-i b{display:flex;align-items:center;min-width:0}.gs-alt-i b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gs-alt-i small{grid-column:1/-1;color:var(--gs-g);font-size:13px}.gs-alt-i .gs-pag{font-size:13px;font-weight:700;white-space:nowrap}' +
+      '.gs-dia-h{font:var(--peso-titulos) 20px/1.2 var(--fuente-titulos);color:var(--color-principal-oscuro);margin:var(--e5) 0 0}' +
+      '.gs-fotos{display:flex;gap:var(--e2);flex-wrap:wrap}.gs-fotos button{font-size:14px}' +
+      '.gs-visor img{display:block;max-width:100%;max-height:70vh;margin:0 auto;border-radius:var(--radio);background:var(--gs-f)}';
   }
 
   /* ---------- utilidades ---------- */
-  function cargando(msg) { return '<div class="gs-cargando"><div class="gs-giro"></div>' + esc(msg || 'Cargando…') + '</div>'; }
+  function cargando(msg) { return '<div class="gs-cargando" role="status"><div class="u-carga"></div>' + esc(msg || 'Cargando…') + '</div>'; }
   function errorHtml(e) { return '<div class="gs-error" role="alert">' + esc(e && e.message || e) + '</div>'; }
   function $(s) { return S.el && S.el.querySelector(s); }
   function eur(n) { return (Math.round(Math.abs(n || 0) * 100) / 100).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.').replace(/,00$/, '') + ' €'; }
@@ -281,7 +285,7 @@
   function htmlFotos(lista) {
     if (!lista || !lista.length) return '';
     return '<div class="gs-sec">Fotos</div><div class="gs-fotos">' + lista.map(function (f, i) {
-      return '<button type="button" class="gs-b2" data-gs-foto="' + i + '">📷 ' + esc(f.t || 'Foto ' + (i + 1)) + '</button>';
+      return '<button type="button" class="gs-b2" data-gs-foto="' + i + '">' + esc(f.t || 'Foto ' + (i + 1)) + '</button>';
     }).join('') + '</div>';
   }
   function engancharFotos(hoja, lista, titulo) {
@@ -368,8 +372,8 @@
     var ver = document.querySelector('header.cab .ver-btn'), sol = document.querySelector('header.cab .sol-btn');
     el.innerHTML = '<div class="gs"><style>' + css() + cssExtra() + '</style>' +
       '<header class="gs-cab">' + (ver ? '<button type="button" class="gs-ver" id="gs-ver" title="Versión y novedades">' + esc(ver.textContent.trim()) + '</button>' : '') +
-      (sol ? '<button type="button" class="gs-sol" id="gs-sol" title="Pide un cambio, cuéntanos un fallo o pregúntanos una duda" aria-label="Pedir algo a Utilo">💬</button>' : '') +
-      '<h1>GESTIÓN</h1><p><span id="gs-hora">Excel GESTION</span><button class="gs-re" id="gs-re" type="button" aria-label="Actualizar" title="Volver a leer el Excel">↻</button></p>' +
+      (sol ? '<button type="button" class="gs-sol" id="gs-sol" title="Pide un cambio, cuéntanos un fallo o pregúntanos una duda" aria-label="Pedir algo a Utilo">' + ICONO_SOL + '</button>' : '') +
+      '<h1>Gestión <span class="gs-pint" id="gs-pint" hidden></span></h1><p><span id="gs-hora">Excel GESTION</span><button class="gs-re" id="gs-re" type="button" aria-label="Actualizar" title="Volver a leer el Excel">↻</button></p>' +
       '<nav class="gs-tabs" role="tablist">' + TABS.map(function (t) {
         return '<button type="button" role="tab" data-gs-tab="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + t[1] + '</button>';
       }).join('') + '</nav></header>' +
@@ -403,7 +407,7 @@
     return opciones(forzar && !S.opciones).then(function (o) {
       return dato(clave(), fn, [S.temp, !!forzar], forzar).then(function (r) {
         if (S.tab !== tab || !document.body.contains(main)) return;
-        hora(r.hora); pinta(o, r);
+        hora(r.hora); pintada(S.temp); pinta(o, r);
       });
     }).then(null, function (e) {
       if (S.tab === tab) main.innerHTML = errorHtml(e) + '<p style="text-align:center"><button class="gs-chip" type="button" id="gs-reint">Reintentar</button></p>';
@@ -451,7 +455,7 @@
   function telDe(n) { return ((S.opciones || {}).tels || {})[n] || ''; }
   function estadoPago(e) {
     return !e.ps ? '<span class="gs-pag gs-neg">Sin P.S.</span>' : e.pendiente > 0.005 ? '<span class="gs-pag gs-neg">Faltan ' + eur(e.pendiente) + '</span>' :
-      e.pago ? '<span class="gs-pag gs-pos">Pagado</span>' : '<span class="gs-pag" style="color:#a35d00">Falta inscripción</span>';
+      e.pago ? '<span class="gs-pag gs-pos">Pagado</span>' : '<span class="gs-pag gs-amb">Falta inscripción</span>';
   }
 
   function pResumen(main, forzar) {
@@ -476,9 +480,9 @@
         '<button type="button" data-gs-kpi="pagar" class="' + (porPagar.length ? 'gs-alerta' : '') + '"><b>' + porPagar.length + '</b><small>Por pagar</small></button>' +
         '<button type="button" data-gs-kpi="alertas" class="' + (nAl ? 'gs-alerta' : '') + '"><b id="gs-nal">' + nAl + '</b><small>Alertas</small></button></div>' +
         // Alertas: pagos, avisos del Excel, equipos sin liga y jugadoras con alerta (estas, en cuanto se cargan).
-        '<div class="gs-card gs-alts" id="gs-alts"><div class="gs-alts-t">⚠️ Alertas</div>' +
+        '<div class="gs-card gs-alts" id="gs-alts"><div class="gs-alts-t">Alertas</div>' +
         htmlAlerta('pagar', 'Pagos pendientes', porPagar, function (e) { return estadoPago(e); }, r) +
-        htmlAlerta('avisos', 'Problemas en la inscripción', avisos, function (e) { return '<span class="gs-pag" style="color:#a35d00">' + esc(e.ocupado ? 'Nombre repetido ×' + e.ocupado : e.revisar) + '</span>'; }, r) +
+        htmlAlerta('avisos', 'Problemas en la inscripción', avisos, function (e) { return '<span class="gs-pag gs-amb">' + esc(e.ocupado ? 'Nombre repetido ×' + e.ocupado : e.revisar) + '</span>'; }, r) +
         htmlAlerta('sinliga', 'Equipos sin liga', sinLiga, function () { return ''; }, r) +
         '<div id="gs-aljug"><details class="gs-alt"><summary><span>Jugadoras con alerta</span><em>…</em></summary><p class="gs-nota">Cargando las jugadoras…</p></details></div></div>' +
         '<div class="gs-dias">' + [''].concat(ordenDias).map(function (d) {
@@ -493,7 +497,7 @@
           var gestor = k === 'SIN' ? '' : gestorDeLiga(k), tel = telDe(gestor);
           h += '<details class="gs-card gs-liga" data-gs-liga="' + esc(k) + '"' + (S.abiertas[k] ? ' open' : '') + '><summary>' +
             '<div class="gs-liga-n">' + (k === 'SIN' ? 'Sin liga' : '<small>' + esc(compCorta(k.split('|').slice(0, 2).join('|'))) + '</small>' + esc(ligaCorta(k))) + '</div>' +
-            (gestor ? '<div class="gs-liga-g"><span>Gestor: <b>' + esc(gestor) + '</b></span>' + (tel ? aWa(wa(tel), '💬 WhatsApp').replace('class="gs-b2"', 'class="gs-wa"') : '') + '</div>' : '') +
+            (gestor ? '<div class="gs-liga-g"><span>Gestor: <b>' + esc(gestor) + '</b></span>' + (tel ? aWa(wa(tel), 'WhatsApp').replace('class="gs-b2"', 'class="gs-wa"') : '') + '</div>' : '') +
             '<div class="gs-liga-s">' + lista.length + (lista.length === 1 ? ' equipo · ' : ' equipos · ') + jug + ' jugadoras' + (pend ? ' · <b class="gs-neg">' + pend + ' por pagar</b>' : ' · todo pagado') + '</div>' +
             '</summary>' +
             lista.map(function (e) {
@@ -530,7 +534,7 @@
       dato('jug_' + S.temp, 'gestionJugadoras', [S.temp, false]).then(function (rj) {
         var cont = main.querySelector('#gs-aljug'); if (!cont || !document.body.contains(cont)) return;
         var js = rj.lista.filter(function (j) { return enFiltro(j) && FILTROS_JUG.alerta(j); });
-        cont.innerHTML = htmlAlerta('alerta', 'Jugadoras con alerta', js, function (j) { return '<span class="gs-pag" style="color:#a35d00">' + esc(String(j.alerta).split('·')[0].trim().slice(0, 40)) + '</span>'; }, rj, true);
+        cont.innerHTML = htmlAlerta('alerta', 'Jugadoras con alerta', js, function (j) { return '<span class="gs-pag gs-amb">' + esc(String(j.alerta).split('·')[0].trim().slice(0, 40)) + '</span>'; }, rj, true);
         var n = main.querySelector('#gs-nal'); if (n) { n.textContent = nAl + js.length; if (nAl + js.length) n.parentNode.classList.add('gs-alerta'); }
         engancharAlertas(cont, function (j) { fichaJugadora(j, o, rj); });
       }, function () { var cont = main.querySelector('#gs-aljug'); if (cont) cont.innerHTML = ''; });
@@ -590,7 +594,7 @@
         var lista = q ? r.lista.filter(function (e) { return norm2([e.equipo, e.capi, e.liga, e.asig, e.teamForm, e.mail, e.tel].join(' ')).indexOf(q) >= 0; })
           : base.filter(FILTROS_EQ[f.filtro]);
         $('#gs-eqlista').innerHTML = (q ? '<p class="gs-aviso-b">Buscando en toda la temporada ' + esc(S.temp) + ', también en las inscripciones con ERROR.</p>' : '') +
-          (esCorreo(f.q) ? '<p style="margin:8px 0 0"><button type="button" class="gs-b2" id="gs-eqcorreo">📧 Ver todo lo de este correo</button></p>' : '') +
+          (esCorreo(f.q) ? '<p style="margin:8px 0 0"><button type="button" class="gs-b2" id="gs-eqcorreo">Ver todo lo de este correo</button></p>' : '') +
           '<p class="gs-s" style="margin:12px 2px 0;font-size:13px;color:var(--gs-g)">' + lista.length + (lista.length === 1 ? ' inscripción' : ' inscripciones') + '</p>' +
           '<div class="gs-card"><div class="gs-lista">' + (lista.length ? lista.map(function (e) {
             var t = [];
@@ -650,9 +654,9 @@
       '<p class="gs-nota" style="margin:-8px 0 8px">' + esc(compCorta(e.comp) + (e.liga ? ' · ' + ligaCorta(e.liga) : '')) + '</p>' +
       (t.length ? '<div class="gs-tags" style="margin:-4px 0 8px">' + t.join('') + '</div>' : '') +
       '<div class="gs-btns">' +
-      aWa(e.linkContacto || wa(e.tel), '💬 Capitana') + aWa(e.linkMensaje, '📤 Mensaje inicial') + aWa(e.linkEstado, '📋 Estado del equipo') +
-      (!e.error && !e.buscan ? '<button type="button" class="gs-b2" id="gs-verjug">👥 Jugadoras</button>' : '') +
-      (e.mail ? '<button type="button" class="gs-b2" id="gs-vercorreo">📧 Su correo</button>' : '') +
+      aWa(e.linkContacto || wa(e.tel), 'Escribir a la capitana') + aWa(e.linkMensaje, 'Enviar mensaje inicial') + aWa(e.linkEstado, 'Enviar estado del equipo') +
+      (!e.error && !e.buscan ? '<button type="button" class="gs-b2" id="gs-verjug">Ver jugadoras</button>' : '') +
+      (e.mail ? '<button type="button" class="gs-b2" id="gs-vercorreo">Ver todo lo de su correo</button>' : '') +
       (url ? '<a class="gs-b2" href="' + esc(url) + '" target="_blank" rel="noopener">Excel ↗</a>' : '') + '</div>' +
       '<div class="gs-sec">Liga y organización</div><div class="gs-dos">' + campos.slice(0, 4).map(htmlCampo).join('') + '</div>' +
       '<div class="gs-dos">' + campos.slice(4, 7).map(htmlCampo).join('') + '</div>' + htmlCampo(campos[7]) +
@@ -698,12 +702,12 @@
     var t = [];
     if (j.error) t.push(tag('ERROR', 'gs-tag-r'));
     if (j.porDni) t.push(tag('Mismo DNI, otro correo', 'gs-tag-a'));
-    if (j.alerta) t.push(tag('⚠️ ' + j.alerta.split('·')[0].trim().slice(0, 60), 'gs-tag-a'));
+    if (j.alerta) t.push(tag(j.alerta.split('·')[0].trim().slice(0, 60), 'gs-tag-a'));
     if (!j.error && !j.xporty) t.push(tag('Sin Xporty', 'gs-tag-g'));
     if (!j.error && j.incluida === '🚫') t.push(tag('Cami personalizada', 'gs-tag-g'));
     return '<button type="button" class="gs-item" data-gs-j="' + i + '"><div style="min-width:0">' +
       '<div class="gs-t">' + esc(j.nombreCompleto || j.mail) + '</div>' +
-      '<div class="gs-s">' + esc([conEquipo ? compCorta(j.comp) + ' · ' + j.equipo : '', j.cami ? '👕 ' + j.cami : (j.dorsal ? '👕 ' + j.dorsal : ''), edad1(j.edad, true) ? edad1(j.edad, true) + ' años' : ''].filter(String).join(' · ')) +
+      '<div class="gs-s">' + esc([conEquipo ? compCorta(j.comp) + ' · ' + j.equipo : '', j.cami ? 'Camiseta ' + j.cami : (j.dorsal ? 'Dorsal ' + j.dorsal : ''), edad1(j.edad, true) ? edad1(j.edad, true) + ' años' : ''].filter(String).join(' · ')) +
       (j.color ? ' ' + punto(j.color) : '') + '</div>' +
       (t.length ? '<div class="gs-tags">' + t.join('') + '</div>' : '') + '</div></button>';
   }
@@ -729,7 +733,7 @@
         var lista = q ? r.lista.filter(function (j) { return norm2([j.nombreCompleto, j.nombre, j.ap1, j.ap2, j.dni, j.mail, j.cami, j.equipo, j.tel].join(' ')).indexOf(q) >= 0; })
           : base.filter(FILTROS_JUG[f.filtro]);
         $('#gs-jlista').innerHTML = (q ? '<p class="gs-aviso-b">Buscando en toda la temporada ' + esc(S.temp) + ', también en las inscripciones con ERROR.</p>' : '') +
-          (esCorreo(f.q) ? '<p style="margin:8px 0 0"><button type="button" class="gs-b2" id="gs-jcorreo">📧 Ver todo lo de este correo (todas las temporadas)</button></p>' : '') +
+          (esCorreo(f.q) ? '<p style="margin:8px 0 0"><button type="button" class="gs-b2" id="gs-jcorreo">Ver todo lo de este correo (todas las temporadas)</button></p>' : '') +
           '<p class="gs-s" style="margin:12px 2px 0;font-size:13px;color:var(--gs-g)">' + lista.length + (lista.length === 1 ? ' inscripción' : ' inscripciones') + '</p>' +
           '<div class="gs-card"><div class="gs-lista">' + (lista.length ? lista.slice(0, MAX_LISTA).map(function (j) { return itemJugadora(j, r.lista.indexOf(j), q || !f.equipo); }).join('') +
             (lista.length > MAX_LISTA ? '<div class="gs-mas">Y ' + (lista.length - MAX_LISTA) + ' más: elige un equipo o busca.</div>' : '')
@@ -771,9 +775,9 @@
     var v = ventana(j.nombreCompleto || 'Jugadora',
       '<p class="gs-nota" style="margin:-8px 0 8px">' + esc(compCorta(j.comp) + ' · ' + j.equipo + ' · alta ' + j.alta) + '</p>' +
       (j.error ? '<div class="gs-tags" style="margin:-4px 0 8px">' + tag('ERROR: esta inscripción no cuenta', 'gs-tag-r') + '</div>' : '') +
-      (alertas ? '<div class="gs-al">' + alertas + (lAl ? '<p><a class="gs-a" href="' + esc(lAl) + '"' + (/^whatsapp:/.test(lAl) ? '' : ' target="_blank" rel="noopener"') + '>💬 Enviar el aviso por WhatsApp</a></p>' : '') + '</div>' : '') +
-      '<div class="gs-btns">' + aWa(wa(j.tel), '💬 WhatsApp') +
-      (j.mail ? '<button type="button" class="gs-b2" id="gs-vercorreo">📧 Todo lo de su correo</button>' : '') +
+      (alertas ? '<div class="gs-al">' + alertas + (lAl ? '<p><a class="gs-a" href="' + esc(lAl) + '"' + (/^whatsapp:/.test(lAl) ? '' : ' target="_blank" rel="noopener"') + '>Enviar el aviso por WhatsApp</a></p>' : '') + '</div>' : '') +
+      '<div class="gs-btns">' + aWa(wa(j.tel), 'WhatsApp') +
+      (j.mail ? '<button type="button" class="gs-b2" id="gs-vercorreo">Ver todo lo de su correo</button>' : '') +
       (url ? '<a class="gs-b2" href="' + esc(url) + '" target="_blank" rel="noopener">Excel ↗</a>' : '') + '</div>' +
       '<div class="gs-sec">Inscripción</div>' + htmlCampo(campos[0]) + htmlCampo(campos[1]) +
       '<div class="gs-sec">Datos personales</div><div class="gs-dos">' + campos.slice(2, 9).map(htmlCampo).join('') + '</div>' +
@@ -800,7 +804,7 @@
 
   /* ---------- todo lo de un correo (todas las temporadas) ---------- */
   function verCorreo(mail) {
-    var v = ventana('📧 ' + mail, cargando('Buscando en todo GESTION…'));
+    var v = ventana(mail, cargando('Buscando en todo GESTION…'));
     var c = { mail: String(mail || '').trim().toLowerCase() };
     opciones().then(function (o) {
       return llamar('gestionCorreo', [c.mail]).then(function (r) {
