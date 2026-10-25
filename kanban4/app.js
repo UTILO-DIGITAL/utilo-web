@@ -14,7 +14,7 @@
   var CLAVE = 'kanban_' + (C.clave || 'negocio');
   // T0133: carpeta de este archivo (…/kanban/), para cargar los módulos de las secciones (economia.js…).
   var BASE = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/[^/]*$/, '') : '../kanban/'; })();
-  var VERSION_MODULOS = '22'; // T0207 · T0208 · T0149 · T0213
+  var VERSION_MODULOS = '23'; // T0207 · T0208 · T0149 · T0213 · T0218
   // T0150: diseño de PROTOCOLO DISEÑO UTILO. Solo para los negocios que tienen su marca.css (index.html con marca: '…').
   // Los demás (Konamigas hasta T0149) siguen exactamente como antes.
   var MARCA = String(C.marca || '').replace(/[^a-z0-9_-]/gi, '');
@@ -144,6 +144,9 @@
     GESTION: { t: 'Gestión', i: '🗂️', js: 'gestion.js' }, // T0139: sección con módulo propio (equipos y jugadoras)
     ECONOMIA: { t: 'Economía', i: '💶', js: 'economia.js' }, // T0133: sección con módulo propio
     LIGAS: { t: 'Ligas', i: '⚽' },
+    // T0218: la Bandeja de Utilo es una sección, pero vive dentro de la página del tablero (la pinta el motor):
+    // la barra solo le dice al tablero qué enseñar (window.SX_TABLERO, BANDEJA_WEB.js del motor).
+    BANDEJA: { t: 'Bandeja', i: '📥', tablero: true },
     PERFIL: { t: 'Perfil', i: '👤' }
   };
 
@@ -157,6 +160,7 @@
     GESTION: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     ECONOMIA: '<path d="M17 6.5A7 7 0 1 0 17 17.5"/><path d="M4 10.5h9M4 13.5h9"/>',
     LIGAS: '<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4"/><path d="M12 13v4M9 20h6"/>',
+    BANDEJA: '<path d="M4 13l2.5-7.5A2 2 0 0 1 8.4 4h7.2a2 2 0 0 1 1.9 1.5L20 13"/><path d="M4 13v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5h-5l-1 2h-4l-1-2z"/>',
     PERFIL: '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"/>'
   };
   function icono(s) {
@@ -297,22 +301,26 @@
 
   /** Script que va dentro de la página del tablero: cambia de sección sin recargar. */
   function scriptBarra(secs, cred) {
-    var P = {}, T = {};
-    secs.forEach(function (s) { T[s] = infoSeccion(s).t; if (s !== 'KANBAN') P[s] = htmlSeccion(s, cred); });
-    return scriptsModulos(secs, cred) + '<script>(function(){var P=' + JSON.stringify(P).replace(/</g, '\\u003c') + ',T=' + JSON.stringify(T) +
+    var P = {}, T = {}, TB = { KANBAN: 1 };
+    secs.forEach(function (s) {
+      T[s] = infoSeccion(s).t;
+      if (infoSeccion(s).tablero) TB[s] = 1; // T0218: sección dentro del tablero (la Bandeja)
+      else if (s !== 'KANBAN') P[s] = htmlSeccion(s, cred);
+    });
+    return scriptsModulos(secs, cred) + '<script>(function(){var P=' + JSON.stringify(P).replace(/</g, '\\u003c') + ',T=' + JSON.stringify(T) + ',TB=' + JSON.stringify(TB) +
       ',N=' + JSON.stringify(C.nombreApp || 'App') + ',K0="";' +
       'function ir(s,push){var nav=document.querySelector(".sx"),p=document.getElementById("sx-panel");if(!nav||!p)return;' +
       'if(!document.body.classList.contains("sx-otra"))K0=document.title;' +
       '[].forEach.call(nav.querySelectorAll("a[data-sx]"),function(a){if(a.getAttribute("data-sx")===s)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");});' +
-      'if(!P[s]){document.body.classList.remove("sx-otra");p.innerHTML="";if(K0)document.title=K0;}' +
+      'if(!P[s]){document.body.classList.remove("sx-otra");p.innerHTML="";if(K0)document.title=K0;if(window.SX_TABLERO)window.SX_TABLERO(s);}' +
       'else{p.innerHTML=P[s];document.body.classList.add("sx-otra");document.title=T[s]+" · "+N;' +
       'var m=p.querySelector("[data-sx-mod]");if(m){var k=m.getAttribute("data-sx-mod"),X=window.SX_MOD||{};' +
       'if(X[k])X[k].abrir(m);else{var t=setInterval(function(){if((window.SX_MOD||{})[k]&&document.body.contains(m)){clearInterval(t);window.SX_MOD[k].abrir(m);}},100);setTimeout(function(){clearInterval(t);},15000);}}}' +
       'window.scrollTo(0,0);if(push)history.pushState({sx:s},"",location.pathname+"?s="+s.toLowerCase());}' +
       'document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[data-sx]");' +
       'if(!a||e.metaKey||e.ctrlKey||e.shiftKey||e.button)return;e.preventDefault();ir(a.getAttribute("data-sx"),true);});' +
-      'window.addEventListener("popstate",function(){var s=(new URLSearchParams(location.search).get("s")||"KANBAN").toUpperCase();ir(P[s]?s:"KANBAN",false);});' +
-      'var s0=(new URLSearchParams(location.search).get("s")||"").toUpperCase();if(P[s0])ir(s0,false);' +
+      'window.addEventListener("popstate",function(){var s=(new URLSearchParams(location.search).get("s")||"KANBAN").toUpperCase();ir(P[s]||TB[s]?s:"KANBAN",false);});' +
+      'var s0=(new URLSearchParams(location.search).get("s")||"").toUpperCase();if(P[s0]||(TB[s0]&&s0!=="KANBAN"))ir(s0,false);' +
       '})();<\/script>';
   }
 
