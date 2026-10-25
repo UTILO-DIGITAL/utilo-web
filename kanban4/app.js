@@ -15,6 +15,7 @@
   // T0133: carpeta de este archivo (…/kanban/), para cargar los módulos de las secciones (economia.js…).
   var BASE = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/[^/]*$/, '') : '../kanban/'; })();
   var VERSION_MODULOS = '23'; // T0207 · T0208 · T0149 · T0213 · T0218
+  var VERSION_ICONO = '2'; // T0222: el ?v= de los iconos del index.html de cada negocio (sube con ellos)
   // T0150: diseño de PROTOCOLO DISEÑO UTILO. Solo para los negocios que tienen su marca.css (index.html con marca: '…').
   // Los demás (Konamigas hasta T0149) siguen exactamente como antes.
   var MARCA = String(C.marca || '').replace(/[^a-z0-9_-]/gi, '');
@@ -118,8 +119,9 @@
 
   function cabecera(cred) {
     return '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
-      '<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icono-180.png">' +
-      '<link rel="icon" href="icono-192.png"><meta name="apple-mobile-web-app-capable" content="yes">' +
+      // T0222: el icono que guarda el iPhone al «Añadir a pantalla de inicio» es el de esta cabecera (sustituye a la del index.html)
+      '<link rel="manifest" href="manifest.webmanifest?v=' + VERSION_ICONO + '"><link rel="apple-touch-icon" href="icono-180.png?v=' + VERSION_ICONO + '">' +
+      '<link rel="icon" href="icono-192.png?v=' + VERSION_ICONO + '"><meta name="apple-mobile-web-app-capable" content="yes">' +
       '<meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="' + texto(C.color || '#ffffff') + '">' +
       '<meta name="apple-mobile-web-app-title" content="' + texto(C.nombreApp || 'Kanban') + '">' +
       '<script>window.KANBAN=' + JSON.stringify(C).replace(/</g, '\\u003c') + ';<\/script>' +
