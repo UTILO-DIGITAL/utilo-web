@@ -628,7 +628,7 @@
     S.tab = t;
     [].forEach.call(S.el.querySelectorAll('[data-ec-tab]'), function (x) { x.setAttribute('aria-selected', x.getAttribute('data-ec-tab') === t); });
     var b = S.el.querySelector('[data-ec-tab=' + t + ']'); if (b && b.scrollIntoView) b.scrollIntoView({ inline: 'center', block: 'nearest' });
-    window.scrollTo(0, 0);
+    window.scrollTo(0, 0); document.body.scrollTop = 0; // T0224: en el móvil el scroll es del body
     pintar();
   }
 

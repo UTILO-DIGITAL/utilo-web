@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"><!-- T0224: pantalla completa (zona segura del iPhone) y sin zoom; el mismo que kanban4/app.js · VIEWPORT -->
 <title>Kanban DEV</title>
 <!-- T0190: web de DEV de UTILO_CORE 4.0 (entrar con Google). Llama a la implementación de DEV de utilo-apps
      (dev/subir.js la actualiza en cada subida). Los datos son los de ejemplo del Sheet DEV, nunca de un cliente. -->
@@ -12,7 +12,7 @@
     var q = new URLSearchParams(location.search).get('marca'), m = q;
     try { if (q) localStorage.setItem('dev_marca', q); m = localStorage.getItem('dev_marca'); } catch (e) {}
     window.DEV_MARCA = /^(utilo|konamigas)$/.test(m || '') ? m : 'utilo';
-    document.write('<link rel="stylesheet" href="../' + window.DEV_MARCA + '/marca.css?v=22"><link rel="stylesheet" href="../estilos/base.css?v=22">');
+    document.write('<link rel="stylesheet" href="../' + window.DEV_MARCA + '/marca.css?v=24"><link rel="stylesheet" href="../estilos/base.css?v=24">');
   })();
 </script>
 <script>
@@ -30,7 +30,7 @@
 </head>
 <body class="u">
 <div class="kz"><div class="kz-caja kz-centro" role="status"><div class="u-carga"></div><p>Cargando…</p></div></div>
-<script src="../kanban4/google.js?v=23"></script>
-<script src="../kanban4/app.js?v=23"></script>
+<script src="../kanban4/google.js?v=24"></script>
+<script src="../kanban4/app.js?v=24"></script>
 </body>
 </html>
