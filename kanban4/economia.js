@@ -11,7 +11,8 @@
  * T0135: mismas fuentes, tamaños, botones y ventanas que el kanban; versión y «Pedir algo a Utilo» también aquí.
  * T0137: pestaña Movimientos (ver, buscar, editar y borrar; los borrados quedan en el Excel y todo cambio va a HISTORIAL).
  * T0138: factura o ticket de un movimiento: foto o PDF que se sube a Drive, o uno que ya está en Drive.
- * T0145: la factura o el ticket se ve dentro de la app («Ver»), con la vista previa de Drive (economiaArchivo).
+ * T0145: la factura o el ticket se veía dentro de la app. T0213: «Ver» la abre en Drive, porque las que sube Make (T0210) no
+ *   las puede leer la llave de la web, que solo ve lo que crea o elige ella.
  * T0207: con la llave de la persona, la web solo ve en Drive lo que ha subido o elegido con ella: una factura que ya está
  *   en Drive se elige con la ventana de Google (UG.elegir) y lo que no se puede previsualizar se abre en Drive.
  * Resumen: desplegable discreto «Beneficio y reparto» de la temporada elegida (beneficio, reparto a socios, resultado) y pestaña Presupuesto
@@ -672,7 +673,7 @@
       fila('Categoría', esc(m.categoria || (m.interno ? 'Traspaso interno' : '—'))) + fila('Competición', esc(compCorta(m.comp))) +
       fila('Paga → cobra', deA(m.emite, m.recibe, eq)) + (m.equipo ? fila('Equipo', esc(nombreEquipo(m.equipo, m.comp))) : '') +
       fila('Pago', m.efectivo ? 'Efectivo' : 'Banco') + fila('IVA', esc(ivaTxt)) +
-      fila('Factura o ticket', m.link ? (m.linkUrl ? '<button type="button" class="ec-a" id="ec-dver" style="background:none;border:0;padding:0;cursor:pointer">Ver ' + esc(m.link) + '</button> · <a class="ec-a" href="' + esc(m.linkUrl) + '" target="_blank" rel="noopener">Drive ↗</a>' : esc(m.link)) : (gasto && m.iva && m.iva !== '0' ? '<b class="ec-neg">Falta</b>' : 'No hace falta')) +
+      fila('Factura o ticket', m.link ? (m.linkUrl ? '<a class="ec-a" href="' + esc(m.linkUrl) + '" target="_blank" rel="noopener">Ver ' + esc(m.link) + ' en Drive ↗</a>' : esc(m.link)) : (gasto && m.iva && m.iva !== '0' ? '<b class="ec-neg">Falta</b>' : 'No hace falta')) +
       fila('Concepto del banco', esc(m.concepto)) + '</div>' +
       (m.detalles ? '<div class="ec-dtx"><b>Detalles</b><p>' + esc(m.detalles) + '</p></div>' : '') +
       (m.historial ? '<details class="ec-dhist"><summary>Historial de cambios</summary><pre>' + esc(m.historial) + '</pre></details>' : '') +
@@ -683,7 +684,6 @@
         '<button type="button" class="ec-b1" id="ec-ded">Editar</button>') + '</div>' +
       (url ? '<p style="text-align:center;margin:12px 0 0"><a class="ec-a" href="' + esc(url) + '" target="_blank" rel="noopener">Abrir en el Excel ↗</a></p>' : ''));
     var q = function (s) { return v.el.querySelector(s); };
-    if (q('#ec-dver')) q('#ec-dver').onclick = function () { verArchivo(m.linkUrl, m.link); };
     if (q('#ec-ded')) q('#ec-ded').onclick = function () { v.cerrar(); formulario(m); };
     if (q('#ec-dfac')) q('#ec-dfac').onclick = function () { v.cerrar(); adjuntar(m); };
     if (q('#ec-dbor')) q('#ec-dbor').onclick = function () { v.cerrar(); borrar(m, true); };
@@ -779,16 +779,6 @@
         });
       }, function (e) { q('#ec-flista').innerHTML = ''; err(e); });
     };
-  }
-
-  /** T0145: ver la factura o el ticket dentro de la app (vista previa que da Drive; un PDF, su primera página). */
-  function verArchivo(url, titulo) {
-    var v = ventana(titulo || 'Factura o ticket', '<div id="ec-visor">' + cargando('Abriendo el archivo…') + '</div>');
-    var pie = '<div class="ec-acc"><a class="ec-b2" href="' + esc(url) + '" target="_blank" rel="noopener">Abrir en Drive ↗</a></div>';
-    llamar('economiaArchivo', [url]).then(function (a) {
-      v.el.querySelector('#ec-visor').innerHTML = (a.img ? '<img alt="' + esc(a.nombre) + '" src="' + a.img + '" style="display:block;max-width:100%;max-height:70vh;margin:0 auto;border-radius:10px;background:var(--ec-f)">' :
-        '<p>' + (a.abrir ? 'Este archivo no se subió ni se eligió desde la app: ábrelo en Drive.' : 'Este archivo no se puede ver aquí.') + '</p>') + (/pdf/.test(a.mime) ? '<p class="ec-s" style="font-size:12.5px;color:var(--ec-g);text-align:center">Es un PDF: se ve su primera página.</p>' : '') + pie;
-    }, function (e) { v.el.querySelector('#ec-visor').innerHTML = errorHtml(e) + pie; });
   }
 
   /* ---------- APUNTAR o EDITAR un movimiento ---------- */
