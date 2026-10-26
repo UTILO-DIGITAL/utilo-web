@@ -1188,8 +1188,8 @@
         chips([['libres', 'Libres'], ['local', 'En el local']], k, 'gs-csver') +
         '<div class="gs-kpis gs-cs-kpis">' +
           '<div class="gs-kpi"><b>En el local</b><span class="gs-val">' + suma('local') + '</span><span class="gs-sub">sueltas, sin contar los packs</span></div>' +
-          '<div class="gs-kpi"><b>Reservadas</b><span class="gs-val">' + suma('reservadas') + '</span><span class="gs-sub">por preparar</span></div>' +
-          '<div class="gs-kpi"><b>Libres</b><span class="gs-val">' + suma('libres') + '</span><span class="gs-sub">para dar a quien no tiene</span></div>' +
+          '<div class="gs-kpi"><b>Por preparar</b><span class="gs-val">' + suma('reservadas') + '</span><span class="gs-sub">asignadas, falta el pack</span></div>' +
+          '<div class="gs-kpi"><b>Libres</b><span class="gs-val">' + suma('libres') + '</span><span class="gs-sub">en el local, sin dueña</span></div>' +
           '<div class="gs-kpi"><b>En negativo</b><span class="gs-val ' + (neg ? 'gs-neg' : 'gs-pos') + '">' + neg + '</span><span class="gs-sub">' + (neg ? 'revisa con un recuento' : 'todo cuadra') + '</span></div>' +
         '</div>' +
         (neg ? '<div class="gs-al"><p>' + neg + (neg === 1 ? ' combinación sale' : ' combinaciones salen') + ' en negativo (en rojo): se han dado más camisetas de las que constan. Un recuento del local lo corrige.</p></div>' : '');
