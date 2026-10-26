@@ -18,6 +18,9 @@
  * T0240 · Camisetas › Stock y Pedidos, de solo lectura, del Excel CAMISETAS (módulo privado camisetas, camisetasDatos): libres
  *   o en el local por modelo, color y dorsal-talla (en el ordenador, un cuadro como el de CAMISETAS; en el móvil, una tarjeta por
  *   color) y cada pedido con su paso. Hacer pedidos y el recuento siguen en el menú «Camisetas» del Excel.
+ * T0246 · Camisetas por modelo: Stock y Pedidos se eligen por modelo, sin temporada (el modelo es de la competición y sus
+ *   camisetas sirven a todas las competiciones que lo llevan, de cualquier temporada); Entregas sigue por temporada. Marca nueva
+ *   «Sin camiseta»: no se le hará (ni se pide ni guarda una del local) y no cuenta como pendiente.
  * T0241 · Camisetas › Recuento: el recuento del local desde el móvil, con las cajas delante (lo que hacían «Preparar recuento» y
  *   «Aplicar recuento» del Excel): por color, cada dorsal-talla con lo que debería haber; se cambia solo lo que no cuadra, se
  *   apuntan las que no salen y, tras ver el resumen, camisetasRecuentoAplicar lo escribe en DB_AJUSTES_STOCK. Lo contado se
@@ -39,7 +42,7 @@
   var S = { tab: 'resumen', temp: '', fComp: '', fLiga: '', dia: '', datos: {}, opciones: null, el: null,
     eq: { filtro: 'todos', q: '' }, jug: { filtro: 'todas', q: '', equipo: '' }, cam: { filtro: 'pendientes', q: '', todo: {}, equipo: '' },
     // T0240: Camisetas › Entregas (de GESTION), Stock y Pedidos (del Excel CAMISETAS)
-    cs: { vista: 'entregas', modelo: '', ver: 'libres', ped: 'marcha', rec: '', recAbierto: '' } }; // T0241: rec, modelo del recuento
+    cs: { vista: 'entregas', modelo: '', ver: 'libres', ped: 'marcha', recAbierto: '' } }; // T0241: recAbierto, el color que se está contando
 
   function ctx() { return window.SX_CTX || {}; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -293,7 +296,8 @@
       // T0240 · Camisetas: Entregas · Stock · Pedidos arriba; stock en cuadro (ordenador) o por color (móvil); pedidos con sus pasos.
       '.gs-sw3{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:var(--e3)}.gs-sw3 button{padding:0 2px;font-size:14px}' + // T0241: cuatro, con Recuento
       '@media(min-width:900px){.gs-sw3{max-width:600px}}' +
-      '.gs-cs-f{grid-template-columns:repeat(2,minmax(0,1fr));max-width:560px}@media(max-width:520px){.gs-cs-f{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.gs-cs-f select:first-child{grid-column:auto}}' +
+      '.gs-cs-f{grid-template-columns:minmax(0,1fr);max-width:420px}@media(max-width:520px){.gs-cs-f{grid-template-columns:minmax(0,1fr)}}' + // T0246: un solo selector, el de modelo
+      '.gs-cs-mi{margin:6px 2px 0}' +
       '@media(min-width:900px){.gs-cs-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}' +
       '.gs-cs-mh{display:flex;justify-content:space-between;gap:var(--e2);align-items:baseline}.gs-cs-mh b{font:var(--peso-titulos) 17px/1.25 var(--fuente-titulos);color:var(--color-principal-oscuro)}' +
       '.gs-cs-mh span{font-size:13px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}' +
@@ -340,7 +344,6 @@
       '.gs .gs-rc-st input{width:56px;min-height:44px;text-align:center;font:700 19px/1 var(--fuente-texto);font-variant-numeric:tabular-nums;padding:0 2px;-moz-appearance:textfield}' +
       '.gs-rc-st input::-webkit-outer-spin-button,.gs-rc-st input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}' +
       '.gs-rc-dif{margin-left:var(--e2);padding:0 var(--e1);border-radius:var(--radio-peq);background:var(--color-destacado);font-weight:800;font-size:13px;font-variant-numeric:tabular-nums;color:var(--color-texto)}.gs-rc-dif:empty{display:none}' +
-      '.gs-rc-f{grid-template-columns:96px minmax(0,1fr)}@media(min-width:900px){.gs-rc-f{grid-template-columns:140px minmax(0,1fr)}}' +
       '.gs-rc-cam{background:color-mix(in srgb,var(--color-destacado) 30%,var(--color-superficie));border-radius:var(--radio-peq)}' +
       '.gs-rc-cam .gs-rc-st input{border-color:var(--color-texto)}' +
       '.gs-rc-cf{box-shadow:inset 3px 0 0 var(--gs-r)}.gs-rc-cft{grid-column:1/-1;color:var(--gs-r);font-size:13px;font-weight:700;margin-top:var(--e1)}' +
@@ -1097,8 +1100,11 @@
   // [estado, chip, color de la etiqueta, en el resumen del equipo: una, varias]
   var ESTADOS_CAM = [['Por pedir', 'Por pedir', 'gs-tag-r', 'por pedir', 'por pedir'], ['Pedida', 'Pedidas', 'gs-tag-g', 'pedida', 'pedidas'],
     ['Por preparar', 'Por preparar', 'gs-tag-a', 'por preparar', 'por preparar'], ['Preparada', 'Preparadas', '', 'preparada', 'preparadas'],
-    ['Entregada', 'Entregadas', 'gs-tag-v', 'entregada', 'entregadas']];
-  var MARCAS = ['Preparada', 'Entregada', 'No llegó', 'Defectuosa'];
+    ['Entregada', 'Entregadas', 'gs-tag-v', 'entregada', 'entregadas'], ['Sin camiseta', 'Sin camiseta', 'gs-tag-g', 'sin camiseta', 'sin camiseta']];
+  // T0246: «Sin camiseta» es para quien no tendrá camiseta (p. ej. de una temporada pasada que no la recogió): ni se pide ni guarda una del local.
+  var MARCAS = ['Preparada', 'Entregada', 'No llegó', 'Defectuosa', 'Sin camiseta'];
+  /** Ya no falta nada: entregada o sin camiseta (T0246). */
+  function camHecha(j) { return j.estadoCami === 'Entregada' || j.estadoCami === 'Sin camiseta'; }
   function conCami(j) { return !j.error && !!j.estadoCami; }
   function tagEstado(j) {
     if (j.estadoCami === 'Recalculando') return tag('Recalculando: pulsa ↻', 'gs-tag-g');
@@ -1144,7 +1150,7 @@
       '<div class="gs-sec">Marcar como</div><div class="gs-marcas">' + MARCAS.map(function (m) {
         return '<button type="button" class="gs-b2" data-gs-marca="' + esc(m) + '" aria-pressed="' + (j.marca === m) + '">' + esc(m) + '</button>';
       }).join('') + '</div>' +
-      '<p class="gs-nota">No llegó y Defectuosa la vuelven a Por pedir; «Actualizar camisetas» del Excel CAMISETAS apunta el −1 en el stock.</p>' +
+      '<p class="gs-nota">No llegó y Defectuosa la vuelven a Por pedir; «Actualizar camisetas» del Excel CAMISETAS apunta el −1 en el stock. Sin camiseta: no se le hará (no se pide ni guarda una del local).</p>' +
       '<div class="gs-error" id="gs-err" hidden></div>' +
       '<div class="gs-acc">' + (j.marca ? '<button type="button" class="gs-b2 gs-b2r" data-gs-marca="">Quitar la marca</button>' : '') +
       '<button type="button" class="gs-b2" data-gs-cerrar>Cerrar</button></div>');
@@ -1180,29 +1186,32 @@
     return h ? '<i class="gs-color" style="background:' + esc(h) + '" title="' + esc(n) + '"></i>' : '';
   }
   function numCam(n) { return n ? '<span class="' + (n < 0 ? 'gs-neg' : '') + '">' + n + '</span>' : ''; }
-  /** Temporada (la misma que en el resto de Gestión) y, si hace falta, el modelo. */
-  function filtrosCam(r, conModelo) {
-    var mods = []; r.stock.forEach(function (f) { if (mods.indexOf(f.modelo) < 0) mods.push(f.modelo); });
-    r.modelos.forEach(function (m) { if (mods.indexOf(m.modelo) < 0) mods.push(m.modelo); });
+  /**
+   * T0246 · Stock y Pedidos van por modelo, sin temporada: el modelo es de la competición y sus camisetas sirven a todas
+   * las competiciones que lo llevan, de cualquier temporada. Debajo, esas competiciones y el proveedor.
+   */
+  function filtrosCam(r) {
+    var info = modeloCam(r);
     return '<div class="gs-filtros gs-cs-f">' +
-      '<select class="gs-sel" id="gs-cst" aria-label="Temporada">' + r.temps.map(function (t) { return '<option' + (t === r.temp ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select>' +
-      (conModelo ? '<select class="gs-sel" id="gs-csm" aria-label="Modelo"><option value="">Todos los modelos</option>' + mods.map(function (m) {
-        return '<option value="' + esc(m) + '"' + (m === S.cs.modelo ? ' selected' : '') + '>' + esc(m || 'Sin modelo') + '</option>';
-      }).join('') + '</select>' : '') + '</div>';
+      '<select class="gs-sel" id="gs-csm" aria-label="Modelo">' + r.modelos.map(function (m) {
+        return '<option value="' + esc(m.modelo) + '"' + (m.modelo === r.modelo ? ' selected' : '') + '>' + esc(m.modelo) + '</option>';
+      }).join('') + '</select></div>' +
+      (info ? '<p class="gs-nota gs-cs-mi">' + esc([info.comps.length ? 'Lo llevan ' + info.comps.join(', ') : 'Ninguna competición lo lleva', info.proveedor].filter(String).join(' · ')) + '</p>' : '');
   }
+  function modeloCam(r) { return r.modelos.filter(function (x) { return x.modelo === r.modelo; })[0]; }
   function engancharFiltrosCam(main) {
-    var t = $('#gs-cst'); if (t) t.onchange = function () { S.temp = t.value; S.fComp = ''; S.fLiga = ''; S.cs.modelo = ''; pCamisetas(main); };
     var m = $('#gs-csm'); if (m) m.onchange = function () { S.cs.modelo = m.value; pCamisetas(main); };
   }
   function cuandoCam(main, forzar, msg, pinta) {
-    var tab = S.tab, vista = S.cs.vista, clave = 'cs_' + S.temp;
+    var tab = S.tab, vista = S.cs.vista, clave = 'cs_' + S.cs.modelo;
     if (forzar || !S.datos[clave]) main.innerHTML = selVista() + cargando(msg);
     engancharVista(main);
     return opciones().then(function () {
-      return dato(clave, 'camisetasDatos', [S.temp, !!forzar], forzar);
+      return dato(clave, 'camisetasDatos', [S.cs.modelo, !!forzar], forzar);
     }).then(function (r) {
       if (S.tab !== tab || S.cs.vista !== vista || !document.body.contains(main)) return;
-      if (r.temp !== S.temp) S.datos['cs_' + r.temp] = r; // sin camisetas en esa temporada: la del Excel
+      // Sin modelo elegido (o uno que ya no está), el motor da el que más jugadoras tiene en la temporada en curso.
+      if (r.modelo !== S.cs.modelo) { S.cs.modelo = r.modelo; S.datos['cs_' + r.modelo] = r; }
       hora(r.hora);
       var abrirX = r.url ? ' (<a href="' + esc(r.url) + '" target="_blank" rel="noopener">abrir</a>)' : '';
       main.innerHTML = selVista() + pinta(r) + '<p class="gs-nota gs-cs-pie">' + (vista === 'recuento' ? 'Del Excel CAMISETAS' + abrirX +
@@ -1221,10 +1230,10 @@
   function pCamStock(main, forzar) {
     return cuandoCam(main, forzar, 'Cargando el stock…', function (r) {
       var f = S.cs, k = f.ver === 'local' ? 'local' : 'libres';
-      var filas = r.stock.filter(function (x) { return !f.modelo || x.modelo === f.modelo; });
+      var filas = r.stock;
       var suma = function (c) { return filas.reduce(function (s, x) { return s + x[c]; }, 0); };
       var neg = filas.filter(function (x) { return x[k] < 0; }).length;
-      var h = filtrosCam(r, true) +
+      var h = filtrosCam(r) +
         chips([['libres', 'Libres'], ['local', 'En el local']], k, 'gs-csver') +
         '<div class="gs-kpis gs-cs-kpis">' +
           '<div class="gs-kpi"><b>En el local</b><span class="gs-val">' + suma('local') + '</span><span class="gs-sub">sueltas, sin contar los packs</span></div>' +
@@ -1234,21 +1243,16 @@
         '</div>' +
         (neg ? '<div class="gs-al"><p>' + neg + (neg === 1 ? ' combinación sale' : ' combinaciones salen') + ' en negativo (en rojo): se han dado más camisetas de las que constan. Un recuento del local lo corrige.</p>' +
           '<p><button type="button" class="gs-chip" id="gs-csrec">Hacer un recuento ›</button></p></div>' : '');
-      // Un bloque por modelo; dentro, color × dorsal-talla con lo que no es cero.
-      var mods = []; filas.forEach(function (x) { if (mods.indexOf(x.modelo) < 0) mods.push(x.modelo); });
-      var hay = filas.some(function (x) { return x[k] !== 0; });
-      if (!hay) return h + '<div class="gs-vacio">' + (k === 'libres' ? 'No hay camisetas libres' : 'No hay camisetas en el local') + ' en ' + esc(r.temp) + (f.modelo ? ' de ' + esc(f.modelo) : '') + '.</div>';
-      return h + mods.map(function (m) {
-        var fm = filas.filter(function (x) { return x.modelo === m && x[k] !== 0; });
-        if (!fm.length) return '';
+      // Color × dorsal-talla con lo que no es cero.
+      var fm = filas.filter(function (x) { return x[k] !== 0; }), m = r.modelo;
+      if (!fm.length) return h + '<div class="gs-vacio">' + (k === 'libres' ? 'No hay camisetas libres' : 'No hay camisetas en el local') + (m ? ' de ' + esc(m) : '') + '.</div>';
+      return h + (function () {
         var cols = [], camis = [];
         fm.forEach(function (x) { if (cols.indexOf(x.color) < 0) cols.push(x.color); if (camis.indexOf(x.cami) < 0) camis.push(x.cami); });
         camis.sort(ordenCami);
         var val = function (c, ca) { var x = fm.filter(function (y) { return y.color === c && y.cami === ca; })[0]; return x ? x[k] : 0; };
         var tot = fm.reduce(function (s, x) { return s + x[k]; }, 0);
-        var info = r.modelos.filter(function (x) { return x.modelo === m; })[0];
-        var cab = '<div class="gs-cs-mh"><b>' + esc(m || 'Sin modelo') + '</b><span>' + tot + (k === 'libres' ? ' libres' : ' en el local') + '</span></div>' +
-          (info ? '<div class="gs-cam-s">' + esc([info.comps, info.proveedor].filter(String).join(' · ')) + '</div>' : '');
+        var cab = '<div class="gs-cs-mh"><b>' + esc(m) + '</b><span>' + tot + (k === 'libres' ? ' libres' : ' en el local') + '</span></div>';
         if (ancho()) {
           return '<section class="gs-card">' + cab + '<div class="gs-cs-tw"><table class="gs-cs-t"><thead><tr><th>Color</th>' + camis.map(function (ca) { return '<th>' + esc(ca) + '</th>'; }).join('') + '<th>Total</th></tr></thead><tbody>' +
             cols.map(function (c) {
@@ -1262,11 +1266,11 @@
           return '<div class="gs-cs-c"><div class="gs-cs-ch"><b>' + puntoCam(r, c) + '<span>' + esc(c) + '</span></b><span class="' + (t < 0 ? 'gs-neg' : '') + '">' + t + '</span></div>' +
             '<div class="gs-cs-ks">' + lc.map(function (ca) { var n = val(c, ca); return '<span class="gs-cs-k' + (n < 0 ? ' gs-cs-neg' : '') + '">' + esc(ca) + ' <b>' + n + '</b></span>'; }).join('') + '</div></div>';
         }).join('') + '</section>';
-      }).join('');
+      })();
     }).then(function (r) {
       var c = $('#gs-csver'); if (r && c) c.onclick = function (e) { var b = e.target.closest('[data-gs-f]'); if (!b) return; S.cs.ver = b.getAttribute('data-gs-f'); pCamisetas(main); };
       // T0241: del aviso de negativos al recuento, con el modelo elegido (si hay uno)
-      var rc = $('#gs-csrec'); if (r && rc) rc.onclick = function () { S.cs.vista = 'recuento'; if (S.cs.modelo) S.cs.rec = S.cs.modelo; window.scrollTo(0, 0); document.body.scrollTop = 0; pCamisetas(main); };
+      var rc = $('#gs-csrec'); if (r && rc) rc.onclick = function () { S.cs.vista = 'recuento'; window.scrollTo(0, 0); document.body.scrollTop = 0; pCamisetas(main); };
     });
   }
   function ordenCami(a, b) {
@@ -1276,15 +1280,15 @@
     return t.indexOf(pa[1]) - t.indexOf(pb[1]);
   }
 
-  /** Pedidos de la temporada con su paso (preparado → confirmado → asignado → recibido → en stock) y lo que falta. */
+  /** Pedidos del modelo (T0246; de cualquier temporada) con su paso (preparado → confirmado → asignado → recibido → en stock) y lo que falta. */
   var PASOS_PED = ['Preparado', 'Confirmado', 'Asignado', 'Recibido', 'En stock'];
   function pCamPedidos(main, forzar) {
     return cuandoCam(main, forzar, 'Cargando los pedidos…', function (r) {
       var f = S.cs, orden = r.pasos.map(function (p) { return p[0]; });
       var marcha = r.pedidos.filter(function (p) { return p.paso !== 'enStock'; });
       var lista = f.ped === 'todos' ? r.pedidos : marcha;
-      var h = filtrosCam(r, false) + chips([['marcha', 'En marcha', marcha.length], ['todos', 'Todos', r.pedidos.length]], f.ped === 'todos' ? 'todos' : 'marcha', 'gs-csped');
-      if (!lista.length) return h + '<div class="gs-vacio">' + (r.pedidos.length ? 'Todos los pedidos de ' + esc(r.temp) + ' ya están en stock.' : 'No hay pedidos en ' + esc(r.temp) + '.') + '</div>';
+      var h = filtrosCam(r) + chips([['marcha', 'En marcha', marcha.length], ['todos', 'Todos', r.pedidos.length]], f.ped === 'todos' ? 'todos' : 'marcha', 'gs-csped');
+      if (!lista.length) return h + '<div class="gs-vacio">' + (r.pedidos.length ? 'Todos los pedidos de ' + esc(r.modelo) + ' ya están en stock.' : 'No hay pedidos de ' + esc(r.modelo) + '.') + '</div>';
       return h + '<div class="gs-cs-peds">' + lista.map(function (p) {
         var i = orden.indexOf(p.paso), paso = r.pasos[i] || [], j = p.jugadoras || { total: 0, porEstado: {} };
         // Por entregar: solo lo que aún no tiene la jugadora (las entregadas no se cuentan).
@@ -1295,7 +1299,7 @@
         var huecos = p.asignado && !p.enStock && p.unidades > j.total ? p.unidades - j.total : 0;
         var porEntregar = pend.concat(huecos ? [huecos + ' sin jugadora'] : []).join(' · ') || (j.total ? 'nada: todas entregadas' : p.asignado || p.enStock ? 'ninguna jugadora tiene este pedido' : '');
         return '<section class="gs-card gs-cs-p"><div class="gs-cam-h"><b><span>' + esc(p.hash) + '</span></b>' + tag(paso[1] || p.paso, p.paso === 'enStock' ? 'gs-tag-v' : p.paso === 'sinConfirmar' ? 'gs-tag-r' : 'gs-tag-a') + '</div>' +
-          '<div class="gs-cam-s">' + esc([p.modelo, p.unidades + ' camisetas', p.fecha ? 'pedido el ' + p.fecha : ''].filter(String).join(' · ')) + '</div>' +
+          '<div class="gs-cam-s">' + esc([p.temp, p.unidades + ' camisetas', p.fecha ? 'pedido el ' + p.fecha : ''].filter(String).join(' · ')) + '</div>' +
           '<div class="gs-pasos" aria-label="Paso ' + (i + 1) + ' de ' + PASOS_PED.length + '">' + PASOS_PED.map(function (n, x) {
             var c = x < i || p.paso === 'enStock' ? 'gs-hecho' : x === i ? 'gs-ahora' : '';
             return '<span class="' + c + '"><i></i><small>' + n + '</small></span>';
@@ -1325,7 +1329,7 @@
   /** La factura de cada pedido, a su archivo de Drive (camisetasFacturas, de ECONOMIA); si no se encuentra, a la carpeta FACTURAS. */
   function enlazarFacturas(main, r) {
     var els = main.querySelectorAll('[data-gs-fac]'); if (!els.length) return;
-    var cods = [].map.call(els, function (x) { return x.getAttribute('data-gs-fac'); }), clave = 'csfac_' + r.temp;
+    var cods = [].map.call(els, function (x) { return x.getAttribute('data-gs-fac'); }), clave = 'csfac_' + r.modelo;
     var pintar = function (m) {
       [].forEach.call(main.querySelectorAll('[data-gs-fac]'), function (x) {
         var t = x.getAttribute('data-gs-fac'), u = m[codFactura(t)];
@@ -1340,34 +1344,25 @@
   /* ---------- T0241 · Camisetas › Recuento del local ----------
    * Lo que debería haber suelto es EN EL LOCAL del stock (camisetasDatos), la misma cuenta que «Preparar recuento» del Excel.
    * Cada dorsal-talla empieza con lo que debería haber (las que constan en negativo, en 0): se cambia solo lo que no cuadra.
-   * Lo contado se guarda en este navegador (por persona, temporada y modelo) hasta aplicarlo, por si se cierra la web a medias.
+   * T0246: el stock es del modelo, sin temporada; el recuento usa el mismo selector de modelo que Stock y Pedidos.
+   * Lo contado se guarda en este navegador (por persona y modelo) hasta aplicarlo, por si se cierra la web a medias.
    * Al aplicar, el motor vuelve a leer el Excel: si algo de ese modelo ha cambiado mientras tanto, no escribe nada y lo marca. */
   var TALLAS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-  function recClave(t, m) { return 'gs-rec|' + (ctx().persona || '') + '|' + t + '|' + m; }
-  function recLeer(t, m) {
-    var b = null; try { b = JSON.parse(localStorage.getItem(recClave(t, m)) || 'null'); } catch (e) {}
+  function recClave(m) { return 'gs-rec|' + (ctx().persona || '') + '|' + m; }
+  function recLeer(m) {
+    var b = null; try { b = JSON.parse(localStorage.getItem(recClave(m)) || 'null'); } catch (e) {}
     b = b && typeof b === 'object' ? b : {};
     return { cont: b.cont || {}, otras: b.otras || [], hechos: b.hechos || {}, conflicto: b.conflicto || {}, cuando: b.cuando || 0 };
   }
-  function recGuardar(t, m, b) { b.cuando = Date.now(); try { localStorage.setItem(recClave(t, m), JSON.stringify(b)); } catch (e) {} }
-  function recBorrar(t, m) { try { localStorage.removeItem(recClave(t, m)); } catch (e) {} }
+  function recGuardar(m, b) { b.cuando = Date.now(); try { localStorage.setItem(recClave(m), JSON.stringify(b)); } catch (e) {} }
+  function recBorrar(m) { try { localStorage.removeItem(recClave(m)); } catch (e) {} }
   function recEmpezado(b) { return Object.keys(b.cont).length + b.otras.length + Object.keys(b.hechos).length > 0; }
 
-  /** Modelos de la temporada con algo en el local: [{ modelo, n }] (n: las que deberían estar, sin contar las negativas). */
-  function recModelos(r) {
-    var M = {}, orden = [];
-    r.stock.forEach(function (x) {
-      if (!x.local) return;
-      if (!(x.modelo in M)) { M[x.modelo] = 0; orden.push(x.modelo); }
-      if (x.local > 0) M[x.modelo] += x.local;
-    });
-    return orden.map(function (m) { return { modelo: m, n: M[m] }; });
-  }
-  /** Colores del modelo con sus dorsal-talla (lo que no es 0): [{ color, lineas: [{ k: 'COLOR|CAMI', cami, n }] }]. */
-  function recColores(r, m) {
+  /** Colores del modelo elegido con sus dorsal-talla (lo que no es 0): [{ color, lineas: [{ k: 'COLOR|CAMI', cami, n }] }]. */
+  function recColores(r) {
     var C = {}, cols = [];
     r.stock.forEach(function (x) {
-      if (x.modelo !== m || !x.local) return;
+      if (!x.local) return;
       if (!C[x.color]) { C[x.color] = []; cols.push(x.color); }
       C[x.color].push({ k: x.color + '|' + x.cami, cami: x.cami, n: x.local });
     });
@@ -1431,22 +1426,15 @@
     var cont = { r: null };
     return cuandoCam(main, forzar, 'Cargando lo que debería haber en el local…', function (r) {
       cont.r = r;
-      var mods = recModelos(r);
-      if (!mods.some(function (m) { return m.modelo === S.cs.rec; })) S.cs.rec = mods.length ? mods[0].modelo : '';
-      var m = S.cs.rec, f = '<div class="gs-filtros gs-cs-f gs-rc-f">' +
-        '<select class="gs-sel" id="gs-cst" aria-label="Temporada">' + r.temps.map(function (t) { return '<option' + (t === r.temp ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select>' +
-        (mods.length ? '<select class="gs-sel" id="gs-rcm" aria-label="Modelo">' + mods.map(function (x) {
-          return '<option value="' + esc(x.modelo) + '"' + (x.modelo === m ? ' selected' : '') + '>' + esc((x.modelo || 'Sin modelo') + ' · ' + x.n) + '</option>';
-        }).join('') + '</select>' : '') + '</div>';
-      if (!mods.length) return f + '<div class="gs-vacio">No hay camisetas en el local en ' + esc(r.temp) + '.</div>';
-      var cols = recColores(r, m), b = recLeer(r.temp, m);
+      var m = r.modelo, cols = recColores(r), b = recLeer(m);
+      if (!cols.length) return filtrosCam(r) + '<div class="gs-vacio">No hay camisetas en el local' + (m ? ' de ' + esc(m) : '') + '.</div>';
       var deb = cols.reduce(function (s, c) { return s + c.lineas.reduce(function (a, l) { return a + Math.max(l.n, 0); }, 0); }, 0);
       var hechos = cols.filter(function (c) { return b.hechos[c.color]; }).length;
       var neg = cols.reduce(function (s, c) { return s + c.lineas.filter(function (l) { return l.n < 0; }).length; }, 0);
       // Abierto: el que se estaba contando o, si no, el primero sin revisar.
       var abierto = cols.some(function (c) { return c.color === S.cs.recAbierto; }) ? S.cs.recAbierto : ((cols.filter(function (c) { return !b.hechos[c.color]; })[0] || {}).color || '');
       var cf = Object.keys(b.conflicto).length;
-      return f + '<div id="gs-rc">' +
+      return filtrosCam(r) + '<div id="gs-rc">' +
         '<div class="gs-rc-cab"><p><b>' + deb + '</b> deberían estar sueltas · ' + cols.length + (cols.length === 1 ? ' color' : ' colores') +
           ' · <span id="gs-rchechos">revisados ' + hechos + ' de ' + cols.length + '</span></p>' +
           '<p class="gs-nota">Cuenta las sueltas, no las de los packs. Cambia solo lo que no cuadre. Lo que debería haber es de las ' + esc(String(r.hora || '').slice(-5)) +
@@ -1459,15 +1447,13 @@
         '<div class="gs-rc-bar" id="gs-rcbar">' + htmlRecBarra(recDifs(cols, b)) + '</div></div>';
     }).then(function (r) {
       if (!r || !document.body.contains(main)) return;
-      var tm = $('#gs-rcm'); if (tm) tm.onchange = function () { S.cs.rec = tm.value; S.cs.recAbierto = ''; pCamisetas(main); };
-      if (!S.cs.rec) return;
-      enganchaRecuento(main, cont.r, S.cs.rec);
+      if (r.modelo) enganchaRecuento(main, cont.r);
     });
   }
 
-  function enganchaRecuento(main, r, m) {
+  function enganchaRecuento(main, r) {
     var caja = $('#gs-rc'); if (!caja) return; // se crea en cada repintado: sus eventos no se suman
-    var cols = recColores(r, m), b = recLeer(r.temp, m), guardar = function () { recGuardar(r.temp, m, b); };
+    var m = r.modelo, cols = recColores(r), b = recLeer(m), guardar = function () { recGuardar(m, b); };
     var linea = function (k) { for (var i = 0; i < cols.length; i++) for (var j = 0; j < cols[i].lineas.length; j++) if (cols[i].lineas[j].k === k) return cols[i].lineas[j]; return null; };
     var colorDe = function (c) { return cols.filter(function (x) { return x.color === c; })[0]; };
     var totales = function () {
@@ -1516,7 +1502,7 @@
       if (x) { b.otras.splice(Number(x.getAttribute('data-gs-rcq')), 1); guardar(); pCamisetas(main); return; }
       if (e.target.closest('#gs-rcnuevo')) {
         if (!window.confirm('¿Borro lo que has contado de ' + m + ' y empiezas de nuevo?')) return;
-        recBorrar(r.temp, m); S.cs.recAbierto = ''; pCamisetas(main);
+        recBorrar(m); S.cs.recAbierto = ''; pCamisetas(main);
       }
     });
     caja.addEventListener('input', function (e) {
@@ -1539,7 +1525,7 @@
     var mios = cols.map(function (c) { return c.color; });
     var todos = mios.concat((r.nombresColores || []).filter(function (c) { return mios.indexOf(c) < 0; }));
     var v = ventana('Apuntar otra',
-      '<p class="gs-nota" style="margin-top:0">Una camiseta de ' + esc(S.cs.rec) + ' que está en el local y no sale en la lista.</p>' +
+      '<p class="gs-nota" style="margin-top:0">Una camiseta de ' + esc(r.modelo) + ' que está en el local y no sale en la lista.</p>' +
       '<label class="gs-campo">Color<select id="gs-ocol">' + todos.map(function (c) { return '<option' + (c === color ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select></label>' +
       '<div class="gs-dos"><label class="gs-campo">Dorsal<input id="gs-odor" type="number" inputmode="numeric" min="0" step="1" placeholder="p. ej. 7"></label>' +
         '<label class="gs-campo">Cuántas<input id="gs-on" type="number" inputmode="numeric" min="1" step="1" value="1"></label></div>' +
@@ -1573,14 +1559,14 @@
     if (!difs.length) {
       var v0 = ventana('Todo cuadra', '<p>No has cambiado nada: lo que hay en el local de ' + esc(m) + ' es lo que consta. No hay nada que apuntar en el Excel.</p>' +
         '<div class="gs-acc"><button type="button" class="gs-b2" data-gs-cerrar>Seguir contando</button><button type="button" class="gs-b1" id="gs-rcfin">Terminar</button></div>');
-      v0.el.querySelector('#gs-rcfin').onclick = function () { recBorrar(r.temp, m); S.cs.recAbierto = ''; v0.cerrar(); aviso('Recuento de ' + m + ' terminado: todo cuadraba.'); pCamisetas(main); };
+      v0.el.querySelector('#gs-rcfin').onclick = function () { recBorrar(m); S.cs.recAbierto = ''; v0.cerrar(); aviso('Recuento de ' + m + ' terminado: todo cuadraba.'); pCamisetas(main); };
       return;
     }
     var porColor = [];
     difs.forEach(function (x) { var g = porColor.filter(function (y) { return y.color === x.color; })[0]; if (!g) porColor.push(g = { color: x.color, l: [] }); g.l.push(x); });
     var neto = difs.reduce(function (s, x) { return s + x.d; }, 0);
     var v = ventana('Resumen del recuento',
-      '<p style="margin-top:0">' + esc(m) + ' · ' + esc(r.temp) + '<br><b>' + difs.length + (difs.length === 1 ? ' ajuste' : ' ajustes') + '</b> · ' + signo(neto) + ' en total</p>' +
+      '<p style="margin-top:0">' + esc(m) + '<br><b>' + difs.length + (difs.length === 1 ? ' ajuste' : ' ajustes') + '</b> · ' + signo(neto) + ' en total</p>' +
       porColor.map(function (g) {
         return '<div class="gs-rc-rg"><b>' + puntoCam(r, g.color) + '<span>' + esc(g.color) + '</span></b>' + g.l.map(function (x) {
           return '<div class="gs-rc-rl"><span>' + esc(x.cami) + '</span><small>' + (x.fuera ? 'no salía en la lista' : 'constaban ' + cuenta(x.antes) + ' → ' + x.n) + '</small><b class="' + (x.d < 0 ? 'gs-neg' : 'gs-pos') + '">' + signo(x.d) + '</b></div>';
@@ -1596,7 +1582,7 @@
       var err = v.el.querySelector('#gs-rcerr'); err.hidden = true;
       ok.disabled = true; ok.textContent = 'Aplicando…';
       var lento = setTimeout(function () { ok.textContent = 'Leyendo el Excel…'; }, 8000);
-      llamar('camisetasRecuentoAplicar', [r.temp, m, base, contado, b.otras]).then(function (x) {
+      llamar('camisetasRecuentoAplicar', [m, base, contado, b.otras]).then(function (x) {
         clearTimeout(lento);
         if (x.cambiado) {
           // El Excel ha cambiado: se pone al día lo que debería haber y se marcan esas casillas; no se ha escrito nada.
@@ -1606,10 +1592,10 @@
               r.stock.push({ modelo: m, color: k.split('|')[0], cami: k.split('|')[1], entradas: 0, salidas: 0, ajuste: 0, reservadas: 0, local: x.local[k], libres: x.local[k] });
           });
           x.cambiado.forEach(function (y) { b.conflicto[y.color + '|' + y.cami] = y.antes; });
-          recGuardar(r.temp, m, b); v.cerrar(); pCamisetas(main);
+          recGuardar(m, b); v.cerrar(); pCamisetas(main);
           return;
         }
-        recBorrar(r.temp, m); S.cs.recAbierto = '';
+        recBorrar(m); S.cs.recAbierto = '';
         Object.keys(S.datos).forEach(function (k) { if (/^cs_/.test(k)) delete S.datos[k]; }); // el stock ha cambiado: se vuelve a leer
         v.cerrar(); pCamisetas(main);
         ventana('Recuento aplicado', '<p>' + x.aplicado + (x.aplicado === 1 ? ' ajuste apuntado' : ' ajustes apuntados') + ' en DB_AJUSTES_STOCK con el motivo «' + esc(x.motivo) + '». El stock ya cuadra con lo que has contado.</p>' +
@@ -1631,7 +1617,7 @@
       var eqF = f.equipo && enF.filter(function (j) { return j.comp + '|' + j.equipo === f.equipo; })[0];
       if (f.equipo && !eqF) f.equipo = '';
       var base = enF.filter(function (j) { return !f.equipo || j.comp + '|' + j.equipo === f.equipo; });
-      var es = function (k) { return function (j) { return k === 'todas' || (k === 'alerta' ? !!alertaCam(j) : k === 'pendientes' ? j.estadoCami !== 'Entregada' : j.estadoCami === k); }; };
+      var es = function (k) { return function (j) { return k === 'todas' || (k === 'alerta' ? !!alertaCam(j) : k === 'pendientes' ? !camHecha(j) : j.estadoCami === k); }; };
       var cuenta = function (k) { return base.filter(es(k)).length; };
       main.innerHTML = selVista() + '<div class="gs-filtrar">' + filtrosPlegables(o) + // T0238 · T0240: selector de vista
         (eqF ? '<div class="gs-chips" style="margin-top:10px"><button type="button" class="gs-chip" id="gs-cameq" aria-pressed="true">' + punto(eqF.color) + esc(eqF.equipo) + ' ✕</button></div>' : '') + // T0237
@@ -1653,13 +1639,15 @@
           var verTodo = !!f.todo[k] || f.filtro === 'todas';
           var lista = verTodo ? todas : todas.filter(function (j) { return es(f.filtro)(j) && vale(j); });
           n += lista.length;
+          // T0246: las «Sin camiseta» no cuentan para entregar
           var ent = todas.filter(function (j) { return j.estadoCami === 'Entregada'; }).length, e0 = todas[0];
+          var aDar = todas.filter(function (j) { return j.estadoCami !== 'Sin camiseta'; }).length;
           var resto = ESTADOS_CAM.filter(function (e) { return e[0] !== 'Entregada'; }).map(function (e) {
             var c = todas.filter(function (j) { return j.estadoCami === e[0]; }).length; return c ? c + ' ' + (c === 1 ? e[3] : e[4]) : '';
           }).filter(String);
           return '<section class="gs-card gs-cam-eq"><div class="gs-cam-h"><b>' + punto(e0.color) + '<span>' + esc(e0.equipo) + '</span></b>' +
-            '<span class="' + (ent === todas.length ? 'gs-pos' : '') + '">' + ent + ' de ' + todas.length + ' entregadas</span></div>' +
-            '<div class="gs-barra"><i class="gs-ok" style="width:' + Math.round(100 * ent / todas.length) + '%"></i></div>' +
+            '<span class="' + (ent === aDar ? 'gs-pos' : '') + '">' + ent + ' de ' + aDar + ' entregadas</span></div>' +
+            '<div class="gs-barra"><i class="gs-ok" style="width:' + (aDar ? Math.round(100 * ent / aDar) : 100) + '%"></i></div>' +
             '<div class="gs-cam-s">' + esc([S.fComp ? '' : compCorta(e0.comp), e0.liga ? ligaCorta(e0.liga) : '', resto.join(' · ') || 'Todo entregado'].filter(String).join(' · ')) + '</div>' +
             lista.map(function (j) {
               var s = siguiente(j), i = r.lista.indexOf(j);
