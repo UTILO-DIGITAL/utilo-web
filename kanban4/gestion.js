@@ -12,6 +12,9 @@
  *   límite y casillas de seguimiento, fotos del equipo y los WhatsApp que ya prepara el Excel.
  * T0143 · Jugadoras: por equipo, con sus alertas; se corrigen los datos del formulario, se marcan ERROR, G.CONTACTS y XPORTY
  *   y se cambia de equipo. Buscar mira en toda la temporada (también ERROR); con un correo, «todo lo de este correo».
+ * T0234 · Camisetas: lo que falta por entregar, por estado y por equipo, y marcar cada camiseta (Preparada, Entregada, No llegó,
+ *   Defectuosa). El estado es ESTADO CAMISETA de GESTION (la misma fórmula que DB_CAMISETAS del Excel CAMISETAS) y el reparto,
+ *   REPARTO: la app no los calcula. Marcar escribe MARCA CAMISETA. Pedidos y stock siguen en el Excel CAMISETAS.
  * WhatsApp: en el móvil se abre la app (whatsapp://); en el ordenador, WhatsApp Web.
  * Mismo estilo que Economía (se copia de economia.js con el prefijo gs-). Cada cambio queda en GESTION › LOG_APP.
  */
@@ -22,7 +25,7 @@
 
   // temp: temporada cargada (todas sus competiciones); fComp y fLiga: filtros de la app; dia: día elegido en Resumen.
   var S = { tab: 'resumen', temp: '', fComp: '', fLiga: '', dia: '', datos: {}, opciones: null, el: null,
-    eq: { filtro: 'todos', q: '' }, jug: { filtro: 'todas', q: '', equipo: '' } };
+    eq: { filtro: 'todos', q: '' }, jug: { filtro: 'todas', q: '', equipo: '' }, cam: { filtro: 'pendientes', q: '', todo: {} } };
 
   function ctx() { return window.SX_CTX || {}; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -234,6 +237,20 @@
       '.gs-dia-h{font:var(--peso-titulos) 20px/1.2 var(--fuente-titulos);color:var(--color-principal-oscuro);margin:var(--e5) 0 0}' +
       '@media(min-width:900px){.gs-ligas{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:var(--e3);align-items:start;margin-top:var(--e3)}.gs-ligas>.gs-card{margin-top:0}}' + // T0225
       '.gs-fotos{display:flex;gap:var(--e2);flex-wrap:wrap}.gs-fotos button{font-size:14px}' +
+      // T0234 · Camisetas: una tarjeta por equipo con su avance y sus jugadoras; el siguiente paso, a mano derecha.
+      '.gs-cam-h{display:flex;justify-content:space-between;gap:var(--e2);align-items:baseline}.gs-cam-h b{display:flex;align-items:center;min-width:0;font-size:15px}' +
+      '.gs-cam-h b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gs-cam-h>span{font-size:13px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}' +
+      '.gs-cam-eq .gs-barra{height:6px}.gs-barra i.gs-ok{background:var(--gs-v)}' +
+      '.gs-cam-s{font-size:13px;color:var(--gs-g);margin-top:var(--e1)}' +
+      '.gs-cam-j{display:flex;align-items:center;gap:var(--e2);border-top:1px solid var(--gs-l);padding:var(--e2) 0;margin-top:var(--e2)}.gs-cam-j+.gs-cam-j{margin-top:0}' +
+      '.gs-cam-n{flex:1 1 auto;min-width:0;background:none;border:0;padding:0;text-align:left;color:inherit;cursor:pointer;min-height:44px;font-size:14px}' +
+      '.gs-cam-n b{display:block;font-weight:600}.gs-cam-n small{display:block;font-size:12px;color:var(--gs-g);margin-top:2px}' +
+      '.gs-cam-n .gs-tags{margin-top:var(--e1)}' +
+      '.gs-cam-j .gs-b2{flex:none;min-height:44px;padding:0 var(--e3);font-size:14px}' +
+      '.gs-cam-mas{margin-top:var(--e2)}' +
+      '@media(max-width:899px){#gs-camf{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-left:calc(-1 * var(--e4));margin-right:calc(-1 * var(--e4));padding:0 var(--e4)}#gs-camf::-webkit-scrollbar{display:none}#gs-camf .gs-chip{flex:none}}' +
+      '.gs-marcas{display:grid;grid-template-columns:1fr 1fr;gap:var(--e2);margin-top:var(--e2)}.gs-marcas .gs-b2[aria-pressed=true]{background:var(--gs-c);border-color:var(--gs-c);color:var(--color-sobre-principal)}' +
+      '@media(min-width:900px){.gs-cam-eqs{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:var(--e3);align-items:start}.gs-cam-eqs>.gs-card{margin-top:var(--e3)}}' +
       '.gs-visor img{display:block;max-width:100%;max-height:70vh;margin:0 auto;border-radius:var(--radio);background:var(--gs-f)}';
   }
 
@@ -390,7 +407,7 @@
   }
 
   /* ---------- armazón ---------- */
-  var TABS = [['resumen', 'Resumen'], ['equipos', 'Equipos'], ['jugadoras', 'Jugadoras']];
+  var TABS = [['resumen', 'Resumen'], ['equipos', 'Equipos'], ['jugadoras', 'Jugadoras'], ['camisetas', 'Camisetas']];
 
   function abrir(el) {
     S.el = el;
@@ -425,7 +442,7 @@
   function pintar(forzar) {
     var main = $('#gs-main'); if (!main) return;
     var re = $('#gs-re'); if (re) re.disabled = true;
-    var p = S.tab === 'jugadoras' ? pJugadoras : S.tab === 'equipos' ? pEquipos : pResumen;
+    var p = S.tab === 'camisetas' ? pCamisetas : S.tab === 'jugadoras' ? pJugadoras : S.tab === 'equipos' ? pEquipos : pResumen;
     Promise.resolve(p(main, !!forzar)).then(function () { if (re) re.disabled = false; }, function () { if (re) re.disabled = false; });
   }
 
@@ -851,8 +868,9 @@
       htmlFotos(j.fotosLinks) +
       '<div class="gs-sec">Camiseta</div><div class="gs-dl">' +
       fila('Camiseta', esc(j.cami)) + fila('Incluida en el precio', j.incluida === '🚫' ? 'No: personalizada (+10 €)' : j.incluida === '✅' ? 'Sí' : '') +
-      fila('Color', j.color ? punto(j.color) + esc(j.color) : '') + fila('Pedido', esc(j.pedido)) + fila('Preparada', j.preparada ? 'Sí' : 'No') + fila('Entregada', j.entregada ? 'Sí' : 'No') +
-      fila('Incidencia', esc(j.incidencia)) + '</div>' +
+      fila('Color', j.color ? punto(j.color) + esc(j.color) : '') +
+      fila('Estado', j.estadoCami ? '<span id="gs-camest">' + tagEstado(j) + '</span>' : '') + fila('Pedido', esc(j.pedidoFijo)) + fila('Reparto', esc(j.reparto)) + '</div>' +
+      (!j.error && j.estadoCami ? '<p style="margin:8px 0 0"><button type="button" class="gs-b2" id="gs-cammarca">Marcar la camiseta</button></p>' : '') +
       '<div class="gs-sec">Más datos</div><div class="gs-dl">' +
       fila('Alta', esc(j.alta)) + fila('Correo', esc(j.mail)) + fila('Liga', esc(ligaCorta(j.liga))) + fila('Edad', esc(edad1(j.edad, true))) +
       fila('Temporadas con nosotras', esc(j.veterania)) + fila('Normas, imagen, datos y responsabilidad', esc(j.normas)) + '</div>' +
@@ -860,11 +878,144 @@
       '<div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-gs-cerrar>Cerrar</button><button type="button" class="gs-b1" id="gs-ok" disabled>Sin cambios</button></div>');
     engancharFotos(v.el, j.fotosLinks || [], j.nombreCompleto);
     var vc = v.el.querySelector('#gs-vercorreo'); if (vc) vc.onclick = function () { verCorreo(j.mail); };
+    var cm = v.el.querySelector('#gs-cammarca');
+    if (cm) cm.onclick = function () { ventanaCamiseta(j, function () { var x = v.el.querySelector('#gs-camest'); if (x) x.innerHTML = tagEstado(j); }); };
     guardable(v, campos.concat(checks), function (c) {
       return llamar('gestionJugadoraEditar', [{ fila: j.fila, ts: j.ts, mail: j.mail, comp: j.comp, nombre: j.nombreCompleto }, c]);
     }, function (c) {
       aplicarCambios(j, c, PROP_JUG);
       if (c['NOMBRE'] != null || c['1er APELLIDO'] != null) j.nombreCompleto = (j.nombre + ' ' + j.ap1).trim();
+    });
+  }
+
+  /* ---------- CAMISETAS (T0234) ----------
+   * Solo las inscripciones con camiseta y sin ERROR (las que tienen ESTADO CAMISETA, como DB_CAMISETAS).
+   * «Recalculando»: se acaba de quitar la marca y el estado depende del pedido; lo da GESTION al pulsar ↻. */
+  // [estado, chip, color de la etiqueta, en el resumen del equipo: una, varias]
+  var ESTADOS_CAM = [['Por pedir', 'Por pedir', 'gs-tag-r', 'por pedir', 'por pedir'], ['Pedida', 'Pedidas', 'gs-tag-g', 'pedida', 'pedidas'],
+    ['Por preparar', 'Por preparar', 'gs-tag-a', 'por preparar', 'por preparar'], ['Preparada', 'Preparadas', '', 'preparada', 'preparadas'],
+    ['Entregada', 'Entregadas', 'gs-tag-v', 'entregada', 'entregadas']];
+  var MARCAS = ['Preparada', 'Entregada', 'No llegó', 'Defectuosa'];
+  function conCami(j) { return !j.error && !!j.estadoCami; }
+  function ordenEstado(j) { var i = ESTADOS_CAM.map(function (e) { return e[0]; }).indexOf(j.estadoCami); return i < 0 ? -1 : i; }
+  function tagEstado(j) {
+    if (j.estadoCami === 'Recalculando') return tag('Recalculando: pulsa ↻', 'gs-tag-g');
+    var e = ESTADOS_CAM.filter(function (x) { return x[0] === j.estadoCami; })[0];
+    return tag(j.estadoCami, e ? e[2] : 'gs-tag-g');
+  }
+  /** Lo que hace falta saber de su camiseta en cada estado: el pedido si está pedida, el reparto si está preparada. */
+  function detalleCami(j) {
+    var x = [j.cami];
+    if (j.marca === 'No llegó' || j.marca === 'Defectuosa') x.push(j.marca);
+    if (j.estadoCami === 'Pedida' && j.pedidoFijo) x.push('Pedido ' + j.pedidoFijo);
+    // Recién marcada, REPARTO aún no se ha recalculado en GESTION: no es que no tenga partido.
+    if (j.estadoCami === 'Preparada') x.push(j.reparto ? 'Reparto: ' + j.reparto : j.recalc ? 'Reparto: lo calcula GESTION, pulsa ↻ en un minuto' : 'Sin reparto: el equipo no tiene próximo partido');
+    return x.filter(String).join(' · ');
+  }
+  /** El paso que se da desde la lista; el resto (No llegó, Defectuosa, quitar la marca), en su ventana. */
+  function siguiente(j) { return j.estadoCami === 'Por preparar' ? 'Preparada' : j.estadoCami === 'Preparada' ? 'Entregada' : ''; }
+
+  /** Escribe MARCA CAMISETA en GESTION (gestionJugadoraEditar) y pone en lo cargado el estado que devuelve el motor. */
+  function marcar(j, marca) {
+    return llamar('gestionJugadoraEditar', [{ fila: j.fila, ts: j.ts, mail: j.mail, comp: j.comp, nombre: j.nombreCompleto }, { 'MARCA CAMISETA': marca }]).then(function (r) {
+      if (r.cambios) { j.marca = marca; j.reparto = ''; j.recalc = true; if (r.estadoCami) j.estadoCami = r.estadoCami; }
+      aviso(r.cambios ? (j.nombreCompleto || 'Camiseta') + ': ' + (marca ? marca.toLowerCase() : 'sin marca') + '.' : 'Ya estaba así.');
+      return r;
+    });
+  }
+  /** Botón que marca: se desactiva mientras guarda y avisa si GESTION está recalculando. */
+  function conEspera(b, fn) {
+    var antes = b.textContent; b.disabled = true; b.textContent = 'Guardando…';
+    var lento = setTimeout(function () { b.textContent = 'Guardando… (el Excel está recalculando)'; }, 8000);
+    return fn().then(function (r) { clearTimeout(lento); return r; }, function (e) { clearTimeout(lento); b.disabled = false; b.textContent = antes; throw e; });
+  }
+
+  /** Ventana de una camiseta: sus datos y las cuatro marcas (la puesta, apretada) o quitarla. */
+  function ventanaCamiseta(j, hecho) {
+    var v = ventana(j.nombreCompleto || 'Camiseta',
+      '<p class="gs-nota" style="margin:-8px 0 8px">' + esc(compCorta(j.comp) + ' · ' + j.equipo) + '</p>' +
+      '<div class="gs-dl">' + fila('Camiseta', esc(j.cami)) + fila('Color', j.color ? punto(j.color) + esc(j.color) : '') +
+      fila('Estado', tagEstado(j)) + fila('Pedido', esc(j.pedidoFijo)) + fila('Reparto', esc(j.reparto)) + fila('Marca', esc(j.marca) || 'Sin marca') + '</div>' +
+      '<div class="gs-sec">Marcar como</div><div class="gs-marcas">' + MARCAS.map(function (m) {
+        return '<button type="button" class="gs-b2" data-gs-marca="' + esc(m) + '" aria-pressed="' + (j.marca === m) + '">' + esc(m) + '</button>';
+      }).join('') + '</div>' +
+      '<p class="gs-nota">No llegó y Defectuosa la vuelven a Por pedir; «Actualizar camisetas» del Excel CAMISETAS apunta el −1 en el stock.</p>' +
+      '<div class="gs-error" id="gs-err" hidden></div>' +
+      '<div class="gs-acc">' + (j.marca ? '<button type="button" class="gs-b2 gs-b2r" data-gs-marca="">Quitar la marca</button>' : '') +
+      '<button type="button" class="gs-b2" data-gs-cerrar>Cerrar</button></div>');
+    var err = v.el.querySelector('#gs-err');
+    [].forEach.call(v.el.querySelectorAll('[data-gs-marca]'), function (b) {
+      b.onclick = function () {
+        var m = b.getAttribute('data-gs-marca');
+        if (m === j.marca) { v.cerrar(); return; }
+        err.hidden = true;
+        [].forEach.call(v.el.querySelectorAll('[data-gs-marca]'), function (x) { x.disabled = true; });
+        conEspera(b, function () { return marcar(j, m); }).then(function () { v.cerrar(); if (hecho) hecho(); pintar(); }, function (e) {
+          [].forEach.call(v.el.querySelectorAll('[data-gs-marca]'), function (x) { x.disabled = false; });
+          err.textContent = e.message; err.hidden = false;
+        });
+      };
+    });
+  }
+
+  function pCamisetas(main, forzar) {
+    return cuando(main, 'jug', forzar, 'Cargando las camisetas…', function (o, r) {
+      var f = S.cam, base = r.lista.filter(function (j) { return conCami(j) && enFiltro(j); });
+      var es = function (k) { return function (j) { return k === 'todas' || (k === 'pendientes' ? j.estadoCami !== 'Entregada' : j.estadoCami === k); }; };
+      var cuenta = function (k) { return base.filter(es(k)).length; };
+      main.innerHTML = '<div class="gs-filtrar">' + htmlFiltros(o) +
+        chips([['pendientes', 'Por entregar', cuenta('pendientes')]].concat(ESTADOS_CAM.map(function (e) { return [e[0], e[1], cuenta(e[0])]; })).concat([['todas', 'Todas', base.length]]), f.filtro, 'gs-camf') +
+        '<div class="gs-fila" style="margin-top:10px"><input type="search" class="gs-sel" id="gs-camq" placeholder="Buscar: equipo, jugadora, dorsal…" value="' + esc(f.q) + '" aria-label="Buscar"></div></div>' +
+        '<p class="gs-nota" style="margin:8px 2px 0">Pedidos y stock, en el Excel CAMISETAS. Lo que marques aquí lo recoge solo.</p>' +
+        '<div id="gs-camlista"></div>';
+      var pinta = function () {
+        var q = norm2(f.q);
+        var vale = function (j) { return !q || norm2([j.equipo, j.nombreCompleto, j.cami, j.mail].join(' ')).indexOf(q) >= 0; };
+        // Equipos con alguna camiseta del filtro; «Ver todo el equipo» enseña también las demás (entregadas y pendientes).
+        var grupos = {}, orden = [];
+        base.forEach(function (j) { var k = j.comp + '|' + j.equipo; if (!grupos[k]) { grupos[k] = []; orden.push(k); } grupos[k].push(j); });
+        var eqs = orden.filter(function (k) { return grupos[k].some(function (j) { return es(f.filtro)(j) && vale(j); }); });
+        eqs.sort(function (a, b) { return grupos[a][0].equipo.localeCompare(grupos[b][0].equipo); });
+        var n = 0;
+        var h = eqs.map(function (k) {
+          var todas = grupos[k].slice().sort(function (a, b) { return ordenEstado(a) - ordenEstado(b) || a.nombreCompleto.localeCompare(b.nombreCompleto); });
+          var verTodo = !!f.todo[k] || f.filtro === 'todas';
+          var lista = verTodo ? todas : todas.filter(function (j) { return es(f.filtro)(j) && vale(j); });
+          n += lista.length;
+          var ent = todas.filter(function (j) { return j.estadoCami === 'Entregada'; }).length, e0 = todas[0];
+          var resto = ESTADOS_CAM.filter(function (e) { return e[0] !== 'Entregada'; }).map(function (e) {
+            var c = todas.filter(function (j) { return j.estadoCami === e[0]; }).length; return c ? c + ' ' + (c === 1 ? e[3] : e[4]) : '';
+          }).filter(String);
+          return '<section class="gs-card gs-cam-eq"><div class="gs-cam-h"><b>' + punto(e0.color) + '<span>' + esc(e0.equipo) + '</span></b>' +
+            '<span class="' + (ent === todas.length ? 'gs-pos' : '') + '">' + ent + ' de ' + todas.length + ' entregadas</span></div>' +
+            '<div class="gs-barra"><i class="gs-ok" style="width:' + Math.round(100 * ent / todas.length) + '%"></i></div>' +
+            '<div class="gs-cam-s">' + esc([S.fComp ? '' : compCorta(e0.comp), e0.liga ? ligaCorta(e0.liga) : '', resto.join(' · ') || 'Todo entregado'].filter(String).join(' · ')) + '</div>' +
+            lista.map(function (j) {
+              var s = siguiente(j), i = r.lista.indexOf(j);
+              return '<div class="gs-cam-j"><button type="button" class="gs-cam-n" data-gs-cj="' + i + '"><b>' + esc(j.nombreCompleto || j.mail) + '</b>' +
+                '<small>' + esc(detalleCami(j)) + '</small><div class="gs-tags">' + tagEstado(j) + '</div></button>' +
+                (s ? '<button type="button" class="gs-b2" data-gs-sig="' + i + '">' + esc(s) + '</button>' : '') + '</div>';
+            }).join('') +
+            (f.filtro !== 'todas' && todas.length > lista.length || f.todo[k] ? '<p class="gs-cam-mas"><button type="button" class="gs-chip" data-gs-todo="' + esc(k) + '">' +
+              (f.todo[k] ? 'Ver solo ' + (f.filtro === 'pendientes' ? 'lo que falta' : 'el filtro') : 'Ver todo el equipo (' + todas.length + ')') + '</button></p>' : '') +
+            '</section>';
+        }).join('');
+        $('#gs-camlista').innerHTML = (q ? '<p class="gs-aviso-b">Buscando en las camisetas de ' + esc(S.temp) + ' con este filtro.</p>' : '') +
+          '<p class="gs-s" style="margin:12px 2px 0;font-size:13px;color:var(--gs-g)">' + n + (n === 1 ? ' camiseta' : ' camisetas') + ' · ' + eqs.length + (eqs.length === 1 ? ' equipo' : ' equipos') + '</p>' +
+          (eqs.length ? '<div class="gs-cam-eqs">' + h + '</div>' : '<div class="gs-vacio">' + (base.length ? 'No hay camisetas con este filtro.' : 'No hay camisetas en esta temporada.') + '</div>');
+        [].forEach.call(main.querySelectorAll('[data-gs-cj]'), function (b) { b.onclick = function () { ventanaCamiseta(r.lista[Number(b.getAttribute('data-gs-cj'))]); }; });
+        [].forEach.call(main.querySelectorAll('[data-gs-sig]'), function (b) {
+          b.onclick = function () {
+            var j = r.lista[Number(b.getAttribute('data-gs-sig'))];
+            conEspera(b, function () { return marcar(j, siguiente(j)); }).then(function () { pCamisetas(main); }, function (e) { aviso(e.message); });
+          };
+        });
+        [].forEach.call(main.querySelectorAll('[data-gs-todo]'), function (b) { b.onclick = function () { var k = b.getAttribute('data-gs-todo'); f.todo[k] = !f.todo[k]; pinta(); }; });
+      };
+      pinta();
+      engancharFiltros(main, function () { pCamisetas(main); });
+      $('#gs-camf').onclick = function (ev) { var b = ev.target.closest('[data-gs-f]'); if (!b) return; f.filtro = b.getAttribute('data-gs-f'); f.todo = {}; pCamisetas(main); };
+      var t0; $('#gs-camq').oninput = function () { var v = this.value; clearTimeout(t0); t0 = setTimeout(function () { f.q = v; pinta(); }, 150); };
     });
   }
 
