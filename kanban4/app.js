@@ -14,7 +14,7 @@
   var CLAVE = 'kanban_' + (C.clave || 'negocio');
   // T0133: carpeta de este archivo (…/kanban/), para cargar los módulos de las secciones (economia.js…).
   var BASE = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/[^/]*$/, '') : '../kanban/'; })();
-  var VERSION_MODULOS = '32'; // T0207 · T0208 · T0149 · T0213 · T0218 · T0224 · T0225 · T0230 · T0231 · T0232 · T0233 · T0228 (también el ?v= de las hojas del tablero)
+  var VERSION_MODULOS = '33'; // T0207 · T0208 · T0149 · T0213 · T0218 · T0224 · T0225 · T0230 · T0231 · T0232 · T0233 · T0228 · T0234 (también el ?v= de las hojas del tablero)
   var VERSION_ICONO = '2'; // T0222: el ?v= de los iconos del index.html de cada negocio (sube con ellos)
   // T0150: diseño de PROTOCOLO DISEÑO UTILO. Solo para los negocios que tienen su marca.css (index.html con marca: '…').
   // Los demás (Konamigas hasta T0149) siguen exactamente como antes.
@@ -154,7 +154,7 @@
 
   var SECCIONES = {
     KANBAN: { t: 'Kanban', i: '📋' },
-    GESTION: { t: 'Gestión', i: '🗂️', js: 'gestion.js' }, // T0139: sección con módulo propio (equipos y jugadoras)
+    GESTION: { t: 'Gestión', i: '🗂️', js: 'gestion.js' }, // T0139: sección con módulo propio (equipos, jugadoras y, desde T0234, camisetas)
     ECONOMIA: { t: 'Economía', i: '💶', js: 'economia.js' }, // T0133: sección con módulo propio
     LIGAS: { t: 'Ligas', i: '⚽' },
     // T0218: la Bandeja de Utilo es una sección, pero vive dentro de la página del tablero (la pinta el motor):
