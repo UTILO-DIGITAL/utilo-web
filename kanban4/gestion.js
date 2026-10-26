@@ -21,6 +21,10 @@
  * T0246 · Camisetas por modelo: Stock y Pedidos se eligen por modelo, sin temporada (el modelo es de la competición y sus
  *   camisetas sirven a todas las competiciones que lo llevan, de cualquier temporada); Entregas sigue por temporada. Marca nueva
  *   «Sin camiseta»: no se le hará (ni se pide ni guarda una del local) y no cuenta como pendiente.
+ * T0241 · Camisetas › Recuento: el recuento del local desde el móvil, con las cajas delante (lo que hacían «Preparar recuento» y
+ *   «Aplicar recuento» del Excel): por color, cada dorsal-talla con lo que debería haber; se cambia solo lo que no cuadra, se
+ *   apuntan las que no salen y, tras ver el resumen, camisetasRecuentoAplicar lo escribe en DB_AJUSTES_STOCK. Lo contado se
+ *   guarda en el propio navegador hasta aplicarlo.
  * T0235 · Equipos, Jugadoras y, dentro de cada equipo, Camisetas van por orden de inscripción (Marca temporal de GESTION),
  *   de la más antigua a la más reciente, con las de ERROR en su sitio: así se ve una inscripción mal hecha y la que la corrige.
  * T0237 · Alertas › Camisetas: un equipo por línea con lo que pide hacer algo (repartir hoy, reparto pasado, preparadas sin
@@ -38,7 +42,7 @@
   var S = { tab: 'resumen', temp: '', fComp: '', fLiga: '', dia: '', datos: {}, opciones: null, el: null,
     eq: { filtro: 'todos', q: '' }, jug: { filtro: 'todas', q: '', equipo: '' }, cam: { filtro: 'pendientes', q: '', todo: {}, equipo: '' },
     // T0240: Camisetas › Entregas (de GESTION), Stock y Pedidos (del Excel CAMISETAS)
-    cs: { vista: 'entregas', modelo: '', ver: 'libres', ped: 'marcha' } };
+    cs: { vista: 'entregas', modelo: '', ver: 'libres', ped: 'marcha', recAbierto: '' } }; // T0241: recAbierto, el color que se está contando
 
   function ctx() { return window.SX_CTX || {}; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -290,8 +294,8 @@
       '@media(min-width:900px){.gs-cam-eqs{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:var(--e3);align-items:start}.gs-cam-eqs>.gs-card{margin-top:var(--e3)}}' +
       '.gs-visor img{display:block;max-width:100%;max-height:70vh;margin:0 auto;border-radius:var(--radio);background:var(--gs-f)}' +
       // T0240 · Camisetas: Entregas · Stock · Pedidos arriba; stock en cuadro (ordenador) o por color (móvil); pedidos con sus pasos.
-      '.gs-sw3{grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:var(--e3)}' +
-      '@media(min-width:900px){.gs-sw3{max-width:480px}}' +
+      '.gs-sw3{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:var(--e3)}.gs-sw3 button{padding:0 2px;font-size:14px}' + // T0241: cuatro, con Recuento
+      '@media(min-width:900px){.gs-sw3{max-width:600px}}' +
       '.gs-cs-f{grid-template-columns:minmax(0,1fr);max-width:420px}@media(max-width:520px){.gs-cs-f{grid-template-columns:minmax(0,1fr)}}' + // T0246: un solo selector, el de modelo
       '.gs-cs-mi{margin:6px 2px 0}' +
       '@media(min-width:900px){.gs-cs-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}' +
@@ -322,7 +326,41 @@
       '.gs-cs-col{margin-top:var(--e2)}.gs-cs-cl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 var(--e2);border-top:1px solid var(--gs-l);padding:var(--e2) 0;font-size:14px}' +
       '.gs-cs-cl b{display:flex;align-items:center;min-width:0;font-weight:600}.gs-cs-cl b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gs-cs-cl>span{font-weight:700;font-variant-numeric:tabular-nums}' +
       '.gs-cs-cl small{grid-column:1/-1;color:var(--gs-g);font-size:13px}' +
-      '.gs-cs-pie{margin:var(--e5) 2px 0}';
+      '.gs-cs-pie{margin:var(--e5) 2px 0}' +
+      // T0241 · Recuento: una tarjeta plegable por color; cada dorsal-talla con lo que debería haber y − n +. Lo cambiado, en amarillo.
+      '.gs-rc-cab p{margin:var(--e3) 2px 0}.gs-rc-cab b{font-variant-numeric:tabular-nums}' +
+      '.gs-enl{background:none;border:0;padding:0;font:inherit;color:var(--color-principal-oscuro);text-decoration:underline;cursor:pointer;min-height:32px}' +
+      '.gs-al-r{border-left-color:var(--gs-r)}' +
+      '.gs-rc-c{padding:0 var(--e4)}.gs-rc-c>summary{display:flex;justify-content:space-between;align-items:center;gap:var(--e2);min-height:52px;cursor:pointer;list-style:none}' +
+      '.gs-rc-c>summary::-webkit-details-marker{display:none}.gs-rc-c>summary>b{display:flex;align-items:center;min-width:0;font-weight:700;font-size:15px}.gs-rc-c>summary>b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+      '.gs-rc-c>summary::after{content:"▾";color:var(--gs-g);margin-left:var(--e1)}.gs-rc-c[open]>summary::after{content:"▴"}' +
+      '.gs-rc-cs{display:flex;align-items:center;gap:var(--e2);white-space:nowrap;font-variant-numeric:tabular-nums;margin-left:auto}.gs-rc-cs>span{font-weight:700;min-width:28px;text-align:right}' +
+      '.gs-rc-cs em{font-style:normal;font-size:12px;font-weight:700;padding:2px var(--e2);border-radius:var(--radio-peq);background:color-mix(in srgb,var(--color-destacado) 45%,var(--color-superficie));color:var(--color-texto)}' +
+      '.gs-rc-cs i{font-style:normal;font-weight:800}.gs-rc-ok>summary>b{color:var(--gs-g)}' +
+      '.gs-rc-l{display:grid;grid-template-columns:minmax(56px,1fr) auto auto;grid-template-areas:"k st st" "d st st";align-items:center;gap:0 var(--e2);border-top:1px solid var(--gs-l);padding:var(--e2) var(--e2);margin:0 calc(-1 * var(--e2))}' +
+      '.gs-rc-k{grid-area:k;font:700 17px/1.2 var(--fuente-texto);font-variant-numeric:tabular-nums}.gs-rc-d{grid-area:d;font-size:13px;color:var(--gs-g)}.gs-rc-d b{color:var(--color-texto)}' +
+      '.gs-rc-st{grid-area:st;display:flex;align-items:center;gap:var(--e1)}' +
+      '.gs-rc-st button{width:44px;height:44px;border:1.5px solid var(--color-borde-campo);background:var(--color-superficie);border-radius:var(--radio);font:700 22px/1 var(--fuente-texto);color:var(--color-principal-oscuro);cursor:pointer;padding:0;touch-action:manipulation}' +
+      '.gs .gs-rc-st input{width:56px;min-height:44px;text-align:center;font:700 19px/1 var(--fuente-texto);font-variant-numeric:tabular-nums;padding:0 2px;-moz-appearance:textfield}' +
+      '.gs-rc-st input::-webkit-outer-spin-button,.gs-rc-st input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}' +
+      '.gs-rc-dif{margin-left:var(--e2);padding:0 var(--e1);border-radius:var(--radio-peq);background:var(--color-destacado);font-weight:800;font-size:13px;font-variant-numeric:tabular-nums;color:var(--color-texto)}.gs-rc-dif:empty{display:none}' +
+      '.gs-rc-cam{background:color-mix(in srgb,var(--color-destacado) 30%,var(--color-superficie));border-radius:var(--radio-peq)}' +
+      '.gs-rc-cam .gs-rc-st input{border-color:var(--color-texto)}' +
+      '.gs-rc-cf{box-shadow:inset 3px 0 0 var(--gs-r)}.gs-rc-cft{grid-column:1/-1;color:var(--gs-r);font-size:13px;font-weight:700;margin-top:var(--e1)}' +
+      '.gs-rc-acc{display:flex;gap:var(--e2);justify-content:space-between;flex-wrap:wrap;border-top:1px solid var(--gs-l);padding:var(--e3) 0}' +
+      '.gs-rc-acc .gs-b2[aria-pressed=true]{color:var(--gs-v);border-color:var(--gs-v)}' +
+      '.gs-rc-o{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:var(--e2);align-items:center;border-top:1px solid var(--gs-l);padding:var(--e2) 0;font-size:14px}' +
+      '.gs-rc-o>b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}' +
+      '.gs-rc-tallas{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:var(--e1);margin-top:var(--e1)}.gs-rc-tallas .gs-chip{min-width:0;padding:0}.gs-rc-tallas .gs-chip[aria-pressed=true]{background:var(--gs-c);border-color:var(--gs-c);color:var(--color-sobre-principal)}' +
+      // La barra de abajo, pegada abajo. En el móvil el scroll es del body, que ya deja sitio a la barra de secciones (T0224).
+      '.gs-rc-bar{position:sticky;bottom:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:var(--e3);' +
+        'margin:var(--e4) calc(-1 * var(--e4)) 0;padding:var(--e3) var(--e4);background:var(--color-fondo);border-top:1px solid var(--gs-l);box-shadow:0 -6px 14px -10px rgba(0,0,0,.35)}' +
+      '.gs-rc-bar>span{display:flex;flex-direction:column;font-variant-numeric:tabular-nums}.gs-rc-bar small{color:var(--gs-g);font-size:13px}' +
+      '@media(min-width:900px){.gs-rc-bar{bottom:0;margin:var(--e4) 0 0;border:1px solid var(--gs-l);border-radius:var(--radio)}' +
+        '.gs-rc-cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:0 var(--e3);align-items:start}}' +
+      '.gs-rc-rg{border-top:1px solid var(--gs-l);padding:var(--e2) 0}.gs-rc-rg>b{display:flex;align-items:center;font-weight:700}' +
+      '.gs-rc-rl{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:var(--e2);align-items:baseline;padding:2px 0 2px 21px;font-variant-numeric:tabular-nums}' +
+      '.gs-rc-rl small{color:var(--gs-g);font-size:13px}';
   }
 
   /* ---------- utilidades ---------- */
@@ -1131,8 +1169,8 @@
     });
   }
 
-  /* ---------- T0240 · Camisetas › Stock y Pedidos (Excel CAMISETAS, solo lectura) ---------- */
-  var VISTAS_CAM = [['entregas', 'Entregas'], ['stock', 'Stock'], ['pedidos', 'Pedidos']];
+  /* ---------- T0240 · Camisetas › Stock y Pedidos (Excel CAMISETAS, solo lectura) · T0241 · Recuento ---------- */
+  var VISTAS_CAM = [['entregas', 'Entregas'], ['stock', 'Stock'], ['pedidos', 'Pedidos'], ['recuento', 'Recuento']];
   function selVista() {
     return '<div class="gs-sw gs-sw3" id="gs-csv" role="group" aria-label="Camisetas">' + VISTAS_CAM.map(function (v) {
       return '<button type="button" data-gs-csv="' + v[0] + '" aria-pressed="' + (S.cs.vista === v[0]) + '">' + v[1] + '</button>';
@@ -1175,8 +1213,9 @@
       // Sin modelo elegido (o uno que ya no está), el motor da el que más jugadoras tiene en la temporada en curso.
       if (r.modelo !== S.cs.modelo) { S.cs.modelo = r.modelo; S.datos['cs_' + r.modelo] = r; }
       hora(r.hora);
-      main.innerHTML = selVista() + pinta(r) + '<p class="gs-nota gs-cs-pie">Solo lectura, del Excel CAMISETAS' +
-        (r.url ? ' (<a href="' + esc(r.url) + '" target="_blank" rel="noopener">abrir</a>)' : '') + '. Los pedidos y el recuento se hacen con su menú «Camisetas».</p>';
+      var abrirX = r.url ? ' (<a href="' + esc(r.url) + '" target="_blank" rel="noopener">abrir</a>)' : '';
+      main.innerHTML = selVista() + pinta(r) + '<p class="gs-nota gs-cs-pie">' + (vista === 'recuento' ? 'Del Excel CAMISETAS' + abrirX +
+        '. Al aplicar, las diferencias se apuntan en DB_AJUSTES_STOCK con tu nombre.' : 'Solo lectura, del Excel CAMISETAS' + abrirX + '. Los pedidos se hacen con su menú «Camisetas»; el recuento, en Recuento.') + '</p>';
       engancharVista(main); engancharFiltrosCam(main);
       return r;
     }).then(null, function (e) {
@@ -1202,7 +1241,8 @@
           '<div class="gs-kpi"><b>Libres</b><span class="gs-val">' + suma('libres') + '</span><span class="gs-sub">en el local, sin dueña</span></div>' +
           '<div class="gs-kpi"><b>En negativo</b><span class="gs-val ' + (neg ? 'gs-neg' : 'gs-pos') + '">' + neg + '</span><span class="gs-sub">' + (neg ? 'revisa con un recuento' : 'todo cuadra') + '</span></div>' +
         '</div>' +
-        (neg ? '<div class="gs-al"><p>' + neg + (neg === 1 ? ' combinación sale' : ' combinaciones salen') + ' en negativo (en rojo): se han dado más camisetas de las que constan. Un recuento del local lo corrige.</p></div>' : '');
+        (neg ? '<div class="gs-al"><p>' + neg + (neg === 1 ? ' combinación sale' : ' combinaciones salen') + ' en negativo (en rojo): se han dado más camisetas de las que constan. Un recuento del local lo corrige.</p>' +
+          '<p><button type="button" class="gs-chip" id="gs-csrec">Hacer un recuento ›</button></p></div>' : '');
       // Color × dorsal-talla con lo que no es cero.
       var fm = filas.filter(function (x) { return x[k] !== 0; }), m = r.modelo;
       if (!fm.length) return h + '<div class="gs-vacio">' + (k === 'libres' ? 'No hay camisetas libres' : 'No hay camisetas en el local') + (m ? ' de ' + esc(m) : '') + '.</div>';
@@ -1229,6 +1269,8 @@
       })();
     }).then(function (r) {
       var c = $('#gs-csver'); if (r && c) c.onclick = function (e) { var b = e.target.closest('[data-gs-f]'); if (!b) return; S.cs.ver = b.getAttribute('data-gs-f'); pCamisetas(main); };
+      // T0241: del aviso de negativos al recuento, con el modelo elegido (si hay uno)
+      var rc = $('#gs-csrec'); if (r && rc) rc.onclick = function () { S.cs.vista = 'recuento'; window.scrollTo(0, 0); document.body.scrollTop = 0; pCamisetas(main); };
     });
   }
   function ordenCami(a, b) {
@@ -1299,9 +1341,276 @@
     llamar('camisetasFacturas', [cods]).then(function (m) { S.datos[clave] = m; if (document.body.contains(main)) pintar(m); }, function () {});
   }
 
+  /* ---------- T0241 · Camisetas › Recuento del local ----------
+   * Lo que debería haber suelto es EN EL LOCAL del stock (camisetasDatos), la misma cuenta que «Preparar recuento» del Excel.
+   * Cada dorsal-talla empieza con lo que debería haber (las que constan en negativo, en 0): se cambia solo lo que no cuadra.
+   * T0246: el stock es del modelo, sin temporada; el recuento usa el mismo selector de modelo que Stock y Pedidos.
+   * Lo contado se guarda en este navegador (por persona y modelo) hasta aplicarlo, por si se cierra la web a medias.
+   * Al aplicar, el motor vuelve a leer el Excel: si algo de ese modelo ha cambiado mientras tanto, no escribe nada y lo marca. */
+  var TALLAS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+  function recClave(m) { return 'gs-rec|' + (ctx().persona || '') + '|' + m; }
+  function recLeer(m) {
+    var b = null; try { b = JSON.parse(localStorage.getItem(recClave(m)) || 'null'); } catch (e) {}
+    b = b && typeof b === 'object' ? b : {};
+    return { cont: b.cont || {}, otras: b.otras || [], hechos: b.hechos || {}, conflicto: b.conflicto || {}, cuando: b.cuando || 0 };
+  }
+  function recGuardar(m, b) { b.cuando = Date.now(); try { localStorage.setItem(recClave(m), JSON.stringify(b)); } catch (e) {} }
+  function recBorrar(m) { try { localStorage.removeItem(recClave(m)); } catch (e) {} }
+  function recEmpezado(b) { return Object.keys(b.cont).length + b.otras.length + Object.keys(b.hechos).length > 0; }
+
+  /** Colores del modelo elegido con sus dorsal-talla (lo que no es 0): [{ color, lineas: [{ k: 'COLOR|CAMI', cami, n }] }]. */
+  function recColores(r) {
+    var C = {}, cols = [];
+    r.stock.forEach(function (x) {
+      if (!x.local) return;
+      if (!C[x.color]) { C[x.color] = []; cols.push(x.color); }
+      C[x.color].push({ k: x.color + '|' + x.cami, cami: x.cami, n: x.local });
+    });
+    return cols.map(function (c) { return { color: c, lineas: C[c].sort(function (a, b) { return ordenCami(a.cami, b.cami); }) }; });
+  }
+  function recVal(b, l) { return l.k in b.cont ? b.cont[l.k] : Math.max(l.n, 0); }
+  /** Lo que no cuadra: [{ color, cami, antes, n, d, fuera }]. Las de fuera del cuadro, con fuera = true. */
+  function recDifs(cols, b) {
+    var d = [];
+    cols.forEach(function (c) { c.lineas.forEach(function (l) { var v = recVal(b, l); if (v !== l.n) d.push({ color: c.color, cami: l.cami, antes: l.n, n: v, d: v - l.n }); }); });
+    b.otras.forEach(function (o) { d.push({ color: o.color, cami: o.cami, antes: 0, n: o.n, d: o.n, fuera: true }); });
+    return d;
+  }
+  function signo(n) { return (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n); }
+  function cuenta(n) { return (n < 0 ? '−' : '') + Math.abs(n); } // lo que consta: sin «+», con el menos tipográfico
+  function hoyTxt() { var d = new Date(); return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear(); }
+
+  function htmlRecLinea(b, l) {
+    var v = recVal(b, l), cf = l.k in b.conflicto;
+    return '<div class="gs-rc-l' + (v !== l.n ? ' gs-rc-cam' : '') + (cf ? ' gs-rc-cf' : '') + '" data-gs-k="' + esc(l.k) + '">' +
+      '<span class="gs-rc-k">' + esc(l.cami) + '</span>' +
+      '<span class="gs-rc-d">' + (l.n < 0 ? 'constan <b class="gs-neg">' + cuenta(l.n) + '</b>' : 'debería <b>' + l.n + '</b>') +
+        '<b class="gs-rc-dif">' + (v !== l.n ? signo(v - l.n) : '') + '</b></span>' +
+      '<span class="gs-rc-st"><button type="button" data-gs-rc="-1" aria-label="Una menos">−</button>' +
+        '<input type="number" inputmode="numeric" min="0" step="1" value="' + v + '" aria-label="Contadas: ' + esc(l.cami) + '">' +
+        '<button type="button" data-gs-rc="1" aria-label="Una más">+</button></span>' +
+      (cf ? '<small class="gs-rc-cft">Ha cambiado en el Excel mientras contabas: constaban ' + cuenta(b.conflicto[l.k]) + ', ahora ' + cuenta(l.n) + '. Vuelve a contarla.</small>' : '') + '</div>';
+  }
+  function resumenColor(c, b) {
+    var deb = 0, cam = 0;
+    c.lineas.forEach(function (l) { if (l.n > 0) deb += l.n; if (recVal(b, l) !== l.n) cam++; });
+    b.otras.forEach(function (o) { if (o.color === c.color) cam++; });
+    return '<span class="gs-rc-cs">' + (cam ? '<em>' + cam + (cam === 1 ? ' cambio' : ' cambios') + '</em>' : '') +
+      (b.hechos[c.color] ? '<i class="gs-pos" aria-label="Revisado">✓</i>' : '') + '<span>' + deb + '</span></span>';
+  }
+  function htmlRecColor(r, c, b, abierto) {
+    return '<details class="gs-card gs-rc-c' + (b.hechos[c.color] ? ' gs-rc-ok' : '') + '" data-gs-c="' + esc(c.color) + '"' + (abierto ? ' open' : '') + '>' +
+      '<summary><b>' + puntoCam(r, c.color) + '<span>' + esc(c.color) + '</span></b>' + resumenColor(c, b) + '</summary>' +
+      '<div class="gs-rc-ls">' + c.lineas.map(function (l) { return htmlRecLinea(b, l); }).join('') + '</div>' +
+      '<div class="gs-rc-acc"><button type="button" class="gs-b2" data-gs-rcotra="' + esc(c.color) + '">+ Hay otra</button>' +
+        '<button type="button" class="gs-b2" data-gs-rchecho="' + esc(c.color) + '" aria-pressed="' + !!b.hechos[c.color] + '">' + (b.hechos[c.color] ? '✓ Revisado' : 'Revisado ›') + '</button></div></details>';
+  }
+  function htmlRecOtras(b) {
+    return '<section class="gs-card gs-rc-otras" id="gs-rcotras"><div class="gs-cs-mh"><b>Otras que he encontrado</b><span>' + (b.otras.length ? b.otras.reduce(function (s, o) { return s + o.n; }, 0) : '') + '</span></div>' +
+      '<p class="gs-nota">Las que hay en el local y no salen arriba.</p>' +
+      b.otras.map(function (o, i) {
+        return '<div class="gs-rc-o"><b>' + esc(o.color) + '</b><span>' + esc(o.cami) + '</span><b class="gs-rc-dif">+' + o.n + '</b>' +
+          '<button type="button" class="gs-chip" data-gs-rcq="' + i + '" aria-label="Quitar ' + esc(o.color + ' ' + o.cami) + '">Quitar</button></div>';
+      }).join('') +
+      '<p style="margin:var(--e3) 0 0"><button type="button" class="gs-b2" data-gs-rcotra="">+ Apuntar otra</button></p></section>';
+  }
+  function htmlRecBarra(difs) {
+    var mas = difs.filter(function (x) { return x.d > 0; }).reduce(function (s, x) { return s + x.d; }, 0);
+    var menos = difs.filter(function (x) { return x.d < 0; }).reduce(function (s, x) { return s - x.d; }, 0);
+    return '<span><b>' + (difs.length ? difs.length + (difs.length === 1 ? ' cambio' : ' cambios') : 'Sin cambios') + '</b>' +
+      (difs.length ? '<small>' + [mas ? '+' + mas : '', menos ? '−' + menos : ''].filter(String).join(' · ') + '</small>' : '<small>todo cuadra por ahora</small>') + '</span>' +
+      '<button type="button" class="gs-b1" id="gs-rcres">Ver resumen</button>';
+  }
+
+  function pCamRecuento(main, forzar) {
+    var cont = { r: null };
+    return cuandoCam(main, forzar, 'Cargando lo que debería haber en el local…', function (r) {
+      cont.r = r;
+      var m = r.modelo, cols = recColores(r), b = recLeer(m);
+      if (!cols.length) return filtrosCam(r) + '<div class="gs-vacio">No hay camisetas en el local' + (m ? ' de ' + esc(m) : '') + '.</div>';
+      var deb = cols.reduce(function (s, c) { return s + c.lineas.reduce(function (a, l) { return a + Math.max(l.n, 0); }, 0); }, 0);
+      var hechos = cols.filter(function (c) { return b.hechos[c.color]; }).length;
+      var neg = cols.reduce(function (s, c) { return s + c.lineas.filter(function (l) { return l.n < 0; }).length; }, 0);
+      // Abierto: el que se estaba contando o, si no, el primero sin revisar.
+      var abierto = cols.some(function (c) { return c.color === S.cs.recAbierto; }) ? S.cs.recAbierto : ((cols.filter(function (c) { return !b.hechos[c.color]; })[0] || {}).color || '');
+      var cf = Object.keys(b.conflicto).length;
+      return filtrosCam(r) + '<div id="gs-rc">' +
+        '<div class="gs-rc-cab"><p><b>' + deb + '</b> deberían estar sueltas · ' + cols.length + (cols.length === 1 ? ' color' : ' colores') +
+          ' · <span id="gs-rchechos">revisados ' + hechos + ' de ' + cols.length + '</span></p>' +
+          '<p class="gs-nota">Cuenta las sueltas, no las de los packs. Cambia solo lo que no cuadre. Lo que debería haber es de las ' + esc(String(r.hora || '').slice(-5)) +
+          '; al aplicar se comprueba otra vez con el Excel.' + (neg ? ' Las ' + neg + ' que constan en negativo empiezan en 0.' : '') + '</p>' +
+          (recEmpezado(b) && b.cuando ? '<p class="gs-nota">Recuento empezado el ' + new Date(b.cuando).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) +
+            ' en este navegador · <button type="button" class="gs-enl" id="gs-rcnuevo">Empezar de nuevo</button></p>' : '') + '</div>' +
+        (cf ? '<div class="gs-al gs-al-r"><p>Mientras contabas ha cambiado el Excel en ' + cf + (cf === 1 ? ' casilla (marcada en rojo). Revísala' : ' casillas (marcadas en rojo). Revísalas') + ' y vuelve a aplicar.</p></div>' : '') +
+        '<div class="gs-rc-cols">' + cols.map(function (c) { return htmlRecColor(r, c, b, c.color === abierto); }).join('') + '</div>' +
+        htmlRecOtras(b) +
+        '<div class="gs-rc-bar" id="gs-rcbar">' + htmlRecBarra(recDifs(cols, b)) + '</div></div>';
+    }).then(function (r) {
+      if (!r || !document.body.contains(main)) return;
+      if (r.modelo) enganchaRecuento(main, cont.r);
+    });
+  }
+
+  function enganchaRecuento(main, r) {
+    var caja = $('#gs-rc'); if (!caja) return; // se crea en cada repintado: sus eventos no se suman
+    var m = r.modelo, cols = recColores(r), b = recLeer(m), guardar = function () { recGuardar(m, b); };
+    var linea = function (k) { for (var i = 0; i < cols.length; i++) for (var j = 0; j < cols[i].lineas.length; j++) if (cols[i].lineas[j].k === k) return cols[i].lineas[j]; return null; };
+    var colorDe = function (c) { return cols.filter(function (x) { return x.color === c; })[0]; };
+    var totales = function () {
+      var bar = $('#gs-rcbar'); if (bar) { bar.innerHTML = htmlRecBarra(recDifs(cols, b)); $('#gs-rcres').onclick = resumen; }
+      var h = $('#gs-rchechos'); if (h) h.textContent = 'revisados ' + cols.filter(function (c) { return b.hechos[c.color]; }).length + ' de ' + cols.length;
+    };
+    var resumenDe = function (c) {
+      var el = caja.querySelector('[data-gs-c="' + CSS.escape(c.color) + '"] > summary .gs-rc-cs');
+      if (el) el.outerHTML = resumenColor(c, b);
+    };
+    // Una casilla: n contadas (o lo que se ha escrito). Igual que lo que debería haber, deja de ser un cambio.
+    var poner = function (fila, n) {
+      var k = fila.getAttribute('data-gs-k'), l = linea(k); if (!l) return;
+      n = Math.max(0, Math.round(Number(n) || 0));
+      if (n === Math.max(l.n, 0)) delete b.cont[k]; else b.cont[k] = n;
+      delete b.conflicto[k];
+      var inp = fila.querySelector('input'); if (document.activeElement !== inp || Number(inp.value) !== n) inp.value = n;
+      fila.classList.toggle('gs-rc-cam', n !== l.n); fila.classList.remove('gs-rc-cf');
+      var cft = fila.querySelector('.gs-rc-cft'); if (cft) cft.remove();
+      fila.querySelector('.gs-rc-dif').textContent = n !== l.n ? signo(n - l.n) : '';
+      resumenDe(colorDe(k.split('|')[0]));
+      guardar(); totales();
+    };
+    caja.addEventListener('click', function (e) {
+      var x = e.target.closest('[data-gs-rc]');
+      if (x) { var fila = x.closest('[data-gs-k]'); poner(fila, Number(fila.querySelector('input').value || 0) + Number(x.getAttribute('data-gs-rc'))); return; }
+      x = e.target.closest('[data-gs-rchecho]');
+      if (x) {
+        var c = x.getAttribute('data-gs-rchecho'), det = x.closest('details');
+        if (b.hechos[c]) delete b.hechos[c]; else b.hechos[c] = true;
+        guardar();
+        x.setAttribute('aria-pressed', !!b.hechos[c]); x.textContent = b.hechos[c] ? '✓ Revisado' : 'Revisado ›';
+        det.classList.toggle('gs-rc-ok', !!b.hechos[c]); resumenDe(colorDe(c)); totales();
+        // Revisado: se cierra y se abre el siguiente sin revisar.
+        if (b.hechos[c]) {
+          det.open = false;
+          var sig = cols.filter(function (y) { return !b.hechos[y.color]; })[0];
+          var ds = sig && caja.querySelector('[data-gs-c="' + CSS.escape(sig.color) + '"]');
+          if (ds) { ds.open = true; S.cs.recAbierto = sig.color; ds.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
+        }
+        return;
+      }
+      x = e.target.closest('[data-gs-rcotra]');
+      if (x) { ventanaOtra(r, cols, b, x.getAttribute('data-gs-rcotra'), function () { guardar(); pCamisetas(main); }); return; }
+      x = e.target.closest('[data-gs-rcq]');
+      if (x) { b.otras.splice(Number(x.getAttribute('data-gs-rcq')), 1); guardar(); pCamisetas(main); return; }
+      if (e.target.closest('#gs-rcnuevo')) {
+        if (!window.confirm('¿Borro lo que has contado de ' + m + ' y empiezas de nuevo?')) return;
+        recBorrar(m); S.cs.recAbierto = ''; pCamisetas(main);
+      }
+    });
+    caja.addEventListener('input', function (e) {
+      var fila = e.target.closest && e.target.closest('[data-gs-k]');
+      if (fila && e.target.tagName === 'INPUT' && e.target.value !== '') poner(fila, e.target.value);
+    });
+    caja.addEventListener('change', function (e) {
+      var fila = e.target.closest && e.target.closest('[data-gs-k]');
+      if (fila && e.target.tagName === 'INPUT') poner(fila, e.target.value);
+    });
+    [].forEach.call(caja.querySelectorAll('details.gs-rc-c'), function (d) {
+      d.addEventListener('toggle', function () { if (d.open) S.cs.recAbierto = d.getAttribute('data-gs-c'); });
+    });
+    var resumen = function () { ventanaResumen(main, r, m, cols, b); };
+    $('#gs-rcres').onclick = resumen;
+  }
+
+  /** Apuntar una que no sale: color, dorsal, talla y cuántas. Si ya sale arriba, se suma a esa casilla. */
+  function ventanaOtra(r, cols, b, color, hecho) {
+    var mios = cols.map(function (c) { return c.color; });
+    var todos = mios.concat((r.nombresColores || []).filter(function (c) { return mios.indexOf(c) < 0; }));
+    var v = ventana('Apuntar otra',
+      '<p class="gs-nota" style="margin-top:0">Una camiseta de ' + esc(r.modelo) + ' que está en el local y no sale en la lista.</p>' +
+      '<label class="gs-campo">Color<select id="gs-ocol">' + todos.map(function (c) { return '<option' + (c === color ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select></label>' +
+      '<div class="gs-dos"><label class="gs-campo">Dorsal<input id="gs-odor" type="number" inputmode="numeric" min="0" step="1" placeholder="p. ej. 7"></label>' +
+        '<label class="gs-campo">Cuántas<input id="gs-on" type="number" inputmode="numeric" min="1" step="1" value="1"></label></div>' +
+      '<div class="gs-campo">Talla<div class="gs-rc-tallas" id="gs-otal" role="group" aria-label="Talla">' + TALLAS.map(function (t) { return '<button type="button" class="gs-chip" data-gs-t="' + t + '" aria-pressed="false">' + t + '</button>'; }).join('') + '</div></div>' +
+      '<p class="gs-error" id="gs-oerr" hidden></p>' +
+      '<div class="gs-acc"><button type="button" class="gs-b2" data-gs-cerrar>Cancelar</button><button type="button" class="gs-b1" id="gs-ook">Apuntar</button></div>');
+    var talla = '';
+    v.el.querySelector('#gs-otal').onclick = function (e) {
+      var x = e.target.closest('[data-gs-t]'); if (!x) return; talla = x.getAttribute('data-gs-t');
+      [].forEach.call(v.el.querySelectorAll('[data-gs-t]'), function (y) { y.setAttribute('aria-pressed', y === x); });
+    };
+    v.el.querySelector('#gs-ook').onclick = function () {
+      var c = v.el.querySelector('#gs-ocol').value, d = v.el.querySelector('#gs-odor').value.trim(), n = Math.round(Number(v.el.querySelector('#gs-on').value));
+      var err = v.el.querySelector('#gs-oerr');
+      var falta = !/^\d{1,3}$/.test(d) ? 'Pon el dorsal (un número).' : !talla ? 'Elige la talla.' : !(n >= 1) ? 'Pon cuántas has encontrado (1 o más).' : '';
+      if (falta) { err.textContent = falta; err.hidden = false; return; }
+      var cami = Number(d) + ' - ' + talla, k = c + '|' + cami, l = null;
+      cols.forEach(function (x) { x.lineas.forEach(function (y) { if (y.k === k) l = y; }); });
+      if (l) { var t = recVal(b, l) + n; if (t === Math.max(l.n, 0)) delete b.cont[k]; else b.cont[k] = t; aviso(c + ' ' + cami + ' ya salía en la lista: sumada ahí (' + t + ').'); }
+      else {
+        var o = b.otras.filter(function (x) { return x.color === c && x.cami === cami; })[0];
+        if (o) o.n += n; else b.otras.push({ color: c, cami: cami, n: n });
+      }
+      v.cerrar(); hecho();
+    };
+  }
+
+  /** Resumen de lo que no cuadra y aplicar: camisetasRecuentoAplicar lo escribe en DB_AJUSTES_STOCK. */
+  function ventanaResumen(main, r, m, cols, b) {
+    var difs = recDifs(cols, b), motivo = 'Recuento local ' + hoyTxt() + ' · ' + (ctx().persona || '');
+    if (!difs.length) {
+      var v0 = ventana('Todo cuadra', '<p>No has cambiado nada: lo que hay en el local de ' + esc(m) + ' es lo que consta. No hay nada que apuntar en el Excel.</p>' +
+        '<div class="gs-acc"><button type="button" class="gs-b2" data-gs-cerrar>Seguir contando</button><button type="button" class="gs-b1" id="gs-rcfin">Terminar</button></div>');
+      v0.el.querySelector('#gs-rcfin').onclick = function () { recBorrar(m); S.cs.recAbierto = ''; v0.cerrar(); aviso('Recuento de ' + m + ' terminado: todo cuadraba.'); pCamisetas(main); };
+      return;
+    }
+    var porColor = [];
+    difs.forEach(function (x) { var g = porColor.filter(function (y) { return y.color === x.color; })[0]; if (!g) porColor.push(g = { color: x.color, l: [] }); g.l.push(x); });
+    var neto = difs.reduce(function (s, x) { return s + x.d; }, 0);
+    var v = ventana('Resumen del recuento',
+      '<p style="margin-top:0">' + esc(m) + '<br><b>' + difs.length + (difs.length === 1 ? ' ajuste' : ' ajustes') + '</b> · ' + signo(neto) + ' en total</p>' +
+      porColor.map(function (g) {
+        return '<div class="gs-rc-rg"><b>' + puntoCam(r, g.color) + '<span>' + esc(g.color) + '</span></b>' + g.l.map(function (x) {
+          return '<div class="gs-rc-rl"><span>' + esc(x.cami) + '</span><small>' + (x.fuera ? 'no salía en la lista' : 'constaban ' + cuenta(x.antes) + ' → ' + x.n) + '</small><b class="' + (x.d < 0 ? 'gs-neg' : 'gs-pos') + '">' + signo(x.d) + '</b></div>';
+        }).join('') + '</div>';
+      }).join('') +
+      '<p class="gs-nota">Se apuntan en DB_AJUSTES_STOCK con el motivo «' + esc(motivo) + '»' + (difs.some(function (x) { return x.fuera; }) ? ' (las que no salían, con «(no estaba en el cuadro)»)' : '') + '.</p>' +
+      '<p class="gs-error" id="gs-rcerr" hidden></p>' +
+      '<div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-gs-cerrar>Seguir contando</button><button type="button" class="gs-b1" id="gs-rcok">Aplicar ' + difs.length + (difs.length === 1 ? ' ajuste' : ' ajustes') + '</button></div>');
+    var ok = v.el.querySelector('#gs-rcok');
+    ok.onclick = function () {
+      var base = {}, contado = [];
+      cols.forEach(function (c) { c.lineas.forEach(function (l) { base[l.k] = l.n; var n = recVal(b, l); if (n !== l.n) contado.push({ color: c.color, cami: l.cami, n: n }); }); });
+      var err = v.el.querySelector('#gs-rcerr'); err.hidden = true;
+      ok.disabled = true; ok.textContent = 'Aplicando…';
+      var lento = setTimeout(function () { ok.textContent = 'Leyendo el Excel…'; }, 8000);
+      llamar('camisetasRecuentoAplicar', [m, base, contado, b.otras]).then(function (x) {
+        clearTimeout(lento);
+        if (x.cambiado) {
+          // El Excel ha cambiado: se pone al día lo que debería haber y se marcan esas casillas; no se ha escrito nada.
+          r.stock.forEach(function (y) { if (y.modelo !== m) return; var k = y.color + '|' + y.cami, n = x.local[k] || 0; y.libres += n - y.local; y.local = n; });
+          Object.keys(x.local).forEach(function (k) {
+            if (!r.stock.some(function (y) { return y.modelo === m && y.color + '|' + y.cami === k; }))
+              r.stock.push({ modelo: m, color: k.split('|')[0], cami: k.split('|')[1], entradas: 0, salidas: 0, ajuste: 0, reservadas: 0, local: x.local[k], libres: x.local[k] });
+          });
+          x.cambiado.forEach(function (y) { b.conflicto[y.color + '|' + y.cami] = y.antes; });
+          recGuardar(m, b); v.cerrar(); pCamisetas(main);
+          return;
+        }
+        recBorrar(m); S.cs.recAbierto = '';
+        Object.keys(S.datos).forEach(function (k) { if (/^cs_/.test(k)) delete S.datos[k]; }); // el stock ha cambiado: se vuelve a leer
+        v.cerrar(); pCamisetas(main);
+        ventana('Recuento aplicado', '<p>' + x.aplicado + (x.aplicado === 1 ? ' ajuste apuntado' : ' ajustes apuntados') + ' en DB_AJUSTES_STOCK con el motivo «' + esc(x.motivo) + '». El stock ya cuadra con lo que has contado.</p>' +
+          '<div class="gs-acc">' + (x.url ? '<a class="gs-b2" href="' + esc(x.url) + '" target="_blank" rel="noopener">Ver en el Excel ↗</a>' : '') + '<button type="button" class="gs-b1" data-gs-cerrar>Hecho</button></div>');
+      }, function (e) {
+        clearTimeout(lento); ok.disabled = false; ok.textContent = 'Aplicar ' + difs.length + (difs.length === 1 ? ' ajuste' : ' ajustes');
+        err.textContent = e.message; err.hidden = false;
+      });
+    };
+  }
+
   function pCamisetas(main, forzar) {
     if (S.cs.vista === 'stock') return pCamStock(main, forzar);
     if (S.cs.vista === 'pedidos') return pCamPedidos(main, forzar);
+    if (S.cs.vista === 'recuento') return pCamRecuento(main, forzar);
     return cuando(main, 'jug', forzar, 'Cargando las camisetas…', function (o, r) {
       var f = S.cam, enF = r.lista.filter(function (j) { return conCami(j) && enFiltro(j); });
       // T0237: desde Alertas › Camisetas llega con un equipo (comp|equipo); se quita con su chip.
