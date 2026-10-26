@@ -654,7 +654,8 @@
       });
       engancharAlertas(main, function (e) { fichaEquipo(e, o, r); });
       // Jugadoras con alerta: se cargan aparte (o salen de lo ya cargado) y se añaden a Alertas.
-      dato('jug_' + S.temp, 'gestionJugadoras', [S.temp, false]).then(function (rj) {
+      // T0237: con ↻ también se releen las jugadoras (antes solo los equipos: Camisetas y Jugadoras con alerta seguían con lo guardado).
+      dato('jug_' + S.temp, 'gestionJugadoras', [S.temp, !!forzar], forzar).then(function (rj) {
         var cont = main.querySelector('#gs-aljug'); if (!cont || !document.body.contains(cont)) return;
         var js = rj.lista.filter(function (j) { return enFiltro(j) && FILTROS_JUG.alerta(j); });
         cont.innerHTML = htmlAlerta('alerta', 'Jugadoras con alerta', js, function (j) {
