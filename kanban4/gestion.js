@@ -355,7 +355,7 @@
       // La barra de abajo, pegada abajo. En el móvil el scroll es del body, que ya deja sitio a la barra de secciones (T0224).
       '.gs-rc-bar{position:sticky;bottom:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:var(--e3);' +
         'margin:var(--e4) calc(-1 * var(--e4)) 0;padding:var(--e3) var(--e4);background:var(--color-fondo);border-top:1px solid var(--gs-l);box-shadow:0 -6px 14px -10px rgba(0,0,0,.35)}' +
-      '.gs-rc-bar>span{display:flex;flex-direction:column;font-variant-numeric:tabular-nums}.gs-rc-bar small{color:var(--gs-g);font-size:13px}' +
+      '.gs-rc-bar>span{display:flex;flex-direction:column;flex:1 1 auto;min-width:0;font-variant-numeric:tabular-nums}.gs-rc-bar>.gs-b1{flex:none;white-space:nowrap;padding:0 var(--e4)}.gs-rc-bar small{color:var(--gs-g);font-size:13px}' +
       '@media(min-width:900px){.gs-rc-bar{bottom:0;margin:var(--e4) 0 0;border:1px solid var(--gs-l);border-radius:var(--radio)}' +
         '.gs-rc-cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:0 var(--e3);align-items:start}}' +
       '.gs-rc-rg{border-top:1px solid var(--gs-l);padding:var(--e2) 0}.gs-rc-rg>b{display:flex;align-items:center;font-weight:700}' +
@@ -1369,10 +1369,11 @@
     return cols.map(function (c) { return { color: c, lineas: C[c].sort(function (a, b) { return ordenCami(a.cami, b.cami); }) }; });
   }
   function recVal(b, l) { return l.k in b.cont ? b.cont[l.k] : Math.max(l.n, 0); }
-  /** Lo que no cuadra: [{ color, cami, antes, n, d, fuera }]. Las de fuera del cuadro, con fuera = true. */
+  /** Lo que no cuadra: [{ color, cami, antes, n, d, fuera, auto }]. Las de fuera del cuadro, con fuera = true; las negativas
+   *  que pasan a 0 sin que nadie las haya tocado, con auto = true (T0241: se distinguen de lo contado). */
   function recDifs(cols, b) {
     var d = [];
-    cols.forEach(function (c) { c.lineas.forEach(function (l) { var v = recVal(b, l); if (v !== l.n) d.push({ color: c.color, cami: l.cami, antes: l.n, n: v, d: v - l.n }); }); });
+    cols.forEach(function (c) { c.lineas.forEach(function (l) { var v = recVal(b, l); if (v !== l.n) d.push({ color: c.color, cami: l.cami, antes: l.n, n: v, d: v - l.n, auto: l.n < 0 && !(l.k in b.cont) }); }); });
     b.otras.forEach(function (o) { d.push({ color: o.color, cami: o.cami, antes: 0, n: o.n, d: o.n, fuera: true }); });
     return d;
   }
@@ -1415,10 +1416,11 @@
       '<p style="margin:var(--e3) 0 0"><button type="button" class="gs-b2" data-gs-rcotra="">+ Apuntar otra</button></p></section>';
   }
   function htmlRecBarra(difs) {
-    var mas = difs.filter(function (x) { return x.d > 0; }).reduce(function (s, x) { return s + x.d; }, 0);
-    var menos = difs.filter(function (x) { return x.d < 0; }).reduce(function (s, x) { return s - x.d; }, 0);
+    // T0241: lo contado y las negativas que pasan a 0 por separado, para que no parezca que ya se ha contado algo.
+    var auto = difs.filter(function (x) { return x.auto; }).length, contadas = difs.length - auto;
     return '<span><b>' + (difs.length ? difs.length + (difs.length === 1 ? ' cambio' : ' cambios') : 'Sin cambios') + '</b>' +
-      (difs.length ? '<small>' + [mas ? '+' + mas : '', menos ? '−' + menos : ''].filter(String).join(' · ') + '</small>' : '<small>todo cuadra por ahora</small>') + '</span>' +
+      (difs.length ? '<small>' + [contadas ? contadas + (contadas === 1 ? ' contada distinta' : ' contadas distintas') : 'nada contado',
+        auto ? auto + (auto === 1 ? ' negativa a 0' : ' negativas a 0') : ''].filter(String).join(' · ') + '</small>' : '<small>todo cuadra por ahora</small>') + '</span>' +
       '<button type="button" class="gs-b1" id="gs-rcres">Ver resumen</button>';
   }
 
@@ -1431,6 +1433,7 @@
       var deb = cols.reduce(function (s, c) { return s + c.lineas.reduce(function (a, l) { return a + Math.max(l.n, 0); }, 0); }, 0);
       var hechos = cols.filter(function (c) { return b.hechos[c.color]; }).length;
       var neg = cols.reduce(function (s, c) { return s + c.lineas.filter(function (l) { return l.n < 0; }).length; }, 0);
+      var enStock = cols.reduce(function (s, c) { return s + c.lineas.reduce(function (a, l) { return a + l.n; }, 0); }, 0);
       // Abierto: el que se estaba contando o, si no, el primero sin revisar.
       var abierto = cols.some(function (c) { return c.color === S.cs.recAbierto; }) ? S.cs.recAbierto : ((cols.filter(function (c) { return !b.hechos[c.color]; })[0] || {}).color || '');
       var cf = Object.keys(b.conflicto).length;
@@ -1438,7 +1441,10 @@
         '<div class="gs-rc-cab"><p><b>' + deb + '</b> deberían estar sueltas · ' + cols.length + (cols.length === 1 ? ' color' : ' colores') +
           ' · <span id="gs-rchechos">revisados ' + hechos + ' de ' + cols.length + '</span></p>' +
           '<p class="gs-nota">Cuenta las sueltas, no las de los packs. Cambia solo lo que no cuadre. Lo que debería haber es de las ' + esc(String(r.hora || '').slice(-5)) +
-          '; al aplicar se comprueba otra vez con el Excel.' + (neg ? ' Las ' + neg + ' que constan en negativo empiezan en 0.' : '') + '</p>' +
+          '; al aplicar se comprueba otra vez con el Excel.</p>' +
+          // T0241: por qué no coincide con «En el local» de Stock, que resta las negativas.
+          (neg ? '<p class="gs-nota">En Stock salen ' + enStock + ': ' + (neg === 1 ? 'la que consta en negativo aquí cuenta' : 'las ' + neg + ' que constan en negativo aquí cuentan') +
+            ' como 0, y al aplicar se corrigen a 0 si no las cambias.</p>' : '') +
           (recEmpezado(b) && b.cuando ? '<p class="gs-nota">Recuento empezado el ' + new Date(b.cuando).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) +
             ' en este navegador · <button type="button" class="gs-enl" id="gs-rcnuevo">Empezar de nuevo</button></p>' : '') + '</div>' +
         (cf ? '<div class="gs-al gs-al-r"><p>Mientras contabas ha cambiado el Excel en ' + cf + (cf === 1 ? ' casilla (marcada en rojo). Revísala' : ' casillas (marcadas en rojo). Revísalas') + ' y vuelve a aplicar.</p></div>' : '') +
@@ -1564,18 +1570,25 @@
     }
     var porColor = [];
     difs.forEach(function (x) { var g = porColor.filter(function (y) { return y.color === x.color; })[0]; if (!g) porColor.push(g = { color: x.color, l: [] }); g.l.push(x); });
-    var neto = difs.reduce(function (s, x) { return s + x.d; }, 0);
+    var neto = difs.reduce(function (s, x) { return s + x.d; }, 0), auto = difs.filter(function (x) { return x.auto; }).length;
+    // T0241: no se aplica hasta revisar todos los colores (así un «Aplicar» sin contar no apunta solo las negativas a 0).
+    var faltan = cols.filter(function (c) { return !b.hechos[c.color]; }).map(function (c) { return c.color; });
     var v = ventana('Resumen del recuento',
-      '<p style="margin-top:0">' + esc(m) + '<br><b>' + difs.length + (difs.length === 1 ? ' ajuste' : ' ajustes') + '</b> · ' + signo(neto) + ' en total</p>' +
+      '<p style="margin-top:0">' + esc(m) + '<br><b>' + difs.length + (difs.length === 1 ? ' ajuste' : ' ajustes') + '</b> · ' + signo(neto) + ' en total' +
+        (auto ? ' (' + auto + (auto === 1 ? ' es una negativa que pasa' : ' son negativas que pasan') + ' a 0)' : '') + '</p>' +
+      (faltan.length ? '<div class="gs-al"><p>Te ' + (faltan.length === 1 ? 'falta 1 color' : 'faltan ' + faltan.length + ' colores') + ' por revisar: ' + esc(faltan.join(', ')) +
+        '. Cuéntalos y pulsa «Revisado ›» en cada uno antes de aplicar.</p></div>' : '') +
       porColor.map(function (g) {
         return '<div class="gs-rc-rg"><b>' + puntoCam(r, g.color) + '<span>' + esc(g.color) + '</span></b>' + g.l.map(function (x) {
-          return '<div class="gs-rc-rl"><span>' + esc(x.cami) + '</span><small>' + (x.fuera ? 'no salía en la lista' : 'constaban ' + cuenta(x.antes) + ' → ' + x.n) + '</small><b class="' + (x.d < 0 ? 'gs-neg' : 'gs-pos') + '">' + signo(x.d) + '</b></div>';
+          return '<div class="gs-rc-rl"><span>' + esc(x.cami) + '</span><small>' + (x.fuera ? 'no salía en la lista' : 'constaban ' + cuenta(x.antes) + ' → ' + x.n + (x.auto ? ' (negativa, sin tocar)' : '')) + '</small><b class="' + (x.d < 0 ? 'gs-neg' : 'gs-pos') + '">' + signo(x.d) + '</b></div>';
         }).join('') + '</div>';
       }).join('') +
       '<p class="gs-nota">Se apuntan en DB_AJUSTES_STOCK con el motivo «' + esc(motivo) + '»' + (difs.some(function (x) { return x.fuera; }) ? ' (las que no salían, con «(no estaba en el cuadro)»)' : '') + '.</p>' +
       '<p class="gs-error" id="gs-rcerr" hidden></p>' +
-      '<div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-gs-cerrar>Seguir contando</button><button type="button" class="gs-b1" id="gs-rcok">Aplicar ' + difs.length + (difs.length === 1 ? ' ajuste' : ' ajustes') + '</button></div>');
+      '<div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-gs-cerrar>Seguir contando</button><button type="button" class="gs-b1" id="gs-rcok"' + (faltan.length ? ' disabled' : '') + '>' +
+        (faltan.length ? 'Te ' + (faltan.length === 1 ? 'falta 1 color' : 'faltan ' + faltan.length + ' colores') + ' por revisar' : 'Aplicar ' + difs.length + (difs.length === 1 ? ' ajuste' : ' ajustes')) + '</button></div>');
     var ok = v.el.querySelector('#gs-rcok');
+    if (faltan.length) return;
     ok.onclick = function () {
       var base = {}, contado = [];
       cols.forEach(function (c) { c.lineas.forEach(function (l) { base[l.k] = l.n; var n = recVal(b, l); if (n !== l.n) contado.push({ color: c.color, cami: l.cami, n: n }); }); });
