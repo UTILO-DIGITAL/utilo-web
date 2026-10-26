@@ -1244,25 +1244,28 @@
       if (!lista.length) return h + '<div class="gs-vacio">' + (r.pedidos.length ? 'Todos los pedidos de ' + esc(r.temp) + ' ya están en stock.' : 'No hay pedidos en ' + esc(r.temp) + '.') + '</div>';
       return h + '<div class="gs-cs-peds">' + lista.map(function (p) {
         var i = orden.indexOf(p.paso), paso = r.pasos[i] || [], j = p.jugadoras || { total: 0, porEstado: {} };
-        var porEstado = Object.keys(j.porEstado).map(function (e) {
+        // Por entregar: solo lo que aún no tiene la jugadora (las entregadas no se cuentan).
+        var pend = Object.keys(j.porEstado).filter(function (e) { return e !== 'Entregada'; }).map(function (e) {
           var x = ESTADOS_CAM.filter(function (y) { return y[0] === e; })[0], n = j.porEstado[e];
           return n + ' ' + (x ? (n === 1 ? x[3] : x[4]) : e.toLowerCase());
-        }).join(', ');
+        });
+        var huecos = p.asignado && !p.enStock && p.unidades > j.total ? p.unidades - j.total : 0;
+        var porEntregar = pend.concat(huecos ? [huecos + ' sin jugadora'] : []).join(' · ') || (j.total ? 'nada: todas entregadas' : '');
         return '<section class="gs-card gs-cs-p"><div class="gs-cam-h"><b><span>' + esc(p.hash) + '</span></b>' + tag(paso[1] || p.paso, p.paso === 'enStock' ? 'gs-tag-v' : p.paso === 'sinConfirmar' ? 'gs-tag-r' : 'gs-tag-a') + '</div>' +
           '<div class="gs-cam-s">' + esc([p.modelo, p.unidades + ' camisetas', p.fecha ? 'pedido el ' + p.fecha : ''].filter(String).join(' · ')) + '</div>' +
           '<div class="gs-pasos" aria-label="Paso ' + (i + 1) + ' de ' + PASOS_PED.length + '">' + PASOS_PED.map(function (n, x) {
             var c = x < i || p.paso === 'enStock' ? 'gs-hecho' : x === i ? 'gs-ahora' : '';
             return '<span class="' + c + '"><i></i><small>' + n + '</small></span>';
           }).join('') + '</div>' +
-          (paso[2] ? '<p class="gs-cs-sig"><b>Falta:</b> ' + esc(paso[2]) + '</p>' : p.paso === 'asignado' ? '<p class="gs-cs-sig">Esperando al proveedor' + (p.estimada ? ': llega el ' + esc(p.estimada) : '') + '.</p>' : '') +
+          (paso[2] ? '<p class="gs-cs-sig"><b>Falta:</b> ' + esc(paso[2]) + '</p>' : p.paso === 'asignado' ? '<p class="gs-cs-sig">Esperando al proveedor' + (p.estimada ? ': llega el ' + esc(p.estimada) : '') + '.</p>' :
+            p.paso === 'enStock' ? '<p class="gs-cs-sig">Llegó y se volcó en el stock' + (p.enStock ? ' el ' + esc(p.enStock) : '') + ': sus camisetas ya cuentan en el local.</p>' : '') +
           '<div class="gs-dl gs-cs-dl">' + fila('Proveedor', esc(p.proveedor)) + fila('Contacto', esc(p.contacto)) +
             fila('Importe', p.precio != null ? eur(p.precio) + (p.unidades ? ' · ' + eur(p.precio / p.unidades) + ' cada una' : '') : '') +
-            fila('Factura', esc(p.factura)) + fila('Entrega prevista', p.paso !== 'enStock' && p.paso !== 'recibido' ? esc(p.estimada) : '') +
+            fila('Factura', p.factura ? '<span data-gs-fac="' + esc(p.factura) + '">' + esc(p.factura) + '</span>' : '') + fila('Entrega prevista', p.paso !== 'enStock' && p.paso !== 'recibido' ? esc(p.estimada) : '') +
             fila('Asignado', esc(p.asignado)) + fila('En stock', esc(p.enStock)) +
             // Asignado y aún no en stock: las del pedido sin jugadora (bajas o cambios) son huecos que «Actualizar camisetas» da a las
             // próximas inscripciones que encajen. En stock ya cuentan como libres en el local.
-            fila('Jugadoras', j.total ? esc([Object.keys(j.porEstado).length === 1 ? porEstado : j.total + ': ' + porEstado,
-              p.asignado && !p.enStock && p.unidades > j.total ? (p.unidades - j.total) + ' sin jugadora' : ''].filter(String).join(' · ')) : '') + '</div>' +
+            fila('Por entregar', esc(porEntregar)) + '</div>' +
           (p.colores.length ? '<details class="gs-alt gs-cs-col"><summary><span>Por color y talla</span><em>' + p.colores.length + (p.colores.length === 1 ? ' color' : ' colores') + '</em></summary>' +
             p.colores.map(function (c) {
               return '<div class="gs-cs-cl"><b>' + puntoCam(r, c.color) + '<span>' + esc(c.color) + '</span></b><span>' + c.n + '</span><small>' + esc(c.tallas.map(function (t) { return t[0] + ' ' + t[1]; }).join(' · ')) + '</small></div>';
@@ -1271,7 +1274,24 @@
       }).join('') + '</div>';
     }).then(function (r) {
       var c = $('#gs-csped'); if (r && c) c.onclick = function (e) { var b = e.target.closest('[data-gs-f]'); if (!b) return; S.cs.ped = b.getAttribute('data-gs-f'); pCamisetas(main); };
+      if (r) enlazarFacturas(main, r);
     });
+  }
+  /** «F.58», «f.058 algo.pdf» → «F.58» (como ecoCodigoArchivo_ de Economía). */
+  function codFactura(t) { var m = String(t || '').trim().match(/^([A-Za-z]+)\.?\s*0*(\d+)/); return m ? m[1].toUpperCase() + '.' + m[2] : String(t || '').trim().toUpperCase(); }
+  /** La factura de cada pedido, a su archivo de Drive (camisetasFacturas, de ECONOMIA); si no se encuentra, a la carpeta FACTURAS. */
+  function enlazarFacturas(main, r) {
+    var els = main.querySelectorAll('[data-gs-fac]'); if (!els.length) return;
+    var cods = [].map.call(els, function (x) { return x.getAttribute('data-gs-fac'); }), clave = 'csfac_' + r.temp;
+    var pintar = function (m) {
+      [].forEach.call(main.querySelectorAll('[data-gs-fac]'), function (x) {
+        var t = x.getAttribute('data-gs-fac'), u = m[codFactura(t)];
+        if (u) x.innerHTML = '<a href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(t) + ' · abrir en Drive ↗</a>';
+        else if (m._carpeta) x.innerHTML = esc(t) + ' · <a href="' + esc(m._carpeta) + '" target="_blank" rel="noopener">buscar en FACTURAS ↗</a>';
+      });
+    };
+    if (S.datos[clave]) return pintar(S.datos[clave]);
+    llamar('camisetasFacturas', [cods]).then(function (m) { S.datos[clave] = m; if (document.body.contains(main)) pintar(m); }, function () {});
   }
 
   function pCamisetas(main, forzar) {
