@@ -170,8 +170,12 @@
       // T0225: en el ordenador, todo el ancho junto al menú; las listas que se comparan van en tabla (base.css · u-tabla).
       '.gs-aviso{left:calc(50% + var(--medio-menu, 0px))}' +
       '@media(min-width:900px){.gs-cab{padding-left:var(--e5);padding-right:var(--e5)}.gs-tabs{margin:0 calc(-1 * var(--e5));padding:0 var(--e3)}' +
-      '.gs-main{max-width:1280px;margin:0;padding:var(--e5) var(--e5) var(--e7)}.gs-filtros,.gs-main>.gs-fila{max-width:760px}' +
-      '.gs-tabla{margin-top:var(--e3)}.gs-tabla .gs-tags{margin-top:0}.gs-tabla .gs-color{margin-right:var(--e2)}}';
+      '.gs-main{max-width:none;margin:0;padding:var(--e5) var(--e5) var(--e7)}.gs-filtros,.gs-main>.gs-fila{max-width:760px}' +
+      '.gs-tabla{margin-top:var(--e3)}.gs-tabla .gs-tags{margin-top:0}.gs-tabla .gs-color{margin-right:var(--e2)}' +
+      // T0232: en Equipos y Jugadoras, los desplegables y el buscador en una fila que ocupa todo el ancho; los botones de filtro, debajo.
+      '.gs-filtrar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--e2)}.gs-filtrar>.gs-filtros,.gs-filtrar>.gs-fila{display:contents}' +
+      '.gs-filtrar .gs-sel{flex:1 1 200px;min-width:200px;max-width:280px}.gs-filtrar #gs-temp{flex:0 0 112px;min-width:0}' +
+      '.gs-filtrar input[type=search]{order:1;flex:2 1 260px;min-width:260px;max-width:none}.gs-filtrar>.gs-chips{order:2;flex:1 1 100%;margin-top:var(--e1)!important}}';
   }
   /** T0225: en el ordenador (desde 900 px) las listas van en tabla; en el móvil, la lista de siempre. */
   var ANCHO = window.matchMedia ? matchMedia('(min-width:900px)') : { matches: false };
@@ -604,10 +608,10 @@
   function pEquipos(main, forzar) {
     return cuando(main, 'eq', forzar, 'Cargando los equipos…', function (o, r) {
       var f = S.eq, base = r.lista.filter(enFiltro), cuenta = function (k) { return base.filter(FILTROS_EQ[k]).length; };
-      main.innerHTML = htmlFiltros(o) +
+      main.innerHTML = '<div class="gs-filtrar">' + htmlFiltros(o) + // T0232
         chips([['todos', 'Inscritos', cuenta('todos')], ['sinliga', 'Sin liga', cuenta('sinliga')], ['pagar', 'Por pagar', cuenta('pagar')],
           ['avisos', 'Avisos', cuenta('avisos')], ['buscan', 'Buscan equipo', cuenta('buscan')], ['error', 'Con ERROR', cuenta('error')]], f.filtro, 'gs-eqf') +
-        '<div class="gs-fila" style="margin-top:10px"><input type="search" class="gs-sel" id="gs-eqq" placeholder="Buscar: equipo, capitana, correo, liga…" value="' + esc(f.q) + '" aria-label="Buscar"></div>' +
+        '<div class="gs-fila" style="margin-top:10px"><input type="search" class="gs-sel" id="gs-eqq" placeholder="Buscar: equipo, capitana, correo, liga…" value="' + esc(f.q) + '" aria-label="Buscar"></div></div>' +
         '<div id="gs-eqlista"></div>';
       var pinta = function () {
         var q = norm2(f.q);
@@ -773,12 +777,12 @@
       if (f.equipo && equipos.indexOf(f.equipo) < 0) equipos.unshift(f.equipo);
       var base = enF.filter(function (j) { return !f.equipo || j.equipo === f.equipo; });
       var cuenta = function (k) { return base.filter(FILTROS_JUG[k]).length; };
-      main.innerHTML = htmlFiltros(o) +
+      main.innerHTML = '<div class="gs-filtrar">' + htmlFiltros(o) + // T0232
         '<div class="gs-fila" style="margin-top:8px"><select class="gs-sel" id="gs-jeq" aria-label="Equipo"><option value="">Todos los equipos (' + equipos.length + ')</option>' +
         equipos.map(function (x) { return '<option' + (x === f.equipo ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select></div>' +
         chips([['todas', 'Inscritas', cuenta('todas')], ['alerta', 'Con alerta', cuenta('alerta')], ['xporty', 'Sin Xporty', cuenta('xporty')],
           ['contactos', 'Sin contacto', cuenta('contactos')], ['personal', 'Cami personalizada', cuenta('personal')], ['error', 'Con ERROR', cuenta('error')]], f.filtro, 'gs-jf') +
-        '<div class="gs-fila" style="margin-top:10px"><input type="search" class="gs-sel" id="gs-jq" placeholder="Buscar: nombre, correo, DNI, teléfono, dorsal…" value="' + esc(f.q) + '" aria-label="Buscar"></div>' +
+        '<div class="gs-fila" style="margin-top:10px"><input type="search" class="gs-sel" id="gs-jq" placeholder="Buscar: nombre, correo, DNI, teléfono, dorsal…" value="' + esc(f.q) + '" aria-label="Buscar"></div></div>' +
         '<div id="gs-jlista"></div>';
       var pinta = function () {
         var q = norm2(f.q);
