@@ -99,8 +99,8 @@
   .u .tablero { padding-left: var(--e5); padding-right: var(--e5); }
   .u .col { flex: 1 1 0; min-width: 200px; }
   /* T0230: todas las cabeceras con la altura de dos líneas, para que un nombre largo («Pendiente de revisión») que pasa
-     a dos no baje su raya y sus tarjetas respecto a las otras columnas */
-  .u .col h2.ch { min-height: calc(2.4em + 2 * var(--e2)); }
+     a dos no baje su raya y sus tarjetas respecto a las otras columnas. Con box-sizing: border-box, la altura incluye la raya (3 px) */
+  .u .col h2.ch { min-height: calc(2.4em + 2 * var(--e2) + 3px); }
   .u .col.plegada { flex: 0 0 auto; min-width: 0; }
   .u .col.plegada h2.ch { writing-mode: vertical-rl; min-height: 0; min-width: 44px; padding: var(--e3) var(--e2);
     border-bottom: 0; border-left: 3px solid var(--estado); }
