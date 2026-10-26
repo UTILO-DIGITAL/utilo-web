@@ -1250,7 +1250,7 @@
           return n + ' ' + (x ? (n === 1 ? x[3] : x[4]) : e.toLowerCase());
         });
         var huecos = p.asignado && !p.enStock && p.unidades > j.total ? p.unidades - j.total : 0;
-        var porEntregar = pend.concat(huecos ? [huecos + ' sin jugadora'] : []).join(' · ') || (j.total ? 'nada: todas entregadas' : '');
+        var porEntregar = pend.concat(huecos ? [huecos + ' sin jugadora'] : []).join(' · ') || (j.total ? 'nada: todas entregadas' : p.asignado || p.enStock ? 'ninguna jugadora tiene este pedido' : '');
         return '<section class="gs-card gs-cs-p"><div class="gs-cam-h"><b><span>' + esc(p.hash) + '</span></b>' + tag(paso[1] || p.paso, p.paso === 'enStock' ? 'gs-tag-v' : p.paso === 'sinConfirmar' ? 'gs-tag-r' : 'gs-tag-a') + '</div>' +
           '<div class="gs-cam-s">' + esc([p.modelo, p.unidades + ' camisetas', p.fecha ? 'pedido el ' + p.fecha : ''].filter(String).join(' · ')) + '</div>' +
           '<div class="gs-pasos" aria-label="Paso ' + (i + 1) + ' de ' + PASOS_PED.length + '">' + PASOS_PED.map(function (n, x) {
