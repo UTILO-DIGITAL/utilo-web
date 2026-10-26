@@ -360,7 +360,9 @@
         '.gs-rc-cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:0 var(--e3);align-items:start}}' +
       '.gs-rc-rg{border-top:1px solid var(--gs-l);padding:var(--e2) 0}.gs-rc-rg>b{display:flex;align-items:center;font-weight:700}' +
       '.gs-rc-rl{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:var(--e2);align-items:baseline;padding:2px 0 2px 21px;font-variant-numeric:tabular-nums}' +
-      '.gs-rc-rl small{color:var(--gs-g);font-size:13px}';
+      '.gs-rc-rl small{color:var(--gs-g);font-size:13px}' +
+      '.gs-rc-tipo{grid-column:1/-1;display:flex;align-items:center;gap:var(--e2);font-size:13px;color:var(--gs-g);margin:2px 0 var(--e1)}.gs-rc-tipo select{flex:1 1 auto;min-width:0;max-width:220px}' +
+      '.gs-rc-negn{grid-column:1/-1;color:var(--gs-g);font-size:12px;margin-top:2px}';
   }
 
   /* ---------- utilidades ---------- */
@@ -1352,7 +1354,7 @@
   function recLeer(m) {
     var b = null; try { b = JSON.parse(localStorage.getItem(recClave(m)) || 'null'); } catch (e) {}
     b = b && typeof b === 'object' ? b : {};
-    return { cont: b.cont || {}, otras: b.otras || [], hechos: b.hechos || {}, conflicto: b.conflicto || {}, cuando: b.cuando || 0 };
+    return { cont: b.cont || {}, otras: b.otras || [], hechos: b.hechos || {}, conflicto: b.conflicto || {}, tipos: b.tipos || {}, cuando: b.cuando || 0 };
   }
   function recGuardar(m, b) { b.cuando = Date.now(); try { localStorage.setItem(recClave(m), JSON.stringify(b)); } catch (e) {} }
   function recBorrar(m) { try { localStorage.removeItem(recClave(m)); } catch (e) {} }
@@ -1368,7 +1370,11 @@
     });
     return cols.map(function (c) { return { color: c, lineas: C[c].sort(function (a, b) { return ordenCami(a.cami, b.cami); }) }; });
   }
-  function recVal(b, l) { return l.k in b.cont ? b.cont[l.k] : Math.max(l.n, 0); }
+  /** Lo que se espera encontrar: lo que debería haber, y 0 si el Excel da negativo (no puede haber menos de 0). */
+  function recEsp(l) { return Math.max(l.n, 0); }
+  function recVal(b, l) { return l.k in b.cont ? b.cont[l.k] : recEsp(l); }
+  /** Por qué falta una camiseta (T0241 · T0247): el primero es «no sé», un ajuste de recuento sin más. */
+  var TIPOS_FALTA = [['Recuento', 'No sé (recuento)'], ['Regalada', 'Regalada'], ['Donada', 'Donada'], ['Perdida', 'Perdida'], ['Defectuosa', 'Defectuosa'], ['Otro', 'Otro']];
   /** Lo que no cuadra: [{ color, cami, antes, n, d, fuera, auto }]. Las de fuera del cuadro, con fuera = true; las negativas
    *  que pasan a 0 sin que nadie las haya tocado, con auto = true (T0241: se distinguen de lo contado). */
   function recDifs(cols, b) {
@@ -1383,18 +1389,19 @@
 
   function htmlRecLinea(b, l) {
     var v = recVal(b, l), cf = l.k in b.conflicto;
-    return '<div class="gs-rc-l' + (v !== l.n ? ' gs-rc-cam' : '') + (cf ? ' gs-rc-cf' : '') + '" data-gs-k="' + esc(l.k) + '">' +
+    return '<div class="gs-rc-l' + (v !== recEsp(l) ? ' gs-rc-cam' : '') + (cf ? ' gs-rc-cf' : '') + '" data-gs-k="' + esc(l.k) + '">' +
       '<span class="gs-rc-k">' + esc(l.cami) + '</span>' +
-      '<span class="gs-rc-d">' + (l.n < 0 ? 'constan <b class="gs-neg">' + cuenta(l.n) + '</b>' : 'debería <b>' + l.n + '</b>') +
-        '<b class="gs-rc-dif">' + (v !== l.n ? signo(v - l.n) : '') + '</b></span>' +
+      '<span class="gs-rc-d">debería <b>' + recEsp(l) + '</b>' +
+        '<b class="gs-rc-dif">' + (v !== recEsp(l) ? signo(v - recEsp(l)) : '') + '</b></span>' +
       '<span class="gs-rc-st"><button type="button" data-gs-rc="-1" aria-label="Una menos">−</button>' +
         '<input type="number" inputmode="numeric" min="0" step="1" value="' + v + '" aria-label="Contadas: ' + esc(l.cami) + '">' +
         '<button type="button" data-gs-rc="1" aria-label="Una más">+</button></span>' +
+      (l.n < 0 ? '<small class="gs-rc-negn">El Excel dice ' + cuenta(l.n) + ': al aplicar se corrige a lo que cuentes.</small>' : '') +
       (cf ? '<small class="gs-rc-cft">Ha cambiado en el Excel mientras contabas: constaban ' + cuenta(b.conflicto[l.k]) + ', ahora ' + cuenta(l.n) + '. Vuelve a contarla.</small>' : '') + '</div>';
   }
   function resumenColor(c, b) {
     var deb = 0, cam = 0;
-    c.lineas.forEach(function (l) { if (l.n > 0) deb += l.n; if (recVal(b, l) !== l.n) cam++; });
+    c.lineas.forEach(function (l) { if (l.n > 0) deb += l.n; if (recVal(b, l) !== recEsp(l)) cam++; });
     b.otras.forEach(function (o) { if (o.color === c.color) cam++; });
     return '<span class="gs-rc-cs">' + (cam ? '<em>' + cam + (cam === 1 ? ' cambio' : ' cambios') + '</em>' : '') +
       (b.hechos[c.color] ? '<i class="gs-pos" aria-label="Revisado">✓</i>' : '') + '<span>' + deb + '</span></span>';
@@ -1416,11 +1423,10 @@
       '<p style="margin:var(--e3) 0 0"><button type="button" class="gs-b2" data-gs-rcotra="">+ Apuntar otra</button></p></section>';
   }
   function htmlRecBarra(difs) {
-    // T0241: lo contado y las negativas que pasan a 0 por separado, para que no parezca que ya se ha contado algo.
-    var auto = difs.filter(function (x) { return x.auto; }).length, contadas = difs.length - auto;
-    return '<span><b>' + (difs.length ? difs.length + (difs.length === 1 ? ' cambio' : ' cambios') : 'Sin cambios') + '</b>' +
-      (difs.length ? '<small>' + [contadas ? contadas + (contadas === 1 ? ' contada distinta' : ' contadas distintas') : 'nada contado',
-        auto ? auto + (auto === 1 ? ' negativa a 0' : ' negativas a 0') : ''].filter(String).join(' · ') + '</small>' : '<small>todo cuadra por ahora</small>') + '</span>' +
+    // T0241: «cambio» es solo lo que cambia la persona; los negativos que pasan a 0 se dicen aparte.
+    var auto = difs.filter(function (x) { return x.auto; }).length, propios = difs.length - auto;
+    return '<span><b>' + (propios ? propios + (propios === 1 ? ' cambio' : ' cambios') : 'Sin cambios') + '</b>' +
+      '<small>' + (auto ? auto + (auto === 1 ? ' negativo se corregirá a 0' : ' negativos se corregirán a 0') : propios ? '' : 'todo cuadra por ahora') + '</small></span>' +
       '<button type="button" class="gs-b1" id="gs-rcres">Ver resumen</button>';
   }
 
@@ -1442,11 +1448,13 @@
           ' · <span id="gs-rchechos">revisados ' + hechos + ' de ' + cols.length + '</span></p>' +
           '<p class="gs-nota">Cuenta las sueltas, no las de los packs. Cambia solo lo que no cuadre. Lo que debería haber es de las ' + esc(String(r.hora || '').slice(-5)) +
           '; al aplicar se comprueba otra vez con el Excel.</p>' +
-          // T0241: por qué no coincide con «En el local» de Stock, que resta las negativas.
-          (neg ? '<p class="gs-nota">En Stock salen ' + enStock + ': ' + (neg === 1 ? 'la que consta en negativo aquí cuenta' : 'las ' + neg + ' que constan en negativo aquí cuentan') +
-            ' como 0, y al aplicar se corrigen a 0 si no las cambias.</p>' : '') +
+
           (recEmpezado(b) && b.cuando ? '<p class="gs-nota">Recuento empezado el ' + new Date(b.cuando).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) +
             ' en este navegador · <button type="button" class="gs-enl" id="gs-rcnuevo">Empezar de nuevo</button></p>' : '') + '</div>' +
+        // T0241: qué es un negativo y por qué no coincide con «En el local» de Stock, que los resta.
+        (neg ? '<div class="gs-al"><p><b>' + neg + (neg === 1 ? ' combinación está' : ' combinaciones están') + ' en negativo en el Excel.</b> Quiere decir que se ha dado ' +
+          'alguna camiseta de más (o de otra talla) y el Excel no cuadra: en la caja no puede haber menos de 0. Aquí salen como «debería 0» y, al aplicar el recuento, ' +
+          'se corrigen a lo que cuentes. Por eso en Stock salen ' + enStock + ' en el local y aquí ' + deb + '.</p></div>' : '') +
         (cf ? '<div class="gs-al gs-al-r"><p>Mientras contabas ha cambiado el Excel en ' + cf + (cf === 1 ? ' casilla (marcada en rojo). Revísala' : ' casillas (marcadas en rojo). Revísalas') + ' y vuelve a aplicar.</p></div>' : '') +
         '<div class="gs-rc-cols">' + cols.map(function (c) { return htmlRecColor(r, c, b, c.color === abierto); }).join('') + '</div>' +
         htmlRecOtras(b) +
@@ -1474,12 +1482,12 @@
     var poner = function (fila, n) {
       var k = fila.getAttribute('data-gs-k'), l = linea(k); if (!l) return;
       n = Math.max(0, Math.round(Number(n) || 0));
-      if (n === Math.max(l.n, 0)) delete b.cont[k]; else b.cont[k] = n;
+      if (n === recEsp(l)) delete b.cont[k]; else b.cont[k] = n;
       delete b.conflicto[k];
       var inp = fila.querySelector('input'); if (document.activeElement !== inp || Number(inp.value) !== n) inp.value = n;
-      fila.classList.toggle('gs-rc-cam', n !== l.n); fila.classList.remove('gs-rc-cf');
+      fila.classList.toggle('gs-rc-cam', n !== recEsp(l)); fila.classList.remove('gs-rc-cf');
       var cft = fila.querySelector('.gs-rc-cft'); if (cft) cft.remove();
-      fila.querySelector('.gs-rc-dif').textContent = n !== l.n ? signo(n - l.n) : '';
+      fila.querySelector('.gs-rc-dif').textContent = n !== recEsp(l) ? signo(n - recEsp(l)) : '';
       resumenDe(colorDe(k.split('|')[0]));
       guardar(); totales();
     };
@@ -1568,30 +1576,46 @@
       v0.el.querySelector('#gs-rcfin').onclick = function () { recBorrar(m); S.cs.recAbierto = ''; v0.cerrar(); aviso('Recuento de ' + m + ' terminado: todo cuadraba.'); pCamisetas(main); };
       return;
     }
-    var porColor = [];
-    difs.forEach(function (x) { var g = porColor.filter(function (y) { return y.color === x.color; })[0]; if (!g) porColor.push(g = { color: x.color, l: [] }); g.l.push(x); });
-    var neto = difs.reduce(function (s, x) { return s + x.d; }, 0), auto = difs.filter(function (x) { return x.auto; }).length;
-    // T0241: no se aplica hasta revisar todos los colores (así un «Aplicar» sin contar no apunta solo las negativas a 0).
+    // T0241: dos bloques, lo que ha contado la persona y los negativos que pasan a 0 (que no ha tocado).
+    var propios = difs.filter(function (x) { return !x.auto; }), autos = difs.filter(function (x) { return x.auto; });
+    var neto = difs.reduce(function (s, x) { return s + x.d; }, 0);
+    var porColor = function (lista, fila) {
+      var g = [];
+      lista.forEach(function (x) { var y = g.filter(function (z) { return z.color === x.color; })[0]; if (!y) g.push(y = { color: x.color, l: [] }); y.l.push(x); });
+      return g.map(function (y) { return '<div class="gs-rc-rg"><b>' + puntoCam(r, y.color) + '<span>' + esc(y.color) + '</span></b>' + y.l.map(fila).join('') + '</div>'; }).join('');
+    };
+    // No se aplica hasta revisar todos los colores (así un «Aplicar» sin contar no apunta solo los negativos a 0).
     var faltan = cols.filter(function (c) { return !b.hechos[c.color]; }).map(function (c) { return c.color; });
+    var boton = faltan.length ? 'Te ' + (faltan.length === 1 ? 'falta 1 color' : 'faltan ' + faltan.length + ' colores') + ' por revisar' :
+      propios.length ? 'Aplicar ' + difs.length + (difs.length === 1 ? ' ajuste' : ' ajustes') : 'Corregir ' + autos.length + (autos.length === 1 ? ' negativo' : ' negativos') + ' a 0';
     var v = ventana('Resumen del recuento',
-      '<p style="margin-top:0">' + esc(m) + '<br><b>' + difs.length + (difs.length === 1 ? ' ajuste' : ' ajustes') + '</b> · ' + signo(neto) + ' en total' +
-        (auto ? ' (' + auto + (auto === 1 ? ' es una negativa que pasa' : ' son negativas que pasan') + ' a 0)' : '') + '</p>' +
+      '<p style="margin-top:0">' + esc(m) + '<br><b>' + difs.length + (difs.length === 1 ? ' ajuste' : ' ajustes') + '</b> · ' + signo(neto) + ' en total</p>' +
       (faltan.length ? '<div class="gs-al"><p>Te ' + (faltan.length === 1 ? 'falta 1 color' : 'faltan ' + faltan.length + ' colores') + ' por revisar: ' + esc(faltan.join(', ')) +
         '. Cuéntalos y pulsa «Revisado ›» en cada uno antes de aplicar.</p></div>' : '') +
-      porColor.map(function (g) {
-        return '<div class="gs-rc-rg"><b>' + puntoCam(r, g.color) + '<span>' + esc(g.color) + '</span></b>' + g.l.map(function (x) {
-          return '<div class="gs-rc-rl"><span>' + esc(x.cami) + '</span><small>' + (x.fuera ? 'no salía en la lista' : 'constaban ' + cuenta(x.antes) + ' → ' + x.n + (x.auto ? ' (negativa, sin tocar)' : '')) + '</small><b class="' + (x.d < 0 ? 'gs-neg' : 'gs-pos') + '">' + signo(x.d) + '</b></div>';
-        }).join('') + '</div>';
-      }).join('') +
+      '<div class="gs-sec">Lo que has contado distinto · ' + propios.length + '</div>' +
+      (propios.length ? porColor(propios, function (x) {
+        var k = x.color + '|' + x.cami;
+        return '<div class="gs-rc-rl"><span>' + esc(x.cami) + '</span><small>' + (x.fuera ? 'no salía en la lista' : 'debería ' + Math.max(x.antes, 0) + ' → ' + x.n) + '</small>' +
+          '<b class="' + (x.d < 0 ? 'gs-neg' : 'gs-pos') + '">' + signo(x.fuera ? x.d : x.n - Math.max(x.antes, 0)) + '</b>' +
+          // Una falta puede decir por qué falta: va al Excel (TIPO, o al final del MOTIVO mientras no exista la columna, T0247).
+          (!x.fuera && x.n < Math.max(x.antes, 0) ? '<label class="gs-rc-tipo">¿Por qué faltan?<select class="gs-sel" data-gs-rctipo="' + esc(k) + '">' + TIPOS_FALTA.map(function (t) {
+            return '<option value="' + t[0] + '"' + ((b.tipos[k] || 'Recuento') === t[0] ? ' selected' : '') + '>' + esc(t[1]) + '</option>';
+          }).join('') + '</select></label>' : '') + '</div>';
+      }) : '<p class="gs-nota">Nada: todo lo que has contado cuadra con lo que debería haber.</p>') +
+      (autos.length ? '<div class="gs-sec">Negativos que se corrigen a 0 · ' + autos.length + '</div>' +
+        '<p class="gs-nota" style="margin-top:0">El Excel daba menos de 0 y no las has cambiado: se dejan en 0.</p>' +
+        porColor(autos, function (x) { return '<div class="gs-rc-rl"><span>' + esc(x.cami) + '</span><small>el Excel dice ' + cuenta(x.antes) + ' → 0</small><b class="gs-pos">' + signo(x.d) + '</b></div>'; }) : '') +
       '<p class="gs-nota">Se apuntan en DB_AJUSTES_STOCK con el motivo «' + esc(motivo) + '»' + (difs.some(function (x) { return x.fuera; }) ? ' (las que no salían, con «(no estaba en el cuadro)»)' : '') + '.</p>' +
       '<p class="gs-error" id="gs-rcerr" hidden></p>' +
-      '<div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-gs-cerrar>Seguir contando</button><button type="button" class="gs-b1" id="gs-rcok"' + (faltan.length ? ' disabled' : '') + '>' +
-        (faltan.length ? 'Te ' + (faltan.length === 1 ? 'falta 1 color' : 'faltan ' + faltan.length + ' colores') + ' por revisar' : 'Aplicar ' + difs.length + (difs.length === 1 ? ' ajuste' : ' ajustes')) + '</button></div>');
+      '<div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-gs-cerrar>Seguir contando</button><button type="button" class="gs-b1" id="gs-rcok"' + (faltan.length ? ' disabled' : '') + '>' + boton + '</button></div>');
+    [].forEach.call(v.el.querySelectorAll('[data-gs-rctipo]'), function (sel) {
+      sel.onchange = function () { var k = sel.getAttribute('data-gs-rctipo'); if (sel.value === 'Recuento') delete b.tipos[k]; else b.tipos[k] = sel.value; recGuardar(m, b); };
+    });
     var ok = v.el.querySelector('#gs-rcok');
     if (faltan.length) return;
     ok.onclick = function () {
       var base = {}, contado = [];
-      cols.forEach(function (c) { c.lineas.forEach(function (l) { base[l.k] = l.n; var n = recVal(b, l); if (n !== l.n) contado.push({ color: c.color, cami: l.cami, n: n }); }); });
+      cols.forEach(function (c) { c.lineas.forEach(function (l) { base[l.k] = l.n; var n = recVal(b, l); if (n !== l.n) contado.push({ color: c.color, cami: l.cami, n: n, tipo: b.tipos[l.k] || 'Recuento' }); }); });
       var err = v.el.querySelector('#gs-rcerr'); err.hidden = true;
       ok.disabled = true; ok.textContent = 'Aplicando…';
       var lento = setTimeout(function () { ok.textContent = 'Leyendo el Excel…'; }, 8000);
