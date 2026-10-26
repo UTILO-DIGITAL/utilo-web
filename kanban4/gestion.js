@@ -182,15 +182,15 @@
       '.gs-aviso{left:calc(50% + var(--medio-menu, 0px))}' +
       '@media(min-width:900px){.gs-cab{padding-left:var(--e5);padding-right:var(--e5)}.gs-tabs{margin:0 calc(-1 * var(--e5));padding:0 var(--e3)}' +
       '.gs-main{max-width:none;margin:0;padding:var(--e5) var(--e5) var(--e7)}.gs-main>.gs-fila{max-width:760px}' +
-      // T0233: en Resumen, filtros compactos; los KPIs junto a Alertas, y los días en columnas con sus ligas una debajo de otra.
-      '.gs-main>.gs-filtros{display:flex;flex-wrap:wrap;gap:var(--e2)}.gs-main>.gs-filtros .gs-sel{flex:0 1 280px;min-width:200px}.gs-main>.gs-filtros #gs-temp{flex:0 0 112px;min-width:0}' +
+      // T0233: en Resumen, los KPIs junto a Alertas, y los días en columnas con sus ligas una debajo de otra (los filtros, como en Equipos: T0238).
       '.gs-res-top{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:var(--e3);align-items:start;margin-top:var(--e3)}' +
       '.gs-res-top>.gs-mini{margin-top:0!important;grid-template-columns:repeat(2,1fr)!important}.gs-res-top>.gs-alts{margin-top:0}' +
       '.gs-semana{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0 var(--e4);align-items:start}' +
       '.gs-semana .gs-ligas{display:block;margin-top:0}.gs-semana .gs-ligas>.gs-liga{margin-top:var(--e3)}' +
       '.gs-tabla{margin-top:var(--e3)}.gs-tabla .gs-tags{margin-top:0}.gs-tabla .gs-color{margin-right:var(--e2)}' +
       // T0232: en Equipos y Jugadoras, los desplegables y el buscador en una fila que ocupa todo el ancho; los botones de filtro, debajo.
-      '.gs-filtrar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--e2)}.gs-filtrar>.gs-filtros,.gs-filtrar>.gs-fila{display:contents}' +
+      '.gs-filtrar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--e2)}.gs-filtrar>.gs-filtros,.gs-filtrar>.gs-fila,.gs-filtrar>.gs-mas,.gs-mas>.gs-filtros,.gs-mas>.gs-fila{display:contents}' +
+      '.gs-fbtn,.gs-puestos{display:none!important}' +
       '.gs-filtrar .gs-sel{flex:1 1 200px;min-width:200px;max-width:280px}.gs-filtrar #gs-temp{flex:0 0 112px;min-width:0}' +
       '.gs-filtrar input[type=search]{order:1;flex:2 1 260px;min-width:260px;max-width:none}.gs-filtrar>.gs-chips{order:2;flex:1 1 100%;margin-top:var(--e1)!important}}';
   }
@@ -229,9 +229,12 @@
       '.gs-eqr b{display:flex;align-items:center;min-width:0}.gs-eqr b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
       '.gs-eqr small{grid-column:2/4;color:var(--gs-g);font-size:13px}' +
       '.gs-eqr .gs-pag{font-size:13px;font-weight:700;white-space:nowrap}' +
-      '.gs-liga summary{list-style:none;cursor:pointer;position:relative;padding-right:28px}.gs-liga summary::-webkit-details-marker{display:none}' +
-      '.gs-liga summary:after{content:"\\25BE";position:absolute;right:0;top:0;font-size:20px;color:var(--gs-g);transition:transform .15s}.gs-liga[open] summary:after{transform:rotate(180deg)}' +
-      '.gs-liga[open] summary{margin-bottom:var(--e2)}' +
+      // T0238: la cabecera de cada liga va en el color de bloque, para que se distinga del fondo (en Konamigas fondo y tarjetas son blancos).
+      '.gs-liga{padding:0;overflow:hidden;border-color:var(--color-borde-campo)}.gs-liga[open]{padding-bottom:var(--e1)}' +
+      '.gs-liga summary{list-style:none;cursor:pointer;position:relative;padding:var(--e3) calc(var(--e4) + 28px) var(--e3) var(--e4);background:var(--gs-f)}.gs-liga summary::-webkit-details-marker{display:none}' +
+      '.gs-liga summary:after{content:"\\25BE";position:absolute;right:var(--e4);top:var(--e3);font-size:20px;color:var(--color-principal-oscuro);transition:transform .15s}.gs-liga[open] summary:after{transform:rotate(180deg)}' +
+      '.gs-liga[open] summary{border-bottom:1px solid var(--color-borde-campo)}.gs-liga>.gs-eqr{width:calc(100% - 2 * var(--e4));margin:0 var(--e4)}.gs-liga summary+.gs-eqr{border-top:0}' +
+      '.gs-liga .gs-wa{background:var(--color-superficie)}' +
       '.gs-liga-n{font:var(--peso-titulos) 20px/1.2 var(--fuente-titulos);color:var(--color-principal-oscuro)}' +
       '.gs-liga-n small{display:block;font:700 12px/1.3 var(--fuente-texto);letter-spacing:.04em;text-transform:uppercase;color:var(--gs-g);margin-bottom:2px}' +
       '.gs-liga-g{display:flex;align-items:center;gap:var(--e2);flex-wrap:wrap;margin-top:var(--e2);font-size:14px}' +
@@ -256,7 +259,21 @@
       '.gs-cam-n .gs-tags{margin-top:var(--e1)}' +
       '.gs-cam-j .gs-b2{flex:none;min-height:44px;padding:0 var(--e3);font-size:14px}' +
       '.gs-cam-mas{margin-top:var(--e2)}' +
-      '@media(max-width:899px){#gs-camf{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-left:calc(-1 * var(--e4));margin-right:calc(-1 * var(--e4));padding:0 var(--e4)}#gs-camf::-webkit-scrollbar{display:none}#gs-camf .gs-chip{flex:none}}' +
+      // T0238: en el móvil, arriba solo el buscador y «Filtros» (como en el tablero, T0231); temporada, competición, liga y equipo, plegados.
+      // Los filtros puestos salen debajo, con ✕ para quitarlos. Los botones de estado y los días, en una fila que se desliza de lado.
+      '.gs-fbtn{display:inline-flex;align-items:center;gap:var(--e2);flex:none}.gs-fbtn[aria-expanded=true]{background:var(--gs-f)}' +
+      '.gs-fbtn::after{content:"";width:8px;height:8px;margin-top:-4px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);transition:transform .15s}' +
+      '.gs-fbtn[aria-expanded=true]::after{margin-top:4px;transform:rotate(-135deg)}' +
+      '.gs-fn{min-width:22px;padding:0 6px;border-radius:var(--radio-peq);background:var(--color-texto);color:var(--color-fondo);font:700 12px/1.7 var(--fuente-texto);text-align:center}' +
+      '.gs-puestos{display:flex;flex-wrap:wrap;gap:var(--e1)}' +
+      '.gs-puesto{display:inline-flex;align-items:center;gap:var(--e2);min-height:32px;max-width:100%;padding:0 var(--e2) 0 var(--e3);border:1px solid var(--gs-l);border-radius:var(--radio);background:var(--gs-f);color:inherit;font:600 13px/1.2 var(--fuente-texto);cursor:pointer}' +
+      '.gs-puesto span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gs-puesto i{font-style:normal;color:var(--gs-g);font-size:15px}' +
+      '@media(max-width:899px){.gs-filtrar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--e2)}' +
+      '.gs-filtrar>.gs-busca{order:1;flex:1 1 0;min-width:0;margin-top:0!important}.gs-busca input{width:100%;min-width:0}.gs-filtrar>.gs-fbtn{order:2}' +
+      '.gs-filtrar>.gs-puestos{order:3;flex:1 1 100%}.gs-filtrar>.gs-mas{order:4;flex:1 1 100%}.gs-mas.gs-cerr{display:none}.gs-mas>.gs-fila{margin-top:var(--e2)!important}' +
+      '.gs-filtrar>.gs-chips{order:5;flex:1 1 100%;margin-top:var(--e1)!important}' +
+      '.gs-filtrar>.gs-chips,.gs-dias{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-left:calc(-1 * var(--e4));margin-right:calc(-1 * var(--e4));padding:0 var(--e4)}' +
+      '.gs-filtrar>.gs-chips::-webkit-scrollbar,.gs-dias::-webkit-scrollbar{display:none}.gs-chips .gs-chip,.gs-dias .gs-chip{flex:none;white-space:nowrap}}' +
       '.gs-marcas{display:grid;grid-template-columns:1fr 1fr;gap:var(--e2);margin-top:var(--e2)}.gs-marcas .gs-b2[aria-pressed=true]{background:var(--gs-c);border-color:var(--gs-c);color:var(--color-sobre-principal)}' +
       '@media(min-width:900px){.gs-cam-eqs{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:var(--e3);align-items:start}.gs-cam-eqs>.gs-card{margin-top:var(--e3)}}' +
       '.gs-visor img{display:block;max-width:100%;max-height:70vh;margin:0 auto;border-radius:var(--radio);background:var(--gs-f)}';
@@ -498,6 +515,39 @@
     $('#gs-fcomp').onchange = function () { S.fComp = this.value; S.fLiga = ''; S.jug.equipo = ''; repinta(); };
     $('#gs-fliga').onchange = function () { S.fLiga = this.value; S.jug.equipo = ''; repinta(); };
   }
+  /** T0238: en el móvil, «Filtros» pliega temporada, competición, liga (y lo que traiga extra); los puestos salen con ✕. */
+  function ultimaTemp(o) { return o.competiciones.map(function (c) { return c.temp; }).sort().pop() || S.temp; }
+  function puestos(o) {
+    var p = [];
+    if (S.temp !== ultimaTemp(o)) p.push(['temp', 'Temporada ' + S.temp]);
+    if (S.fComp) { var c = o.competiciones.filter(function (x) { return x.hash === S.fComp; })[0]; p.push(['comp', c ? c.nombre.trim() : compCorta(S.fComp)]); }
+    if (S.fLiga) p.push(['liga', S.fLiga === 'SIN' ? 'Sin liga' : ligaCorta(S.fLiga)]);
+    if (S.tab === 'jugadoras' && S.jug.equipo) p.push(['equipo', S.jug.equipo]);
+    return p;
+  }
+  function filtrosPlegables(o, extra) {
+    var p = puestos(o);
+    return '<button type="button" class="gs-chip gs-fbtn" id="gs-fbtn" aria-expanded="' + !!S.filAb + '" aria-controls="gs-mas">Filtros' +
+      (p.length ? '<span class="gs-fn">' + p.length + '</span>' : '') + '</button>' +
+      (p.length && !S.filAb ? '<div class="gs-puestos">' + p.map(function (x) {
+        return '<button type="button" class="gs-puesto" data-gs-quitar="' + x[0] + '" aria-label="Quitar ' + esc(x[1]) + '"><span>' + esc(x[1]) + '</span><i aria-hidden="true">✕</i></button>';
+      }).join('') + '</div>' : '') +
+      '<div class="gs-mas' + (S.filAb ? '' : ' gs-cerr') + '" id="gs-mas">' + htmlFiltros(o) + (extra || '') + '</div>';
+  }
+  function engancharPlegables(main, o, repinta) {
+    var b = $('#gs-fbtn'); if (b) b.onclick = function () { S.filAb = !S.filAb; repinta(); };
+    [].forEach.call(main.querySelectorAll('[data-gs-quitar]'), function (x) {
+      x.onclick = function () {
+        var k = x.getAttribute('data-gs-quitar');
+        if (k === 'temp') { S.temp = ultimaTemp(o); S.fComp = ''; S.fLiga = ''; S.jug.equipo = ''; pintar(); return; }
+        if (k === 'comp') S.fComp = '';
+        if (k === 'comp' || k === 'liga') S.fLiga = '';
+        S.jug.equipo = '';
+        repinta();
+      };
+    });
+  }
+  function buscaPh(largo) { return ancho() ? largo : 'Buscar…'; }
   function enFiltro(x) {
     return (!S.fComp || x.comp === S.fComp) && (!S.fLiga || (S.fLiga === 'SIN' ? !x.liga : x.liga === S.fLiga));
   }
@@ -536,7 +586,7 @@
       if (S.dia && !dias[S.dia]) S.dia = '';
       S.abiertas = S.abiertas || {};
       var nAl = porPagar.length + avisos.length + sinLiga.length;
-      var h = htmlFiltros(o) + '<div class="gs-res-top">' + // T0233
+      var h = '<div class="gs-filtrar">' + filtrosPlegables(o) + '</div>' + '<div class="gs-res-top">' + // T0233 · T0238
         '<div class="gs-mini" style="margin-top:12px;grid-template-columns:repeat(4,1fr)">' +
         '<button type="button" data-gs-kpi="equipos"><b>' + eqs.length + '</b><small>Equipos</small></button>' +
         '<button type="button" data-gs-kpi="jugadoras"><b>' + nJug + '</b><small>Jugadoras</small></button>' +
@@ -575,6 +625,7 @@
       if (!ordenDias.length) h += '<div class="gs-vacio">No hay equipos con estos filtros.</div>';
       main.innerHTML = h;
       engancharFiltros(main, function () { pResumen(main); });
+      engancharPlegables(main, o, function () { pResumen(main); });
       [].forEach.call(main.querySelectorAll('[data-gs-dia]'), function (b) { b.onclick = function () { S.dia = b.getAttribute('data-gs-dia'); pResumen(main); }; });
       [].forEach.call(main.querySelectorAll('[data-gs-i]'), function (b) { b.onclick = function () { fichaEquipo(r.lista[Number(b.getAttribute('data-gs-i'))], o, r); }; });
       [].forEach.call(main.querySelectorAll('details.gs-liga'), function (x) {
@@ -648,10 +699,10 @@
   function pEquipos(main, forzar) {
     return cuando(main, 'eq', forzar, 'Cargando los equipos…', function (o, r) {
       var f = S.eq, base = r.lista.filter(enFiltro), cuenta = function (k) { return base.filter(FILTROS_EQ[k]).length; };
-      main.innerHTML = '<div class="gs-filtrar">' + htmlFiltros(o) + // T0232
+      main.innerHTML = '<div class="gs-filtrar">' + filtrosPlegables(o) + // T0232 · T0238
         chips([['todos', 'Inscritos', cuenta('todos')], ['sinliga', 'Sin liga', cuenta('sinliga')], ['pagar', 'Por pagar', cuenta('pagar')],
           ['avisos', 'Avisos', cuenta('avisos')], ['buscan', 'Buscan equipo', cuenta('buscan')], ['error', 'Con ERROR', cuenta('error')]], f.filtro, 'gs-eqf') +
-        '<div class="gs-fila" style="margin-top:10px"><input type="search" class="gs-sel" id="gs-eqq" placeholder="Buscar: equipo, capitana, correo, liga…" value="' + esc(f.q) + '" aria-label="Buscar"></div></div>' +
+        '<div class="gs-fila gs-busca" style="margin-top:10px"><input type="search" class="gs-sel" id="gs-eqq" placeholder="' + buscaPh('Buscar: equipo, capitana, correo, liga…') + '" value="' + esc(f.q) + '" aria-label="Buscar"></div></div>' +
         '<div id="gs-eqlista"></div>';
       var pinta = function () {
         var q = norm2(f.q);
@@ -676,6 +727,7 @@
       };
       pinta();
       engancharFiltros(main, function () { pEquipos(main); });
+      engancharPlegables(main, o, function () { pEquipos(main); });
       $('#gs-eqf').onclick = function (ev) { var b = ev.target.closest('[data-gs-f]'); if (!b) return; f.filtro = b.getAttribute('data-gs-f'); f.q = ''; pEquipos(main); };
       var t0; $('#gs-eqq').oninput = function () { var v = this.value; clearTimeout(t0); t0 = setTimeout(function () { f.q = v; pinta(); }, 150); };
     });
@@ -818,12 +870,12 @@
       if (f.equipo && equipos.indexOf(f.equipo) < 0) equipos.unshift(f.equipo);
       var base = enF.filter(function (j) { return !f.equipo || j.equipo === f.equipo; });
       var cuenta = function (k) { return base.filter(FILTROS_JUG[k]).length; };
-      main.innerHTML = '<div class="gs-filtrar">' + htmlFiltros(o) + // T0232
+      main.innerHTML = '<div class="gs-filtrar">' + filtrosPlegables(o, // T0232 · T0238
         '<div class="gs-fila" style="margin-top:8px"><select class="gs-sel" id="gs-jeq" aria-label="Equipo"><option value="">Todos los equipos (' + equipos.length + ')</option>' +
-        equipos.map(function (x) { return '<option' + (x === f.equipo ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select></div>' +
+        equipos.map(function (x) { return '<option' + (x === f.equipo ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select></div>') +
         chips([['todas', 'Inscritas', cuenta('todas')], ['alerta', 'Con alerta', cuenta('alerta')], ['xporty', 'Sin Xporty', cuenta('xporty')],
           ['contactos', 'Sin contacto', cuenta('contactos')], ['personal', 'Cami personalizada', cuenta('personal')], ['error', 'Con ERROR', cuenta('error')]], f.filtro, 'gs-jf') +
-        '<div class="gs-fila" style="margin-top:10px"><input type="search" class="gs-sel" id="gs-jq" placeholder="Buscar: nombre, correo, DNI, teléfono, dorsal…" value="' + esc(f.q) + '" aria-label="Buscar"></div></div>' +
+        '<div class="gs-fila gs-busca" style="margin-top:10px"><input type="search" class="gs-sel" id="gs-jq" placeholder="' + buscaPh('Buscar: nombre, correo, DNI, teléfono, dorsal…') + '" value="' + esc(f.q) + '" aria-label="Buscar"></div></div>' +
         '<div id="gs-jlista"></div>';
       var pinta = function () {
         var q = norm2(f.q);
@@ -843,6 +895,7 @@
       };
       pinta();
       engancharFiltros(main, function () { pJugadoras(main); });
+      engancharPlegables(main, o, function () { pJugadoras(main); });
       $('#gs-jeq').onchange = function () { f.equipo = this.value; pJugadoras(main); };
       $('#gs-jf').onclick = function (ev) { var b = ev.target.closest('[data-gs-f]'); if (!b) return; f.filtro = b.getAttribute('data-gs-f'); f.q = ''; pJugadoras(main); };
       var t0; $('#gs-jq').oninput = function () { var v = this.value; clearTimeout(t0); t0 = setTimeout(function () { f.q = v; pinta(); }, 150); };
@@ -979,9 +1032,9 @@
       var f = S.cam, base = r.lista.filter(function (j) { return conCami(j) && enFiltro(j); });
       var es = function (k) { return function (j) { return k === 'todas' || (k === 'pendientes' ? j.estadoCami !== 'Entregada' : j.estadoCami === k); }; };
       var cuenta = function (k) { return base.filter(es(k)).length; };
-      main.innerHTML = '<div class="gs-filtrar">' + htmlFiltros(o) +
+      main.innerHTML = '<div class="gs-filtrar">' + filtrosPlegables(o) + // T0238
         chips([['pendientes', 'Por entregar', cuenta('pendientes')]].concat(ESTADOS_CAM.map(function (e) { return [e[0], e[1], cuenta(e[0])]; })).concat([['todas', 'Todas', base.length]]), f.filtro, 'gs-camf') +
-        '<div class="gs-fila" style="margin-top:10px"><input type="search" class="gs-sel" id="gs-camq" placeholder="Buscar: equipo, jugadora, dorsal…" value="' + esc(f.q) + '" aria-label="Buscar"></div></div>' +
+        '<div class="gs-fila gs-busca" style="margin-top:10px"><input type="search" class="gs-sel" id="gs-camq" placeholder="' + buscaPh('Buscar: equipo, jugadora, dorsal…') + '" value="' + esc(f.q) + '" aria-label="Buscar"></div></div>' +
         '<p class="gs-nota" style="margin:8px 2px 0">Pedidos y stock, en el Excel CAMISETAS. Lo que marques aquí lo recoge solo.</p>' +
         '<div id="gs-camlista"></div>';
       var pinta = function () {
@@ -1030,6 +1083,7 @@
       };
       pinta();
       engancharFiltros(main, function () { pCamisetas(main); });
+      engancharPlegables(main, o, function () { pCamisetas(main); });
       $('#gs-camf').onclick = function (ev) { var b = ev.target.closest('[data-gs-f]'); if (!b) return; f.filtro = b.getAttribute('data-gs-f'); f.todo = {}; pCamisetas(main); };
       var t0; $('#gs-camq').oninput = function () { var v = this.value; clearTimeout(t0); t0 = setTimeout(function () { f.q = v; pinta(); }, 150); };
     });
