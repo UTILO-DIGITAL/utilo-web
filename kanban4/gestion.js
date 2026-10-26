@@ -261,7 +261,7 @@
       '.gs-cam-n{flex:1 1 auto;min-width:0;background:none;border:0;padding:0;text-align:left;color:inherit;cursor:pointer;min-height:44px;font-size:14px}' +
       '.gs-cam-n b{display:block;font-weight:600}.gs-cam-n small{display:block;font-size:12px;color:var(--gs-g);margin-top:2px}' +
       '.gs-cam-n .gs-tags{margin-top:var(--e1)}' +
-      '.gs-cam-j .gs-b2{flex:none;min-height:44px;padding:0 var(--e3);font-size:14px}' +
+      '.gs-cam-j .gs-b2{flex:none;max-width:45%;min-height:44px;padding:0 var(--e3);font-size:14px}' +
       '.gs-cam-mas{margin-top:var(--e2)}' +
       // T0238: en el móvil, arriba solo el buscador y «Filtros» (como en el tablero, T0231); temporada, competición, liga y equipo, plegados.
       // Los filtros puestos salen debajo, con ✕ para quitarlos. Los botones de estado y los días, en una fila que se desliza de lado.
@@ -1053,8 +1053,9 @@
   /** Botón que marca: se desactiva mientras guarda y avisa si GESTION está recalculando. */
   function conEspera(b, fn) {
     var antes = b.textContent; b.disabled = true; b.textContent = 'Guardando…';
-    var lento = setTimeout(function () { b.textContent = 'Guardando… (el Excel está recalculando)'; }, 8000);
-    return fn().then(function (r) { clearTimeout(lento); return r; }, function (e) { clearTimeout(lento); b.disabled = false; b.textContent = antes; throw e; });
+    // T0237: texto corto; el largo no cabía en el botón y aplastaba el nombre de la jugadora en el móvil.
+    var lento = setTimeout(function () { b.textContent = 'Recalculando…'; b.title = 'El Excel está recalculando: puede tardar un minuto'; }, 8000);
+    return fn().then(function (r) { clearTimeout(lento); return r; }, function (e) { clearTimeout(lento); b.disabled = false; b.textContent = antes; b.title = ''; throw e; });
   }
 
   /** Ventana de una camiseta: sus datos y las cuatro marcas (la puesta, apretada) o quitarla. */
