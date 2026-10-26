@@ -14,7 +14,7 @@
   var CLAVE = 'kanban_' + (C.clave || 'negocio');
   // T0133: carpeta de este archivo (…/kanban/), para cargar los módulos de las secciones (economia.js…).
   var BASE = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/[^/]*$/, '') : '../kanban/'; })();
-  var VERSION_MODULOS = '44'; // T0207 · T0208 · T0149 · T0213 · T0218 · T0224 · T0225 · T0230 · T0231 · T0232 · T0233 · T0228 · T0234 · T0235 · T0238 · T0237 · T0240 (también el ?v= de las hojas del tablero)
+  var VERSION_MODULOS = '45'; // T0207 · T0208 · T0149 · T0213 · T0218 · T0224 · T0225 · T0230 · T0231 · T0232 · T0233 · T0228 · T0234 · T0235 · T0238 · T0237 · T0240 · T0241 (también el ?v= de las hojas del tablero)
   var VERSION_ICONO = '2'; // T0222: el ?v= de los iconos del index.html de cada negocio (sube con ellos)
   // T0150: diseño de PROTOCOLO DISEÑO UTILO. Solo para los negocios que tienen su marca.css (index.html con marca: '…').
   // Los demás (Konamigas hasta T0149) siguen exactamente como antes.
