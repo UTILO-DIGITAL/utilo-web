@@ -504,3 +504,39 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
 .fv-dentro .u .barra { padding: var(--e3) var(--e4); box-shadow: 0 1px 0 color-mix(in srgb, var(--color-texto) 12%, transparent); }
 .fv-dentro .u .barra + .cab { padding-top: var(--e2); }
 .fv-dentro .u .volver { width: auto; min-height: 40px; }
+
+/* ===================== Actualizar solo (T0228) ===================== */
+/* Lo que cambia en el tablero o en la ficha sin pulsar nada se marca un momento: borde del color principal y fondo con un
+   poco del destacado (en Konamigas el lima solo va sobre el azul, así que no se usa para el borde) */
+@keyframes kc-cambio {
+  0%, 35% { box-shadow: 0 0 0 3px var(--color-principal); background-color: color-mix(in srgb, var(--color-destacado) 28%, var(--color-superficie)); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes kc-cambio-fijo { 0%, 99% { box-shadow: 0 0 0 3px var(--color-principal); } }
+.u .kc-cambio { animation: kc-cambio 2.6s ease-out; border-radius: var(--radio); }
+@media (prefers-reduced-motion: reduce) { .u .kc-cambio { animation: kc-cambio-fijo 2.6s steps(1, end); } }
+/* ↻ de la ficha, junto a «Actualizado» */
+.u .fmeta .recarga { width: 40px; min-height: 40px; }
+@media (max-width: 600px) { .u .fmeta .hora { flex: 1 1 auto; } }
+/* «Esta tarea ha cambiado mientras la editabas»: arriba del todo y a la vista mientras se baja por el formulario */
+.u .f-cambio { position: sticky; top: 0; z-index: 31; margin: var(--e3) var(--e4); padding: var(--e3) var(--e4); border-radius: var(--radio);
+  background: var(--color-bloque); color: var(--color-texto); border-left: 6px solid var(--color-accion); box-shadow: var(--sombra-flota);
+  font: 15px/1.45 var(--fuente-texto); }
+.u .f-cambio.hecho { border-left-color: var(--estado-co); }
+.u .f-cambio-t { margin: 0 0 var(--e2); font-weight: 700; }
+.u .f-cambio-ver { margin: 0 0 var(--e2); }
+.u .f-cambio-ver summary { cursor: pointer; font-weight: 700; color: var(--color-principal-oscuro); min-height: 32px; display: flex; align-items: center; }
+.u .f-cambio-ver ul { margin: var(--e1) 0 0; padding-left: var(--e5); }
+.u .f-cambio-ver li { margin: var(--e1) 0; overflow-wrap: anywhere; }
+.u .f-cambio-tuyo { display: block; color: var(--color-error); font-weight: 700; }
+.u .f-cambio-bot { display: flex; flex-wrap: wrap; gap: var(--e2); justify-content: flex-end; }
+.u .f-cambio-bot .accion { font-size: 16px; min-height: 44px; border-radius: var(--radio); padding: 0 var(--e4); }
+@media (max-width: 600px) { .u .f-cambio-bot button { flex: 1 1 100%; } }
+/* Campo traído de otro que también había cambiado quien edita: se queda lo suyo y se marca para revisarlo */
+.u .campo.f-choque { outline: 2px solid var(--color-accion); outline-offset: 4px; border-radius: var(--radio-peq); }
+/* Deslizar hacia abajo para actualizar la ficha (móvil) */
+.f-tirar { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 8px); z-index: 80; width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center; border-radius: 50%; pointer-events: none;
+  background: var(--color-superficie); color: var(--color-principal-oscuro); box-shadow: var(--sombra-flota); }
+.f-tirar svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.f-tirar.listo { color: var(--color-accion); }
