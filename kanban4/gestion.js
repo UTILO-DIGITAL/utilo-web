@@ -119,6 +119,11 @@
       '.gs-lista{list-style:none;margin:0;padding:0}.gs-item{display:flex;justify-content:space-between;gap:var(--e3);padding:var(--e3) 0;border-top:1px solid var(--gs-l);align-items:center}' +
       '.gs-item:first-child{border-top:0}.gs-item .gs-t{font-weight:700;font-size:15px}.gs-item .gs-s{font-size:13px;color:var(--gs-g);margin-top:2px}' +
       '.gs-item .gs-d{text-align:right;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}' +
+      // T0235: una inscripción con ERROR no cuenta: fondo rojizo y raya roja, en la lista y en la tabla.
+      '.gs-item.gs-err{background:color-mix(in srgb,var(--gs-r) 13%,var(--color-superficie));border-left:4px solid var(--gs-r);padding-left:var(--e3);padding-right:var(--e3);border-radius:var(--radio)}' +
+      '.gs-tabla tr.gs-err td{background:color-mix(in srgb,var(--gs-r) 13%,var(--color-superficie))}.gs-tabla tr.gs-err td:first-child{box-shadow:inset 4px 0 0 var(--gs-r)}' +
+      '.gs-tabla tr.gs-err:hover td{background:color-mix(in srgb,var(--gs-r) 19%,var(--color-superficie))}' +
+      '.gs-tag.gs-tag-err{background:var(--gs-r);border:1px solid var(--gs-r);color:var(--color-superficie)}' +
       '.gs-alta{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--gs-g)}.gs-s .gs-alta{opacity:.75;font-size:.92em}' +
       'button.gs-item{width:100%;background:none;border:0;border-top:1px solid var(--gs-l);color:inherit;text-align:left;cursor:pointer}' +
       '.gs-borrado .gs-t,.gs-borrado .gs-d{text-decoration:line-through;opacity:.6}' +
@@ -659,7 +664,7 @@
           (lista.length && ancho() ? tablaEquipos(lista, r) : // T0225
           '<div class="gs-card"><div class="gs-lista">' + (lista.length ? lista.map(function (e) {
             var t = tagsEquipo(e);
-            return '<button type="button" class="gs-item" data-gs-i="' + r.lista.indexOf(e) + '"><div style="min-width:0">' +
+            return '<button type="button" class="gs-item' + (e.error ? ' gs-err' : '') + '" data-gs-i="' + r.lista.indexOf(e) + '"><div style="min-width:0">' +
               '<div class="gs-t">' + punto(e.color) + esc(e.equipo || '(sin nombre)') + '</div>' +
               '<div class="gs-s">' + esc([S.fComp ? '' : compCorta(e.comp), e.liga ? ligaCorta(e.liga) : (e.dispo ? 'Quiere: ' + e.dispo : ''), e.capi, e.jugadoras ? e.jugadoras + ' jugadoras' : ''].filter(String).join(' · ')) +
                 (q ? ' <span class="gs-alta">· ' + alta(e) + '</span>' : '') + '</div>' +
@@ -678,7 +683,7 @@
 
   function tagsEquipo(e) {
     var t = [];
-    if (e.error) t.push(tag('ERROR', 'gs-tag-r'));
+    if (e.error) t.push(tag('ERROR · no cuenta', 'gs-tag-err'));
     if (e.buscan && !e.error) t.push(tag('Busca equipo', 'gs-tag-g'));
     if (!e.error && !e.buscan && !e.liga) t.push(tag('Sin liga'));
     if (!e.error && !e.buscan && !e.ps) t.push(tag('Sin paga y señal', 'gs-tag-a'));
@@ -693,7 +698,7 @@
     return '<table class="u-tabla gs-tabla"><thead><tr>' + '<th>Inscripción</th><th>Equipo</th>' + (S.fComp ? '' : '<th>Competición</th>') +
       '<th>Liga</th><th>Capitana</th><th class="num">Jugadoras</th><th class="num">Nivel</th><th>Avisos</th></tr></thead><tbody>' +
       lista.map(function (e) {
-        return '<tr tabindex="0" data-gs-i="' + r.lista.indexOf(e) + '">' + '<td class="gs-alta">' + alta(e) + '</td><td class="u-tabla-t">' + punto(e.color) + esc(e.equipo || '(sin nombre)') + '</td>' +
+        return '<tr tabindex="0"' + (e.error ? ' class="gs-err"' : '') + ' data-gs-i="' + r.lista.indexOf(e) + '">' + '<td class="gs-alta">' + alta(e) + '</td><td class="u-tabla-t">' + punto(e.color) + esc(e.equipo || '(sin nombre)') + '</td>' +
           (S.fComp ? '' : '<td>' + esc(compCorta(e.comp)) + '</td>') +
           '<td>' + (e.liga ? esc(ligaCorta(e.liga)) : e.dispo ? '<span class="gs-opc">Quiere: ' + esc(e.dispo) + '</span>' : '') + '</td>' +
           '<td>' + esc(e.capi) + '</td><td class="num">' + (e.jugadoras || '') + '</td><td class="num">' + esc(e.nivel || '') + '</td>' +
@@ -778,7 +783,7 @@
 
   function tagsJugadora(j) {
     var t = [];
-    if (j.error) t.push(tag('ERROR', 'gs-tag-r'));
+    if (j.error) t.push(tag('ERROR · no cuenta', 'gs-tag-err'));
     if (j.porDni) t.push(tag('Mismo DNI, otro correo', 'gs-tag-a'));
     if (j.alerta) t.push(tag(j.alerta.split('·')[0].trim().slice(0, 60), 'gs-tag-a'));
     if (!j.error && !j.xporty) t.push(tag('Sin Xporty', 'gs-tag-g'));
@@ -790,7 +795,7 @@
     return '<table class="u-tabla gs-tabla"><thead><tr>' + '<th>Inscripción</th><th>Jugadora</th>' + (conEquipo ? '<th>Equipo</th>' : '') +
       '<th>Camiseta</th><th class="num">Edad</th><th>Avisos</th></tr></thead><tbody>' +
       lista.map(function (j) {
-        return '<tr tabindex="0" data-gs-j="' + r.lista.indexOf(j) + '">' + '<td class="gs-alta">' + alta(j) + '</td><td class="u-tabla-t">' + esc(j.nombreCompleto || j.mail) + '</td>' +
+        return '<tr tabindex="0"' + (j.error ? ' class="gs-err"' : '') + ' data-gs-j="' + r.lista.indexOf(j) + '">' + '<td class="gs-alta">' + alta(j) + '</td><td class="u-tabla-t">' + esc(j.nombreCompleto || j.mail) + '</td>' +
           (conEquipo ? '<td>' + punto(j.color) + esc(j.equipo) + (S.fComp ? '' : ' <span class="gs-opc">· ' + esc(compCorta(j.comp)) + '</span>') + '</td>' : '') +
           '<td>' + esc(j.cami || (j.dorsal ? 'Dorsal ' + j.dorsal : '')) + '</td><td class="num">' + esc(edad1(j.edad, true)) + '</td>' +
           '<td><div class="gs-tags">' + tagsJugadora(j).join('') + '</div></td></tr>';
@@ -798,7 +803,7 @@
   }
   function itemJugadora(j, i, conEquipo, conAlta) {
     var t = tagsJugadora(j);
-    return '<button type="button" class="gs-item" data-gs-j="' + i + '"><div style="min-width:0">' +
+    return '<button type="button" class="gs-item' + (j.error ? ' gs-err' : '') + '" data-gs-j="' + i + '"><div style="min-width:0">' +
       '<div class="gs-t">' + esc(j.nombreCompleto || j.mail) + '</div>' +
       '<div class="gs-s">' + esc([conEquipo ? compCorta(j.comp) + ' · ' + j.equipo : '', j.cami ? 'Camiseta ' + j.cami : (j.dorsal ? 'Dorsal ' + j.dorsal : ''), edad1(j.edad, true) ? edad1(j.edad, true) + ' años' : ''].filter(String).join(' · ')) +
       (j.color ? ' ' + punto(j.color) : '') + (conAlta ? ' <span class="gs-alta">· ' + alta(j) + '</span>' : '') + '</div>' +
@@ -1043,9 +1048,9 @@
           }).join('') + '</div>' : '<p class="gs-nota">Ninguna.</p>') +
           '<div class="gs-sec">Inscripciones de equipo como capitana (' + r.equipos.length + ')</div>' +
           (r.equipos.length ? '<div class="gs-lista">' + r.equipos.map(function (e, i) {
-            return '<button type="button" class="gs-item" data-gs-ce="' + i + '"><div style="min-width:0"><div class="gs-t">' + punto(e.color) + esc(e.equipo || '(sin nombre)') + '</div>' +
+            return '<button type="button" class="gs-item' + (e.error ? ' gs-err' : '') + '" data-gs-ce="' + i + '"><div style="min-width:0"><div class="gs-t">' + punto(e.color) + esc(e.equipo || '(sin nombre)') + '</div>' +
               '<div class="gs-s">' + esc(['Alta ' + e.alta, compCorta(e.comp) || e.comp, e.liga ? ligaCorta(e.liga) : ''].filter(String).join(' · ')) + '</div>' +
-              (e.error ? '<div class="gs-tags">' + tag('ERROR', 'gs-tag-r') + '</div>' : '') + '</div></button>';
+              (e.error ? '<div class="gs-tags">' + tag('ERROR · no cuenta', 'gs-tag-err') + '</div>' : '') + '</div></button>';
           }).join('') + '</div>' : '<p class="gs-nota">Ninguna.</p>');
         v.el.innerHTML = v.el.querySelector('h2').outerHTML + h;
         [].forEach.call(v.el.querySelectorAll('[data-gs-j]'), function (b) { b.onclick = function () { fichaJugadora(r.jugadoras[Number(b.getAttribute('data-gs-j'))], o, { gidJ: r.gidJ }); }; });
