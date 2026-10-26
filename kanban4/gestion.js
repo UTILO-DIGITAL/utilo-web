@@ -48,7 +48,7 @@
    * Los alias --gs-* siguen para los estilos que van en el propio HTML. */
   function css() {
     return '.gs{--gs-c:var(--color-principal);--gs-a:var(--color-accion);--gs-v:var(--color-bien);--gs-r:var(--color-error);' +
-      '--gs-g:var(--color-suave);--gs-l:var(--color-linea);--gs-f:var(--color-bloque);--gs-am:var(--estado-pr);' +
+      '--gs-g:var(--color-suave);--gs-l:var(--color-linea);--gs-f:var(--color-tarjeta-cab,var(--color-bloque));--gs-am:var(--estado-pr);' +
       'font:400 14px/1.45 var(--fuente-texto);color:var(--color-texto)}' +
       '.gs *{box-sizing:border-box}.gs button{font-family:var(--fuente-texto)}' +
       'html.gs-sin-scroll,html.gs-sin-scroll body{overflow:hidden}' +
@@ -70,14 +70,14 @@
       'body.u-con-barra .gs-cab h1,body.u-con-barra .gs-pint{color:var(--color-principal-oscuro)}body.u-con-barra .gs-cab>p{color:var(--color-suave)}' +
       'body.u-con-barra .gs-ver,body.u-con-barra .gs-sol{background:transparent;border:1.5px solid var(--color-principal-oscuro)}' +
       'body.u-con-barra .gs-tabs button{color:var(--color-suave);opacity:1}body.u-con-barra .gs-tabs button[aria-selected=true]{color:var(--color-principal-oscuro);border-bottom-color:var(--color-principal-oscuro)}' +
-      'body.u-con-barra .gs-tabs .gs-n{background:var(--color-bloque)}}' +
+      'body.u-con-barra .gs-tabs .gs-n{background:var(--gs-f)}}' +
       '.gs-main{max-width:760px;margin:0 auto;padding:var(--e4) var(--e4) 120px}' +
       '.gs-fila{display:flex;gap:var(--e2);flex-wrap:wrap;align-items:center}' +
       // Campos: los de base.css (.u input, .u select). Aquí solo el ancho.
       '.gs input[type=date]{-webkit-appearance:none;appearance:none;width:100%}' +
       '.gs textarea{width:100%}' +
       '.gs-sel{flex:1 1 140px}' +
-      '.gs-card{background:var(--color-superficie);border:1px solid var(--gs-l);border-radius:var(--radio);padding:var(--e3) var(--e4);margin-top:var(--e3)}' +
+      '.gs-card{background:var(--color-tarjeta,var(--color-superficie));border:1px solid var(--gs-l);border-radius:var(--radio);padding:var(--e3) var(--e4);margin-top:var(--e3)}' +
       '.gs-av{margin-top:var(--e4)}.gs-av-t{display:flex;justify-content:space-between;gap:var(--e2);font-size:13px;color:var(--gs-g);font-weight:600}' +
       '.gs-barra{height:8px;border-radius:var(--radio-peq);background:var(--gs-l);overflow:hidden;margin-top:var(--e2)}.gs-barra i{display:block;height:100%;background:var(--gs-c)}' +
       '.gs-kpis{display:grid;grid-template-columns:1fr 1fr;gap:var(--e2);margin-top:var(--e4)}' +
@@ -232,7 +232,7 @@
       '.gs-eqr b{display:flex;align-items:center;min-width:0}.gs-eqr b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
       '.gs-eqr small{grid-column:2/4;color:var(--gs-g);font-size:13px}' +
       '.gs-eqr .gs-pag{font-size:13px;font-weight:700;white-space:nowrap}' +
-      // T0238: la cabecera de cada liga va en el color de bloque, para que se distinga del fondo (en Konamigas fondo y tarjetas son blancos).
+      // T0238: la cabecera de cada liga va en el color de bloque (en Konamigas, desde T0237, el azul de --color-tarjeta-cab), para que se distinga del fondo.
       '.gs-liga{padding:0;overflow:hidden;border-color:var(--color-borde-campo)}.gs-liga[open]{padding-bottom:var(--e1)}' +
       '.gs-liga summary{list-style:none;cursor:pointer;position:relative;padding:var(--e3) calc(var(--e4) + 28px) var(--e3) var(--e4);background:var(--gs-f)}.gs-liga summary::-webkit-details-marker{display:none}' +
       '.gs-liga summary:after{content:"\\25BE";position:absolute;right:var(--e4);top:var(--e3);font-size:20px;color:var(--color-principal-oscuro);transition:transform .15s}.gs-liga[open] summary:after{transform:rotate(180deg)}' +

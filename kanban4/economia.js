@@ -44,7 +44,7 @@
    * Los alias --ec-* siguen para los estilos que van en el propio HTML. */
   function css() {
     return '.ec{--ec-c:var(--color-principal);--ec-a:var(--color-accion);--ec-v:var(--color-bien);--ec-r:var(--color-error);' +
-      '--ec-g:var(--color-suave);--ec-l:var(--color-linea);--ec-f:var(--color-bloque);--ec-am:var(--estado-pr);' +
+      '--ec-g:var(--color-suave);--ec-l:var(--color-linea);--ec-f:var(--color-tarjeta-cab,var(--color-bloque));--ec-am:var(--estado-pr);' +
       'font:400 14px/1.45 var(--fuente-texto);color:var(--color-texto)}' +
       '.ec *{box-sizing:border-box}.ec button{font-family:var(--fuente-texto)}' +
       'html.ec-sin-scroll,html.ec-sin-scroll body{overflow:hidden}' +
@@ -66,14 +66,14 @@
       'body.u-con-barra .ec-cab h1,body.u-con-barra .ec-pint{color:var(--color-principal-oscuro)}body.u-con-barra .ec-cab>p{color:var(--color-suave)}' +
       'body.u-con-barra .ec-ver,body.u-con-barra .ec-sol{background:transparent;border:1.5px solid var(--color-principal-oscuro)}' +
       'body.u-con-barra .ec-tabs button{color:var(--color-suave);opacity:1}body.u-con-barra .ec-tabs button[aria-selected=true]{color:var(--color-principal-oscuro);border-bottom-color:var(--color-principal-oscuro)}' +
-      'body.u-con-barra .ec-tabs .ec-n{background:var(--color-bloque)}}' +
+      'body.u-con-barra .ec-tabs .ec-n{background:var(--ec-f)}}' +
       '.ec-main{max-width:760px;margin:0 auto;padding:var(--e4) var(--e4) 120px}' +
       '.ec-fila{display:flex;gap:var(--e2);flex-wrap:wrap;align-items:center}' +
       // Campos: los de base.css (.u input, .u select). Aquí solo el ancho.
       '.ec input[type=date]{-webkit-appearance:none;appearance:none;width:100%}' +
       '.ec textarea{width:100%}' +
       '.ec-sel{flex:1 1 140px}' +
-      '.ec-card{background:var(--color-superficie);border:1px solid var(--ec-l);border-radius:var(--radio);padding:var(--e3) var(--e4);margin-top:var(--e3)}' +
+      '.ec-card{background:var(--color-tarjeta,var(--color-superficie));border:1px solid var(--ec-l);border-radius:var(--radio);padding:var(--e3) var(--e4);margin-top:var(--e3)}' +
       '.ec-av{margin-top:var(--e4)}.ec-av-t{display:flex;justify-content:space-between;gap:var(--e2);font-size:13px;color:var(--ec-g);font-weight:600}' +
       '.ec-barra{height:8px;border-radius:var(--radio-peq);background:var(--ec-l);overflow:hidden;margin-top:var(--e2)}.ec-barra i{display:block;height:100%;background:var(--ec-c)}' +
       '.ec-kpis{display:grid;grid-template-columns:1fr 1fr;gap:var(--e2);margin-top:var(--e4)}' +

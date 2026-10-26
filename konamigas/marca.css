@@ -21,6 +21,8 @@
   --color-sobre-principal: #FFFFFF;  /* texto sobre el azul */
   --color-sobre-accion: #020252;     /* texto sobre el rosa: azul marino (blanco sobre rosa no llega, 3,6:1) */
   --color-superficie: #FFFFFF;       /* tarjetas y campos */
+  --color-tarjeta: #F3F6FC;          /* azul muy claro · fondo de las tarjetas de Gestión y Economía, para que se separen del blanco (T0237) */
+  --color-tarjeta-cab: #E4EBF8;      /* azul claro · cabeceras de tarjeta, cifras y etiquetas suaves de Gestión y Economía (en vez del rosa, que parecía un error) */
 
   /* Letras */
   --fuente-titulos: 'Montserrat', 'Poppins', sans-serif;
