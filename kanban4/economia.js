@@ -174,7 +174,14 @@
       // T0225: en el ordenador, todo el ancho junto al menú; las listas que se comparan van en tabla (base.css · u-tabla).
       '.ec-aviso{left:calc(50% + var(--medio-menu, 0px))}' +
       '@media(min-width:900px){.ec-cab{padding-left:var(--e5);padding-right:var(--e5)}.ec-tabs{margin:0 calc(-1 * var(--e5));padding:0 var(--e3)}' +
-      '.ec-main{max-width:1280px;margin:0;padding:var(--e5) var(--e5) var(--e7)}.ec-main>.ec-fila{max-width:760px}' +
+      '.ec-main{max-width:none;margin:0;padding:var(--e5) var(--e5) var(--e7)}' +
+      // T0233: filtros compactos en una fila (los desplegables no se estiran; el buscador sí), textos de lectura cómoda
+      // y las tarjetas en columnas (ec-bloques) en lugar de estirarse a todo el ancho.
+      '.ec-fila .ec-sel{flex:0 1 280px;min-width:200px}.ec-fila input[type=search]{flex:1 1 320px;max-width:560px}' +
+      '.ec-filtrar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--e2)}.ec-filtrar>.ec-fila{display:contents}' +
+      '.ec-main>p.ec-s{max-width:90ch}' +
+      '.ec-bloques{display:grid;grid-template-columns:repeat(auto-fill,minmax(460px,1fr));gap:0 var(--e5);align-items:start}' +
+      '.ec-tabla .u-tabla-t{font-weight:700}' +
       '.ec-tabla{margin-top:var(--e3)}.ec-tabla .ec-tag{white-space:nowrap}.ec-tabla .ec-borrado td{text-decoration:line-through;opacity:.6}' +
       '.ec-tabla td.ec-pos,.ec-tabla td.ec-neg{font-weight:700}}';
   }
@@ -309,11 +316,11 @@
         '<div class="ec-kpi"><b>Gastos</b><span class="ec-val">' + esc(K.gastos.t) + '</span>' + (r.totalGastos ? '<span class="ec-sub">de ' + esc(r.totalGastos.pres) + ' previstos</span>' : '') + '</div></div>' +
         '<div class="ec-mini"><div><b>' + esc(K.equipos.t) + '</b><small>Equipos</small></div><div><b>' + esc(K.partidos.t) + '</b><small>Partidos</small></div>' +
         '<button type="button" id="ec-irpend"' + (K.pendientes.n ? ' class="ec-alerta"' : '') + '><b>' + esc(K.pendientes.t) + '</b><small>Por revisar ›</small></button></div>';
-      h += repartoHtml(r);
+      h += repartoHtml(r) + '<div class="ec-bloques">'; // T0233
       ['INGRESOS', 'GASTOS'].forEach(function (sec) {
         var gs = (r.grupos || []).filter(function (g) { return g.seccion === sec; });
         if (!gs.length) return;
-        h += '<h2 class="ec-h2">' + (sec === 'INGRESOS' ? 'Ingresos' : 'Gastos') + ' · real frente a presupuesto</h2><div class="ec-card">';
+        h += '<section class="ec-bloque"><h2 class="ec-h2">' + (sec === 'INGRESOS' ? 'Ingresos' : 'Gastos') + ' · real frente a presupuesto</h2><div class="ec-card">';
         gs.forEach(function (g, i) {
           var id = sec + '_' + i, ab = !!abiertos[id], lin = (g.lineas || []).filter(function (l) { return !vacio(l.real) || !vacio(l.pres); });
           var pct = g.presN ? (g.realN || 0) / g.presN : (g.realN ? 1 : 0);
@@ -331,15 +338,16 @@
                 '<span class="' + e.c + '"><b>' + esc(e.t) + '</b></span></div></button>';
             }).join('') + '</div>' : '') + '</div>';
         });
-        h += '</div>';
+        h += '</div></section>';
       });
       if ((r.porCompeticion || []).length && S.comp === 'TODAS') {
-        h += '<h2 class="ec-h2">Por competición</h2><div class="ec-card"><ul class="ec-lista">' + r.porCompeticion.map(function (c) {
+        h += '<section class="ec-bloque"><h2 class="ec-h2">Por competición</h2><div class="ec-card"><ul class="ec-lista">' + r.porCompeticion.map(function (c) {
           return '<li class="ec-item"><div><div class="ec-t">' + esc(c.n.slice(8) === '--' ? 'Gastos generales' : c.n.slice(8)) + '</div>' +
             '<div class="ec-s">' + esc(c.equipos) + ' equipos · ' + esc(c.partidos) + ' partidos · ingresos ' + esc(c.ingresos) + ' · gastos ' + esc(c.gastos) + '</div></div>' +
             '<div class="ec-d"><span class="' + signo(c.resultadoN) + '">' + esc(c.resultado) + '</span><div class="ec-s ' + signo(c.desvN) + '">' + (vacio(c.desv) ? '' : (c.desvN > 0 ? '+' : '') + esc(c.desv) + ' vs presup.') + '</div></div></li>';
-        }).join('') + '</ul></div>';
+        }).join('') + '</ul></div></section>';
       }
+      h += '</div>';
       var sinCat = (r.resultado || []).filter(function (x) { return /Sin categor/.test(x.n); })[0];
       if (sinCat && !/^0 /.test(sinCat.extra)) h += '<p class="ec-s ec-neg" style="margin-top:12px">' + esc(sinCat.extra) + ' sin categoría no salen en estas cuentas.</p>';
       main.innerHTML = h;
@@ -455,16 +463,16 @@
     var h = '<div class="ec-fila"><select class="ec-sel" id="ec-ptemp" aria-label="Temporada">' + opT + '</select></div>' +
       '<p class="ec-s" style="margin:10px 2px 0;color:var(--ec-g);font-size:13px">Qué partidas mirar para afinar el presupuesto de la ' + esc(r.temporada) + ', comparado con la ' + esc(prev || 'temporada anterior') +
       (eqA && eqP ? ' (' + eqA + ' equipos ahora, ' + eqP + ' entonces)' : '') + ', y dónde se cambia cada una. El presupuesto se cambia en GESTION; aquí solo se mira.</p>';
-    h += '<h2 class="ec-h2">Avisos · ' + (avisos.length + (cal ? 1 : 0)) + '</h2>' + cal + (avisos.length ? avisos.map(function (a) {
+    h += '<div class="ec-bloques"><section class="ec-bloque"><h2 class="ec-h2">Avisos · ' + (avisos.length + (cal ? 1 : 0)) + '</h2>' + cal + (avisos.length ? avisos.map(function (a) {
       return '<div class="ec-av2' + a.c + '"><b>' + esc(a.n) + '</b><p>' + esc(a.t) + '</p><p style="color:var(--ec-g)">' + esc(a.s) + '</p>' + (a.a || '') + '</div>';
-    }).join('') : (cal ? '' : '<div class="ec-card ec-vacio">Nada que afinar ahora mismo: lo real va en línea con el presupuesto.</div>'));
+    }).join('') : (cal ? '' : '<div class="ec-card ec-vacio">Nada que afinar ahora mismo: lo real va en línea con el presupuesto.</div>')) + '</section>'; // T0233
     var bloques = [['calendario', 'Se calculan solas con el calendario (DB_JORNADAS)'], ['partidos', 'Se calcula sola con los partidos'], ['equipos', 'Se calculan solas con los equipos'],
       ['mano', 'Se ponen a mano (DB_COMPETICIONES)'], ['sin', 'Sin presupuesto']];
     bloques.forEach(function (b) {
       if (!filasHtml[b[0]].length) return;
-      h += '<h2 class="ec-h2">' + esc(b[1]) + '</h2><div class="ec-card">' + filasHtml[b[0]].join('') + '</div>';
+      h += '<section class="ec-bloque"><h2 class="ec-h2">' + esc(b[1]) + '</h2><div class="ec-card">' + filasHtml[b[0]].join('') + '</div></section>';
     });
-    return h;
+    return h + '</div>';
   }
 
   /* ---------- CAJA ---------- */
@@ -474,10 +482,10 @@
       return cuando(main, 'caja_KONAMI', 'economiaCaja', ['KONAMI'], forzar, 'Mirando quién tiene el dinero…', function (r) {
         var h = '<p class="ec-s" style="margin:0 2px;color:var(--ec-g);font-size:13px">Dinero de Konami que tiene cada persona. Toca una para ver lo recibido, lo pagado y sus movimientos.</p>';
         if (r.estado) h += '<p style="margin:10px 2px 0;font-size:13.5px">' + esc(r.estado) + '</p>';
-        h += '<div class="ec-card"><div class="ec-lista">' + r.personas.map(function (x) {
+        h += '<div class="ec-bloques"><div class="ec-card"><div class="ec-lista">' + r.personas.map(function (x) {
           return '<button type="button" class="ec-item" data-ec-p="' + esc(x.n) + '"><div><div class="ec-t">' + esc(x.n) + '</div></div>' +
             '<div class="ec-d ' + signo(x.saldoN) + '">' + esc(x.saldo) + ' ›</div></button>';
-        }).join('') + '</div></div>';
+        }).join('') + '</div></div></div>'; // T0233: ec-bloques
         if (r.externos) h += '<p class="ec-s" style="margin:12px 2px;color:var(--ec-g);font-size:12.5px">' + esc(r.externos) + '</p>';
         main.innerHTML = h;
         [].forEach.call(main.querySelectorAll('[data-ec-p]'), function (b) {
@@ -626,10 +634,10 @@
       var temps = ['TODAS'].concat(o.temporadas || []);
       var cats = (o.categorias || []).map(function (c) { return c.n; });
       var h = (f.desde ? '<button type="button" class="ec-volver" id="ec-mvolver">‹ Volver al resumen</button>' : '') +
-        '<div class="ec-fila"><select class="ec-sel" id="ec-mtemp" aria-label="Temporada">' + temps.map(function (t) { return '<option value="' + esc(t) + '"' + (t === f.temp ? ' selected' : '') + '>' + esc(t === 'TODAS' ? 'Todas las temporadas' : t) + '</option>'; }).join('') + '</select>' +
+        '<div class="ec-filtrar"><div class="ec-fila"><select class="ec-sel" id="ec-mtemp" aria-label="Temporada">' + temps.map(function (t) { return '<option value="' + esc(t) + '"' + (t === f.temp ? ' selected' : '') + '>' + esc(t === 'TODAS' ? 'Todas las temporadas' : t) + '</option>'; }).join('') + '</select>' +
         '<select class="ec-sel" id="ec-mcat" aria-label="Categoría"><option value="">Todas las categorías</option>' + cats.map(function (c) { return '<option' + (c === f.cat ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select></div>' +
         '<div class="ec-fila" style="margin-top:8px"><input type="search" class="ec-sel" id="ec-mq" placeholder="Buscar: título, equipo, persona…" value="' + esc(f.q) + '" aria-label="Buscar">' +
-        '<label class="ec-check" style="margin:0;font-size:13.5px"><input type="checkbox" id="ec-melim"' + (f.elim ? ' checked' : '') + '> Ver borrados</label></div>' +
+        '<label class="ec-check" style="margin:0;font-size:13.5px"><input type="checkbox" id="ec-melim"' + (f.elim ? ' checked' : '') + '> Ver borrados</label></div></div>' + // T0233: ec-filtrar
         (f.comp && f.comp !== 'TODAS' ? '<p class="ec-s" style="margin:8px 2px 0;font-size:12.5px;color:var(--ec-g)">Solo ' + esc(compCorta(f.comp)) + ' · <button type="button" class="ec-a" id="ec-mtodas" style="background:none;border:0;padding:0;cursor:pointer">ver todas las competiciones</button></p>' : '') +
         '<div id="ec-mlista"></div>';
       main.innerHTML = h;

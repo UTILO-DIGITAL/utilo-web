@@ -170,7 +170,13 @@
       // T0225: en el ordenador, todo el ancho junto al menú; las listas que se comparan van en tabla (base.css · u-tabla).
       '.gs-aviso{left:calc(50% + var(--medio-menu, 0px))}' +
       '@media(min-width:900px){.gs-cab{padding-left:var(--e5);padding-right:var(--e5)}.gs-tabs{margin:0 calc(-1 * var(--e5));padding:0 var(--e3)}' +
-      '.gs-main{max-width:none;margin:0;padding:var(--e5) var(--e5) var(--e7)}.gs-filtros,.gs-main>.gs-fila{max-width:760px}' +
+      '.gs-main{max-width:none;margin:0;padding:var(--e5) var(--e5) var(--e7)}.gs-main>.gs-fila{max-width:760px}' +
+      // T0233: en Resumen, filtros compactos; los KPIs junto a Alertas, y los días en columnas con sus ligas una debajo de otra.
+      '.gs-main>.gs-filtros{display:flex;flex-wrap:wrap;gap:var(--e2)}.gs-main>.gs-filtros .gs-sel{flex:0 1 280px;min-width:200px}.gs-main>.gs-filtros #gs-temp{flex:0 0 112px;min-width:0}' +
+      '.gs-res-top{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:var(--e3);align-items:start;margin-top:var(--e3)}' +
+      '.gs-res-top>.gs-mini{margin-top:0!important;grid-template-columns:repeat(2,1fr)!important}.gs-res-top>.gs-alts{margin-top:0}' +
+      '.gs-semana{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0 var(--e4);align-items:start}' +
+      '.gs-semana .gs-ligas{display:block;margin-top:0}.gs-semana .gs-ligas>.gs-liga{margin-top:var(--e3)}' +
       '.gs-tabla{margin-top:var(--e3)}.gs-tabla .gs-tags{margin-top:0}.gs-tabla .gs-color{margin-right:var(--e2)}' +
       // T0232: en Equipos y Jugadoras, los desplegables y el buscador en una fila que ocupa todo el ancho; los botones de filtro, debajo.
       '.gs-filtrar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--e2)}.gs-filtrar>.gs-filtros,.gs-filtrar>.gs-fila{display:contents}' +
@@ -497,7 +503,7 @@
       if (S.dia && !dias[S.dia]) S.dia = '';
       S.abiertas = S.abiertas || {};
       var nAl = porPagar.length + avisos.length + sinLiga.length;
-      var h = htmlFiltros(o) +
+      var h = htmlFiltros(o) + '<div class="gs-res-top">' + // T0233
         '<div class="gs-mini" style="margin-top:12px;grid-template-columns:repeat(4,1fr)">' +
         '<button type="button" data-gs-kpi="equipos"><b>' + eqs.length + '</b><small>Equipos</small></button>' +
         '<button type="button" data-gs-kpi="jugadoras"><b>' + nJug + '</b><small>Jugadoras</small></button>' +
@@ -508,12 +514,12 @@
         htmlAlerta('pagar', 'Pagos pendientes', porPagar, function (e) { return estadoPago(e); }, r) +
         htmlAlerta('avisos', 'Problemas en la inscripción', avisos, function (e) { return '<span class="gs-pag gs-amb">' + esc(e.ocupado ? 'Nombre repetido ×' + e.ocupado : e.revisar) + '</span>'; }, r) +
         htmlAlerta('sinliga', 'Equipos sin liga', sinLiga, function () { return ''; }, r) +
-        '<div id="gs-aljug"><details class="gs-alt"><summary><span>Jugadoras con alerta</span><em>…</em></summary><p class="gs-nota">Cargando las jugadoras…</p></details></div></div>' +
+        '<div id="gs-aljug"><details class="gs-alt"><summary><span>Jugadoras con alerta</span><em>…</em></summary><p class="gs-nota">Cargando las jugadoras…</p></details></div></div></div>' +
         '<div class="gs-dias">' + [''].concat(ordenDias).map(function (d) {
           return '<button type="button" class="gs-chip" data-gs-dia="' + esc(d) + '" aria-pressed="' + (d === (S.dia || '')) + '">' + esc(d ? nomDia(d) : 'Todos los días') + '</button>';
-        }).join('') + '<button type="button" class="gs-chip" id="gs-todas">' + (Object.keys(S.abiertas).some(function (k) { return S.abiertas[k]; }) ? 'Cerrar todas' : 'Abrir todas') + '</button></div>';
+        }).join('') + '<button type="button" class="gs-chip" id="gs-todas">' + (Object.keys(S.abiertas).some(function (k) { return S.abiertas[k]; }) ? 'Cerrar todas' : 'Abrir todas') + '</button></div><div class="gs-semana">';
       ordenDias.filter(function (d) { return !S.dia || d === S.dia; }).forEach(function (d) {
-        h += '<div class="gs-dia-h">' + esc(nomDia(d)) + '</div><div class="gs-ligas">';
+        h += '<section class="gs-dia"><div class="gs-dia-h">' + esc(nomDia(d)) + '</div><div class="gs-ligas">';
         dias[d].sort().forEach(function (k) {
           var lista = grupos[k].slice().sort(function (a, b) { return (b.nivel || 0) - (a.nivel || 0) || a.equipo.localeCompare(b.equipo); });
           var jug = lista.reduce(function (a, e) { return a + (e.jugadoras || 0); }, 0);
@@ -530,8 +536,9 @@
                 '<small>' + esc([e.capi, e.jugadoras ? e.jugadoras + ' jugadoras' : 'sin jugadoras', edad1(e.edad) ? edad1(e.edad) + ' años' : ''].filter(String).join(' · ')) + '</small></button>';
             }).join('') + '</details>';
         });
-        h += '</div>';
+        h += '</div></section>';
       });
+      h += '</div>';
       if (!ordenDias.length) h += '<div class="gs-vacio">No hay equipos con estos filtros.</div>';
       main.innerHTML = h;
       engancharFiltros(main, function () { pResumen(main); });
