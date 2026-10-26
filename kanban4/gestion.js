@@ -15,6 +15,8 @@
  * T0234 · Camisetas: lo que falta por entregar, por estado y por equipo, y marcar cada camiseta (Preparada, Entregada, No llegó,
  *   Defectuosa). El estado es ESTADO CAMISETA de GESTION (la misma fórmula que DB_CAMISETAS del Excel CAMISETAS) y el reparto,
  *   REPARTO: la app no los calcula. Marcar escribe MARCA CAMISETA. Pedidos y stock siguen en el Excel CAMISETAS.
+ * T0235 · Equipos, Jugadoras y, dentro de cada equipo, Camisetas van por orden de inscripción (Marca temporal de GESTION),
+ *   de la más antigua a la más reciente, con las de ERROR en su sitio: así se ve una inscripción mal hecha y la que la corrige.
  * WhatsApp: en el móvil se abre la app (whatsapp://); en el ordenador, WhatsApp Web.
  * Mismo estilo que Economía (se copia de economia.js con el prefijo gs-). Cada cambio queda en GESTION › LOG_APP.
  */
@@ -117,6 +119,7 @@
       '.gs-lista{list-style:none;margin:0;padding:0}.gs-item{display:flex;justify-content:space-between;gap:var(--e3);padding:var(--e3) 0;border-top:1px solid var(--gs-l);align-items:center}' +
       '.gs-item:first-child{border-top:0}.gs-item .gs-t{font-weight:700;font-size:15px}.gs-item .gs-s{font-size:13px;color:var(--gs-g);margin-top:2px}' +
       '.gs-item .gs-d{text-align:right;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}' +
+      '.gs-alta{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--gs-g)}.gs-s .gs-alta{opacity:.75;font-size:.92em}' +
       'button.gs-item{width:100%;background:none;border:0;border-top:1px solid var(--gs-l);color:inherit;text-align:left;cursor:pointer}' +
       '.gs-borrado .gs-t,.gs-borrado .gs-d{text-decoration:line-through;opacity:.6}' +
       // Filtros en botones (como los del tablero) y etiquetas pequeñas.
@@ -275,6 +278,14 @@
   function wa(tel) { var d = String(tel || '').replace(/\D/g, ''); if (!d) return ''; if (d.length === 9) d = '34' + d; return waUrl('https://web.whatsapp.com/send?phone=' + d); }
   function aWa(url, txt) { url = waUrl(url); return url ? '<a class="gs-b2" href="' + esc(url) + '"' + (/^whatsapp:/.test(url) ? '' : ' target="_blank" rel="noopener"') + '>' + txt + '</a>' : ''; }
   function colorHex(n) { var c = (S.opciones && S.opciones.colores || []).filter(function (x) { return x.n === n; })[0]; return c && /^#/.test(c.hex) ? c.hex : ''; }
+  /** T0235: por orden de inscripción (ts: Marca temporal de GESTION); a igual hora, por fila. */
+  function porAlta(l) { return l.slice().sort(function (a, b) { return (a.ts || 0) - (b.ts || 0) || a.fila - b.fila; }); }
+  /** Fecha y hora de inscripción, «26/10/26 09:05»: columna en el ordenador; en el móvil, solo buscando, para no cargar la lista. */
+  function alta(x) {
+    if (!x.ts) return '';
+    var d = new Date(x.ts), p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + String(d.getFullYear()).slice(2) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
   function punto(n) { var h = colorHex(n); return h ? '<i class="gs-color" style="background:' + esc(h) + '" title="' + esc(n) + '"></i>' : ''; }
   function aviso(t) {
     var a = document.createElement('div'); a.className = 'gs-aviso'; a.setAttribute('role', 'status'); a.textContent = t;
@@ -640,8 +651,8 @@
       var pinta = function () {
         var q = norm2(f.q);
         // Buscando, se mira en toda la temporada, también lo que tiene ERROR.
-        var lista = q ? r.lista.filter(function (e) { return norm2([e.equipo, e.capi, e.liga, e.asig, e.teamForm, e.mail, e.tel].join(' ')).indexOf(q) >= 0; })
-          : base.filter(FILTROS_EQ[f.filtro]);
+        var lista = porAlta(q ? r.lista.filter(function (e) { return norm2([e.equipo, e.capi, e.liga, e.asig, e.teamForm, e.mail, e.tel].join(' ')).indexOf(q) >= 0; })
+          : base.filter(FILTROS_EQ[f.filtro]));
         $('#gs-eqlista').innerHTML = (q ? '<p class="gs-aviso-b">Buscando en toda la temporada ' + esc(S.temp) + ', también en las inscripciones con ERROR.</p>' : '') +
           (esCorreo(f.q) ? '<p style="margin:8px 0 0"><button type="button" class="gs-b2" id="gs-eqcorreo">Ver todo lo de este correo</button></p>' : '') +
           '<p class="gs-s" style="margin:12px 2px 0;font-size:13px;color:var(--gs-g)">' + lista.length + (lista.length === 1 ? ' inscripción' : ' inscripciones') + '</p>' +
@@ -650,7 +661,8 @@
             var t = tagsEquipo(e);
             return '<button type="button" class="gs-item" data-gs-i="' + r.lista.indexOf(e) + '"><div style="min-width:0">' +
               '<div class="gs-t">' + punto(e.color) + esc(e.equipo || '(sin nombre)') + '</div>' +
-              '<div class="gs-s">' + esc([S.fComp ? '' : compCorta(e.comp), e.liga ? ligaCorta(e.liga) : (e.dispo ? 'Quiere: ' + e.dispo : ''), e.capi, e.jugadoras ? e.jugadoras + ' jugadoras' : ''].filter(String).join(' · ')) + '</div>' +
+              '<div class="gs-s">' + esc([S.fComp ? '' : compCorta(e.comp), e.liga ? ligaCorta(e.liga) : (e.dispo ? 'Quiere: ' + e.dispo : ''), e.capi, e.jugadoras ? e.jugadoras + ' jugadoras' : ''].filter(String).join(' · ')) +
+                (q ? ' <span class="gs-alta">· ' + alta(e) + '</span>' : '') + '</div>' +
               (t.length ? '<div class="gs-tags">' + t.join('') + '</div>' : '') +
               '</div><div class="gs-d">' + (e.nivel ? 'Nivel ' + esc(e.nivel) : '') + '</div></button>';
           }).join('') : '<div class="gs-vacio">No hay inscripciones con este filtro.</div>') + '</div></div>');
@@ -678,10 +690,10 @@
   }
   /** T0225: Equipos en el ordenador. Cada fila abre la ficha del equipo, como en el móvil. */
   function tablaEquipos(lista, r) {
-    return '<table class="u-tabla gs-tabla"><thead><tr><th>Equipo</th>' + (S.fComp ? '' : '<th>Competición</th>') +
+    return '<table class="u-tabla gs-tabla"><thead><tr>' + '<th>Inscripción</th><th>Equipo</th>' + (S.fComp ? '' : '<th>Competición</th>') +
       '<th>Liga</th><th>Capitana</th><th class="num">Jugadoras</th><th class="num">Nivel</th><th>Avisos</th></tr></thead><tbody>' +
       lista.map(function (e) {
-        return '<tr tabindex="0" data-gs-i="' + r.lista.indexOf(e) + '"><td class="u-tabla-t">' + punto(e.color) + esc(e.equipo || '(sin nombre)') + '</td>' +
+        return '<tr tabindex="0" data-gs-i="' + r.lista.indexOf(e) + '">' + '<td class="gs-alta">' + alta(e) + '</td><td class="u-tabla-t">' + punto(e.color) + esc(e.equipo || '(sin nombre)') + '</td>' +
           (S.fComp ? '' : '<td>' + esc(compCorta(e.comp)) + '</td>') +
           '<td>' + (e.liga ? esc(ligaCorta(e.liga)) : e.dispo ? '<span class="gs-opc">Quiere: ' + esc(e.dispo) + '</span>' : '') + '</td>' +
           '<td>' + esc(e.capi) + '</td><td class="num">' + (e.jugadoras || '') + '</td><td class="num">' + esc(e.nivel || '') + '</td>' +
@@ -775,21 +787,21 @@
   }
   /** T0225: Jugadoras en el ordenador. Cada fila abre la ficha de la jugadora, como en el móvil. */
   function tablaJugadoras(lista, r, conEquipo) {
-    return '<table class="u-tabla gs-tabla"><thead><tr><th>Jugadora</th>' + (conEquipo ? '<th>Equipo</th>' : '') +
+    return '<table class="u-tabla gs-tabla"><thead><tr>' + '<th>Inscripción</th><th>Jugadora</th>' + (conEquipo ? '<th>Equipo</th>' : '') +
       '<th>Camiseta</th><th class="num">Edad</th><th>Avisos</th></tr></thead><tbody>' +
       lista.map(function (j) {
-        return '<tr tabindex="0" data-gs-j="' + r.lista.indexOf(j) + '"><td class="u-tabla-t">' + esc(j.nombreCompleto || j.mail) + '</td>' +
+        return '<tr tabindex="0" data-gs-j="' + r.lista.indexOf(j) + '">' + '<td class="gs-alta">' + alta(j) + '</td><td class="u-tabla-t">' + esc(j.nombreCompleto || j.mail) + '</td>' +
           (conEquipo ? '<td>' + punto(j.color) + esc(j.equipo) + (S.fComp ? '' : ' <span class="gs-opc">· ' + esc(compCorta(j.comp)) + '</span>') + '</td>' : '') +
           '<td>' + esc(j.cami || (j.dorsal ? 'Dorsal ' + j.dorsal : '')) + '</td><td class="num">' + esc(edad1(j.edad, true)) + '</td>' +
           '<td><div class="gs-tags">' + tagsJugadora(j).join('') + '</div></td></tr>';
       }).join('') + '</tbody></table>';
   }
-  function itemJugadora(j, i, conEquipo) {
+  function itemJugadora(j, i, conEquipo, conAlta) {
     var t = tagsJugadora(j);
     return '<button type="button" class="gs-item" data-gs-j="' + i + '"><div style="min-width:0">' +
       '<div class="gs-t">' + esc(j.nombreCompleto || j.mail) + '</div>' +
       '<div class="gs-s">' + esc([conEquipo ? compCorta(j.comp) + ' · ' + j.equipo : '', j.cami ? 'Camiseta ' + j.cami : (j.dorsal ? 'Dorsal ' + j.dorsal : ''), edad1(j.edad, true) ? edad1(j.edad, true) + ' años' : ''].filter(String).join(' · ')) +
-      (j.color ? ' ' + punto(j.color) : '') + '</div>' +
+      (j.color ? ' ' + punto(j.color) : '') + (conAlta ? ' <span class="gs-alta">· ' + alta(j) + '</span>' : '') + '</div>' +
       (t.length ? '<div class="gs-tags">' + t.join('') + '</div>' : '') + '</div></button>';
   }
 
@@ -811,14 +823,14 @@
       var pinta = function () {
         var q = norm2(f.q);
         // Buscando, se mira en toda la temporada, también lo que tiene ERROR (p. ej. dos inscripciones del mismo correo).
-        var lista = q ? r.lista.filter(function (j) { return norm2([j.nombreCompleto, j.nombre, j.ap1, j.ap2, j.dni, j.mail, j.cami, j.equipo, j.tel].join(' ')).indexOf(q) >= 0; })
-          : base.filter(FILTROS_JUG[f.filtro]);
+        var lista = porAlta(q ? r.lista.filter(function (j) { return norm2([j.nombreCompleto, j.nombre, j.ap1, j.ap2, j.dni, j.mail, j.cami, j.equipo, j.tel].join(' ')).indexOf(q) >= 0; })
+          : base.filter(FILTROS_JUG[f.filtro]));
         $('#gs-jlista').innerHTML = (q ? '<p class="gs-aviso-b">Buscando en toda la temporada ' + esc(S.temp) + ', también en las inscripciones con ERROR.</p>' : '') +
           (esCorreo(f.q) ? '<p style="margin:8px 0 0"><button type="button" class="gs-b2" id="gs-jcorreo">Ver todo lo de este correo (todas las temporadas)</button></p>' : '') +
           '<p class="gs-s" style="margin:12px 2px 0;font-size:13px;color:var(--gs-g)">' + lista.length + (lista.length === 1 ? ' inscripción' : ' inscripciones') + '</p>' +
           (lista.length && ancho() ? tablaJugadoras(lista.slice(0, MAX_LISTA), r, q || !f.equipo) + // T0225
             (lista.length > MAX_LISTA ? '<div class="gs-mas">Y ' + (lista.length - MAX_LISTA) + ' más: elige un equipo o busca.</div>' : '') :
-          '<div class="gs-card"><div class="gs-lista">' + (lista.length ? lista.slice(0, MAX_LISTA).map(function (j) { return itemJugadora(j, r.lista.indexOf(j), q || !f.equipo); }).join('') +
+          '<div class="gs-card"><div class="gs-lista">' + (lista.length ? lista.slice(0, MAX_LISTA).map(function (j) { return itemJugadora(j, r.lista.indexOf(j), q || !f.equipo, !!q); }).join('') +
             (lista.length > MAX_LISTA ? '<div class="gs-mas">Y ' + (lista.length - MAX_LISTA) + ' más: elige un equipo o busca.</div>' : '')
             : '<div class="gs-vacio">No hay jugadoras con este filtro.</div>') + '</div></div>');
         [].forEach.call(main.querySelectorAll('[data-gs-j]'), function (b) { b.onclick = function () { fichaJugadora(r.lista[Number(b.getAttribute('data-gs-j'))], o, r, equipos); }; });
@@ -897,7 +909,6 @@
     ['Entregada', 'Entregadas', 'gs-tag-v', 'entregada', 'entregadas']];
   var MARCAS = ['Preparada', 'Entregada', 'No llegó', 'Defectuosa'];
   function conCami(j) { return !j.error && !!j.estadoCami; }
-  function ordenEstado(j) { var i = ESTADOS_CAM.map(function (e) { return e[0]; }).indexOf(j.estadoCami); return i < 0 ? -1 : i; }
   function tagEstado(j) {
     if (j.estadoCami === 'Recalculando') return tag('Recalculando: pulsa ↻', 'gs-tag-g');
     var e = ESTADOS_CAM.filter(function (x) { return x[0] === j.estadoCami; })[0];
@@ -978,7 +989,7 @@
         eqs.sort(function (a, b) { return grupos[a][0].equipo.localeCompare(grupos[b][0].equipo); });
         var n = 0;
         var h = eqs.map(function (k) {
-          var todas = grupos[k].slice().sort(function (a, b) { return ordenEstado(a) - ordenEstado(b) || a.nombreCompleto.localeCompare(b.nombreCompleto); });
+          var todas = porAlta(grupos[k]); // T0235
           var verTodo = !!f.todo[k] || f.filtro === 'todas';
           var lista = verTodo ? todas : todas.filter(function (j) { return es(f.filtro)(j) && vale(j); });
           n += lista.length;
