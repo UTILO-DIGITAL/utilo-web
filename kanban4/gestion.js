@@ -14,7 +14,10 @@
  *   y se cambia de equipo. Buscar mira en toda la temporada (también ERROR); con un correo, «todo lo de este correo».
  * T0234 · Camisetas: lo que falta por entregar, por estado y por equipo, y marcar cada camiseta (Preparada, Entregada, No llegó,
  *   Defectuosa). El estado es ESTADO CAMISETA de GESTION (la misma fórmula que DB_CAMISETAS del Excel CAMISETAS) y el reparto,
- *   REPARTO: la app no los calcula. Marcar escribe MARCA CAMISETA. Pedidos y stock siguen en el Excel CAMISETAS.
+ *   REPARTO: la app no los calcula. Marcar escribe MARCA CAMISETA.
+ * T0240 · Camisetas › Stock y Pedidos, de solo lectura, del Excel CAMISETAS (módulo privado camisetas, camisetasDatos): libres
+ *   o en el local por modelo, color y dorsal-talla (en el ordenador, un cuadro como el de CAMISETAS; en el móvil, una tarjeta por
+ *   color) y cada pedido con su paso. Hacer pedidos y el recuento siguen en el menú «Camisetas» del Excel.
  * T0235 · Equipos, Jugadoras y, dentro de cada equipo, Camisetas van por orden de inscripción (Marca temporal de GESTION),
  *   de la más antigua a la más reciente, con las de ERROR en su sitio: así se ve una inscripción mal hecha y la que la corrige.
  * T0237 · Alertas › Camisetas: un equipo por línea con lo que pide hacer algo (repartir hoy, reparto pasado, preparadas sin
@@ -30,7 +33,9 @@
 
   // temp: temporada cargada (todas sus competiciones); fComp y fLiga: filtros de la app; dia: día elegido en Resumen.
   var S = { tab: 'resumen', temp: '', fComp: '', fLiga: '', dia: '', datos: {}, opciones: null, el: null,
-    eq: { filtro: 'todos', q: '' }, jug: { filtro: 'todas', q: '', equipo: '' }, cam: { filtro: 'pendientes', q: '', todo: {}, equipo: '' } };
+    eq: { filtro: 'todos', q: '' }, jug: { filtro: 'todas', q: '', equipo: '' }, cam: { filtro: 'pendientes', q: '', todo: {}, equipo: '' },
+    // T0240: Camisetas › Entregas (de GESTION), Stock y Pedidos (del Excel CAMISETAS)
+    cs: { vista: 'entregas', modelo: '', ver: 'libres', ped: 'marcha' } };
 
   function ctx() { return window.SX_CTX || {}; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -280,7 +285,38 @@
       '.gs-filtrar>.gs-chips::-webkit-scrollbar,.gs-dias::-webkit-scrollbar{display:none}.gs-chips .gs-chip,.gs-dias .gs-chip{flex:none;white-space:nowrap}}' +
       '.gs-marcas{display:grid;grid-template-columns:1fr 1fr;gap:var(--e2);margin-top:var(--e2)}.gs-marcas .gs-b2[aria-pressed=true]{background:var(--gs-c);border-color:var(--gs-c);color:var(--color-sobre-principal)}' +
       '@media(min-width:900px){.gs-cam-eqs{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:var(--e3);align-items:start}.gs-cam-eqs>.gs-card{margin-top:var(--e3)}}' +
-      '.gs-visor img{display:block;max-width:100%;max-height:70vh;margin:0 auto;border-radius:var(--radio);background:var(--gs-f)}';
+      '.gs-visor img{display:block;max-width:100%;max-height:70vh;margin:0 auto;border-radius:var(--radio);background:var(--gs-f)}' +
+      // T0240 · Camisetas: Entregas · Stock · Pedidos arriba; stock en cuadro (ordenador) o por color (móvil); pedidos con sus pasos.
+      '.gs-sw3{grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:var(--e3)}' +
+      '@media(min-width:900px){.gs-sw3{max-width:480px}}' +
+      '.gs-cs-f{grid-template-columns:repeat(2,minmax(0,1fr));max-width:560px}@media(max-width:520px){.gs-cs-f{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.gs-cs-f select:first-child{grid-column:auto}}' +
+      '@media(min-width:900px){.gs-cs-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}' +
+      '.gs-cs-mh{display:flex;justify-content:space-between;gap:var(--e2);align-items:baseline}.gs-cs-mh b{font:var(--peso-titulos) 17px/1.25 var(--fuente-titulos);color:var(--color-principal-oscuro)}' +
+      '.gs-cs-mh span{font-size:13px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}' +
+      '.gs-cs-tw{overflow-x:auto;margin-top:var(--e3)}' +
+      '.gs-cs-t{border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}' +
+      '.gs-cs-t th,.gs-cs-t td{border:1px solid var(--gs-l);padding:var(--e1) var(--e2);text-align:center;white-space:nowrap;background:var(--color-superficie)}' +
+      '.gs-cs-t thead th,.gs-cs-t tfoot th,.gs-cs-t tfoot td,.gs-cs-t .gs-cs-tot{background:var(--gs-f);font-weight:700}' +
+      '.gs-cs-t tbody th{text-align:left;font-weight:600}.gs-cs-t td{min-width:44px}' +
+      '.gs-cs-t .gs-cs-neg{background:color-mix(in srgb,var(--gs-r) 13%,var(--color-superficie));font-weight:700}' +
+      '.gs-cs-c{border-top:1px solid var(--gs-l);padding:var(--e2) 0;margin-top:var(--e2)}.gs-cs-c+.gs-cs-c{margin-top:0}' +
+      '.gs-cs-ch{display:flex;justify-content:space-between;gap:var(--e2);align-items:center;font-size:14px}.gs-cs-ch b{display:flex;align-items:center;min-width:0;font-weight:600}' +
+      '.gs-cs-ch b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gs-cs-ch>span{font-weight:700;font-variant-numeric:tabular-nums}' +
+      '.gs-cs-ks{display:flex;flex-wrap:wrap;gap:var(--e1);margin-top:var(--e2)}' +
+      '.gs-cs-k{display:inline-flex;gap:var(--e1);align-items:baseline;padding:2px var(--e2);border-radius:var(--radio-peq);background:var(--gs-f);font-size:13px;font-variant-numeric:tabular-nums}' +
+      '.gs-cs-k.gs-cs-neg{background:transparent;border:1px solid var(--gs-r);color:var(--gs-r)}' +
+      '@media(min-width:900px){.gs-cs-peds{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:var(--e3);align-items:start}.gs-cs-peds>.gs-card{margin-top:var(--e3)}}' +
+      '.gs-cs-p .gs-cam-h b span{white-space:normal}' +
+      '.gs-pasos{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:var(--e1);margin-top:var(--e3)}' +
+      '.gs-pasos i{display:block;height:6px;border-radius:var(--radio-peq);background:var(--gs-l)}.gs-pasos small{display:block;font-size:11px;color:var(--gs-g);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+      '.gs-pasos .gs-hecho i{background:var(--gs-v)}.gs-pasos .gs-ahora i{background:var(--gs-am)}.gs-pasos .gs-ahora small{color:var(--color-texto);font-weight:700}' +
+      '@media(max-width:520px){.gs-pasos small{display:none}}' + // en el móvil no caben: el paso lo dice la etiqueta de arriba
+      '.gs-cs-sig{margin:var(--e2) 0 0;font-size:14px}' +
+      '.gs-cs-dl{margin-top:var(--e2)}' +
+      '.gs-cs-col{margin-top:var(--e2)}.gs-cs-cl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 var(--e2);border-top:1px solid var(--gs-l);padding:var(--e2) 0;font-size:14px}' +
+      '.gs-cs-cl b{display:flex;align-items:center;min-width:0;font-weight:600}.gs-cs-cl b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gs-cs-cl>span{font-weight:700;font-variant-numeric:tabular-nums}' +
+      '.gs-cs-cl small{grid-column:1/-1;color:var(--gs-g);font-size:13px}' +
+      '.gs-cs-pie{margin:var(--e5) 2px 0}';
   }
 
   /* ---------- utilidades ---------- */
@@ -1086,7 +1122,156 @@
     });
   }
 
+  /* ---------- T0240 · Camisetas › Stock y Pedidos (Excel CAMISETAS, solo lectura) ---------- */
+  var VISTAS_CAM = [['entregas', 'Entregas'], ['stock', 'Stock'], ['pedidos', 'Pedidos']];
+  function selVista() {
+    return '<div class="gs-sw gs-sw3" id="gs-csv" role="group" aria-label="Camisetas">' + VISTAS_CAM.map(function (v) {
+      return '<button type="button" data-gs-csv="' + v[0] + '" aria-pressed="' + (S.cs.vista === v[0]) + '">' + v[1] + '</button>';
+    }).join('') + '</div>';
+  }
+  function engancharVista(main) {
+    var sv = $('#gs-csv'); if (!sv) return;
+    sv.onclick = function (e) { var b = e.target.closest('[data-gs-csv]'); if (!b) return; S.cs.vista = b.getAttribute('data-gs-csv'); window.scrollTo(0, 0); pCamisetas(main); };
+  }
+  /** Muestra del color: el de DB_COLORES de CAMISETAS y, si no está, el de GESTION. */
+  function puntoCam(r, n) {
+    var c = (r.colores || {})[n], h = c ? c[0] : colorHex(n);
+    return h ? '<i class="gs-color" style="background:' + esc(h) + '" title="' + esc(n) + '"></i>' : '';
+  }
+  function numCam(n) { return n ? '<span class="' + (n < 0 ? 'gs-neg' : '') + '">' + n + '</span>' : ''; }
+  /** Temporada (la misma que en el resto de Gestión) y, si hace falta, el modelo. */
+  function filtrosCam(r, conModelo) {
+    var mods = []; r.stock.forEach(function (f) { if (mods.indexOf(f.modelo) < 0) mods.push(f.modelo); });
+    r.modelos.forEach(function (m) { if (mods.indexOf(m.modelo) < 0) mods.push(m.modelo); });
+    return '<div class="gs-filtros gs-cs-f">' +
+      '<select class="gs-sel" id="gs-cst" aria-label="Temporada">' + r.temps.map(function (t) { return '<option' + (t === r.temp ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select>' +
+      (conModelo ? '<select class="gs-sel" id="gs-csm" aria-label="Modelo"><option value="">Todos los modelos</option>' + mods.map(function (m) {
+        return '<option value="' + esc(m) + '"' + (m === S.cs.modelo ? ' selected' : '') + '>' + esc(m || 'Sin modelo') + '</option>';
+      }).join('') + '</select>' : '') + '</div>';
+  }
+  function engancharFiltrosCam(main) {
+    var t = $('#gs-cst'); if (t) t.onchange = function () { S.temp = t.value; S.fComp = ''; S.fLiga = ''; S.cs.modelo = ''; pCamisetas(main); };
+    var m = $('#gs-csm'); if (m) m.onchange = function () { S.cs.modelo = m.value; pCamisetas(main); };
+  }
+  function cuandoCam(main, forzar, msg, pinta) {
+    var tab = S.tab, vista = S.cs.vista, clave = 'cs_' + S.temp;
+    if (forzar || !S.datos[clave]) main.innerHTML = selVista() + cargando(msg);
+    engancharVista(main);
+    return opciones().then(function () {
+      return dato(clave, 'camisetasDatos', [S.temp, !!forzar], forzar);
+    }).then(function (r) {
+      if (S.tab !== tab || S.cs.vista !== vista || !document.body.contains(main)) return;
+      if (r.temp !== S.temp) S.datos['cs_' + r.temp] = r; // sin camisetas en esa temporada: la del Excel
+      hora(r.hora);
+      main.innerHTML = selVista() + pinta(r) + '<p class="gs-nota gs-cs-pie">Solo lectura, del Excel CAMISETAS' +
+        (r.url ? ' (<a href="' + esc(r.url) + '" target="_blank" rel="noopener">abrir</a>)' : '') + '. Los pedidos y el recuento se hacen con su menú «Camisetas».</p>';
+      engancharVista(main); engancharFiltrosCam(main);
+      return r;
+    }).then(null, function (e) {
+      if (S.tab !== tab || S.cs.vista !== vista) return;
+      main.innerHTML = selVista() + errorHtml(e) + '<p style="text-align:center"><button class="gs-chip" type="button" id="gs-reint">Reintentar</button></p>';
+      engancharVista(main);
+      var b = $('#gs-reint'); if (b) b.onclick = function () { pintar(true); };
+    });
+  }
+
+  /** Stock: libres (o en el local) por modelo, color y dorsal-talla. Las mismas cuentas que la pestaña STOCK. */
+  function pCamStock(main, forzar) {
+    return cuandoCam(main, forzar, 'Cargando el stock…', function (r) {
+      var f = S.cs, k = f.ver === 'local' ? 'local' : 'libres';
+      var filas = r.stock.filter(function (x) { return !f.modelo || x.modelo === f.modelo; });
+      var suma = function (c) { return filas.reduce(function (s, x) { return s + x[c]; }, 0); };
+      var neg = filas.filter(function (x) { return x[k] < 0; }).length;
+      var h = filtrosCam(r, true) +
+        chips([['libres', 'Libres'], ['local', 'En el local']], k, 'gs-csver') +
+        '<div class="gs-kpis gs-cs-kpis">' +
+          '<div class="gs-kpi"><b>En el local</b><span class="gs-val">' + suma('local') + '</span><span class="gs-sub">sueltas, sin contar los packs</span></div>' +
+          '<div class="gs-kpi"><b>Reservadas</b><span class="gs-val">' + suma('reservadas') + '</span><span class="gs-sub">por preparar</span></div>' +
+          '<div class="gs-kpi"><b>Libres</b><span class="gs-val">' + suma('libres') + '</span><span class="gs-sub">para dar a quien no tiene</span></div>' +
+          '<div class="gs-kpi"><b>En negativo</b><span class="gs-val ' + (neg ? 'gs-neg' : 'gs-pos') + '">' + neg + '</span><span class="gs-sub">' + (neg ? 'revisa con un recuento' : 'todo cuadra') + '</span></div>' +
+        '</div>' +
+        (neg ? '<div class="gs-al"><p>' + neg + (neg === 1 ? ' combinación sale' : ' combinaciones salen') + ' en negativo (en rojo): se han dado más camisetas de las que constan. Un recuento del local lo corrige.</p></div>' : '');
+      // Un bloque por modelo; dentro, color × dorsal-talla con lo que no es cero.
+      var mods = []; filas.forEach(function (x) { if (mods.indexOf(x.modelo) < 0) mods.push(x.modelo); });
+      var hay = filas.some(function (x) { return x[k] !== 0; });
+      if (!hay) return h + '<div class="gs-vacio">' + (k === 'libres' ? 'No hay camisetas libres' : 'No hay camisetas en el local') + ' en ' + esc(r.temp) + (f.modelo ? ' de ' + esc(f.modelo) : '') + '.</div>';
+      return h + mods.map(function (m) {
+        var fm = filas.filter(function (x) { return x.modelo === m && x[k] !== 0; });
+        if (!fm.length) return '';
+        var cols = [], camis = [];
+        fm.forEach(function (x) { if (cols.indexOf(x.color) < 0) cols.push(x.color); if (camis.indexOf(x.cami) < 0) camis.push(x.cami); });
+        camis.sort(ordenCami);
+        var val = function (c, ca) { var x = fm.filter(function (y) { return y.color === c && y.cami === ca; })[0]; return x ? x[k] : 0; };
+        var tot = fm.reduce(function (s, x) { return s + x[k]; }, 0);
+        var info = r.modelos.filter(function (x) { return x.modelo === m; })[0];
+        var cab = '<div class="gs-cs-mh"><b>' + esc(m || 'Sin modelo') + '</b><span>' + tot + (k === 'libres' ? ' libres' : ' en el local') + '</span></div>' +
+          (info ? '<div class="gs-cam-s">' + esc([info.comps, info.proveedor].filter(String).join(' · ')) + '</div>' : '');
+        if (ancho()) {
+          return '<section class="gs-card">' + cab + '<div class="gs-cs-tw"><table class="gs-cs-t"><thead><tr><th>Color</th>' + camis.map(function (ca) { return '<th>' + esc(ca) + '</th>'; }).join('') + '<th>Total</th></tr></thead><tbody>' +
+            cols.map(function (c) {
+              var t = 0;
+              return '<tr><th>' + puntoCam(r, c) + esc(c) + '</th>' + camis.map(function (ca) { var n = val(c, ca); t += n; return '<td' + (n < 0 ? ' class="gs-cs-neg"' : '') + '>' + numCam(n) + '</td>'; }).join('') + '<td class="gs-cs-tot">' + numCam(t) + '</td></tr>';
+            }).join('') +
+            '</tbody><tfoot><tr><th>Total</th>' + camis.map(function (ca) { return '<td>' + numCam(cols.reduce(function (s, c) { return s + val(c, ca); }, 0)) + '</td>'; }).join('') + '<td>' + tot + '</td></tr></tfoot></table></div></section>';
+        }
+        return '<section class="gs-card">' + cab + cols.map(function (c) {
+          var lc = camis.filter(function (ca) { return val(c, ca); }), t = lc.reduce(function (s, ca) { return s + val(c, ca); }, 0);
+          return '<div class="gs-cs-c"><div class="gs-cs-ch"><b>' + puntoCam(r, c) + '<span>' + esc(c) + '</span></b><span class="' + (t < 0 ? 'gs-neg' : '') + '">' + t + '</span></div>' +
+            '<div class="gs-cs-ks">' + lc.map(function (ca) { var n = val(c, ca); return '<span class="gs-cs-k' + (n < 0 ? ' gs-cs-neg' : '') + '">' + esc(ca) + ' <b>' + n + '</b></span>'; }).join('') + '</div></div>';
+        }).join('') + '</section>';
+      }).join('');
+    }).then(function (r) {
+      var c = $('#gs-csver'); if (r && c) c.onclick = function (e) { var b = e.target.closest('[data-gs-f]'); if (!b) return; S.cs.ver = b.getAttribute('data-gs-f'); pCamisetas(main); };
+    });
+  }
+  function ordenCami(a, b) {
+    var t = ['XS', 'S', 'M', 'L', 'XL', 'XXL'], pa = String(a).split(' - '), pb = String(b).split(' - ');
+    var na = parseInt(pa[0], 10), nb = parseInt(pb[0], 10);
+    if (na !== nb) return (isNaN(na) ? 999 : na) - (isNaN(nb) ? 999 : nb);
+    return t.indexOf(pa[1]) - t.indexOf(pb[1]);
+  }
+
+  /** Pedidos de la temporada con su paso (preparado → confirmado → asignado → recibido → en stock) y lo que falta. */
+  var PASOS_PED = ['Preparado', 'Confirmado', 'Asignado', 'Recibido', 'En stock'];
+  function pCamPedidos(main, forzar) {
+    return cuandoCam(main, forzar, 'Cargando los pedidos…', function (r) {
+      var f = S.cs, orden = r.pasos.map(function (p) { return p[0]; });
+      var marcha = r.pedidos.filter(function (p) { return p.paso !== 'enStock'; });
+      var lista = f.ped === 'todos' ? r.pedidos : marcha;
+      var h = filtrosCam(r, false) + chips([['marcha', 'En marcha', marcha.length], ['todos', 'Todos', r.pedidos.length]], f.ped === 'todos' ? 'todos' : 'marcha', 'gs-csped');
+      if (!lista.length) return h + '<div class="gs-vacio">' + (r.pedidos.length ? 'Todos los pedidos de ' + esc(r.temp) + ' ya están en stock.' : 'No hay pedidos en ' + esc(r.temp) + '.') + '</div>';
+      return h + '<div class="gs-cs-peds">' + lista.map(function (p) {
+        var i = orden.indexOf(p.paso), paso = r.pasos[i] || [], j = p.jugadoras || { total: 0, porEstado: {} };
+        var porEstado = Object.keys(j.porEstado).map(function (e) {
+          var x = ESTADOS_CAM.filter(function (y) { return y[0] === e; })[0], n = j.porEstado[e];
+          return n + ' ' + (x ? (n === 1 ? x[3] : x[4]) : e.toLowerCase());
+        }).join(', ');
+        return '<section class="gs-card gs-cs-p"><div class="gs-cam-h"><b><span>' + esc(p.hash) + '</span></b>' + tag(paso[1] || p.paso, p.paso === 'enStock' ? 'gs-tag-v' : p.paso === 'sinConfirmar' ? 'gs-tag-r' : 'gs-tag-a') + '</div>' +
+          '<div class="gs-cam-s">' + esc([p.modelo, p.unidades + ' camisetas', p.fecha ? 'pedido el ' + p.fecha : ''].filter(String).join(' · ')) + '</div>' +
+          '<div class="gs-pasos" aria-label="Paso ' + (i + 1) + ' de ' + PASOS_PED.length + '">' + PASOS_PED.map(function (n, x) {
+            var c = x < i || p.paso === 'enStock' ? 'gs-hecho' : x === i ? 'gs-ahora' : '';
+            return '<span class="' + c + '"><i></i><small>' + n + '</small></span>';
+          }).join('') + '</div>' +
+          (paso[2] ? '<p class="gs-cs-sig"><b>Falta:</b> ' + esc(paso[2]) + '</p>' : p.paso === 'asignado' ? '<p class="gs-cs-sig">Esperando al proveedor' + (p.estimada ? ': llega el ' + esc(p.estimada) : '') + '.</p>' : '') +
+          '<div class="gs-dl gs-cs-dl">' + fila('Proveedor', esc(p.proveedor)) + fila('Contacto', esc(p.contacto)) +
+            fila('Importe', p.precio != null ? eur(p.precio) + (p.unidades ? ' · ' + eur(p.precio / p.unidades) + ' cada una' : '') : '') +
+            fila('Factura', esc(p.factura)) + fila('Entrega prevista', p.paso !== 'enStock' && p.paso !== 'recibido' ? esc(p.estimada) : '') +
+            fila('Asignado', esc(p.asignado)) + fila('En stock', esc(p.enStock)) +
+            fila('Jugadoras', j.total ? esc(Object.keys(j.porEstado).length === 1 ? porEstado : j.total + ': ' + porEstado) : '') + '</div>' +
+          (p.colores.length ? '<details class="gs-alt gs-cs-col"><summary><span>Por color y talla</span><em>' + p.colores.length + (p.colores.length === 1 ? ' color' : ' colores') + '</em></summary>' +
+            p.colores.map(function (c) {
+              return '<div class="gs-cs-cl"><b>' + puntoCam(r, c.color) + '<span>' + esc(c.color) + '</span></b><span>' + c.n + '</span><small>' + esc(c.tallas.map(function (t) { return t[0] + ' ' + t[1]; }).join(' · ')) + '</small></div>';
+            }).join('') + '</details>' : '') +
+          '</section>';
+      }).join('') + '</div>';
+    }).then(function (r) {
+      var c = $('#gs-csped'); if (r && c) c.onclick = function (e) { var b = e.target.closest('[data-gs-f]'); if (!b) return; S.cs.ped = b.getAttribute('data-gs-f'); pCamisetas(main); };
+    });
+  }
+
   function pCamisetas(main, forzar) {
+    if (S.cs.vista === 'stock') return pCamStock(main, forzar);
+    if (S.cs.vista === 'pedidos') return pCamPedidos(main, forzar);
     return cuando(main, 'jug', forzar, 'Cargando las camisetas…', function (o, r) {
       var f = S.cam, enF = r.lista.filter(function (j) { return conCami(j) && enFiltro(j); });
       // T0237: desde Alertas › Camisetas llega con un equipo (comp|equipo); se quita con su chip.
@@ -1095,11 +1280,11 @@
       var base = enF.filter(function (j) { return !f.equipo || j.comp + '|' + j.equipo === f.equipo; });
       var es = function (k) { return function (j) { return k === 'todas' || (k === 'alerta' ? !!alertaCam(j) : k === 'pendientes' ? j.estadoCami !== 'Entregada' : j.estadoCami === k); }; };
       var cuenta = function (k) { return base.filter(es(k)).length; };
-      main.innerHTML = '<div class="gs-filtrar">' + filtrosPlegables(o) + // T0238
+      main.innerHTML = selVista() + '<div class="gs-filtrar">' + filtrosPlegables(o) + // T0238 · T0240: selector de vista
         (eqF ? '<div class="gs-chips" style="margin-top:10px"><button type="button" class="gs-chip" id="gs-cameq" aria-pressed="true">' + punto(eqF.color) + esc(eqF.equipo) + ' ✕</button></div>' : '') + // T0237
         chips([['alerta', 'Para hacer', cuenta('alerta')], ['pendientes', 'Por entregar', cuenta('pendientes')]].concat(ESTADOS_CAM.map(function (e) { return [e[0], e[1], cuenta(e[0])]; })).concat([['todas', 'Todas', base.length]]), f.filtro, 'gs-camf') +
         '<div class="gs-fila gs-busca" style="margin-top:10px"><input type="search" class="gs-sel" id="gs-camq" placeholder="' + buscaPh('Buscar: equipo, jugadora, dorsal…') + '" value="' + esc(f.q) + '" aria-label="Buscar"></div></div>' +
-        '<p class="gs-nota" style="margin:8px 2px 0">Pedidos y stock, en el Excel CAMISETAS. Lo que marques aquí lo recoge solo.</p>' +
+        '<p class="gs-nota" style="margin:8px 2px 0">Lo que marques aquí lo recoge solo el Excel CAMISETAS. El stock y los pedidos, arriba.</p>' +
         '<div id="gs-camlista"></div>';
       var pinta = function () {
         var q = norm2(f.q);
@@ -1146,6 +1331,7 @@
         [].forEach.call(main.querySelectorAll('[data-gs-todo]'), function (b) { b.onclick = function () { var k = b.getAttribute('data-gs-todo'); f.todo[k] = !f.todo[k]; pinta(); }; });
       };
       pinta();
+      engancharVista(main);
       engancharFiltros(main, function () { pCamisetas(main); });
       engancharPlegables(main, o, function () { pCamisetas(main); });
       var be = $('#gs-cameq'); if (be) be.onclick = function () { f.equipo = ''; pCamisetas(main); };
