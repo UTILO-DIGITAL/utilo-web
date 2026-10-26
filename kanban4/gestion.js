@@ -298,6 +298,8 @@
       '.gs-cs-t th,.gs-cs-t td{border:1px solid var(--gs-l);padding:var(--e1) var(--e2);text-align:center;white-space:nowrap;background:var(--color-superficie)}' +
       '.gs-cs-t thead th,.gs-cs-t tfoot th,.gs-cs-t tfoot td,.gs-cs-t .gs-cs-tot{background:var(--gs-f);font-weight:700}' +
       '.gs-cs-t tbody th{text-align:left;font-weight:600}.gs-cs-t td{min-width:44px}' +
+      // Con muchas dorsal-talla el cuadro se desliza de lado: la columna del color se queda fija.
+      '.gs-cs-t th:first-child{position:sticky;left:0;z-index:1;box-shadow:inset -1px 0 0 var(--gs-l)}' +
       '.gs-cs-t .gs-cs-neg{background:color-mix(in srgb,var(--gs-r) 13%,var(--color-superficie));font-weight:700}' +
       '.gs-cs-c{border-top:1px solid var(--gs-l);padding:var(--e2) 0;margin-top:var(--e2)}.gs-cs-c+.gs-cs-c{margin-top:0}' +
       '.gs-cs-ch{display:flex;justify-content:space-between;gap:var(--e2);align-items:center;font-size:14px}.gs-cs-ch b{display:flex;align-items:center;min-width:0;font-weight:600}' +
@@ -1257,7 +1259,10 @@
             fila('Importe', p.precio != null ? eur(p.precio) + (p.unidades ? ' · ' + eur(p.precio / p.unidades) + ' cada una' : '') : '') +
             fila('Factura', esc(p.factura)) + fila('Entrega prevista', p.paso !== 'enStock' && p.paso !== 'recibido' ? esc(p.estimada) : '') +
             fila('Asignado', esc(p.asignado)) + fila('En stock', esc(p.enStock)) +
-            fila('Jugadoras', j.total ? esc(Object.keys(j.porEstado).length === 1 ? porEstado : j.total + ': ' + porEstado) : '') + '</div>' +
+            // Asignado y aún no en stock: las del pedido sin jugadora (bajas o cambios) son huecos que «Actualizar camisetas» da a las
+            // próximas inscripciones que encajen. En stock ya cuentan como libres en el local.
+            fila('Jugadoras', j.total ? esc([Object.keys(j.porEstado).length === 1 ? porEstado : j.total + ': ' + porEstado,
+              p.asignado && !p.enStock && p.unidades > j.total ? (p.unidades - j.total) + ' sin jugadora' : ''].filter(String).join(' · ')) : '') + '</div>' +
           (p.colores.length ? '<details class="gs-alt gs-cs-col"><summary><span>Por color y talla</span><em>' + p.colores.length + (p.colores.length === 1 ? ' color' : ' colores') + '</em></summary>' +
             p.colores.map(function (c) {
               return '<div class="gs-cs-cl"><b>' + puntoCam(r, c.color) + '<span>' + esc(c.color) + '</span></b><span>' + c.n + '</span><small>' + esc(c.tallas.map(function (t) { return t[0] + ' ' + t[1]; }).join(' · ')) + '</small></div>';
