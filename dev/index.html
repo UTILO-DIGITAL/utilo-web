@@ -12,7 +12,7 @@
     var q = new URLSearchParams(location.search).get('marca'), m = q;
     try { if (q) localStorage.setItem('dev_marca', q); m = localStorage.getItem('dev_marca'); } catch (e) {}
     window.DEV_MARCA = /^(utilo|konamigas)$/.test(m || '') ? m : 'utilo';
-    document.write('<link rel="stylesheet" href="../' + window.DEV_MARCA + '/marca.css?v=41"><link rel="stylesheet" href="../estilos/base.css?v=41">');
+    document.write('<link rel="stylesheet" href="../' + window.DEV_MARCA + '/marca.css?v=42"><link rel="stylesheet" href="../estilos/base.css?v=42">');
   })();
 </script>
 <script>
@@ -30,7 +30,7 @@
 </head>
 <body class="u">
 <div class="kz"><div class="kz-caja kz-centro" role="status"><div class="u-carga"></div><p>Cargando…</p></div></div>
-<script src="../kanban4/google.js?v=41"></script>
-<script src="../kanban4/app.js?v=41"></script>
+<script src="../kanban4/google.js?v=42"></script>
+<script src="../kanban4/app.js?v=42"></script>
 </body>
 </html>
