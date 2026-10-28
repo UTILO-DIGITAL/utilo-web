@@ -388,3 +388,87 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .pd-r { margin-top: var(--e2); padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-bloque); font-size: 14px;
   white-space: pre-wrap; overflow-wrap: anywhere; }
 .u .pd-r b { display: block; font-size: 12px; color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .02em; }
+
+/* ---------- Camisetas de Konamigas (T0258, konamigas/secciones/camisetas.js) ----------
+ * Para el móvil, de pie en el campo: zonas de 44 px, el paso siguiente de cada jugadora a la derecha y lo que se está
+ * guardando, más claro. El punto de color es el de la camiseta (un dato del Excel, COLORES.COLOR_HEX). */
+.u .cm { display: flex; flex-direction: column; gap: var(--e4); padding-top: var(--e4); }
+.u .cm-carga { display: flex; flex-direction: column; align-items: center; gap: var(--e3); padding: var(--e6) 0; }
+.u .cm .u-filtros { margin: 0; }
+.u .cm-chips, .u .cm-sw { display: flex; flex-wrap: wrap; gap: var(--e2); }
+.u .cm-chip { min-height: 44px; padding: 0 var(--e3); border: 1px solid var(--color-borde-campo); border-radius: var(--radio-peq);
+  background: var(--color-superficie); color: var(--color-texto); font: 600 14px/1.2 var(--fuente-texto); cursor: pointer; }
+.u .cm-chip[aria-pressed=true] { background: var(--color-principal); border-color: var(--color-principal); color: var(--color-sobre-principal); }
+.u .cm-chip .u-cifra { font-weight: 400; }
+.u .cm-resumen { margin: 0; font-size: 16px; }
+/* Recurso propio de Konamigas: la cifra de lo que falta, como pintada (una por pantalla). */
+.u .cm-pintada { font: 400 22px/1 var(--fuente-destacar, var(--fuente-titulos)); color: var(--color-principal-oscuro); }
+.u .cm-color { display: inline-block; flex: none; width: 12px; height: 12px; margin-right: var(--e2); vertical-align: -1px;
+  border-radius: var(--radio-peq); border: 1px solid var(--color-linea); }
+.u .cm-eq { background: var(--color-tarjeta, var(--color-superficie)); border: 1px solid var(--color-linea); border-radius: var(--radio); padding: var(--e3); }
+.u .cm-eq-cab { display: flex; align-items: baseline; justify-content: space-between; gap: var(--e3); }
+.u .cm-eq-cab .n-grupo { margin: 0; overflow-wrap: anywhere; }
+.u .cm-ok { color: var(--color-bien); font-weight: 700; }
+.u .cm-barra { height: 6px; margin: var(--e2) 0 var(--e1); border-radius: var(--radio-peq); background: var(--color-linea); overflow: hidden; }
+.u .cm-barra i { display: block; height: 100%; background: var(--color-bien); transition: width .2s; }
+.u .cm-eq-sub { margin: 0 0 var(--e2); }
+.u .cm-jugs { list-style: none; margin: 0; padding: 0; }
+.u .cm-jug { display: flex; align-items: center; gap: var(--e2); border-top: 1px solid var(--color-linea); }
+.u .cm-jug-n { flex: 1 1 auto; min-width: 0; min-height: 44px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: var(--e2) 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.u .cm-jug-n b { overflow-wrap: anywhere; }
+.u .cm-jug-n .u-nota { display: flex; align-items: center; }
+.u .cm-jug-e { font-size: 13px; }
+.u .cm-sig { flex: none; min-width: 108px; }
+.u .cm-guardando { opacity: .65; }
+.u .cm-eq-pie:not(:empty) { margin-top: var(--e2); }
+.u .cm-dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--e2) var(--e4); margin: 0; }
+.u .cm-dl dt { font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; }
+.u .cm-dl dd { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: var(--e1); }
+.u .cm-marcas .u-btn { flex: 1 1 140px; }
+.u .cm-acciones { margin: 0; }
+.u .cm-color-b h3 { display: flex; align-items: center; gap: var(--e1); font-size: 16px; margin: 0 0 var(--e2); }
+.u .cm-celdas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: var(--e1); }
+.u .cm-celdas li { display: flex; flex-direction: column; align-items: center; padding: var(--e1) var(--e2); border: 1px solid var(--color-linea);
+  border-radius: var(--radio-peq); font-size: 13px; }
+.u .cm-celdas li b { font-size: 16px; }
+.u .cm-cuadro td.num { width: 1%; }
+.u .cm-dos { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e3); }
+.u .cm-dos[hidden] { display: none; }
+.u .cm-tipos { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0 var(--e4); }
+.u .cm-tipos legend { padding: 0; margin-bottom: var(--e1); }
+.u .cm-pedir .n-grupo { margin-bottom: var(--e2); }
+.u .cm-pedir p { margin: 0 0 var(--e3); }
+.u .cm-peds { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e3); }
+.u .cm-ped { border: 1px solid var(--color-linea); border-radius: var(--radio); padding: var(--e3); }
+.u .cm-ped p { margin: var(--e1) 0; }
+.u .cm-ped-cab { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); }
+.u .cm-ped-l { list-style: none; margin: var(--e2) 0; padding: 0; display: grid; gap: var(--e1); }
+.u .cm-ped-l li { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--e1); }
+.u .cm-ped-l .cm-color { align-self: center; margin-right: 0; }
+.u .cm-rec { border-top: 1px solid var(--color-linea); padding-top: var(--e3); }
+.u .cm-rec-ok .n-grupo { color: var(--color-bien); }
+.u .cm-rec-l { list-style: none; margin: var(--e2) 0 0; padding: 0; }
+.u .cm-rec-l li { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e2) var(--e3); padding: var(--e2) 0; border-bottom: 1px solid var(--color-linea); }
+.u .cm-rec-l li.cm-dif { background: var(--color-bloque); padding-left: var(--e2); padding-right: var(--e2); }
+.u .cm-rec-c { flex: 1 1 140px; display: flex; flex-direction: column; }
+.u .cm-rec-c b { display: flex; align-items: center; }
+.u .cm-paso { display: flex; align-items: center; gap: var(--e2); }
+.u .cm-paso b { min-width: 2.2em; text-align: center; font-size: 18px; }
+.u .cm-falta { flex: 1 1 100%; }
+.u .cm-otra { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e3); margin-top: var(--e3); align-items: end; }
+.u .cm-otra .u-campo:first-child { grid-column: 1 / -1; }
+.u .cm-rec-pie { border-top: 1px solid var(--color-linea); padding-top: var(--e3); display: flex; flex-direction: column; gap: var(--e2); }
+.u .cm-rec-pie p { margin: 0; }
+/* En el móvil, los filtros en una fila que se desliza y los campos uno debajo de otro: la lista empieza arriba. */
+@media (max-width: 899px) {
+  .u .cm-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 calc(var(--e4) * -1); padding: 0 var(--e4); }
+  .u .cm-chips::-webkit-scrollbar { display: none; }
+  .u .cm-chip { flex: none; }
+  .u .cm-filtros .u-campo, .u .cm-filtros .u-campo:first-child { flex: 1 1 100%; max-width: none; }
+}
+@media (min-width: 900px) {
+  .u .cm-otra { grid-template-columns: 2fr 1fr 1fr 1fr auto; }
+  .u .cm-otra .u-campo:first-child { grid-column: auto; }
+  .u .cm-eqs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e3); }
+}
