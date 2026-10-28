@@ -426,29 +426,38 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .lg-eqt > span { display: flex; flex-direction: column; min-width: 0; }
 .u .lg-eqt small { font-size: 12px; color: var(--color-suave); font-weight: 400; }
 .u .lg-lista { border-top: 1px solid var(--color-linea); margin: 0 0 var(--e3); }
-/* Un partido, como un marcador: local a la izquierda (pegado al centro), en medio la hora o el resultado con el campo
-   debajo, visitante a la derecha; debajo, centrado, el árbitro y, si no se juega como estaba, por qué. */
-.u .lg-p { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-areas: "l c v" "m m m" "a a a";
-  align-items: center; gap: 2px var(--e3); width: 100%; padding: var(--e3) var(--e2); text-align: left;
+/* Un partido: a la izquierda la hora, el campo y el árbitro; en el centro solo el marcador (local, resultado o «vs»,
+   visitante); en el ordenador, a la derecha un hueco del mismo ancho para que el marcador quede centrado. Debajo del
+   marcador, por qué no se juega como estaba. */
+.u .lg-p { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto minmax(0, 1fr) 76px; grid-template-areas: "i l c v ." "i a a a .";
+  align-items: center; gap: 0 var(--e3); width: 100%; padding: var(--e3) var(--e2); text-align: left;
   border: 0; border-bottom: 1px solid var(--color-linea); border-left: 4px solid transparent; background: none; color: inherit; font: inherit; cursor: pointer; }
 .u .lg-p:hover { background: color-mix(in srgb, var(--color-bloque) 60%, var(--color-superficie)); }
 .u .lg-p.lg-mio { border-left-color: var(--color-principal); }
-.u .lg-pl, .u .lg-pv { display: flex; align-items: center; gap: var(--e2); min-width: 0; font-size: 15px; line-height: 1.25; }
+.u .lg-pi { grid-area: i; align-self: start; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.u .lg-pi b { font-size: 16px; }
+.u .lg-pi small { font-size: 12px; color: var(--color-suave); overflow-wrap: anywhere; line-height: 1.3; }
+.u .lg-pl, .u .lg-pv { display: flex; align-items: center; gap: var(--e2); min-width: 0; font-size: 16px; line-height: 1.25; }
 .u .lg-pl { grid-area: l; justify-content: flex-end; text-align: right; }
 .u .lg-pv { grid-area: v; justify-content: flex-start; }
 .u .lg-nom { min-width: 0; overflow-wrap: anywhere; }
 .u .lg-gana { font-weight: 700; }
-.u .lg-pc { grid-area: c; display: flex; flex-direction: column; align-items: center; min-width: 72px; padding: var(--e1) var(--e2);
+.u .lg-pc { grid-area: c; display: flex; align-items: center; justify-content: center; min-width: 64px; min-height: 40px; padding: 0 var(--e2);
   border-radius: var(--radio); background: var(--color-tarjeta, var(--color-bloque)); }
-.u .lg-pc b { font: var(--peso-titulos) 20px/1.1 var(--fuente-titulos); color: var(--color-principal-oscuro); white-space: nowrap; }
+.u .lg-pc b { font: var(--peso-titulos) 22px/1 var(--fuente-titulos); color: var(--color-principal-oscuro); white-space: nowrap; }
 .u .lg-pc b span { margin: 0 .2em; color: var(--color-suave); }
-.u .lg-pc b.lg-phora { font-size: 17px; }
-.u .lg-pc small { font-size: 12px; color: var(--color-suave); }
-.u .lg-pm { grid-area: m; justify-self: center; display: flex; flex-wrap: wrap; justify-content: center; gap: 0 var(--e2); margin-top: var(--e1); font-size: 13px; color: var(--color-suave); text-align: center; }
-.u .lg-p-fuera .lg-pl, .u .lg-p-fuera .lg-pv, .u .lg-p-fuera .lg-pc b { color: var(--color-suave); }
-.u .lg-p-fuera .lg-pc b.lg-phora { text-decoration: line-through; }
+.u .lg-pvs { background: none; color: var(--color-suave); font-size: 13px; font-weight: 600; }
+.u .lg-pa { grid-area: a; justify-self: center; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--e1) var(--e2); margin-top: var(--e2); }
+.u .lg-pliga { font-size: 12px; color: var(--color-suave); }
+.u .lg-p-fuera .lg-pl, .u .lg-p-fuera .lg-pv { color: var(--color-suave); }
+.u .lg-p-fuera .lg-pi b { text-decoration: line-through; color: var(--color-suave); }
+@media (max-width: 639px) {
+  .u .lg-p { grid-template-columns: 52px minmax(0, 1fr) auto minmax(0, 1fr); grid-template-areas: "i l c v" "i a a a"; gap: 0 var(--e2); padding: var(--e3) var(--e1) var(--e3) var(--e2); }
+  .u .lg-pl, .u .lg-pv { font-size: 14px; gap: 6px; }
+  .u .lg-pc { min-width: 50px; padding: 0 var(--e1); } .u .lg-pc b { font-size: 19px; }
+}
 /* Por qué un partido no se juega como estaba: anulado (no se recupera), aplazado (se recupera) o recuperación. */
-.u .lg-pav { grid-area: a; justify-self: center; margin-top: var(--e1); padding: 1px var(--e2); border-radius: var(--radio-peq); font-size: 12px; font-weight: 700; text-align: center; }
+.u .lg-pav { padding: 1px var(--e2); border-radius: var(--radio-peq); font-size: 12px; font-weight: 700; text-align: center; }
 .u .lg-av-no { color: var(--estado-bl); background: color-mix(in srgb, var(--estado-bl) 10%, var(--color-superficie)); }
 .u .lg-av-si { color: var(--estado-pr); background: color-mix(in srgb, var(--estado-pr) 12%, var(--color-superficie)); }
 .u .lg-av-rec { color: var(--estado-ec); background: color-mix(in srgb, var(--estado-ec) 10%, var(--color-superficie)); }

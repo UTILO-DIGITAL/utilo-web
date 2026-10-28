@@ -447,8 +447,9 @@
         return null;
       }
       /**
-       * Un partido en una lista, como un marcador: el local a la izquierda y el visitante a la derecha, cada uno con el color
-       * de su camiseta; en medio la hora (o el resultado) y el campo; debajo, el árbitro y, si no se juega como estaba, por qué.
+       * Un partido en una lista. En el centro, solo el marcador: el local, el resultado (o «vs» si aún no se ha jugado) y el
+       * visitante, cada uno con el color de su camiseta. A un lado, la hora, el campo y el árbitro. Debajo del marcador, si
+       * no se juega como estaba, por qué (y, en el calendario, de qué liga y jornada es).
        */
       function htmlPartido(p, conLiga) {
         var res = conResultado(p), gl = num(p.GOLES_LOCAL), gv = num(p.GOLES_VISITANTE), av = avisoPartido(p);
@@ -457,14 +458,16 @@
           return '<span class="lg-p' + lado + (gana ? ' lg-gana' : '') + '">' + (lado === 'l' ? '<span class="lg-nom">' + texto(equipo(id) || 'Por decidir') + '</span>' + punto(id)
             : punto(id) + '<span class="lg-nom">' + texto(equipo(id) || 'Por decidir') + '</span>') + '</span>';
         };
-        var centro = res ? '<b class="u-cifra">' + gl + '<span>–</span>' + gv + '</b>' : '<b class="u-cifra lg-phora">' + texto(p.HORA || '--:--') + '</b>';
-        var meta = [conLiga ? ligaCompleta(p.ID_LIGA) + ' · J' + p.JORNADA : '', res ? p.HORA : '',
-          libre ? '' : arbitro(p) ? 'Árbitro: ' + persona(arbitro(p)) : 'Sin árbitro'].filter(String);
-        return '<button type="button" class="lg-p' + (esMio(p) ? ' lg-mio' : '') + (CON_MOTIVO.indexOf(p.ESTADO) >= 0 ? ' lg-p-fuera' : '') + '" data-p="' + texto(p.ID) + '">' +
-          (libre ? '<span class="lg-pl"><span class="lg-nom">' + texto(equipo(p.ID_INSCRIPCION_LOCAL || p.ID_INSCRIPCION_VISITANTE) || 'Campo libre') + '</span></span><span class="lg-pc"><b class="lg-phora">' + texto(p.HORA || '') + '</b><small>' + texto(campo(p.ID_CAMPO)) + '</small></span><span class="lg-pv"></span>'
-            : eq(p.ID_INSCRIPCION_LOCAL, 'l', res && gl > gv) + '<span class="lg-pc">' + centro + '<small>' + texto(campo(p.ID_CAMPO)) + '</small></span>' + eq(p.ID_INSCRIPCION_VISITANTE, 'v', res && gv > gl)) +
-          '<span class="lg-pm">' + (p._pendiente || p._nueva ? '<span class="u-chip">Guardando</span>' : '') + (meta.length ? '<span>' + texto(meta.join(' · ')) + '</span>' : '') + '</span>' +
-          (av ? '<span class="lg-pav ' + av.clase + '">' + texto(av.texto) + (p.MOTIVO && CON_MOTIVO.indexOf(p.ESTADO) >= 0 ? ' · ' + texto(p.MOTIVO) : '') + '</span>' : '') + '</button>';
+        var info = '<span class="lg-pi"><b class="u-cifra">' + texto(p.HORA || '--:--') + '</b><small>' + texto(campo(p.ID_CAMPO)) + '</small>' +
+          (libre ? '' : '<small class="lg-parb" title="Árbitro">' + texto(arbitro(p) ? persona(arbitro(p)) : 'Sin árbitro') + '</small>') + '</span>';
+        var debajo = [conLiga ? '<span class="lg-pliga">' + texto(ligaCompleta(p.ID_LIGA) + ' · J' + p.JORNADA) + '</span>' : '',
+          p._pendiente || p._nueva ? '<span class="u-chip">Guardando</span>' : '',
+          av ? '<span class="lg-pav ' + av.clase + '">' + texto(av.texto) + (p.MOTIVO && CON_MOTIVO.indexOf(p.ESTADO) >= 0 ? ' · ' + texto(p.MOTIVO) : '') + '</span>' : ''].join('');
+        return '<button type="button" class="lg-p' + (esMio(p) ? ' lg-mio' : '') + (CON_MOTIVO.indexOf(p.ESTADO) >= 0 ? ' lg-p-fuera' : '') + '" data-p="' + texto(p.ID) + '"' +
+          ' aria-label="' + texto(titulo(p) + ', ' + (p.HORA || '') + ', ' + campo(p.ID_CAMPO) + (res ? ', ' + gl + ' a ' + gv : '')) + '">' + info +
+          (libre ? '<span class="lg-pl"></span><span class="lg-pc lg-pvs">' + texto(equipo(p.ID_INSCRIPCION_LOCAL || p.ID_INSCRIPCION_VISITANTE) || 'Campo libre') + '</span><span class="lg-pv"></span>'
+            : eq(p.ID_INSCRIPCION_LOCAL, 'l', res && gl > gv) + '<span class="lg-pc' + (res ? '' : ' lg-pvs') + '">' + (res ? '<b class="u-cifra">' + gl + '<span>–</span>' + gv + '</b>' : 'vs') + '</span>' + eq(p.ID_INSCRIPCION_VISITANTE, 'v', res && gv > gl)) +
+          (debajo ? '<span class="lg-pa">' + debajo + '</span>' : '') + '</button>';
       }
       /** Festivo o descanso de un día (tabla CALENDARIO), o ''. */
       function especial(f) { var c = ix.cal[f]; return c ? (c.FESTIVO ? 'Festivo' : 'Sin partidos') + (c.MOTIVO ? ': ' + c.MOTIVO : '') : ''; }
