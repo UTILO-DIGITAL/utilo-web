@@ -311,3 +311,40 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .pf-carga { display: flex; flex-direction: column; align-items: center; gap: var(--e3); padding: var(--e6) 0; }
 .u .pf .u-perfil dl { margin-top: 0; }
 .u .pf-hora { margin: 0; }
+
+/* ---------- Piezas de las secciones del núcleo (T0257) ----------
+ * Pestañas de una sección, filtros encima de una lista, formulario en dos columnas en la ventana, una cifra mala
+ * (en negativo, pasada de presupuesto) y la fila de total de una tabla. Solo variables. */
+.u .u-pestanas { display: flex; gap: var(--e1); overflow-x: auto; border-bottom: 1px solid var(--color-linea); scrollbar-width: none; }
+.u .u-pestanas::-webkit-scrollbar { display: none; }
+.u .u-pestanas button { flex: none; min-height: 44px; padding: 0 var(--e3); border: 0; border-bottom: 3px solid transparent; background: none;
+  color: var(--color-suave); font: 700 14px/1.2 var(--fuente-texto); cursor: pointer; }
+.u .u-pestanas button[aria-selected=true] { color: var(--color-principal-oscuro); border-bottom-color: var(--color-principal); }
+.u .u-filtros { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--e2) var(--e3); margin: 0 0 var(--e3); }
+.u .u-filtros .u-campo { flex: 1 1 140px; max-width: 240px; }
+.u .u-filtros .u-campo:first-child { flex-basis: 200px; max-width: none; }
+.u .u-check { display: inline-flex; align-items: center; gap: var(--e2); min-height: 44px; font-size: 14px; cursor: pointer; }
+.u .u-campos { display: grid; grid-template-columns: 1fr; gap: var(--e3); }
+.u .u-campos .u-campo > input, .u .u-campos .u-campo > select, .u .u-campos .u-campo > textarea { width: 100%; }
+.u .u-campos [hidden] { display: none; }
+.u .u-campos > .u-nota { margin: calc(var(--e2) * -1) 0 0; }
+@media (min-width: 640px) { .u .u-campos { grid-template-columns: 1fr 1fr; } .u .u-campos .u-ancho { grid-column: 1 / -1; } }
+.u .u-mal { color: var(--color-error); font-weight: 700; }
+.u .u-tabla td.u-tabla-t .u-nota { font-weight: 400; }
+/* Una tabla que no cabe en el móvil se desplaza en su caja, nunca la página. Columnas solo para pantallas anchas. */
+.u .u-tabla-caja { max-width: 100%; overflow-x: auto; margin: 0 0 var(--e2); }
+.u .u-tabla-caja > .u-tabla { margin: 0; }
+@media (max-width: 639px) { .u .u-solo-ancho { display: none; } }
+@media (min-width: 640px) { .u .u-solo-movil { display: none; } }
+.u .u-tabla tr.u-tabla-total td, .u .u-tabla tr.eco-total td { font-weight: 700; border-top: 1px solid var(--color-borde-campo); }
+
+/* Economía (nucleo/secciones/economia.js): periodo y pestañas arriba; título de bloque con su botón al lado. */
+.u .eco-barra { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--e3) var(--e4); margin: 0 0 var(--e4); }
+.u .eco-barra .eco-per { flex: 0 1 220px; }
+.u .eco-barra .u-pestanas { flex: 1 1 320px; min-width: 0; }
+.u .eco-cab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e3); margin: 0 0 var(--e3); }
+.u .eco-cab .n-grupo, .u .eco-cab .u-nota { margin: 0; }
+.u .eco-tabla { margin: 0 0 var(--e2); }
+.u .eco-tabla td.num { width: 1%; }
+.u .eco-anulada { text-decoration: line-through; color: var(--color-suave); }
+.u .u-tabla-caja + .u-btn { margin-top: var(--e2); }

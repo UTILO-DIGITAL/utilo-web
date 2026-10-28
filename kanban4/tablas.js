@@ -167,6 +167,8 @@
       /** Filas de la copia (las que ya se han leído). */
       filas: function (n) { return mem[n] ? mem[n].filas : []; },
       fila: function (n, id) { return mem[n] ? mem[n].ids[String(id)] || null : null; },
+      /** T0257: columnas de una tabla ya leída, en su orden (también si todavía no tiene filas). */
+      columnas: function (n) { return mem[n] ? mem[n].cols.slice() : []; },
       /** Cambios sin confirmar todavía (para avisar antes de cerrar la página). */
       pendientes: function () { return pendientes; },
 
@@ -222,15 +224,21 @@
         return p;
       },
 
-      /** Alta: la fila sale al momento (con _nueva y un ID provisional) y toma su ID cuando lo da el motor. op: como en actualizar. */
+      /**
+       * Alta: la fila sale al momento (con _nueva y un ID provisional) y toma su ID cuando lo da el motor.
+       * op.fn (opcional): una función de la sección que hace el alta en el motor y devuelve lo mismo que tablasCrear
+       * ({ id, fila, v }), con otras si ha cambiado más filas. Recibe op.args (T0254) o, si no hay, [valores] (T0257:
+       * economiaEmitir, que pone el número de la factura).
+       */
       crear: function (n, valores, op) {
+        op = op || {};
         var m = mem[n] || (mem[n] = { cols: Object.keys(valores), filas: [], ids: {}, v: '', clave: 'ID' });
         var tmp = 'nueva-' + (++nuevos), f = copia(valores);
         f[m.clave] = tmp; f._nueva = true; f._pendiente = 1;
         m.filas.push(f); m.ids[tmp] = f;
         pendientes++;
         emitir('cambio', n, { id: tmp, optimista: true });
-        return (op && op.fn ? llamar(op.fn, op.args || []) : llamar('tablasCrear', [n, valores])).then(function (r) {
+        return (op.fn ? llamar(op.fn, op.args || [valores]) : llamar('tablasCrear', [n, valores])).then(function (r) {
           pendientes--;
           delete m.ids[tmp];
           delete f._nueva; delete f._pendiente;
