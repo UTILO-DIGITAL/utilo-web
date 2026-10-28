@@ -187,10 +187,11 @@
     var b = this; b.disabled = true; b.textContent = 'Midiendo…';
     $('medida').innerHTML = '';
     var t0 = performance.now();
-    llamar('tablasMedir', [{ tabla: TABLA, viejo: ['CAMISETAS', 'INSCRIPCIONES_JUGADORAS'] }]).then(function (pasos) {
+    llamar('tablasMedir', [{ tabla: TABLA, viejo: ['CAMISETAS', 'INSCRIPCIONES_JUGADORAS'] }]).then(function (r) {
+      var pasos = r.pasos || r;
       $('medida').innerHTML = pasos.map(function (p) { return '<tr><td>' + esc(p.paso) + '</td><td class="n">' + esc(p.ms) + '</td><td>' + esc(p.llamadas) + '</td><td>' + esc(p.detalle) + '</td></tr>'; }).join('') +
         '<tr><td><b>Toda la medida, desde el navegador</b></td><td class="n">' + Math.round(performance.now() - t0) + '</td><td></td><td></td></tr>';
-      window.MEDIDA = pasos;
+      window.MEDIDA = r;
     }, function (e) { aviso(e.message); }).then(function () { b.disabled = false; b.textContent = 'Medir'; });
   };
 })();
