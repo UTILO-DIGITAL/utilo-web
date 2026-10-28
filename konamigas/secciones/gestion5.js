@@ -205,13 +205,20 @@
     avisosJugadora: avisosJugadora, buscarJugadoras: buscarJugadoras, problemasJugadora: problemasJugadora, nombreJug: nombreJug };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
-  /* ======================= pantalla ======================= */
+
+  /* ======================= pantalla =======================
+   * Se ve como la Gestión publicada (kanban4/gestion.js, 4.1): cabecera con la temporada pintada, la hora de los datos y ↻;
+   * pestañas; filtros comunes (temporada, competición, liga), plegados en el móvil tras «Filtros (n)»; botones de filtro con
+   * su contador; tabla en el ordenador (desde 900 px) y lista en el móvil; fichas en ventana con «Guardar N cambios».
+   * Los estilos son los gs- de estilos/base.css (bloque «Gestión de Konamigas»). */
 
   var BASE = ['TEMPORADAS', 'COMPETICIONES', 'LIGAS', 'EQUIPOS', 'INSCRIPCIONES_EQUIPOS', 'JUGADORAS', 'STAFF', 'COLORES', 'FOTOS', 'REVISIONES'];
   var ECO = ['TARIFAS', 'DESCUENTOS', 'MOVIMIENTOS'];
   var IJ = 'INSCRIPCIONES_JUGADORAS';
   var PESTANAS = { RESUMEN: 'Resumen', EQUIPOS: 'Equipos', JUGADORAS: 'Jugadoras', FOTOS: 'Fotos', REVISIONES: 'Revisiones' };
-  var VER = 150;
+  var VER = 250;
+  var DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+  var ACEPTA = { ACEPTA_NORMAS: 'Normas', ACEPTA_DERECHOS_IMAGEN: 'Fotos', ACEPTA_DATOS: 'Datos', ACEPTA_RESPONSABILIDAD: 'Responsabilidad' };
 
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function opciones(lista, sel, vacio) {
@@ -220,14 +227,45 @@
     }).join('');
   }
   function guardado(k, v) { try { if (v === undefined) return localStorage.getItem(k) || ''; localStorage.setItem(k, v); } catch (e) {} return ''; }
-  function chips(av) { return av.map(function (a) { return ' <span class="u-chip">' + texto(a.t) + '</span>'; }).join(''); }
-  /** Enlace de WhatsApp a un teléfono (a uno de 9 cifras se le pone el 34 de España), o '' si no hay teléfono. */
-  function whatsapp(tel, et) {
+  function plural(n, uno, varios) { return n + ' ' + (n === 1 ? uno : varios); }
+  /** Euros sin «,00» (como la publicada). */
+  function eurC(c) { return eur(c).replace(/,00 €$/, ' €'); }
+  function edad1(n) { return isFinite(n) && n > 0 ? (Math.round(n * 10) / 10).toFixed(1).replace('.', ',').replace(/,0$/, '') : ''; }
+  function tag(t, c) { return '<span class="gs-tag ' + (c || '') + '">' + texto(t) + '</span>'; }
+  function fila(et, v) { return v === '' || v == null ? '' : '<div class="gs-df"><span>' + texto(et) + '</span><span>' + v + '</span></div>'; }
+  /** Fecha de inscripción corta, «26/10/26» (y la hora, si la tiene). */
+  function alta(s) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(String(s || ''));
+    return m ? m[3] + '/' + m[2] + '/' + m[1].slice(2) + (m[4] && (m[4] + m[5]) !== '0000' ? ' ' + m[4] + ':' + m[5] : '') : '';
+  }
+  function esMovil() { return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (window.matchMedia && matchMedia('(pointer:coarse)').matches); }
+  /** WhatsApp a un teléfono (a uno de 9 cifras se le pone el 34): en el móvil, la app; en el ordenador, WhatsApp Web. */
+  function wa(tel) {
     var n = String(tel || '').replace(/\D/g, '');
     if (n.length === 9) n = '34' + n;
-    return n.length >= 9 ? '<a class="u-btn" href="https://wa.me/' + n + '" target="_blank" rel="noopener">' + et + '</a>' : '';
+    if (n.length < 9) return '';
+    return (esMovil() ? 'whatsapp://send?phone=' : 'https://web.whatsapp.com/send?phone=') + n;
   }
-  function plural(n, uno, varios) { return n + ' ' + (n === 1 ? uno : varios); }
+  function aWa(tel, et, clase) {
+    var u = wa(tel);
+    return u ? '<a class="' + (clase || 'gs-b2') + '" href="' + texto(u) + '"' + (/^whatsapp:/.test(u) ? '' : ' target="_blank" rel="noopener"') + '>' + texto(et) + '</a>' : '';
+  }
+  function porAlta(a, b) {
+    var x = String(a.FECHA_INSCRIPCION || ''), y = String(b.FECHA_INSCRIPCION || '');
+    return x < y ? -1 : x > y ? 1 : String(a.ID) < String(b.ID) ? -1 : String(a.ID) > String(b.ID) ? 1 : 0;
+  }
+  /** Lo que ha cambiado en una ficha respecto a la fila. Una casilla vacía en el Excel es «no»; una fecha con hora, igual a su día. */
+  function cambios(f, v) {
+    var c = {};
+    Object.keys(v).forEach(function (k) {
+      if (v[k] === undefined) return;
+      if (typeof v[k] === 'boolean') { if ((f[k] === true) !== v[k]) c[k] = v[k]; return; }
+      var a = String(f[k] == null ? '' : f[k]);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(v[k]) && a.slice(0, 10) === v[k]) return;
+      if (a.trim() !== String(v[k])) c[k] = v[k];
+    });
+    return c;
+  }
 
   window.UN.registrar('GESTION', {
     abrir: function (el, ctx) {
@@ -238,18 +276,24 @@
         .filter(function (s) { return PESTANAS[s]; });
       if (!pest.length) pest = Object.keys(PESTANAS);
       var CLAVE = 'ges_' + ctx.id + '_';
-      var S = { tab: pest.indexOf(guardado(CLAVE + 'tab')) >= 0 ? guardado(CLAVE + 'tab') : pest[0], tem: guardado(CLAVE + 'tem'), comp: '', liga: '',
-        eq: { q: '', ver: '', estado: '' }, ju: { q: '', ver: '', equipo: '', n: VER }, fo: { estado: 'Sin vincular' }, rv: { todas: false },
-        leido: false, ijTem: '' };
+      var abiertas = {};
+      try { abiertas = JSON.parse(guardado(CLAVE + 'abiertas') || '{}') || {}; } catch (e) {}
+      var S = { tab: pest.indexOf(guardado(CLAVE + 'tab')) >= 0 ? guardado(CLAVE + 'tab') : pest[0], tem: guardado(CLAVE + 'tem'), comp: '', liga: '', dia: '',
+        filAb: false, eq: { filtro: 'inscritos', q: '' }, ju: { filtro: 'activas', q: '', equipo: '', n: VER }, fo: { filtro: 'Sin vincular' }, rv: { todas: false },
+        leido: false, ijTem: '', leyendo: '', hora: '' };
 
-      el.innerHTML = (cfg.AYUDA ? '<p class="u-nota n-ayuda">' + texto(cfg.AYUDA) + '</p>' : '') +
-        '<div class="eco-barra"><label class="u-campo eco-per"><span class="u-etiqueta">Temporada</span><select id="ges-tem"></select></label>' +
-        '<div class="u-pestanas" role="tablist">' + pest.map(function (p) {
-          return '<button type="button" role="tab" data-tab="' + p + '">' + PESTANAS[p] + '</button>';
-        }).join('') + '</div></div>' +
-        '<div id="ges-cont"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div>' +
-        '<div class="u-velo" id="ges-velo"><div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="ges-vt"><div class="n-ventana" id="ges-vent"></div></div></div>';
-      var cont = el.querySelector('#ges-cont'), velo = el.querySelector('#ges-velo'), vent = el.querySelector('#ges-vent'), selTem = el.querySelector('#ges-tem');
+      el.innerHTML = '<div class="gs gs5">' +
+        '<header class="gs-cab"><p><span class="gs-pint" id="gs-pint" hidden></span><span id="gs-hora">Datos guardados en este dispositivo</span>' +
+        '<button type="button" class="gs-re" id="gs-re" aria-label="Volver a leer el Excel" title="Volver a leer el Excel">↻</button></p>' +
+        '<nav class="gs-tabs" role="tablist">' + pest.map(function (p) {
+          return '<button type="button" role="tab" data-tab="' + p + '" aria-selected="' + (p === S.tab) + '">' + PESTANAS[p] + '</button>';
+        }).join('') + '</nav></header>' +
+        '<div class="gs-main" id="gs-main"><div class="gs-cargando" role="status"><div class="u-carga"></div>Cargando la temporada…</div></div>' +
+        '<button type="button" class="gs-fab" id="gs-fab" hidden></button></div>';
+      var raiz = el.querySelector('.gs'), main = el.querySelector('#gs-main'), fab = el.querySelector('#gs-fab');
+      var velo = null, vent = null;
+      var MQ = window.matchMedia ? window.matchMedia('(min-width:900px)') : { matches: false };
+      function ancho() { return MQ.matches; }
 
       /* ---------- datos ---------- */
 
@@ -260,35 +304,63 @@
           tar: PAGOS ? T.filas('TARIFAS') : [], des: PAGOS ? T.filas('DESCUENTOS') : [], mov: PAGOS ? T.filas('MOVIMIENTOS') : []
         };
       }
-      var d, tem, ix, ies, cx;
+      var d, tem, ix, ies, cx, memo, porIe;
       function preparar() {
         d = datos();
-        var ts = temporadas(d);
-        tem = ts.filter(function (t) { return String(t.ID) === S.tem; })[0] || temporadaActual(d);
+        tem = temporadas(d).filter(function (t) { return String(t.ID) === S.tem; })[0] || temporadaActual(d);
         ix = { tem: indice(d.tem), com: indice(d.com), lig: indice(d.lig), eqs: indice(d.eqs), ie: indice(d.ie), jug: indice(d.jug), stf: indice(d.stf), col: indice(d.col), ij: indice(d.ij) };
         ies = tem ? iesDe(d, tem.ID) : [];
-        cx = contexto(d, tem ? tem.ID : '', { pagos: PAGOS, ijLeidas: !!tem && S.ijTem === tem.ID });
-        selTem.innerHTML = opciones(ts.map(function (t) { return [t.ID, t.NOMBRE || t.ID]; }), tem ? tem.ID : '');
+        cx = contexto(d, tem ? tem.ID : '', { pagos: PAGOS, ijLeidas: jugLeidas() });
+        memo = { pago: {}, avE: {}, avJ: {} };
+        porIe = {};
+        d.ij.forEach(function (j) { (porIe[j.ID_INSCRIPCION_EQUIPO] = porIe[j.ID_INSCRIPCION_EQUIPO] || []).push(j); });
       }
+      function jugLeidas() { return !!tem && S.ijTem === tem.ID; }
       function nom(t, id) { var f = ix[t][String(id || '')]; return f ? txt(f.NOMBRE || f.APODO || f.ID) : txt(id); }
       function nomComp(id) { var c = ix.com[String(id || '')]; return c ? txt(c.NOMBRE_COMERCIAL || c.NOMBRE) : txt(id); }
       function nomIe(id) { var i = ix.ie[String(id || '')]; return i ? txt(i.NOMBRE_EQUIPO) || nom('eqs', i.ID_EQUIPO) : txt(id); }
-      function punto(idColor) {
-        var c = ix.col[String(idColor || '')];
-        var hex = c && /^#?[0-9a-f]{3,8}$/i.test(txt(c.COLOR_HEX)) ? (txt(c.COLOR_HEX)[0] === '#' ? '' : '#') + txt(c.COLOR_HEX) : '';
-        return hex ? '<span class="ges-punto" style="background:' + texto(hex) + '" title="' + texto(c.NOMBRE) + '"></span>' : '';
+      function hexDe(idColor) {
+        var c = ix.col[String(idColor || '')], h = c ? txt(c.COLOR_HEX) : '';
+        return /^#?[0-9a-f]{3,8}$/i.test(h) ? (h[0] === '#' ? '' : '#') + h : '';
       }
-      function chip(f) { return f && (f._pendiente || f._nueva) ? ' <span class="u-chip">Guardando</span>' : ''; }
+      /** El color de camiseta del equipo como un punto: es un dato (COLORES.COLOR_HEX), no un adorno. */
+      function punto(idColor) {
+        var h = hexDe(idColor);
+        return h ? '<i class="gs-color" style="background:' + texto(h) + '" title="' + texto(nom('col', idColor)) + '"></i>' : '';
+      }
+      function guardando(f) { return f && (f._pendiente || f._nueva) ? tag('Guardando', 'gs-tag-g') : ''; }
+      function pagoDe(i) { if (!PAGOS) return null; var k = String(i.ID); if (!(k in memo.pago)) memo.pago[k] = pago(d, i); return memo.pago[k]; }
+      function falta(i) { var p = pagoDe(i); return p && !p.incluida && !p.sinTarifa && p.falta > 0 ? p.falta : 0; }
+      function avE(i) { var k = String(i.ID); if (!memo.avE[k]) memo.avE[k] = avisosEquipo(d, i, cx); return memo.avE[k]; }
+      function avJ(j) { var k = String(j.ID); if (!memo.avJ[k]) memo.avJ[k] = avisosJugadora(d, j, cx); return memo.avJ[k]; }
+      function activas(idIe) { return (porIe[idIe] || []).filter(function (j) { return j.ESTADO === 'Activa'; }); }
+      /** Cuenta como inscrito (como en la publicada): ni Baja, ni sin confirmar, ni copa. */
+      function inscrito(i) { return cuenta(i) && i.ESTADO !== 'Solicitada'; }
+      function staff(id) { return ix.stf[String(id || '')] || null; }
 
       /** INSCRIPCIONES_JUGADORAS de la temporada: la parte de sus equipos inscritos. Al momento si ya se vio. */
       function parteTem(t) { return { clave: 'T:' + t, col: 'ID_INSCRIPCION_EQUIPO', valores: iesDe(datos(), t).map(function (i) { return i.ID; }) }; }
-      function leerTem() {
-        if (!tem) return;
+      function leerTem(fresco) {
+        if (!tem) return Promise.resolve();
         var t = tem.ID, p = parteTem(t), o = {}; o[IJ] = p;
-        var ya = T.tiene && T.tiene(IJ, p);
-        if (ya) S.ijTem = t;
-        T.leer([IJ], { partes: o }).then(function () { S.ijTem = t; if (ctx.abierta()) pintar(); }, function (e) {
+        if (T.tiene && T.tiene(IJ, p)) S.ijTem = t;
+        return T.leer([IJ], { partes: o, fresco: !!fresco }).then(function () { S.ijTem = t; if (ctx.abierta()) pintar(); }, function (e) {
           if (ctx.abierta()) ctx.aviso('No se han podido leer las jugadoras: ' + String(e.message).replace(/^\w+:\s*/, ''));
+        });
+      }
+      function ponerHora() {
+        var x = el.querySelector('#gs-hora'); if (!x) return;
+        x.textContent = S.hora ? 'Datos de las ' + S.hora : 'Datos guardados en este dispositivo';
+      }
+      function ahora() { var f = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; }; return p(f.getHours()) + ':' + p(f.getMinutes()); }
+      /** ↻: vuelve a leer del Excel las tablas y la parte de la temporada. */
+      function releer() {
+        var b = el.querySelector('#gs-re'); if (b) b.disabled = true;
+        Promise.all([T.refrescar(tablas, true), leerTem(true)]).then(function () {
+          S.hora = ahora(); ponerHora(); if (b) b.disabled = false; if (ctx.abierta()) pintar();
+        }, function (e) {
+          if (b) b.disabled = false;
+          if (ctx.abierta()) ctx.aviso('No se ha podido leer el Excel: ' + String(e.message).replace(/^\w+:\s*/, ''));
         });
       }
 
@@ -296,411 +368,639 @@
 
       function pintar() {
         if (!S.leido) return;
+        var act = document.activeElement, qFoco = act && raiz.contains(act) && act.getAttribute('data-q');
         preparar();
-        [].forEach.call(el.querySelectorAll('[data-tab]'), function (b) {
+        [].forEach.call(el.querySelectorAll('.gs-tabs [data-tab]'), function (b) {
           var si = b.getAttribute('data-tab') === S.tab;
           b.setAttribute('aria-selected', si ? 'true' : 'false');
           if (si && b.parentNode.scrollWidth > b.parentNode.clientWidth) b.parentNode.scrollLeft = Math.max(0, b.offsetLeft - b.parentNode.offsetLeft - 16);
         });
-        if (!tem) { cont.innerHTML = '<p class="u-vacio">Todavía no hay temporadas. Añade la primera en la tabla TEMPORADAS del Excel COMPETICION.</p>'; return; }
+        var pint = el.querySelector('#gs-pint');
+        pint.textContent = tem ? txt(tem.NOMBRE || tem.ID) : ''; pint.hidden = !tem;
+        var fb = { EQUIPOS: ['inscribirEquipo', '+ Inscribir equipo'], JUGADORAS: ['inscribirJugadora', '+ Inscribir jugadora'] }[S.tab];
+        fab.hidden = !fb || !tem;
+        if (fb) { fab.setAttribute('data-accion', fb[0]); fab.textContent = fb[1]; }
+        if (!tem) { main.innerHTML = '<div class="gs-vacio">Todavía no hay temporadas. Añade la primera en la tabla TEMPORADAS del Excel COMPETICION.</div>'; return; }
         if (tem.ID !== S.ijTem && !S.leyendo) { S.leyendo = tem.ID; leerTem(); }
-        cont.innerHTML = ({ RESUMEN: htmlResumen, EQUIPOS: htmlEquipos, JUGADORAS: htmlJugadoras, FOTOS: htmlFotos, REVISIONES: htmlRevisiones })[S.tab]()
-          .replace(/<table class="u-tabla([^"]*)">/g, '<div class="u-tabla-caja"><table class="u-tabla$1">').replace(/<\/table>/g, '</table></div>');
-        var q = cont.querySelector('[data-q]');
-        if (q && S.foco) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
-        S.foco = false;
+        main.innerHTML = (cfg.AYUDA ? '<p class="gs-nota gs-ayuda">' + texto(cfg.AYUDA) + '</p>' : '') +
+          ({ RESUMEN: htmlResumen, EQUIPOS: htmlEquipos, JUGADORAS: htmlJugadoras, FOTOS: htmlFotos, REVISIONES: htmlRevisiones })[S.tab]();
+        if (qFoco) { var q = main.querySelector('[data-q="' + qFoco + '"]'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); } }
       }
-      function cargandoJug() { return S.ijTem !== tem.ID ? '<p class="u-nota" role="status">Cargando las jugadoras de ' + texto(tem.NOMBRE) + '…</p>' : ''; }
+      function cargandoJug(msg) { return '<div class="gs-cargando" role="status"><div class="u-carga"></div>' + texto(msg || 'Cargando las jugadoras de ' + tem.NOMBRE + '…') + '</div>'; }
+      function caja(t) { return '<div class="u-tabla-caja">' + t + '</div>'; }
 
-      /** Filtros de competición y liga de la temporada (comunes a Resumen, Equipos y Jugadoras). */
-      function filtrosComp() {
+      /* ---------- filtros comunes: temporada, competición y liga (en el móvil, plegados tras «Filtros») ---------- */
+
+      function htmlFiltros(soloTem) {
+        var ts = temporadas(d).map(function (t) { return [t.ID, txt(t.NOMBRE || t.ID)]; });
+        var h = '<div class="gs-filtros' + (soloTem ? ' gs-filtros-1' : '') + '"><select class="gs-sel" id="gs-temp" data-f="temp" aria-label="Temporada">' + opciones(ts, tem.ID) + '</select>';
+        if (soloTem) return h + '</div>';
         var cs = compsDe(d, tem.ID).map(function (c) { return [c.ID, txt(c.NOMBRE_COMERCIAL || c.NOMBRE)]; });
         if (S.comp && !cs.some(function (c) { return c[0] === S.comp; })) S.comp = '';
         var ls = d.lig.filter(function (l) { return S.comp ? String(l.ID_COMPETICION) === S.comp : cs.some(function (c) { return c[0] === String(l.ID_COMPETICION); }); })
+          .sort(function (a, b) { return (DIAS.indexOf(diaNorm(a.DIA_SEMANA)) - DIAS.indexOf(diaNorm(b.DIA_SEMANA))) || txt(a.NOMBRE).localeCompare(txt(b.NOMBRE), 'es'); })
           .map(function (l) { return [l.ID, txt(l.NOMBRE) + (S.comp ? '' : ' · ' + nomComp(l.ID_COMPETICION))]; });
-        return '<label class="u-campo"><span class="u-etiqueta">Competición</span><select data-f="comp">' + opciones(cs, S.comp, 'Todas') + '</select></label>' +
-          '<label class="u-campo"><span class="u-etiqueta">Liga</span><select data-f="liga">' + opciones([['-', 'Sin liga']].concat(ls), S.liga, 'Todas') + '</select></label>';
+        if (S.liga && S.liga !== '-' && !ls.some(function (l) { return l[0] === S.liga; })) S.liga = '';
+        return h + '<select class="gs-sel" id="gs-fcomp" data-f="comp" aria-label="Competición">' + opciones(cs, S.comp, 'Todas las competiciones') + '</select>' +
+          '<select class="gs-sel" id="gs-fliga" data-f="liga" aria-label="Liga">' + opciones(ls.concat([['-', 'Sin liga']]), S.liga, 'Todas las ligas') + '</select></div>';
+      }
+      function puestos(soloTem) {
+        var p = [], act = temporadaActual(d);
+        if (act && tem.ID !== act.ID) p.push(['temp', 'Temporada ' + txt(tem.NOMBRE)]);
+        if (soloTem) return p;
+        if (S.comp) p.push(['comp', nomComp(S.comp)]);
+        if (S.liga) p.push(['liga', S.liga === '-' ? 'Sin liga' : nom('lig', S.liga)]);
+        if (S.tab === 'JUGADORAS' && S.ju.equipo) p.push(['equipo', nomIe(S.ju.equipo)]);
+        return p;
+      }
+      function filtrosPlegables(extra, soloTem) {
+        var p = puestos(soloTem);
+        return '<button type="button" class="gs-chip gs-fbtn" id="gs-fbtn" aria-expanded="' + !!S.filAb + '" aria-controls="gs-mas">Filtros' +
+          (p.length ? '<span class="gs-fn">' + p.length + '</span>' : '') + '</button>' +
+          (p.length && !S.filAb ? '<div class="gs-puestos">' + p.map(function (x) {
+            return '<button type="button" class="gs-puesto" data-quitar="' + x[0] + '" aria-label="Quitar ' + texto(x[1]) + '"><span>' + texto(x[1]) + '</span><i aria-hidden="true">✕</i></button>';
+          }).join('') + '</div>' : '') +
+          '<div class="gs-mas' + (S.filAb ? '' : ' gs-cerr') + '" id="gs-mas">' + htmlFiltros(soloTem) + (extra || '') + '</div>';
       }
       function enFiltro(ie) {
         if (S.comp && String(ie.ID_COMPETICION) !== S.comp) return false;
         if (S.liga === '-' ? !!ie.ID_LIGA : S.liga && String(ie.ID_LIGA) !== S.liga) return false;
         return true;
       }
+      /** Botones de filtro con su contador: [[valor, texto, cuántos]]. */
+      function chips(lista, actual, grupo) {
+        return '<div class="gs-chips" data-chips="' + grupo + '">' + lista.map(function (c) {
+          return '<button type="button" class="gs-chip" data-chip="' + grupo + '" data-v="' + texto(c[0]) + '" aria-pressed="' + (c[0] === actual) + '">' + texto(c[1]) + (c[2] != null ? ' · ' + c[2] : '') + '</button>';
+        }).join('') + '</div>';
+      }
+      function buscador(k, valor, largo) {
+        return '<div class="gs-fila gs-busca"><input type="search" class="gs-sel" data-q="' + k + '" id="gs-q-' + k + '" placeholder="' + texto(ancho() ? largo : 'Buscar…') + '" value="' + texto(valor) + '" aria-label="Buscar"></div>';
+      }
+      function diaNorm(x) { var n = norm(x); return DIAS.filter(function (dd) { return norm(dd) === n; })[0] || txt(x); }
+
+      /* ---------- RESUMEN: cifras, alertas y, por día, cada liga con sus equipos ---------- */
+
+      function estadoPago(i) {
+        if (!PAGOS || i.ESTADO !== 'Confirmada') return '';
+        var p = pagoDe(i);
+        if (!p) return '';
+        if (p.incluida) return '<span class="gs-pag gs-pos">Incluida</span>';
+        if (p.sinTarifa) return '<span class="gs-pag gs-amb">Sin tarifa</span>';
+        if (p.falta > 0) return '<span class="gs-pag gs-neg">' + (p.cobrado <= 0 ? 'Sin pagar · ' : 'Faltan ') + eurC(p.falta) + '</span>';
+        return '<span class="gs-pag gs-pos">Pagado</span>';
+      }
+      function edadMedia(idIe) {
+        var es = activas(idIe).map(function (j) { var p = ix.jug[j.ID_JUGADORA]; return p ? edad(p.FECHA_NACIMIENTO) : ''; }).filter(function (x) { return x !== ''; });
+        return es.length ? es.reduce(function (a, b) { return a + b; }, 0) / es.length : 0;
+      }
+      function diaDe(k) { if (!k) return 'Sin liga'; var l = ix.lig[k]; return l ? diaNorm(l.DIA_SEMANA) || 'Otro día' : 'Otro día'; }
+
+      /** Un grupo de Alertas: se despliega con su lista (hasta 40); cada línea abre su ficha; al final, ir a la pestaña ya filtrada. */
+      function htmlAlerta(titulo, items, ir) {
+        if (!items.length) return '<details class="gs-alt" data-vacio><summary><span>' + texto(titulo) + '</span><em class="gs-pos">0</em></summary></details>';
+        return '<details class="gs-alt"><summary><span>' + texto(titulo) + '</span><em class="gs-neg">' + items.length + '</em></summary>' +
+          items.slice(0, 40).map(function (x) {
+            return '<button type="button" class="gs-alt-i" ' + x.attr + '><b>' + x.nombre + '</b>' + (x.detalle || '') + (x.sub ? '<small>' + texto(x.sub) + '</small>' : '') + '</button>';
+          }).join('') + (items.length > 40 ? '<div class="gs-mas-n">Y ' + (items.length - 40) + ' más.</div>' : '') +
+          (ir && pest.indexOf(ir[0]) >= 0 ? '<p class="gs-ir"><button type="button" class="gs-chip" data-ir="' + ir[0] + '" data-irf="' + ir[1] + '">Ver en ' + PESTANAS[ir[0]] + ' ›</button></p>' : '') + '</details>';
+      }
+      function lineas(av) { return '<span class="gs-pag gs-amb">' + av.map(function (a) { return '<span>' + texto(a.t) + '</span>'; }).join('') + '</span>'; }
+      function itemEq(i, detalle) {
+        var cap = ix.jug[i.ID_CAPITANA];
+        return { attr: 'data-ie="' + texto(i.ID) + '"', nombre: punto(i.ID_COLOR) + '<span>' + texto(nomIe(i.ID)) + '</span>', detalle: detalle,
+          sub: [nombreJug(cap), i.ID_LIGA ? nom('lig', i.ID_LIGA) : nomComp(i.ID_COMPETICION)].filter(Boolean).join(' · ') };
+      }
 
       function htmlResumen() {
-        var vis = ies.filter(enFiltro), eqs = vis.filter(cuenta), conf = eqs.filter(function (i) { return i.ESTADO === 'Confirmada'; });
-        var activas = 0, falta = 0, nFalta = 0, grupos = {};
-        var visIx = indice(vis);
-        d.ij.forEach(function (j) { var ie = visIx[j.ID_INSCRIPCION_EQUIPO]; if (ie && cuenta(ie) && j.ESTADO === 'Activa') activas++; });
-        vis.forEach(function (ie) {
-          avisosEquipo(d, ie, cx).forEach(function (a) { (grupos[a.k] = grupos[a.k] || []).push({ ie: ie, a: a }); });
-          if (PAGOS && cuenta(ie) && ie.ESTADO === 'Confirmada') { var p = pago(d, ie); if (p && p.falta > 0 && !p.incluida && !p.sinTarifa) { falta += p.falta; nFalta++; } }
+        var vis = ies.filter(enFiltro), eqs = vis.filter(inscrito), leidas = jugLeidas();
+        var nJug = 0;
+        eqs.forEach(function (i) { nJug += activas(i.ID).length; });
+        var porPagar = eqs.filter(function (i) { return falta(i) > 0; });
+        var sinConf = vis.filter(function (i) { return cuenta(i) && i.ESTADO === 'Solicitada'; });
+        var sinLiga = eqs.filter(function (i) { return !i.ID_LIGA; });
+        var problemas = eqs.filter(function (i) { return avE(i).some(function (a) { return a.k !== 'pago' && a.k !== 'liga'; }); });
+        var jAl = [];
+        if (leidas) eqs.forEach(function (i) { activas(i.ID).forEach(function (j) { if (avJ(j).length) jAl.push(j); }); });
+        var fotos = pest.indexOf('FOTOS') >= 0 ? d.fot.filter(function (f) { return String(f.ID_TEMPORADA) === String(tem.ID) && f.ESTADO === 'Sin vincular'; }) : [];
+        var revs = pest.indexOf('REVISIONES') >= 0 ? d.rev.filter(function (r) { return r.RESUELTO !== true; }) : [];
+        var nAl = porPagar.length + sinConf.length + problemas.length + sinLiga.length + jAl.length + fotos.length + revs.length;
+
+        var h = '<div class="gs-filtrar">' + filtrosPlegables() + '</div><div class="gs-res-top">' +
+          '<div class="gs-mini gs-mini-' + (PAGOS ? 4 : 3) + '">' +
+          '<button type="button" data-ir="EQUIPOS" data-irf="inscritos"><b>' + eqs.length + '</b><small>Equipos</small></button>' +
+          '<button type="button" data-ir="JUGADORAS" data-irf="activas"><b>' + (leidas ? nJug : '…') + '</b><small>Jugadoras</small></button>' +
+          (PAGOS ? '<button type="button" data-ir="EQUIPOS" data-irf="pagar" class="' + (porPagar.length ? 'gs-alerta' : '') + '"><b>' + porPagar.length + '</b><small>Por pagar</small></button>' : '') +
+          '<button type="button" data-kpi="alertas" class="' + (nAl ? 'gs-alerta' : '') + '"><b>' + nAl + '</b><small>Alertas</small></button></div>' +
+          '<div class="gs-card gs-alts" id="gs-alts"><div class="gs-alts-t">Alertas</div>' +
+          (PAGOS ? htmlAlerta('Pagos pendientes', porPagar.map(function (i) { return itemEq(i, estadoPago(i)); }), ['EQUIPOS', 'pagar']) : '') +
+          htmlAlerta('Sin confirmar', sinConf.map(function (i) { return itemEq(i, '<span class="gs-pag gs-amb">Inscripción sin confirmar</span>'); }), ['EQUIPOS', 'solicitadas']) +
+          htmlAlerta('Problemas en la inscripción', problemas.map(function (i) { return itemEq(i, lineas(avE(i).filter(function (a) { return a.k !== 'pago' && a.k !== 'liga'; }))); }), ['EQUIPOS', 'avisos']) +
+          htmlAlerta('Equipos sin liga', sinLiga.map(function (i) { return itemEq(i, ''); }), ['EQUIPOS', 'sinliga']) +
+          (leidas ? htmlAlerta('Jugadoras con alerta', jAl.map(function (j) {
+            return { attr: 'data-ij="' + texto(j.ID) + '"', nombre: '<span>' + texto(nombreJug(ix.jug[j.ID_JUGADORA]) || j.ID_JUGADORA) + '</span>', detalle: lineas(avJ(j)),
+              sub: [nomIe(j.ID_INSCRIPCION_EQUIPO), nom('lig', (ix.ie[j.ID_INSCRIPCION_EQUIPO] || {}).ID_LIGA)].filter(Boolean).join(' · ') };
+          }), ['JUGADORAS', 'avisos']) : '<details class="gs-alt"><summary><span>Jugadoras con alerta</span><em>…</em></summary><p class="gs-nota">Cargando las jugadoras…</p></details>') +
+          (pest.indexOf('FOTOS') >= 0 ? htmlAlerta('Fotos sin vincular', fotos.map(function (f) {
+            return { attr: 'data-foto="' + texto(f.ID) + '"', nombre: '<span>' + texto(f.NOMBRE_ORIGINAL || f.ID) + '</span>', sub: fecha(f.FECHA) };
+          }), ['FOTOS', 'Sin vincular']) : '') +
+          (pest.indexOf('REVISIONES') >= 0 ? htmlAlerta('Revisiones sin resolver', revs.map(function (r) {
+            return { attr: 'data-rev="' + texto(r.ID) + '"', nombre: '<span>' + texto(r.TIPO + ' · ' + r.ID_REGISTRO) + '</span>', sub: txt(r.MOTIVO) };
+          }), ['REVISIONES', '']) : '') + '</div></div>';
+
+        // Días con ligas (por el día de juego de LIGAS), en orden de la semana; al final, los equipos sin liga.
+        var grupos = {};
+        eqs.forEach(function (i) { var k = String(i.ID_LIGA || ''); (grupos[k] = grupos[k] || []).push(i); });
+        var dias = {};
+        Object.keys(grupos).forEach(function (k) { var dd = diaDe(k); (dias[dd] = dias[dd] || []).push(k); });
+        var orden = DIAS.filter(function (x) { return dias[x]; }).concat(Object.keys(dias).filter(function (x) { return DIAS.indexOf(x) < 0 && x !== 'Sin liga'; }))
+          .concat(dias['Sin liga'] ? ['Sin liga'] : []);
+        if (S.dia && !dias[S.dia]) S.dia = '';
+        var verDias = orden.filter(function (x) { return !S.dia || x === S.dia; });
+        var visibles = [];
+        verDias.forEach(function (x) { visibles = visibles.concat(dias[x]); });
+        var algunaAbierta = visibles.some(function (k) { return abiertas[k || 'SIN']; });
+        h += '<div class="gs-dias">' + [''].concat(orden).map(function (x) {
+          return '<button type="button" class="gs-chip" data-dia="' + texto(x) + '" aria-pressed="' + (x === S.dia) + '">' + texto(x || 'Todos los días') + '</button>';
+        }).join('') + (orden.length ? '<button type="button" class="gs-chip" id="gs-todas">' + (algunaAbierta ? 'Cerrar todas' : 'Abrir todas') + '</button>' : '') + '</div><div class="gs-semana">';
+        verDias.forEach(function (x) {
+          h += '<section class="gs-dia"><div class="gs-dia-h">' + texto(x) + '</div><div class="gs-ligas">';
+          dias[x].sort(function (a, b) {
+            if (!a) return 1; if (!b) return -1;
+            var la = ix.lig[a] || {}, lb = ix.lig[b] || {};
+            return nomComp(la.ID_COMPETICION).localeCompare(nomComp(lb.ID_COMPETICION), 'es') || txt(la.NOMBRE).localeCompare(txt(lb.NOMBRE), 'es');
+          }).forEach(function (k) {
+            var l = ix.lig[k], kk = k || 'SIN';
+            var lista = grupos[k].slice().sort(function (a, b) { return (Number(b.NIVEL) || 0) - (Number(a.NIVEL) || 0) || nomIe(a.ID).localeCompare(nomIe(b.ID), 'es'); });
+            var jug = 0; lista.forEach(function (i) { jug += activas(i.ID).length; });
+            var pend = lista.filter(function (i) { return falta(i) > 0; }).length;
+            var g = l ? staff(l.ID_GESTOR) : null;
+            h += '<details class="gs-card gs-liga" data-liga="' + texto(kk) + '"' + (abiertas[kk] ? ' open' : '') + '><summary>' +
+              '<div class="gs-liga-n">' + (l ? '<small>' + texto(nomComp(l.ID_COMPETICION)) + '</small>' + texto(l.NOMBRE) : 'Sin liga') + '</div>' +
+              (g ? '<div class="gs-liga-g"><span>Gestor: <b>' + texto(g.APODO || g.NOMBRE) + '</b></span>' + aWa(g.TELEFONO, 'WhatsApp', 'gs-wa') + '</div>' : '') +
+              '<div class="gs-liga-s">' + plural(lista.length, 'equipo', 'equipos') + ' · ' + (leidas ? plural(jug, 'jugadora', 'jugadoras') : '… jugadoras') +
+              (PAGOS ? (pend ? ' · <b class="gs-neg">' + pend + ' por pagar</b>' : ' · todo pagado') : '') + '</div></summary>' +
+              lista.map(function (i) {
+                var n = activas(i.ID).length, em = edad1(edadMedia(i.ID));
+                return '<button type="button" class="gs-eqr" data-ie="' + texto(i.ID) + '"><span class="gs-n">' + texto(i.NIVEL || '–') + '</span>' +
+                  '<b>' + punto(i.ID_COLOR) + '<span>' + texto(nomIe(i.ID)) + '</span></b>' + (estadoPago(i) || '<span></span>') +
+                  '<small>' + texto([nombreJug(ix.jug[i.ID_CAPITANA]), leidas ? (n ? plural(n, 'jugadora', 'jugadoras') : 'sin jugadoras') : '', em ? em + ' años' : ''].filter(Boolean).join(' · ')) +
+                  guardando(i) + '</small></button>';
+              }).join('') + '</details>';
+          });
+          h += '</div></section>';
         });
-        var jav = {};
-        if (S.ijTem === tem.ID) d.ij.forEach(function (j) { if (!visIx[j.ID_INSCRIPCION_EQUIPO]) return; avisosJugadora(d, j, cx).forEach(function (a) { (jav[a.k] = jav[a.k] || []).push({ ij: j, a: a }); }); });
-        var revs = d.rev.filter(function (r) { return r.RESUELTO !== true; }).length;
-        var sinV = d.fot.filter(function (f) { return String(f.ID_TEMPORADA) === String(tem.ID) && f.ESTADO === 'Sin vincular'; }).length;
-        var h = '<div class="u-filtros">' + filtrosComp() + '</div>' +
-          '<table class="u-tabla eco-tabla"><tbody>' +
-          fila('Equipos', plural(conf.length, 'confirmado', 'confirmados') + ' · ' + plural(eqs.length - conf.length, 'sin confirmar', 'sin confirmar'), String(eqs.length), 'EQUIPOS') +
-          fila('Jugadoras', S.ijTem === tem.ID ? 'Activas en esos equipos' : 'Cargando…', S.ijTem === tem.ID ? String(activas) : '…', 'JUGADORAS') +
-          (PAGOS ? fila('Por pagar', plural(nFalta, 'equipo confirmado', 'equipos confirmados') + ' con la inscripción sin pagar del todo', eur(falta), 'EQUIPOS', 'pago') : '') +
-          (pest.indexOf('REVISIONES') >= 0 ? fila('Revisiones', 'Casos dudosos sin resolver', String(revs), 'REVISIONES') : '') +
-          (pest.indexOf('FOTOS') >= 0 ? fila('Fotos sin vincular', 'De ' + texto(tem.NOMBRE), String(sinV), 'FOTOS') : '') +
-          '</tbody></table>';
-        function fila(t, nota, cifra, ir, ver) {
-          return '<tr tabindex="0" data-ir="' + ir + '"' + (ver ? ' data-ver="' + ver + '"' : '') + '><td class="u-tabla-t">' + t + '<div class="u-nota">' + nota + '</div></td><td class="num"><span class="u-cifra">' + cifra + '</span></td></tr>';
-        }
-        var nombresEq = { pago: 'Pagos pendientes', liga: 'Equipos confirmados sin liga', capitana: 'Capitana', solicitada: 'Inscripciones sin confirmar', seguimiento: 'Seguimiento (mensaje inicial, grupo)', color: 'Color repetido en la liga', nombre: 'Nombre repetido en la competición' };
-        var nombresJu = { dorsal: 'Dorsales (sin dorsal o repetido)', doble: 'Jugadoras en dos equipos de la misma competición', acepta: 'Sin aceptar normas, datos o responsabilidad' };
-        var ks = Object.keys(nombresEq).filter(function (k) { return grupos[k]; }), kj = Object.keys(nombresJu).filter(function (k) { return jav[k]; });
-        h += '<h2 class="n-grupo">Avisos de <span class="ges-destacar">' + texto(tem.NOMBRE) + '</span></h2>';
-        if (!ks.length && !kj.length) h += '<p class="u-vacio">' + (S.ijTem === tem.ID ? 'Nada pendiente con estos filtros.' : 'Sin avisos de equipos. Los de las jugadoras salen al cargarlas.') + '</p>';
-        ks.forEach(function (k) {
-          var xs = grupos[k];
-          h += '<details class="ges-grupo"><summary>' + nombresEq[k] + ' <span class="u-chip">' + xs.length + '</span></summary><table class="u-tabla eco-tabla"><tbody>' +
-            xs.slice(0, 40).map(function (x) { return '<tr tabindex="0" data-ie="' + texto(x.ie.ID) + '"><td class="u-tabla-t">' + punto(x.ie.ID_COLOR) + texto(nomIe(x.ie.ID)) + '<div class="u-nota">' + texto([nomComp(x.ie.ID_COMPETICION), nom('lig', x.ie.ID_LIGA)].filter(Boolean).join(' · ')) + '</div></td><td>' + texto(x.a.t) + '</td></tr>'; }).join('') +
-            '</tbody></table>' + (xs.length > 40 ? '<p class="u-nota">Y ' + (xs.length - 40) + ' más.</p>' : '') + '</details>';
-        });
-        kj.forEach(function (k) {
-          var xs = jav[k];
-          h += '<details class="ges-grupo"><summary>' + nombresJu[k] + ' <span class="u-chip">' + xs.length + '</span></summary><table class="u-tabla eco-tabla"><tbody>' +
-            xs.slice(0, 40).map(function (x) { return '<tr tabindex="0" data-ij="' + texto(x.ij.ID) + '"><td class="u-tabla-t">' + texto(nombreJug(ix.jug[x.ij.ID_JUGADORA]) || x.ij.ID_JUGADORA) + '<div class="u-nota">' + texto(nomIe(x.ij.ID_INSCRIPCION_EQUIPO)) + '</div></td><td>' + texto(x.a.t) + '</td></tr>'; }).join('') +
-            '</tbody></table>' + (xs.length > 40 ? '<p class="u-nota">Y ' + (xs.length - 40) + ' más.</p>' : '') + '</details>';
-        });
-        // Por liga: cada liga con sus equipos, del nivel más alto al más bajo.
-        var porLiga = {};
-        eqs.forEach(function (i) { var k = String(i.ID_LIGA || ''); (porLiga[k] = porLiga[k] || []).push(i); });
-        var ligas = Object.keys(porLiga).sort(function (a, b) {
-          if (!a) return 1; if (!b) return -1;
-          var la = ix.lig[a] || {}, lb = ix.lig[b] || {}, dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-          return (dias.indexOf(la.DIA_SEMANA) - dias.indexOf(lb.DIA_SEMANA)) || String(la.NOMBRE).localeCompare(String(lb.NOMBRE), 'es');
-        });
-        h += '<h2 class="n-grupo">Por liga</h2>';
-        if (!ligas.length) h += '<p class="u-vacio">No hay equipos inscritos en ' + texto(tem.NOMBRE) + (S.comp || S.liga ? ' con estos filtros' : '') + '. Inscribe el primero en Equipos.</p>';
-        ligas.forEach(function (k) {
-          var l = ix.lig[k], xs = porLiga[k].sort(function (a, b) { return (Number(b.NIVEL) || 0) - (Number(a.NIVEL) || 0) || nomIe(a.ID).localeCompare(nomIe(b.ID), 'es'); });
-          var g = l && l.ID_GESTOR ? nom('stf', l.ID_GESTOR) : '';
-          h += '<details class="ges-grupo"' + (S.abiertas && S.abiertas[k] ? ' open' : '') + ' data-liga="' + texto(k) + '"><summary>' + (l ? texto(l.NOMBRE) + ' · ' + texto(nomComp(l.ID_COMPETICION)) : 'Sin liga') +
-            ' <span class="u-chip">' + plural(xs.length, 'equipo', 'equipos') + '</span>' + (l ? '<span class="u-nota"> ' + texto([l.DIA_SEMANA, g].filter(Boolean).join(' · ')) + '</span>' : '') + '</summary>' +
-            '<table class="u-tabla eco-tabla n-lista"><thead><tr><th>Equipo</th><th>Nivel</th><th>Jugadoras</th>' + (PAGOS ? '<th class="num">Falta</th>' : '') + '</tr></thead><tbody>' +
-            xs.map(function (i) {
-              var p = PAGOS ? pago(d, i) : null, n = plantilla(d, i.ID).filter(function (j) { return j.ESTADO === 'Activa'; }).length;
-              return '<tr tabindex="0" data-ie="' + texto(i.ID) + '"><td class="u-tabla-t">' + punto(i.ID_COLOR) + texto(nomIe(i.ID)) + chip(i) + (i.ESTADO !== 'Confirmada' ? ' <span class="u-chip">' + texto(i.ESTADO) + '</span>' : '') + '</td>' +
-                '<td data-t="Nivel">' + texto(i.NIVEL ? 'Nivel ' + i.NIVEL : '') + '</td><td>' + (S.ijTem === tem.ID ? plural(n, 'jugadora', 'jugadoras') : '') + '</td>' +
-                (PAGOS ? '<td class="num">' + (i.ESTADO !== 'Confirmada' ? '' : p && p.falta > 0 && !p.sinTarifa ? '<span class="u-mal">' + eur(p.falta) + '</span>' : p && p.sinTarifa ? '<span class="u-nota">Sin tarifa</span>' : '<span class="u-nota">Al día</span>') + '</td>' : '') + '</tr>';
-            }).join('') + '</tbody></table></details>';
-        });
-        return cargandoJug() + h;
+        h += '</div>';
+        if (!orden.length) h += '<div class="gs-vacio">' + (ies.length ? 'No hay equipos con estos filtros.' : 'Todavía no hay equipos inscritos en ' + texto(tem.NOMBRE) + '. Inscribe el primero en Equipos.') + '</div>';
+        return h;
       }
 
-      var VER_EQ = { '': 'Todos', confirmados: 'Confirmados', solicitados: 'Sin confirmar', avisos: 'Con avisos', pago: 'Por pagar', bajas: 'Bajas', copas: 'Copas y supercopas' };
-      function equiposFiltrados() {
-        var q = norm(S.eq.q), v = S.eq.ver;
-        return ies.filter(function (i) {
-          if (!enFiltro(i)) return false;
-          if (v === 'bajas') { if (i.ESTADO !== 'Baja') return false; }
-          else if (v === 'copas') { if (i.ORIGEN !== 'Clasificación') return false; }
-          else if (!q && (i.ESTADO === 'Baja')) return false;
-          if (v === 'confirmados' && i.ESTADO !== 'Confirmada') return false;
-          if (v === 'solicitados' && i.ESTADO !== 'Solicitada') return false;
-          if (v === 'avisos' && !avisosEquipo(d, i, cx).length) return false;
-          if (v === 'pago') { var p = pago(d, i); if (i.ESTADO !== 'Confirmada' || !p || p.incluida || p.sinTarifa || p.falta <= 0) return false; }
-          if (q) {
-            var cap = ix.jug[i.ID_CAPITANA];
-            if (norm([i.ID, i.NOMBRE_EQUIPO, nom('eqs', i.ID_EQUIPO), nom('lig', i.ID_LIGA), nom('stf', i.ID_RESPONSABLE), nombreJug(cap), cap && cap.TELEFONO].join(' ')).indexOf(q) < 0) return false;
-          }
-          return true;
-        }).sort(function (a, b) { return nomIe(a.ID).localeCompare(nomIe(b.ID), 'es'); });
+      /* ---------- EQUIPOS ---------- */
+
+      var FILTROS_EQ = {
+        inscritos: inscrito,
+        sinliga: function (i) { return inscrito(i) && !i.ID_LIGA; },
+        pagar: function (i) { return inscrito(i) && falta(i) > 0; },
+        avisos: function (i) { return inscrito(i) && avE(i).length > 0; },
+        solicitadas: function (i) { return i.ESTADO === 'Solicitada' && i.ORIGEN !== 'Clasificación'; },
+        bajas: function (i) { return i.ESTADO === 'Baja'; },
+        copas: function (i) { return i.ORIGEN === 'Clasificación' && i.ESTADO !== 'Baja'; }
+      };
+      function tagsEquipo(i) {
+        var t = [];
+        if (i.ESTADO === 'Baja') t.push(tag('Baja · no cuenta', 'gs-tag-err'));
+        if (i.ORIGEN === 'Clasificación') t.push(tag('Copa', 'gs-tag-g'));
+        avE(i).forEach(function (a) {
+          t.push(tag(a.t, a.k === 'solicitada' ? 'gs-tag-g' : a.k === 'liga' ? '' : a.k === 'nombre' || a.k === 'color' ? 'gs-tag-r' : 'gs-tag-a'));
+        });
+        if (inscrito(i) && i.EN_XPORTY !== true) t.push(tag('Sin Xporty', 'gs-tag-g'));
+        t.push(guardando(i));
+        return t.filter(Boolean);
       }
       function htmlEquipos() {
-        var xs = equiposFiltrados();
-        var h = '<div class="eco-cab"><p class="u-nota">' + plural(xs.length, 'inscripción', 'inscripciones') + ' de equipo</p>' +
-          '<button type="button" class="u-btn u-btn-accion" data-accion="inscribirEquipo">Inscribir equipo</button></div>' +
-          '<div class="u-filtros"><label class="u-campo"><span class="u-etiqueta">Buscar</span><input type="search" data-q="eq" value="' + texto(S.eq.q) + '" placeholder="Equipo, capitana, liga…"></label>' + filtrosComp() +
-          '<label class="u-campo"><span class="u-etiqueta">Ver</span><select data-f="eqver">' + opciones(Object.keys(VER_EQ).filter(function (k) { return k && (PAGOS || k !== 'pago'); }).map(function (k) { return [k, VER_EQ[k]]; }), S.eq.ver, 'Todos') + '</select></label></div>';
-        if (!xs.length) return h + '<p class="u-vacio">' + (ies.length ? 'Ningún equipo cumple el filtro. Quita algún filtro para ver más.' : 'Todavía no hay equipos inscritos en ' + texto(tem.NOMBRE) + '. Los que inscribas salen aquí al momento.') + '</p>';
-        return h + '<table class="u-tabla eco-tabla n-lista"><thead><tr><th>Equipo</th><th>Liga</th><th>Capitana</th><th>Jugadoras</th><th>Avisos</th></tr></thead><tbody>' + xs.map(function (i) {
-          var n = plantilla(d, i.ID).filter(function (j) { return j.ESTADO === 'Activa'; }).length, av = avisosEquipo(d, i, cx);
-          return '<tr tabindex="0" data-ie="' + texto(i.ID) + '"><td class="u-tabla-t">' + punto(i.ID_COLOR) + texto(nomIe(i.ID)) + chip(i) +
-            (i.ESTADO !== 'Confirmada' ? ' <span class="u-chip">' + texto(i.ESTADO) + '</span>' : '') + (i.ORIGEN === 'Clasificación' ? ' <span class="u-chip">Copa</span>' : '') +
-            '<div class="u-nota">' + texto([S.comp ? '' : nomComp(i.ID_COMPETICION), i.NIVEL ? 'Nivel ' + i.NIVEL : ''].filter(Boolean).join(' · ')) + '</div></td>' +
-            '<td>' + texto(nom('lig', i.ID_LIGA)) + '</td><td>' + texto(nombreJug(ix.jug[i.ID_CAPITANA])) + '</td>' +
-            '<td>' + (S.ijTem === tem.ID ? plural(n, 'jugadora', 'jugadoras') : '…') + '</td><td>' + chips(av) + '</td></tr>';
-        }).join('') + '</tbody></table>';
+        var base = ies.filter(enFiltro), n = function (k) { return base.filter(FILTROS_EQ[k]).length; };
+        var ls = [['inscritos', 'Inscritos', n('inscritos')], ['sinliga', 'Sin liga', n('sinliga')]];
+        if (PAGOS) ls.push(['pagar', 'Por pagar', n('pagar')]);
+        ls.push(['avisos', 'Avisos', n('avisos')], ['solicitadas', 'Sin confirmar', n('solicitadas')], ['bajas', 'Bajas', n('bajas')]);
+        if (n('copas')) ls.push(['copas', 'Copas', n('copas')]);
+        if (!FILTROS_EQ[S.eq.filtro] || (S.eq.filtro === 'pagar' && !PAGOS)) S.eq.filtro = 'inscritos';
+        return '<div class="gs-filtrar">' + filtrosPlegables() + chips(ls, S.eq.filtro, 'eq') + buscador('eq', S.eq.q, 'Buscar: equipo, capitana, teléfono, liga, responsable…') + '</div>' +
+          '<div id="gs-lista">' + listaEquipos() + '</div>';
+      }
+      function listaEquipos() {
+        var q = norm(S.eq.q).trim();
+        // Buscando, se mira en toda la temporada, también en las bajas.
+        var xs = (q ? ies.filter(function (i) {
+          var cap = ix.jug[i.ID_CAPITANA];
+          return norm([i.ID, i.NOMBRE_EQUIPO, nom('eqs', i.ID_EQUIPO), nom('lig', i.ID_LIGA), nom('stf', i.ID_RESPONSABLE), nombreJug(cap), cap && cap.TELEFONO, cap && cap.EMAIL].join(' ')).indexOf(q) >= 0;
+        }) : ies.filter(enFiltro).filter(FILTROS_EQ[S.eq.filtro])).sort(porAlta);
+        var h = (q ? '<p class="gs-aviso-b">Buscando en toda la temporada ' + texto(tem.NOMBRE) + ', también en las bajas.</p>' : '') +
+          '<p class="gs-cuenta">' + plural(xs.length, 'inscripción', 'inscripciones') + '</p>';
+        if (!xs.length) return h + '<div class="gs-card"><div class="gs-vacio">' + (ies.length ? 'No hay inscripciones con este filtro.' : 'Todavía no hay equipos inscritos en ' + texto(tem.NOMBRE) + '. Los que inscribas salen aquí al momento.') + '</div></div>';
+        var leidas = jugLeidas();
+        if (ancho()) return h + caja('<table class="u-tabla gs-tabla"><thead><tr><th>Inscripción</th><th>Equipo</th>' + (S.comp ? '' : '<th>Competición</th>') +
+          '<th>Liga</th><th>Capitana</th><th class="num">Jugadoras</th><th class="num">Nivel</th><th>Avisos</th></tr></thead><tbody>' + xs.map(function (i) {
+            return '<tr tabindex="0"' + (i.ESTADO === 'Baja' ? ' class="gs-err"' : '') + ' data-ie="' + texto(i.ID) + '"><td class="gs-alta">' + alta(i.FECHA_INSCRIPCION) + '</td>' +
+              '<td class="u-tabla-t">' + punto(i.ID_COLOR) + texto(nomIe(i.ID)) + '</td>' + (S.comp ? '' : '<td>' + texto(nomComp(i.ID_COMPETICION)) + '</td>') +
+              '<td>' + texto(nom('lig', i.ID_LIGA)) + '</td><td>' + texto(nombreJug(ix.jug[i.ID_CAPITANA])) + '</td>' +
+              '<td class="num">' + (leidas ? activas(i.ID).length || '' : '…') + '</td><td class="num">' + texto(i.NIVEL || '') + '</td>' +
+              '<td><div class="gs-tags">' + tagsEquipo(i).join('') + '</div></td></tr>';
+          }).join('') + '</tbody></table>');
+        return h + '<div class="gs-card"><div class="gs-lista">' + xs.map(function (i) {
+          var t = tagsEquipo(i), n = leidas ? activas(i.ID).length : 0;
+          return '<button type="button" class="gs-item' + (i.ESTADO === 'Baja' ? ' gs-err' : '') + '" data-ie="' + texto(i.ID) + '"><div class="gs-min">' +
+            '<div class="gs-t">' + punto(i.ID_COLOR) + texto(nomIe(i.ID) || '(sin nombre)') + '</div>' +
+            '<div class="gs-s">' + texto([S.comp ? '' : nomComp(i.ID_COMPETICION), i.ID_LIGA ? nom('lig', i.ID_LIGA) : '', nombreJug(ix.jug[i.ID_CAPITANA]), n ? plural(n, 'jugadora', 'jugadoras') : ''].filter(Boolean).join(' · ')) +
+            (q ? ' <span class="gs-alta">· ' + alta(i.FECHA_INSCRIPCION) + '</span>' : '') + '</div>' +
+            (t.length ? '<div class="gs-tags">' + t.join('') + '</div>' : '') + '</div><div class="gs-d">' + (i.NIVEL ? 'Nivel ' + texto(i.NIVEL) : '') + '</div></button>';
+        }).join('') + '</div></div>';
       }
 
-      var VER_JU = { '': 'Activas', avisos: 'Con avisos', dorsal: 'Sin dorsal', xporty: 'Sin Xporty', contactos: 'Sin contactos', bajas: 'Bajas' };
+      /* ---------- JUGADORAS ---------- */
+
+      function ijCuenta(j) { var ie = ix.ie[j.ID_INSCRIPCION_EQUIPO]; return j.ESTADO !== 'Baja' && !!ie && ie.ESTADO !== 'Baja'; }
+      var FILTROS_JUG = {
+        activas: ijCuenta,
+        avisos: function (j) { return ijCuenta(j) && avJ(j).length > 0; },
+        xporty: function (j) { return ijCuenta(j) && j.EN_XPORTY !== true; },
+        contactos: function (j) { return ijCuenta(j) && j.EN_CONTACTOS_GOOGLE !== true; },
+        dorsal: function (j) { return ijCuenta(j) && !txt(j.DORSAL); },
+        bajas: function (j) { return !ijCuenta(j); }
+      };
+      function tagsJugadora(j) {
+        var t = [];
+        if (!ijCuenta(j)) t.push(tag('Baja · no cuenta', 'gs-tag-err'));
+        avJ(j).forEach(function (a) { t.push(tag(a.t, a.k === 'doble' ? 'gs-tag-r' : 'gs-tag-a')); });
+        if (ijCuenta(j) && j.EN_XPORTY !== true) t.push(tag('Sin Xporty', 'gs-tag-g'));
+        if (ijCuenta(j) && j.EN_CONTACTOS_GOOGLE !== true) t.push(tag('Sin contacto', 'gs-tag-g'));
+        t.push(guardando(j));
+        return t.filter(Boolean);
+      }
+      function visJug() { return indice(ies.filter(enFiltro)); }
       function htmlJugadoras() {
-        var vis = indice(ies.filter(enFiltro)), q = norm(S.ju.q), v = S.ju.ver;
+        var vis = visJug();
         if (S.ju.equipo && !vis[S.ju.equipo]) S.ju.equipo = '';
-        var xs = d.ij.filter(function (j) {
-          var ie = vis[j.ID_INSCRIPCION_EQUIPO];
-          if (!ie) return false;
-          if (S.ju.equipo && String(j.ID_INSCRIPCION_EQUIPO) !== S.ju.equipo) return false;
-          if (v === 'bajas' ? j.ESTADO !== 'Baja' : j.ESTADO === 'Baja') return false;
-          if (v === 'avisos' && !avisosJugadora(d, j, cx).length) return false;
-          if (v === 'dorsal' && txt(j.DORSAL)) return false;
-          if (v === 'xporty' && j.EN_XPORTY === true) return false;
-          if (v === 'contactos' && j.EN_CONTACTOS_GOOGLE === true) return false;
-          if (q) {
-            var p = ix.jug[j.ID_JUGADORA] || {};
-            if (norm([j.ID_JUGADORA, nombreJug(p), p.TELEFONO, p.EMAIL, p.NUM_DOCUMENTO, p.INSTAGRAM, nomIe(j.ID_INSCRIPCION_EQUIPO), 'dorsal ' + txt(j.DORSAL)].join(' ')).indexOf(q) < 0 &&
-              !(telefono(q).length >= 6 && telefono(p.TELEFONO).indexOf(telefono(q)) >= 0)) return false;
-          }
-          return true;
-        }).sort(function (a, b) { return nomIe(a.ID_INSCRIPCION_EQUIPO).localeCompare(nomIe(b.ID_INSCRIPCION_EQUIPO), 'es') || nombreJug(ix.jug[a.ID_JUGADORA]).localeCompare(nombreJug(ix.jug[b.ID_JUGADORA]), 'es'); });
-        var eqs = Object.keys(vis).map(function (k) { return vis[k]; }).filter(function (i) { return i.ESTADO !== 'Baja'; }).sort(function (a, b) { return nomIe(a.ID).localeCompare(nomIe(b.ID), 'es'); })
+        var eqs = Object.keys(vis).map(function (k) { return vis[k]; }).filter(function (i) { return i.ESTADO !== 'Baja'; })
+          .sort(function (a, b) { return nomIe(a.ID).localeCompare(nomIe(b.ID), 'es'); })
           .map(function (i) { return [i.ID, nomIe(i.ID) + (S.comp ? '' : ' · ' + nomComp(i.ID_COMPETICION))]; });
-        var h = '<div class="eco-cab"><p class="u-nota">' + (S.ijTem === tem.ID ? plural(xs.length, 'inscripción', 'inscripciones') + ' de jugadora' : 'Cargando…') + '</p>' +
-          '<button type="button" class="u-btn u-btn-accion" data-accion="inscribirJugadora">Inscribir jugadora</button></div>' +
-          '<div class="u-filtros"><label class="u-campo"><span class="u-etiqueta">Buscar</span><input type="search" data-q="ju" value="' + texto(S.ju.q) + '" placeholder="Nombre, teléfono, DNI, dorsal…"></label>' + filtrosComp() +
-          '<label class="u-campo"><span class="u-etiqueta">Equipo</span><select data-f="juequipo">' + opciones(eqs, S.ju.equipo, 'Todos') + '</select></label>' +
-          '<label class="u-campo"><span class="u-etiqueta">Ver</span><select data-f="juver">' + opciones(Object.keys(VER_JU).filter(Boolean).map(function (k) { return [k, VER_JU[k]]; }), v, 'Activas') + '</select></label></div>';
-        if (S.ijTem !== tem.ID) return h + cargandoJug();
-        if (xs.length) {
-          h += '<table class="u-tabla eco-tabla n-lista"><thead><tr><th>Jugadora</th><th>Equipo</th><th>Dorsal</th><th>Edad</th><th>Avisos</th></tr></thead><tbody>' + xs.slice(0, S.ju.n).map(function (j) {
-            var p = ix.jug[j.ID_JUGADORA] || {}, e = edad(p.FECHA_NACIMIENTO);
-            return '<tr tabindex="0" data-ij="' + texto(j.ID) + '"><td class="u-tabla-t">' + texto(nombreJug(p) || j.ID_JUGADORA) + chip(j) + (j.ESTADO === 'Baja' ? ' <span class="u-chip">Baja</span>' : '') + '</td>' +
-              '<td>' + punto((ix.ie[j.ID_INSCRIPCION_EQUIPO] || {}).ID_COLOR) + texto(nomIe(j.ID_INSCRIPCION_EQUIPO)) + '</td><td data-t="Dorsal">' + texto(txt(j.DORSAL) ? 'Dorsal ' + txt(j.DORSAL) : '') + '</td>' +
-              '<td>' + (e === '' ? '' : e + ' años') + '</td><td>' + chips(avisosJugadora(d, j, cx)) + '</td></tr>';
-          }).join('') + '</tbody></table>';
-          if (xs.length > S.ju.n) h += '<button type="button" class="u-btn" data-accion="vermas">Ver ' + Math.min(VER, xs.length - S.ju.n) + ' más</button>';
-        } else h += '<p class="u-vacio">' + (q ? 'Ninguna jugadora inscrita esta temporada encaja con la búsqueda.' : 'Ninguna jugadora cumple el filtro.') + '</p>';
+        var leidas = jugLeidas();
+        var base = leidas ? d.ij.filter(function (j) { return vis[j.ID_INSCRIPCION_EQUIPO] && (!S.ju.equipo || String(j.ID_INSCRIPCION_EQUIPO) === S.ju.equipo); }) : [];
+        var n = function (k) { return leidas ? base.filter(FILTROS_JUG[k]).length : null; };
+        if (!FILTROS_JUG[S.ju.filtro]) S.ju.filtro = 'activas';
+        return '<div class="gs-filtrar">' + filtrosPlegables('<div class="gs-fila gs-fila-eq"><select class="gs-sel" id="gs-jeq" data-f="juequipo" aria-label="Equipo">' +
+            opciones(eqs, S.ju.equipo, 'Todos los equipos (' + eqs.length + ')') + '</select></div>') +
+          chips([['activas', 'Inscritas', n('activas')], ['avisos', 'Con aviso', n('avisos')], ['xporty', 'Sin Xporty', n('xporty')], ['contactos', 'Sin contacto', n('contactos')],
+            ['dorsal', 'Sin dorsal', n('dorsal')], ['bajas', 'Bajas', n('bajas')]], S.ju.filtro, 'ju') +
+          buscador('ju', S.ju.q, 'Buscar: nombre, correo, DNI, teléfono, dorsal…') + '</div>' +
+          '<div id="gs-lista">' + listaJugadoras() + '</div>';
+      }
+      function listaJugadoras() {
+        if (!jugLeidas()) return cargandoJug();
+        var vis = visJug(), q = norm(S.ju.q).trim(), tq = telefono(S.ju.q), todas = indice(ies);
+        // Buscando, se mira en toda la temporada, también en las bajas; si no, el filtro de arriba.
+        var xs = d.ij.filter(function (j) {
+          if (q) {
+            if (!todas[j.ID_INSCRIPCION_EQUIPO]) return false;
+            var p = ix.jug[j.ID_JUGADORA] || {};
+            return norm([j.ID_JUGADORA, nombreJug(p), p.TELEFONO, p.EMAIL, p.NUM_DOCUMENTO, p.INSTAGRAM, nomIe(j.ID_INSCRIPCION_EQUIPO), 'dorsal ' + txt(j.DORSAL)].join(' ')).indexOf(q) >= 0 ||
+              (tq.length >= 6 && telefono(p.TELEFONO).indexOf(tq) >= 0);
+          }
+          return vis[j.ID_INSCRIPCION_EQUIPO] && (!S.ju.equipo || String(j.ID_INSCRIPCION_EQUIPO) === S.ju.equipo) && FILTROS_JUG[S.ju.filtro](j);
+        }).sort(porAlta);
+        var conEq = !!q || !S.ju.equipo;
+        var h = (q ? '<p class="gs-aviso-b">Buscando en toda la temporada ' + texto(tem.NOMBRE) + ', también en las bajas.</p>' : '') +
+          '<p class="gs-cuenta">' + plural(xs.length, 'inscripción', 'inscripciones') + '</p>';
+        var ver = xs.slice(0, S.ju.n);
+        if (!xs.length) h += '<div class="gs-card"><div class="gs-vacio">' + (q ? 'Ninguna jugadora inscrita esta temporada encaja con la búsqueda.' : 'No hay jugadoras con este filtro.') + '</div></div>';
+        else if (ancho()) h += caja('<table class="u-tabla gs-tabla"><thead><tr><th>Inscripción</th><th>Jugadora</th>' + (conEq ? '<th>Equipo</th>' : '') +
+          '<th class="num">Dorsal</th><th class="num">Edad</th><th>Avisos</th></tr></thead><tbody>' + ver.map(function (j) {
+            var p = ix.jug[j.ID_JUGADORA] || {}, ie = ix.ie[j.ID_INSCRIPCION_EQUIPO] || {};
+            return '<tr tabindex="0"' + (ijCuenta(j) ? '' : ' class="gs-err"') + ' data-ij="' + texto(j.ID) + '"><td class="gs-alta">' + alta(j.FECHA_INSCRIPCION) + '</td>' +
+              '<td class="u-tabla-t">' + texto(nombreJug(p) || j.ID_JUGADORA) + '</td>' +
+              (conEq ? '<td>' + punto(ie.ID_COLOR) + texto(nomIe(j.ID_INSCRIPCION_EQUIPO)) + (S.comp ? '' : ' <span class="gs-opc">· ' + texto(nomComp(ie.ID_COMPETICION)) + '</span>') + '</td>' : '') +
+              '<td class="num">' + texto(txt(j.DORSAL)) + '</td><td class="num">' + texto(edad(p.FECHA_NACIMIENTO)) + '</td>' +
+              '<td><div class="gs-tags">' + tagsJugadora(j).join('') + '</div></td></tr>';
+          }).join('') + '</tbody></table>');
+        else h += '<div class="gs-card"><div class="gs-lista">' + ver.map(function (j) { return itemJugadora(j, conEq, !!q); }).join('') + '</div></div>';
+        if (xs.length > S.ju.n) h += '<p class="gs-ir"><button type="button" class="gs-chip" data-accion="vermas">Ver ' + Math.min(VER, xs.length - S.ju.n) + ' más</button></p>';
         // Al buscar, también las que no están inscritas esta temporada (de otros años), para abrir su ficha o inscribirlas.
         if (q.length >= 3) {
           var ya = {}; xs.forEach(function (j) { ya[j.ID_JUGADORA] = 1; });
           var otras = buscarJugadoras(d.jug, S.ju.q, 30).filter(function (p) { return !ya[p.ID]; });
-          if (otras.length) h += '<h2 class="n-grupo">Otras jugadoras</h2><p class="u-nota">Sin inscripción en este filtro de ' + texto(tem.NOMBRE) + '.</p><table class="u-tabla eco-tabla n-lista"><tbody>' + otras.map(function (p) {
-            return '<tr tabindex="0" data-jug="' + texto(p.ID) + '"><td class="u-tabla-t">' + texto(nombreJug(p)) + '</td><td>' + texto(p.ID) + '</td><td>' + texto(p.TELEFONO) + '</td></tr>';
-          }).join('') + '</tbody></table>';
+          if (otras.length) h += '<div class="gs-sec">Otras jugadoras</div><p class="gs-nota">Sin inscripción en ' + texto(tem.NOMBRE) + ': de otros años o sin equipo.</p>' +
+            '<div class="gs-card"><div class="gs-lista">' + otras.map(function (p) {
+              return '<button type="button" class="gs-item" data-jug="' + texto(p.ID) + '"><div class="gs-min"><div class="gs-t">' + texto(nombreJug(p)) + '</div>' +
+                '<div class="gs-s">' + texto([p.ID, p.TELEFONO, p.EMAIL].filter(Boolean).join(' · ')) + '</div></div></button>';
+            }).join('') + '</div></div>';
         }
         return h;
       }
-
-      function htmlFotos() {
-        var fs = d.fot.filter(function (f) { return String(f.ID_TEMPORADA) === String(tem.ID) && (!S.fo.estado || f.ESTADO === S.fo.estado); })
-          .sort(function (a, b) { return String(b.FECHA) < String(a.FECHA) ? -1 : String(b.FECHA) > String(a.FECHA) ? 1 : String(a.NOMBRE_ORIGINAL).localeCompare(String(b.NOMBRE_ORIGINAL), 'es'); });
-        var h = '<div class="u-filtros"><label class="u-campo"><span class="u-etiqueta">Ver</span><select data-f="foestado">' + opciones([['Sin vincular', 'Sin vincular'], ['Vinculada', 'Vinculadas']], S.fo.estado, 'Todas') + '</select></label></div>' +
-          '<p class="u-nota">' + plural(fs.length, 'foto', 'fotos') + ' de ' + texto(tem.NOMBRE) + '. Toca una para verla y decir de quién es.</p>';
-        if (!fs.length) return h + '<p class="u-vacio">' + (S.fo.estado === 'Sin vincular' ? 'Todas las fotos de la temporada tienen su jugadora.' : 'No hay fotos con este filtro.') + '</p>';
-        return h + '<table class="u-tabla eco-tabla n-lista"><thead><tr><th>Foto</th><th>Jugadora</th><th>Fecha</th><th>Publicable</th></tr></thead><tbody>' + fs.slice(0, 300).map(function (f) {
-          return '<tr tabindex="0" data-foto="' + texto(f.ID) + '"><td class="u-tabla-t">' + texto(f.NOMBRE_ORIGINAL || f.ID) + chip(f) + (f.ESTADO === 'Sin vincular' ? ' <span class="u-chip">Sin vincular</span>' : '') + '</td>' +
-            '<td>' + texto(nombreJug(ix.jug[f.ID_JUGADORA])) + '</td><td>' + fecha(f.FECHA) + '</td><td>' + (f.PUBLICABLE === true ? 'Sí' : 'No') + '</td></tr>';
-        }).join('') + '</tbody></table>' + (fs.length > 300 ? '<p class="u-nota">Y ' + (fs.length - 300) + ' más.</p>' : '');
+      function itemJugadora(j, conEq, conAlta) {
+        var p = ix.jug[j.ID_JUGADORA] || {}, ie = ix.ie[j.ID_INSCRIPCION_EQUIPO] || {}, t = tagsJugadora(j), e = edad(p.FECHA_NACIMIENTO);
+        return '<button type="button" class="gs-item' + (ijCuenta(j) ? '' : ' gs-err') + '" data-ij="' + texto(j.ID) + '"><div class="gs-min">' +
+          '<div class="gs-t">' + texto(nombreJug(p) || j.ID_JUGADORA) + '</div>' +
+          '<div class="gs-s">' + (conEq ? punto(ie.ID_COLOR) : '') + texto([conEq ? nomIe(j.ID_INSCRIPCION_EQUIPO) : '', e !== '' ? e + ' años' : ''].filter(Boolean).join(' · ')) +
+          (conAlta ? ' <span class="gs-alta">· ' + alta(j.FECHA_INSCRIPCION) + '</span>' : '') + '</div>' +
+          (t.length ? '<div class="gs-tags">' + t.join('') + '</div>' : '') + '</div><div class="gs-d">' + (txt(j.DORSAL) ? texto(txt(j.DORSAL)) : '') + '</div></button>';
       }
 
+      /* ---------- FOTOS y REVISIONES ---------- */
+
+      function htmlFotos() {
+        var deTem = d.fot.filter(function (f) { return String(f.ID_TEMPORADA) === String(tem.ID); });
+        var n = function (e) { return deTem.filter(function (f) { return !e || f.ESTADO === e; }).length; };
+        var fs = deTem.filter(function (f) { return !S.fo.filtro || f.ESTADO === S.fo.filtro; })
+          .sort(function (a, b) { return String(b.FECHA) < String(a.FECHA) ? -1 : String(b.FECHA) > String(a.FECHA) ? 1 : String(a.NOMBRE_ORIGINAL).localeCompare(String(b.NOMBRE_ORIGINAL), 'es'); });
+        var h = '<div class="gs-filtrar">' + filtrosPlegables('', true) + chips([['Sin vincular', 'Sin vincular', n('Sin vincular')], ['Vinculada', 'Vinculadas', n('Vinculada')], ['', 'Todas', n('')]], S.fo.filtro, 'fo') + '</div>' +
+          '<p class="gs-cuenta">' + plural(fs.length, 'foto', 'fotos') + ' de ' + texto(tem.NOMBRE) + '. Toca una para verla y decir de quién es.</p>';
+        if (!fs.length) return h + '<div class="gs-card"><div class="gs-vacio">' + (S.fo.filtro === 'Sin vincular' ? 'Todas las fotos de la temporada tienen su jugadora.' : 'No hay fotos con este filtro.') + '</div></div>';
+        h += '<div id="gs-lista">';
+        var ver = fs.slice(0, 300), mas = fs.length > 300 ? '<div class="gs-mas-n">Y ' + (fs.length - 300) + ' más.</div>' : '';
+        if (ancho()) return h + caja('<table class="u-tabla gs-tabla"><thead><tr><th>Fecha</th><th>Foto</th><th>Jugadora</th><th>Publicable</th></tr></thead><tbody>' + ver.map(function (f) {
+          return '<tr tabindex="0" data-foto="' + texto(f.ID) + '"><td class="gs-alta">' + fecha(f.FECHA) + '</td><td class="u-tabla-t">' + texto(f.NOMBRE_ORIGINAL || f.ID) + '</td>' +
+            '<td>' + (f.ID_JUGADORA ? texto(nombreJug(ix.jug[f.ID_JUGADORA]) || f.ID_JUGADORA) : tag('Sin vincular', 'gs-tag-a')) + '</td><td>' + (f.PUBLICABLE === true ? 'Sí' : 'No') + guardando(f) + '</td></tr>';
+        }).join('') + '</tbody></table>') + mas + '</div>';
+        return h + '<div class="gs-card"><div class="gs-lista">' + ver.map(function (f) {
+          return '<button type="button" class="gs-item" data-foto="' + texto(f.ID) + '"><div class="gs-min"><div class="gs-t">' + texto(f.NOMBRE_ORIGINAL || f.ID) + '</div>' +
+            '<div class="gs-s">' + texto([fecha(f.FECHA), f.ID_JUGADORA ? nombreJug(ix.jug[f.ID_JUGADORA]) || f.ID_JUGADORA : ''].filter(Boolean).join(' · ')) + '</div>' +
+            '<div class="gs-tags">' + (f.ID_JUGADORA ? '' : tag('Sin vincular', 'gs-tag-a')) + (f.PUBLICABLE === true ? tag('Publicable', 'gs-tag-v') : '') + guardando(f) + '</div></div></button>';
+        }).join('') + mas + '</div></div></div>';
+      }
       function htmlRevisiones() {
+        var pend = d.rev.filter(function (r) { return r.RESUELTO !== true; }).length;
         var rs = d.rev.filter(function (r) { return S.rv.todas || r.RESUELTO !== true; }).sort(function (a, b) {
           if ((a.RESUELTO === true) !== (b.RESUELTO === true)) return a.RESUELTO === true ? 1 : -1;
           return String(b.FECHA) < String(a.FECHA) ? -1 : 1;
         });
-        var h = '<div class="eco-cab"><p class="u-nota">' + plural(d.rev.filter(function (r) { return r.RESUELTO !== true; }).length, 'revisión sin resolver', 'revisiones sin resolver') + ' · casos dudosos al unir una inscripción o una foto con su jugadora o equipo.</p>' +
-          '<button type="button" class="u-btn" data-accion="todasRev">' + (S.rv.todas ? 'Ver solo las pendientes' : 'Ver también las resueltas') + '</button></div>';
-        if (!rs.length) return h + '<p class="u-vacio">No hay revisiones pendientes.</p>';
-        return h + '<table class="u-tabla eco-tabla n-lista"><thead><tr><th>Caso</th><th>Motivo</th><th></th></tr></thead><tbody>' + rs.map(function (r) {
-          return '<tr tabindex="0" data-rev="' + texto(r.ID) + '"><td class="u-tabla-t">' + texto(r.TIPO) + ' · ' + texto(r.ID_REGISTRO) + chip(r) + '<div class="u-nota">' + fecha(r.FECHA) + (r.CANDIDATOS ? ' · ' + texto(r.CANDIDATOS) : '') + '</div></td>' +
-            '<td>' + texto(r.MOTIVO) + '</td><td>' + (r.RESUELTO === true ? '<span class="u-chip">Resuelta</span>' : '') + '</td></tr>';
-        }).join('') + '</tbody></table>';
+        var h = '<div class="gs-filtrar">' + chips([['', 'Sin resolver', pend], ['todas', 'Todas', d.rev.length]], S.rv.todas ? 'todas' : '', 'rv') + '</div>' +
+          '<p class="gs-cuenta">Casos dudosos al unir una inscripción o una foto con su jugadora o equipo.</p>';
+        if (!rs.length) return h + '<div class="gs-card"><div class="gs-vacio">No hay revisiones pendientes.</div></div>';
+        h += '<div id="gs-lista">';
+        if (ancho()) return h + caja('<table class="u-tabla gs-tabla"><thead><tr><th>Fecha</th><th>Caso</th><th>Motivo</th><th></th></tr></thead><tbody>' + rs.map(function (r) {
+          return '<tr tabindex="0" data-rev="' + texto(r.ID) + '"><td class="gs-alta">' + fecha(r.FECHA) + '</td><td class="u-tabla-t">' + texto(r.TIPO) + ' · ' + texto(r.ID_REGISTRO) +
+            (r.CANDIDATOS ? '<div class="gs-opc">' + texto(r.CANDIDATOS) + '</div>' : '') + '</td><td>' + texto(r.MOTIVO) + '</td>' +
+            '<td>' + (r.RESUELTO === true ? tag('Resuelta', 'gs-tag-v') : '') + guardando(r) + '</td></tr>';
+        }).join('') + '</tbody></table>') + '</div>';
+        return h + '<div class="gs-card"><div class="gs-lista">' + rs.map(function (r) {
+          return '<button type="button" class="gs-item" data-rev="' + texto(r.ID) + '"><div class="gs-min"><div class="gs-t">' + texto(r.TIPO) + ' · ' + texto(r.ID_REGISTRO) + '</div>' +
+            '<div class="gs-s">' + texto([fecha(r.FECHA), r.MOTIVO].filter(Boolean).join(' · ')) + '</div>' +
+            '<div class="gs-tags">' + (r.RESUELTO === true ? tag('Resuelta', 'gs-tag-v') : '') + guardando(r) + '</div></div></button>';
+        }).join('') + '</div></div></div>';
       }
 
-      /* ---------- ventanas ---------- */
+      /* ---------- ventanas (como las de la publicada: velo, hoja, ✕, Esc, pie fijo) ---------- */
 
       var alCerrar = null;
-      function ventana(html, alAbrir) {
-        vent.innerHTML = html;
-        velo.classList.add('abierto');
-        velo.scrollTop = 0;
+      function ventana(titulo, html, alAbrir) {
+        cerrar();
+        velo = document.createElement('div');
+        velo.className = 'gs-velo';
+        velo.innerHTML = '<div class="gs-hoja" role="dialog" aria-modal="true" aria-labelledby="gs-vt"><h2><span id="gs-vt">' + titulo + '</span>' +
+          '<button type="button" class="gs-x" aria-label="Cerrar" data-cerrar>×</button></h2>' + html + '</div>';
+        raiz.appendChild(velo);
+        vent = velo.querySelector('.gs-hoja');
+        document.documentElement.classList.add('gs-sin-scroll');
+        velo.addEventListener('click', function (e) { if (e.target === velo) cerrar(); });
         if (alAbrir) alAbrir();
         var p = vent.querySelector('input:not([type=hidden]):not([type=checkbox]), select, textarea');
         if (p && window.matchMedia && window.matchMedia('(hover: hover)').matches) p.focus();
       }
-      function cerrar() { velo.classList.remove('abierto'); vent.innerHTML = ''; if (alCerrar) { var f = alCerrar; alCerrar = null; f(); } }
-      function campo(et, html, extra) { return '<label class="u-campo' + (extra ? ' ' + extra : '') + '"><span class="u-etiqueta">' + et + '</span>' + html + '</label>'; }
-      function casilla(id, et, si) { return '<label class="u-check"><input type="checkbox" id="' + id + '"' + (si === true ? ' checked' : '') + '> ' + et + '</label>'; }
-      function val(id) { var e = vent.querySelector('#' + id); return !e ? undefined : e.type === 'checkbox' ? e.checked : String(e.value).trim(); }
-      function verError(mal) { var e = vent.querySelector('.u-error'); e.textContent = mal.join(' '); e.hidden = !mal.length; }
-      function cambios(f, v) {
-        var c = {};
-        Object.keys(v).forEach(function (k) {
-          if (v[k] === undefined) return;
-          // Una casilla vacía en el Excel es «no»: no se escribe false encima si no se ha tocado.
-          if (typeof v[k] === 'boolean' ? (f[k] === true) !== v[k] : String(f[k] == null ? '' : f[k]) !== String(v[k])) c[k] = v[k];
+      function cerrar() {
+        if (velo) { velo.remove(); velo = null; vent = null; }
+        document.documentElement.classList.remove('gs-sin-scroll');
+        if (alCerrar) { var f = alCerrar; alCerrar = null; f(); }
+      }
+      function tecla(e) { if (e.key === 'Escape' && velo) cerrar(); }
+      document.addEventListener('keydown', tecla);
+
+      /** Un campo de ficha: c = { id, et, t: 'texto'|'select'|'si'|'area'|'fecha'|'tel'|'email'|'buscar', v, opts, vacio, nota, pre, ancho, cls, attrs }. */
+      function campo(c) {
+        var v = c.v == null ? '' : c.v, inp;
+        if (c.t === 'si') return '<label class="gs-check' + (c.cls ? ' ' + c.cls : '') + '"><input type="checkbox" id="' + c.id + '"' + (v === true ? ' checked' : '') + (c.attrs || '') + '> ' + texto(c.et) + '</label>';
+        if (c.t === 'select') {
+          var os = (c.vacio !== undefined ? [['', c.vacio]] : []).concat(c.opts || []);
+          // Un valor que no está en la lista se ve tal cual, avisado.
+          if (String(v) !== '' && !os.some(function (o) { return String(o[0]) === String(v); })) os.splice(c.vacio !== undefined ? 1 : 0, 0, [v, v + ' (no está en la lista)']);
+          inp = '<select id="' + c.id + '"' + (c.attrs || '') + '>' + opciones(os, v) + '</select>';
+        } else if (c.t === 'area') inp = '<textarea id="' + c.id + '" rows="2"' + (c.attrs || '') + '>' + texto(v) + '</textarea>';
+        else {
+          if (c.t === 'fecha') v = String(v).slice(0, 10);
+          inp = '<input type="' + ({ fecha: 'date', tel: 'tel', email: 'email', buscar: 'search' }[c.t] || 'text') + '" id="' + c.id + '" value="' + texto(v) + '"' + (c.attrs || '') + ' autocomplete="off">';
+        }
+        return '<label class="gs-campo' + (c.ancho ? ' gs-ancho' : '') + (c.cls ? ' ' + c.cls : '') + '" for="' + c.id + '">' + (c.pre || '') + texto(c.et) + inp +
+          (c.nota ? '<div class="gs-nota">' + c.nota + '</div>' : '') + '</label>';
+      }
+      function val(id) { var e = vent && vent.querySelector('#' + id); return !e ? undefined : e.type === 'checkbox' ? e.checked : String(e.value).trim(); }
+      function verError(mal) { var e = vent.querySelector('#gs-err'); e.textContent = mal.join(' '); e.hidden = !mal.length; }
+      function pie(idOk, texto0) {
+        return '<div class="gs-error" id="gs-err" role="alert" hidden></div><div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-cerrar>' + (texto0 || 'Cerrar') + '</button>' +
+          '<button type="button" class="gs-b1" id="' + idOk + '">Guardar</button></div>';
+      }
+      /** Lo que hay escrito en una ficha para un grupo { pre, ks }. */
+      function valores(g) { var o = {}; g.ks.forEach(function (k) { o[k] = val(g.pre + k); }); if (g.ajustar) g.ajustar(o); return o; }
+      /** «Guardar N cambios» (desactivado «Sin cambios» si no hay), contando los de todos los grupos de la ficha. */
+      function guardable(idOk, grupos, guardar) {
+        var ok = vent.querySelector('#' + idOk);
+        function cuenta0() { return grupos.reduce(function (n, g) { return n + Object.keys(cambios(g.f, valores(g))).length; }, 0); }
+        function mira() { var n = cuenta0(); ok.disabled = !n; ok.textContent = n ? 'Guardar ' + plural(n, 'cambio', 'cambios') : 'Sin cambios'; }
+        vent.addEventListener('input', mira); vent.addEventListener('change', mira); mira();
+        ok.onclick = function () {
+          var cs = grupos.map(function (g) { return cambios(g.f, valores(g)); });
+          if (!cs.some(function (c) { return Object.keys(c).length; })) return;
+          var mal = guardar.validar ? guardar.validar(cs) : [];
+          if (mal.length) { verError(mal); return; }
+          verError([]); ok.disabled = true; ok.textContent = 'Guardando…';
+          // Al momento: la pantalla cambia ya (con «Guardando» en la fila) y el Excel se escribe por detrás.
+          cerrar();
+          var ps = guardar.escribir(cs).filter(Boolean);
+          Promise.all(ps).then(function () { if (ctx.abierta()) ctx.aviso('Guardado en el Excel.'); }, function () {});
+        };
+      }
+      function ligasDe(idComp) {
+        return d.lig.filter(function (l) { return String(l.ID_COMPETICION) === String(idComp); }).map(function (l) {
+          var g = staff(l.ID_GESTOR);
+          return [l.ID, [txt(l.NOMBRE), diaNorm(l.DIA_SEMANA), g ? txt(g.APODO || g.NOMBRE) : ''].filter(Boolean).join(' · ')];
         });
-        return c;
       }
-      function dato(et, v) { return v === '' || v == null ? '' : '<div><dt>' + et + '</dt><dd>' + v + '</dd></div>'; }
-      function guardar(tabla, f, c, que) {
-        if (!Object.keys(c).length) return;
-        T.actualizar(tabla, f.ID, c).then(function () { if (ctx.abierta()) ctx.aviso((que || 'Cambios') + ' guardados en el Excel.'); }, function () {});
-      }
-      function ligasDe(idComp) { return d.lig.filter(function (l) { return String(l.ID_COMPETICION) === String(idComp); }).map(function (l) { return [l.ID, txt(l.NOMBRE) + (l.DIA_SEMANA ? ' · ' + l.DIA_SEMANA : '')]; }); }
       function gestores() {
         return d.stf.filter(function (s) { return s.ES_GESTOR === true && s.ACTIVO !== false; }).map(function (s) { return [s.ID, txt(s.APODO || s.NOMBRE)]; })
           .sort(function (a, b) { return a[1].localeCompare(b[1], 'es'); });
       }
+      var NIVELES = ['1', '2', '3', '4', '5'].map(function (n) { return [n, n + (n === '1' ? ' (el más bajo)' : n === '5' ? ' (el más alto)' : '')]; });
 
-      /** Ficha de la inscripción de un equipo: lo de este año (editable), el equipo, sus pagos y su plantilla. */
+      /** Ficha de la inscripción de un equipo: liga y organización, seguimiento, pagos, plantilla, el equipo y la inscripción. */
       function fichaEquipo(ie) {
         var e = ix.eqs[ie.ID_EQUIPO] || {}, pl = plantilla(d, ie.ID), av = avisosEquipo(d, ie, cx), p = PAGOS ? pago(d, ie) : null;
+        var cap = ix.jug[ie.ID_CAPITANA], c = ix.com[ie.ID_COMPETICION] || {}, esTem = String(c.ID_TEMPORADA) === String(tem.ID);
         var otras = d.ie.filter(function (x) { return String(x.ID_EQUIPO) === String(ie.ID_EQUIPO) && x !== ie; })
           .sort(function (a, b) { return String(b.FECHA_INSCRIPCION) < String(a.FECHA_INSCRIPCION) ? -1 : 1; });
         var capis = pl.filter(function (j) { return j.ESTADO !== 'Baja'; }).map(function (j) { return [j.ID_JUGADORA, nombreJug(ix.jug[j.ID_JUGADORA]) || j.ID_JUGADORA]; });
-        if (ie.ID_CAPITANA && !capis.some(function (c) { return c[0] === String(ie.ID_CAPITANA); })) capis.unshift([ie.ID_CAPITANA, (nombreJug(ix.jug[ie.ID_CAPITANA]) || ie.ID_CAPITANA) + ' (no está en la plantilla)']);
-        var cols = d.col.map(function (c) { return [c.ID, txt(c.NOMBRE || c.CODIGO || c.ID)]; });
-        var html = '<h2 id="ges-vt">' + punto(ie.ID_COLOR) + texto(nomIe(ie.ID)) + '</h2>' +
-          '<p class="u-nota">' + texto([nomComp(ie.ID_COMPETICION), nom('lig', ie.ID_LIGA), ie.ID].filter(Boolean).join(' · ')) + chips(av) + '</p>' +
-          (ix.jug[ie.ID_CAPITANA] && ix.jug[ie.ID_CAPITANA].TELEFONO ? '<div class="n-botones">' + whatsapp(ix.jug[ie.ID_CAPITANA].TELEFONO, 'Escribir a la capitana') + '</div>' : '') +
-          '<h3 class="n-grupo">Esta temporada</h3><div class="u-campos">' +
-          campo('Nombre este año', '<input type="text" id="e-NOMBRE_EQUIPO" value="' + texto(ie.NOMBRE_EQUIPO) + '" maxlength="80">') +
-          campo('Estado', '<select id="e-ESTADO">' + opciones([['Solicitada', 'Solicitada'], ['Confirmada', 'Confirmada'], ['Baja', 'Baja']], ie.ESTADO) + '</select>') +
-          campo('Liga', '<select id="e-ID_LIGA">' + opciones(ligasDe(ie.ID_COMPETICION), ie.ID_LIGA, 'Sin liga todavía') + '</select>') +
-          campo('Nivel', '<select id="e-NIVEL">' + opciones(['1', '2', '3', '4', '5'].map(function (n) { return [n, n + (n === '1' ? ' (el más bajo)' : n === '5' ? ' (el más alto)' : '')]; }), ie.NIVEL, '—') + '</select>') +
-          campo('Color de camiseta', '<select id="e-ID_COLOR">' + opciones(cols, ie.ID_COLOR, 'Sin color') + '</select>') +
-          campo('Responsable (cobra la señal)', '<select id="e-ID_RESPONSABLE">' + opciones(gestores(), ie.ID_RESPONSABLE, 'Nadie') + '</select>') +
-          campo('Capitana', '<select id="e-ID_CAPITANA">' + opciones(capis, ie.ID_CAPITANA, capis.length ? 'Sin capitana' : 'Inscribe primero a sus jugadoras') + '</select>', 'u-ancho') +
-          '<div class="u-ancho ges-checks">' + casilla('e-MENSAJE_INICIAL_ENVIADO', 'Mensaje inicial enviado', ie.MENSAJE_INICIAL_ENVIADO) + casilla('e-GRUPO_CREADO', 'Grupo de WhatsApp creado', ie.GRUPO_CREADO) +
-          casilla('e-EN_XPORTY', 'En Xporty', ie.EN_XPORTY) + '</div>' +
-          campo('Notas internas', '<textarea id="e-NOTAS" rows="2">' + texto(ie.NOTAS) + '</textarea>', 'u-ancho') +
-          '</div><p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="e-guardar">Guardar</button><button type="button" class="u-btn" data-cerrar>Cerrar</button></div>';
+        if (ie.ID_CAPITANA && !capis.some(function (x) { return x[0] === String(ie.ID_CAPITANA); })) capis.unshift([ie.ID_CAPITANA, (nombreJug(cap) || ie.ID_CAPITANA) + ' (no está en la plantilla)']);
+        var cols = d.col.map(function (x) { return [x.ID, txt(x.NOMBRE || x.CODIGO || x.ID)]; });
+        var t = [];
+        if (ie.ESTADO === 'Baja') t.push(tag('Baja · no cuenta', 'gs-tag-r'));
+        if (ie.ORIGEN === 'Clasificación') t.push(tag('Copa', 'gs-tag-g'));
+        av.forEach(function (a) { t.push(tag(a.t, a.k === 'solicitada' ? 'gs-tag-g' : a.k === 'nombre' || a.k === 'color' ? 'gs-tag-r' : 'gs-tag-a')); });
+        var nAct = pl.filter(function (j) { return j.ESTADO === 'Activa'; }).length, cargandoPl = !jugLeidas() && esTem;
+        var html = '<p class="gs-nota gs-sub">' + texto([nomComp(ie.ID_COMPETICION), nom('lig', ie.ID_LIGA), ie.ID].filter(Boolean).join(' · ')) + '</p>' +
+          (t.length ? '<div class="gs-tags gs-sub2">' + t.join('') + '</div>' : '') +
+          '<div class="gs-btns">' + (cap ? aWa(cap.TELEFONO, 'Escribir a la capitana') : '') +
+          (ie.ESTADO !== 'Baja' ? '<button type="button" class="gs-b2" id="gs-verjug" data-id="' + texto(ie.ID) + '">Ver jugadoras</button>' : '') + '</div>' +
+          '<div class="gs-sec">Liga y organización</div><div class="gs-dos">' +
+          campo({ id: 'e-ID_LIGA', t: 'select', et: 'Liga', v: ie.ID_LIGA, opts: ligasDe(ie.ID_COMPETICION), vacio: '— Sin liga —' }) +
+          campo({ id: 'e-NIVEL', t: 'select', et: 'Nivel', v: ie.NIVEL == null ? '' : String(ie.NIVEL), opts: NIVELES, vacio: '—' }) +
+          campo({ id: 'e-ID_RESPONSABLE', t: 'select', et: 'Responsable (cobra la señal)', v: ie.ID_RESPONSABLE, opts: gestores(), vacio: '—' }) +
+          campo({ id: 'e-ID_COLOR', t: 'select', et: 'Color de camiseta', v: ie.ID_COLOR, opts: cols, vacio: '—', pre: '<i class="gs-color" id="gs-colpre" style="background:' + texto(hexDe(ie.ID_COLOR) || 'transparent') + '"></i>' }) +
+          campo({ id: 'e-NOMBRE_EQUIPO', t: 'texto', et: 'Nombre este año', v: ie.NOMBRE_EQUIPO, attrs: ' maxlength="80"' }) +
+          campo({ id: 'e-ESTADO', t: 'select', et: 'Estado', v: ie.ESTADO, opts: [['Solicitada', 'Solicitada (sin confirmar)'], ['Confirmada', 'Confirmada'], ['Baja', 'Baja (no cuenta)']] }) +
+          '</div>' +
+          '<div class="gs-sec">Seguimiento</div><div class="gs-checks">' +
+          campo({ id: 'e-MENSAJE_INICIAL_ENVIADO', t: 'si', et: 'Mensaje inicial enviado (M.I)', v: ie.MENSAJE_INICIAL_ENVIADO }) +
+          campo({ id: 'e-GRUPO_CREADO', t: 'si', et: 'Grupo de WhatsApp creado (Gr C/TS)', v: ie.GRUPO_CREADO }) +
+          campo({ id: 'e-EN_XPORTY', t: 'si', et: 'Dado de alta en Xporty', v: ie.EN_XPORTY }) + '</div>' +
+          campo({ id: 'e-NOTAS', t: 'area', et: 'Notas internas', v: ie.NOTAS });
         if (p) {
-          html += '<h3 class="n-grupo">Pago de la inscripción</h3>' + (p.incluida ? '<p class="u-nota">Incluida en otra inscripción: no se cobra.</p>' :
-            '<dl class="ges-datos">' + (p.sinTarifa ? dato('Precio', 'Sin tarifa en TARIFAS para esta competición') : dato('Precio', eur(p.precio)) + (p.descuento ? dato('Descuento', eur(p.descuento)) : '')) +
-            dato('Cobrado', eur(p.cobrado) + (p.cobros ? ' (' + plural(p.cobros, 'movimiento', 'movimientos') + ')' : '')) +
-            (p.sinTarifa ? '' : dato('Falta', p.falta > 0 ? '<span class="u-mal">' + eur(p.falta) + '</span>' : p.falta < 0 ? 'Ha pagado ' + eur(-p.falta) + ' de más' : 'Al día')) + '</dl>' +
-            '<p class="u-nota">Los cobros se apuntan en Economía, con «Inscripción» y esta inscripción (' + texto(ie.ID) + ') de referencia.</p>');
+          html += '<div class="gs-sec">Pagos</div>' + (p.incluida ? '<p class="gs-nota">Incluida en otra inscripción: no se cobra.</p>' : '<div class="gs-dl">' +
+            fila('Precio', p.sinTarifa ? '<span class="gs-amb">Sin tarifa en TARIFAS para esta competición</span>' : eurC(p.precio)) +
+            (p.descuento ? fila('Descuento', eurC(p.descuento)) : '') +
+            fila('Cobrado', eurC(p.cobrado) + (p.cobros ? ' (' + plural(p.cobros, 'movimiento', 'movimientos') + ')' : '')) +
+            (p.sinTarifa ? '' : fila('Pendiente', p.falta > 0 ? '<b class="gs-neg">Faltan ' + eurC(p.falta) + '</b>' : p.falta < 0 ? '<b class="gs-pos">Ha pagado ' + eurC(-p.falta) + ' de más</b>' : '<span class="gs-pos">Al día</span>')) + '</div>' +
+            '<p class="gs-nota">Los cobros se apuntan en Economía con la referencia «Inscripción» · ' + texto(ie.ID) + '.</p>');
         }
-        html += '<h3 class="n-grupo">Plantilla <span class="u-chip">' + pl.filter(function (j) { return j.ESTADO === 'Activa'; }).length + '</span></h3>' +
-          (S.ijTem !== tem.ID && String((ix.com[ie.ID_COMPETICION] || {}).ID_TEMPORADA) === String(tem.ID) ? '<p class="u-nota">Cargando…</p>' : '') +
-          (pl.length ? '<table class="u-tabla eco-tabla"><tbody>' + pl.map(function (j) {
-            return '<tr tabindex="0" data-ij="' + texto(j.ID) + '"><td class="u-tabla-t">' + texto(nombreJug(ix.jug[j.ID_JUGADORA]) || j.ID_JUGADORA) + chip(j) +
-              (String(j.ID_JUGADORA) === String(ie.ID_CAPITANA) ? ' <span class="u-chip">Capitana</span>' : '') + (j.ESTADO === 'Baja' ? ' <span class="u-chip">Baja</span>' : '') + '</td><td class="num">' + texto(txt(j.DORSAL) ? 'Dorsal ' + txt(j.DORSAL) : 'Sin dorsal') + '</td></tr>';
-          }).join('') + '</tbody></table>' : '<p class="u-vacio">Sin jugadoras inscritas.</p>') +
-          (ie.ESTADO !== 'Baja' ? '<button type="button" class="u-btn" data-accion="inscribirAqui" data-id="' + texto(ie.ID) + '">Inscribir jugadora en este equipo</button>' : '');
-        html += '<h3 class="n-grupo">El equipo</h3><div class="u-campos">' +
-          campo('Nombre actual (todas las temporadas)', '<input type="text" id="q-NOMBRE" value="' + texto(e.NOMBRE) + '" maxlength="80">') +
-          campo('Tipo', '<select id="q-TIPO">' + opciones([['Liga', 'Liga'], ['Kopa di Mondo', 'Kopa di Mondo']], e.TIPO) + '</select>') +
-          campo('Notas del equipo', '<textarea id="q-NOTAS" rows="2">' + texto(e.NOTAS) + '</textarea>', 'u-ancho') +
-          '</div><div class="n-botones"><button type="button" class="u-btn" id="q-guardar">Guardar el equipo</button></div>' +
-          '<dl class="ges-datos">' + dato('Alta', fecha(e.FECHA_ALTA)) + dato('ID', texto(e.ID)) + '</dl>';
-        if (otras.length) html += '<p class="u-nota">Otras inscripciones:</p><table class="u-tabla eco-tabla"><tbody>' + otras.map(function (x) {
-          var c = ix.com[x.ID_COMPETICION] || {};
-          return '<tr tabindex="0" data-ie="' + texto(x.ID) + '"><td class="u-tabla-t">' + texto(x.NOMBRE_EQUIPO) + '<div class="u-nota">' + texto([nom('tem', c.ID_TEMPORADA) || c.ID_TEMPORADA, nomComp(x.ID_COMPETICION), x.ESTADO].filter(Boolean).join(' · ')) + '</div></td></tr>';
-        }).join('') + '</tbody></table>';
-        html += '<h3 class="n-grupo">Inscripción</h3><dl class="ges-datos">' + dato('Fecha', fecha(ie.FECHA_INSCRIPCION)) + dato('Origen', texto(ie.ORIGEN)) +
-          (ie.ID_INSCRIPCION_ORIGEN ? dato('Viene de', texto(nomIe(ie.ID_INSCRIPCION_ORIGEN)) + ' (' + texto(ie.ID_INSCRIPCION_ORIGEN) + ')') : '') +
-          dato('Experiencia', texto(ie.EXPERIENCIA)) + dato('Disponibilidad', texto(ie.DISPONIBILIDAD)) + dato('Horario preferido', texto(ie.PREFERENCIA_HORARIA)) + dato('Comentarios', texto(ie.COMENTARIOS)) + '</dl>';
-        ventana(html, function () {
-          vent.querySelector('#e-guardar').onclick = function () {
-            var nv = { NOMBRE_EQUIPO: val('e-NOMBRE_EQUIPO'), ESTADO: val('e-ESTADO'), ID_LIGA: val('e-ID_LIGA'), NIVEL: val('e-NIVEL'), ID_COLOR: val('e-ID_COLOR'),
-              ID_RESPONSABLE: val('e-ID_RESPONSABLE'), ID_CAPITANA: val('e-ID_CAPITANA'), MENSAJE_INICIAL_ENVIADO: val('e-MENSAJE_INICIAL_ENVIADO'),
-              GRUPO_CREADO: val('e-GRUPO_CREADO'), EN_XPORTY: val('e-EN_XPORTY'), NOTAS: val('e-NOTAS') };
-            var mal = [];
-            if (!nv.NOMBRE_EQUIPO) mal.push('Falta el nombre de este año.');
-            if (mal.length) { verError(mal); return; }
-            var c = cambios(ie, nv);
-            cerrar();
-            guardar('INSCRIPCIONES_EQUIPOS', ie, c, 'Cambios del equipo');
-          };
-          vent.querySelector('#q-guardar').onclick = function () {
-            if (!e.ID) return;
-            var nv = { NOMBRE: val('q-NOMBRE'), TIPO: val('q-TIPO'), NOTAS: val('q-NOTAS') };
-            if (!nv.NOMBRE) { verError(['Falta el nombre del equipo.']); return; }
-            var c = cambios(e, nv);
-            cerrar();
-            guardar('EQUIPOS', e, c, 'Datos del equipo');
-          };
+        html += '<div class="gs-sec">Plantilla (' + (cargandoPl ? '…' : nAct) + ')</div>' +
+          campo({ id: 'e-ID_CAPITANA', t: 'select', et: 'Capitana', v: ie.ID_CAPITANA, opts: capis, vacio: capis.length ? '— Sin capitana —' : 'Inscribe primero a sus jugadoras' }) +
+          (cargandoPl ? '<p class="gs-nota">Cargando las jugadoras…</p>' : '') +
+          (pl.length ? '<div class="gs-lista gs-plantilla">' + pl.map(function (j) {
+            var q = ix.jug[j.ID_JUGADORA] || {}, baja = j.ESTADO === 'Baja';
+            return '<button type="button" class="gs-item' + (baja ? ' gs-err' : '') + '" data-ij="' + texto(j.ID) + '"><div class="gs-min"><div class="gs-t">' + texto(nombreJug(q) || j.ID_JUGADORA) + '</div>' +
+              '<div class="gs-tags">' + (String(j.ID_JUGADORA) === String(ie.ID_CAPITANA) ? tag('Capitana', 'gs-tag-v') : '') + (baja ? tag('Baja', 'gs-tag-err') : '') + guardando(j) + '</div></div>' +
+              '<div class="gs-d">' + (txt(j.DORSAL) ? texto(txt(j.DORSAL)) : '<span class="gs-opc">Sin dorsal</span>') + '</div></button>';
+          }).join('') + '</div>' : (cargandoPl ? '' : '<p class="gs-nota">Sin jugadoras inscritas.</p>')) +
+          (ie.ESTADO !== 'Baja' && esTem ? '<p class="gs-ir"><button type="button" class="gs-b2" data-accion="inscribirAqui" data-id="' + texto(ie.ID) + '">Inscribir jugadora en este equipo</button></p>' : '');
+        html += '<div class="gs-sec">El equipo</div>' + (e.ID ? '<div class="gs-dos">' +
+          campo({ id: 'q-NOMBRE', t: 'texto', et: 'Nombre actual (todas las temporadas)', v: e.NOMBRE, attrs: ' maxlength="80"' }) +
+          campo({ id: 'q-TIPO', t: 'select', et: 'Tipo', v: e.TIPO, opts: [['Liga', 'Liga'], ['Kopa di Mondo', 'Kopa di Mondo']] }) + '</div>' +
+          campo({ id: 'q-NOTAS', t: 'area', et: 'Notas del equipo', v: e.NOTAS }) +
+          '<div class="gs-dl">' + fila('Alta', texto(fecha(e.FECHA_ALTA))) + fila('ID', texto(e.ID)) + '</div>' : '<p class="gs-nota">No encuentro el equipo ' + texto(ie.ID_EQUIPO) + ' en EQUIPOS.</p>');
+        if (otras.length) html += '<p class="gs-nota">Otras temporadas:</p><div class="gs-lista">' + otras.map(function (x) {
+          var cc = ix.com[x.ID_COMPETICION] || {};
+          return '<button type="button" class="gs-item' + (x.ESTADO === 'Baja' ? ' gs-err' : '') + '" data-ie="' + texto(x.ID) + '"><div class="gs-min"><div class="gs-t">' + punto(x.ID_COLOR) + texto(x.NOMBRE_EQUIPO || x.ID) + '</div>' +
+            '<div class="gs-s">' + texto([nom('tem', cc.ID_TEMPORADA) || cc.ID_TEMPORADA, nomComp(x.ID_COMPETICION), nom('lig', x.ID_LIGA), x.ESTADO].filter(Boolean).join(' · ')) + '</div></div></button>';
+        }).join('') + '</div>';
+        html += '<div class="gs-sec">Inscripción</div><div class="gs-dl">' + fila('Fecha', texto(fecha(ie.FECHA_INSCRIPCION))) + fila('Origen', texto(ie.ORIGEN)) +
+          (ie.ID_INSCRIPCION_ORIGEN ? fila('Viene de', texto(nomIe(ie.ID_INSCRIPCION_ORIGEN)) + ' (' + texto(ie.ID_INSCRIPCION_ORIGEN) + ')') : '') +
+          fila('Capitana', texto(nombreJug(cap))) + fila('Teléfono', texto(cap && cap.TELEFONO)) + fila('Correo', texto(cap && cap.EMAIL)) +
+          fila('Experiencia', texto(ie.EXPERIENCIA)) + fila('Disponibilidad', texto(ie.DISPONIBILIDAD)) + fila('Horario preferido', texto(ie.PREFERENCIA_HORARIA)) +
+          (jugLeidas() || !esTem ? fila('Edad media', edad1(edadMedia(ie.ID)) ? texto(edad1(edadMedia(ie.ID)) + ' años') : '') : '') + '</div>' +
+          (txt(ie.COMENTARIOS) ? '<div class="gs-dtx"><b>Comentarios</b><p>' + texto(ie.COMENTARIOS) + '</p></div>' : '') +
+          pie('e-guardar');
+        var gIe = { f: ie, pre: 'e-', ks: ['ID_LIGA', 'NIVEL', 'ID_RESPONSABLE', 'ID_COLOR', 'NOMBRE_EQUIPO', 'ESTADO', 'MENSAJE_INICIAL_ENVIADO', 'GRUPO_CREADO', 'EN_XPORTY', 'NOTAS', 'ID_CAPITANA'] };
+        var gEq = { f: e, pre: 'q-', ks: e.ID ? ['NOMBRE', 'TIPO', 'NOTAS'] : [] };
+        ventana(punto(ie.ID_COLOR) + texto(nomIe(ie.ID)), html, function () {
+          var sc = vent.querySelector('#e-ID_COLOR'), pre = vent.querySelector('#gs-colpre');
+          sc.addEventListener('change', function () { pre.style.background = hexDe(sc.value) || 'transparent'; });
+          guardable('e-guardar', [gIe, gEq], {
+            validar: function (cs) {
+              var mal = [];
+              if ('NOMBRE_EQUIPO' in cs[0] && !cs[0].NOMBRE_EQUIPO) mal.push('Falta el nombre de este año.');
+              if ('NOMBRE' in cs[1] && !cs[1].NOMBRE) mal.push('Falta el nombre del equipo.');
+              return mal;
+            },
+            escribir: function (cs) {
+              return [Object.keys(cs[0]).length ? T.actualizar('INSCRIPCIONES_EQUIPOS', ie.ID, cs[0]) : null,
+                Object.keys(cs[1]).length ? T.actualizar('EQUIPOS', e.ID, cs[1]) : null];
+            }
+          });
         });
       }
 
-      /** Ficha de una jugadora: su inscripción de ahora (si se abre desde una), sus datos personales y todas sus temporadas. */
+      /** Ficha de una jugadora: su inscripción (si se abre desde una), sus datos personales, más datos, fotos y sus temporadas. */
       function fichaJugadora(idJug, ij) {
         var p = ix.jug[String(idJug)];
-        if (!p) { ctx.aviso('No tengo la jugadora ' + idJug + ': actualiza la página.'); return; }
+        if (!p) { ctx.aviso('No tengo la jugadora ' + idJug + ': pulsa ↻.'); return; }
         // Todas sus inscripciones: la parte de esta jugadora (al momento si ya se vio; si no, llega y se vuelve a pintar).
         var o = {}; o[IJ] = { clave: 'J:' + p.ID, col: 'ID_JUGADORA', valores: [p.ID] };
         var pintada = false;
-        T.leer([IJ], { partes: o }).then(function () { if (pintada && velo.classList.contains('abierto') && vent.getAttribute('data-jug') === String(p.ID)) historial(); }, function () {});
-        var ie = ij ? ix.ie[ij.ID_INSCRIPCION_EQUIPO] || {} : null, av = ij ? avisosJugadora(d, ij, cx) : [];
-        var html = '<h2 id="ges-vt">' + texto(nombreJug(p)) + '</h2><p class="u-nota">' + texto(p.ID) + (edad(p.FECHA_NACIMIENTO) !== '' ? ' · ' + edad(p.FECHA_NACIMIENTO) + ' años' : '') + chips(av) + '</p>' +
-          (p.TELEFONO ? '<div class="n-botones">' + whatsapp(p.TELEFONO, 'WhatsApp') + '</div>' : '');
+        T.leer([IJ], { partes: o }).then(function () { if (pintada && vent && vent.getAttribute('data-jug') === String(p.ID)) historial(); }, function () {});
+        var ie = ij ? ix.ie[ij.ID_INSCRIPCION_EQUIPO] || {} : null, av = ij ? avisosJugadora(d, ij, cx) : [], e = edad(p.FECHA_NACIMIENTO);
+        var t = [];
+        if (ij && !ijCuenta(ij)) t.push(tag('Baja: esta inscripción no cuenta', 'gs-tag-r'));
+        av.forEach(function (a) { t.push(tag(a.t, a.k === 'doble' ? 'gs-tag-r' : 'gs-tag-a')); });
+        var html = '<p class="gs-nota gs-sub">' + texto([ij ? nomIe(ij.ID_INSCRIPCION_EQUIPO) : '', ij ? nomComp(ie.ID_COMPETICION) : '', p.ID, e !== '' ? e + ' años' : ''].filter(Boolean).join(' · ')) + '</p>' +
+          (t.length ? '<div class="gs-tags gs-sub2">' + t.join('') + '</div>' : '') +
+          '<div class="gs-btns">' + aWa(p.TELEFONO, 'WhatsApp') +
+          (ie && ie.ID ? '<button type="button" class="gs-b2" data-ie="' + texto(ie.ID) + '">Ver el equipo</button>' : '') +
+          '<button type="button" class="gs-b2" data-accion="inscribirJug" data-id="' + texto(p.ID) + '">Inscribir en otro equipo</button></div>';
         if (ij) {
-          html += '<h3 class="n-grupo">' + punto(ie.ID_COLOR) + texto(nomIe(ij.ID_INSCRIPCION_EQUIPO)) + ' · ' + texto(nomComp(ie.ID_COMPETICION)) + '</h3><div class="u-campos">' +
-            campo('Dorsal', '<input type="text" id="i-DORSAL" value="' + texto(ij.DORSAL) + '" maxlength="4" inputmode="numeric">') +
-            campo('Estado', '<select id="i-ESTADO">' + opciones([['Activa', 'Activa'], ['Baja', 'Baja']], ij.ESTADO) + '</select>') +
-            '<div class="u-ancho ges-checks">' + casilla('i-EN_XPORTY', 'En Xporty', ij.EN_XPORTY) + casilla('i-EN_CONTACTOS_GOOGLE', 'En Contactos de Google', ij.EN_CONTACTOS_GOOGLE) + '</div>' +
-            '</div><p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="i-guardar">Guardar</button><button type="button" class="u-btn" data-cerrar>Cerrar</button>' +
-            (ie.ID ? '<button type="button" class="u-btn u-btn-texto" data-ie="' + texto(ie.ID) + '">Ver el equipo</button>' : '') + '</div>' +
-            '<dl class="ges-datos">' + dato('Inscrita', fecha(ij.FECHA_INSCRIPCION)) + dato('Origen', texto(ij.ORIGEN)) +
-            dato('Acepta', ['ACEPTA_NORMAS', 'ACEPTA_DERECHOS_IMAGEN', 'ACEPTA_DATOS', 'ACEPTA_RESPONSABILIDAD'].map(function (c) {
-              return { ACEPTA_NORMAS: 'normas', ACEPTA_DERECHOS_IMAGEN: 'fotos', ACEPTA_DATOS: 'datos', ACEPTA_RESPONSABILIDAD: 'responsabilidad' }[c] + (ij[c] === true ? ' sí' : ' no');
-            }).join(' · ')) + dato('Cómo nos conoció', texto(ij.COMO_NOS_CONOCIO)) + '</dl>';
+          html += '<div class="gs-sec">Inscripción · ' + punto(ie.ID_COLOR) + texto(nomIe(ij.ID_INSCRIPCION_EQUIPO)) + '</div><div class="gs-dos">' +
+            campo({ id: 'i-DORSAL', t: 'texto', et: 'Dorsal', v: ij.DORSAL, attrs: ' maxlength="3" inputmode="numeric"' }) +
+            campo({ id: 'i-ESTADO', t: 'select', et: 'Estado', v: ij.ESTADO, opts: [['Activa', 'Activa'], ['Baja', 'Baja (no cuenta)']], nota: 'Para cambiarla de equipo, dale de baja aquí e «Inscribir en otro equipo».' }) + '</div>' +
+            '<div class="gs-checks">' + campo({ id: 'i-EN_XPORTY', t: 'si', et: 'Dada de alta en Xporty', v: ij.EN_XPORTY }) +
+            campo({ id: 'i-EN_CONTACTOS_GOOGLE', t: 'si', et: 'Guardada en Contactos de Google', v: ij.EN_CONTACTOS_GOOGLE }) + '</div>';
         }
-        html += '<h3 class="n-grupo">Datos personales</h3><div class="u-campos">' +
-          campo('Nombre', '<input type="text" id="p-NOMBRE" value="' + texto(p.NOMBRE) + '" maxlength="60">') +
-          campo('Primer apellido', '<input type="text" id="p-APELLIDO_1" value="' + texto(p.APELLIDO_1) + '" maxlength="60">') +
-          campo('Segundo apellido', '<input type="text" id="p-APELLIDO_2" value="' + texto(p.APELLIDO_2) + '" maxlength="60">') +
-          campo('Fecha de nacimiento', '<input type="date" id="p-FECHA_NACIMIENTO" value="' + texto(p.FECHA_NACIMIENTO) + '">') +
-          campo('Teléfono', '<input type="tel" id="p-TELEFONO" value="' + texto(p.TELEFONO) + '" maxlength="20">') +
-          campo('Correo', '<input type="email" id="p-EMAIL" value="' + texto(p.EMAIL) + '" maxlength="100">') +
-          campo('Documento', '<select id="p-TIPO_DOCUMENTO">' + opciones([['DNI', 'DNI'], ['NIE', 'NIE'], ['Pasaporte', 'Pasaporte'], ['Otro', 'Otro']], p.TIPO_DOCUMENTO, '—') + '</select>') +
-          campo('Número', '<input type="text" id="p-NUM_DOCUMENTO" value="' + texto(p.NUM_DOCUMENTO) + '" maxlength="20">') +
-          campo('Instagram', '<input type="text" id="p-INSTAGRAM" value="' + texto(p.INSTAGRAM) + '" maxlength="40" placeholder="usuario, sin @">') +
-          campo('Notas', '<textarea id="p-NOTAS" rows="2">' + texto(p.NOTAS) + '</textarea>', 'u-ancho') +
-          '</div><p class="u-error ges-err-p" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn' + (ij ? '' : ' u-btn-accion') + '" id="p-guardar">Guardar sus datos</button>' +
-          (ij ? '' : '<button type="button" class="u-btn" data-cerrar>Cerrar</button>') + '</div>' +
-          '<p class="u-nota">Datos personales: solo para gestionar la liga. Alta: ' + fecha(p.FECHA_ALTA) + '.</p>' +
-          '<h3 class="n-grupo">Sus temporadas</h3><div id="ges-hist"></div>' +
-          '<button type="button" class="u-btn" data-accion="inscribirJug" data-id="' + texto(p.ID) + '">Inscribirla en un equipo</button>';
+        html += '<div class="gs-sec">Datos personales</div><div class="gs-dos">' +
+          campo({ id: 'p-NOMBRE', t: 'texto', et: 'Nombre', v: p.NOMBRE, attrs: ' maxlength="60"' }) +
+          campo({ id: 'p-APELLIDO_1', t: 'texto', et: 'Primer apellido', v: p.APELLIDO_1, attrs: ' maxlength="60"' }) +
+          campo({ id: 'p-APELLIDO_2', t: 'texto', et: 'Segundo apellido', v: p.APELLIDO_2, attrs: ' maxlength="60"' }) +
+          campo({ id: 'p-FECHA_NACIMIENTO', t: 'fecha', et: 'Fecha de nacimiento', v: p.FECHA_NACIMIENTO }) +
+          campo({ id: 'p-TELEFONO', t: 'tel', et: 'Teléfono', v: p.TELEFONO, attrs: ' maxlength="20"' }) +
+          campo({ id: 'p-EMAIL', t: 'email', et: 'Correo', v: p.EMAIL, attrs: ' maxlength="100"' }) +
+          campo({ id: 'p-TIPO_DOCUMENTO', t: 'select', et: 'Documento', v: p.TIPO_DOCUMENTO, opts: [['DNI', 'DNI'], ['NIE', 'NIE'], ['Pasaporte', 'Pasaporte'], ['Otro', 'Otro']], vacio: '—' }) +
+          campo({ id: 'p-NUM_DOCUMENTO', t: 'texto', et: 'Número', v: p.NUM_DOCUMENTO, attrs: ' maxlength="20"' }) +
+          campo({ id: 'p-INSTAGRAM', t: 'texto', et: 'Instagram', v: p.INSTAGRAM, attrs: ' maxlength="40" placeholder="usuario, sin @"' }) + '</div>' +
+          campo({ id: 'p-NOTAS', t: 'area', et: 'Notas', v: p.NOTAS }) +
+          '<p class="gs-nota">Datos personales: solo para gestionar la liga.</p>' +
+          '<div class="gs-sec">Más datos</div><div class="gs-dl">' + fila('Alta', texto(fecha(p.FECHA_ALTA))) + fila('Edad', e !== '' ? texto(e + ' años') : '') +
+          (ij ? fila('Inscrita', texto(fecha(ij.FECHA_INSCRIPCION))) + fila('Origen', texto(ij.ORIGEN)) +
+            fila('Acepta', texto(Object.keys(ACEPTA).map(function (k) { return ACEPTA[k] + (ij[k] === true ? ' sí' : ' no'); }).join(' · '))) +
+            fila('Cómo nos conoció', texto(ij.COMO_NOS_CONOCIO)) : '') + '</div>';
         var fts = d.fot.filter(function (f) { return String(f.ID_JUGADORA) === String(p.ID); });
-        if (fts.length) html += '<h3 class="n-grupo">Fotos <span class="u-chip">' + fts.length + '</span></h3><table class="u-tabla eco-tabla"><tbody>' + fts.map(function (f) {
-          return '<tr tabindex="0" data-foto="' + texto(f.ID) + '"><td class="u-tabla-t">' + texto(f.NOMBRE_ORIGINAL || f.ID) + '<div class="u-nota">' + fecha(f.FECHA) + ' · ' + (f.PUBLICABLE === true ? 'publicable' : 'no publicable') + '</div></td></tr>';
-        }).join('') + '</tbody></table>';
+        if (fts.length) html += '<div class="gs-sec">Fotos (' + fts.length + ')</div><div class="gs-lista">' + fts.map(function (f) {
+          return '<button type="button" class="gs-item" data-foto="' + texto(f.ID) + '"><div class="gs-min"><div class="gs-t">' + texto(f.NOMBRE_ORIGINAL || f.ID) + '</div>' +
+            '<div class="gs-s">' + texto(fecha(f.FECHA) + ' · ' + (f.PUBLICABLE === true ? 'publicable' : 'no publicable')) + '</div></div></button>';
+        }).join('') + '</div>';
+        html += '<div class="gs-sec">Sus temporadas</div><div id="gs-hist"></div>' + pie('i-guardar');
         function historial() {
-          var h = vent.querySelector('#ges-hist'); if (!h) return;
+          var h = vent && vent.querySelector('#gs-hist'); if (!h) return;
           var xs = T.filas(IJ).filter(function (x) { return String(x.ID_JUGADORA) === String(p.ID); }).map(function (x) {
-            var e = ix.ie[x.ID_INSCRIPCION_EQUIPO] || {}, c = ix.com[e.ID_COMPETICION] || {};
-            return { x: x, e: e, c: c, t: ix.tem[c.ID_TEMPORADA] || {} };
+            var ee = ix.ie[x.ID_INSCRIPCION_EQUIPO] || T.fila('INSCRIPCIONES_EQUIPOS', x.ID_INSCRIPCION_EQUIPO) || {}, cc = ix.com[ee.ID_COMPETICION] || {};
+            return { x: x, e: ee, c: cc, t: ix.tem[cc.ID_TEMPORADA] || {} };
           }).sort(function (a, b) { return String(b.x.FECHA_INSCRIPCION) < String(a.x.FECHA_INSCRIPCION) ? -1 : 1; });
           var tiene = T.tiene ? T.tiene(IJ, o[IJ]) : true;
-          h.innerHTML = xs.length ? '<table class="u-tabla eco-tabla"><tbody>' + xs.map(function (y) {
-            return '<tr tabindex="0" data-ij="' + texto(y.x.ID) + '"><td class="u-tabla-t">' + punto(y.e.ID_COLOR) + texto(y.e.NOMBRE_EQUIPO || y.x.ID_INSCRIPCION_EQUIPO) + (y.x.ESTADO === 'Baja' ? ' <span class="u-chip">Baja</span>' : '') +
-              '<div class="u-nota">' + texto([y.t.NOMBRE, txt(y.c.NOMBRE_COMERCIAL || y.c.NOMBRE), txt(y.x.DORSAL) ? 'dorsal ' + txt(y.x.DORSAL) : ''].filter(Boolean).join(' · ')) + '</div></td></tr>';
-          }).join('') + '</tbody></table>' + (tiene ? '' : '<p class="u-nota">Cargando el resto…</p>') : '<p class="u-vacio">' + (tiene ? 'Sin inscripciones.' : 'Cargando…') + '</p>';
+          h.innerHTML = xs.length ? '<div class="gs-lista">' + xs.map(function (y) {
+            var baja = y.x.ESTADO === 'Baja' || y.e.ESTADO === 'Baja';
+            return '<button type="button" class="gs-item' + (baja ? ' gs-err' : '') + '" data-ij="' + texto(y.x.ID) + '"><div class="gs-min"><div class="gs-t">' + punto(y.e.ID_COLOR) + texto(y.e.NOMBRE_EQUIPO || y.x.ID_INSCRIPCION_EQUIPO) + '</div>' +
+              '<div class="gs-s">' + texto([y.t.NOMBRE, txt(y.c.NOMBRE_COMERCIAL || y.c.NOMBRE), baja ? 'Baja' : ''].filter(Boolean).join(' · ')) + '</div></div>' +
+              '<div class="gs-d">' + texto(txt(y.x.DORSAL)) + '</div></button>';
+          }).join('') + '</div>' + (tiene ? '' : '<p class="gs-nota">Cargando el resto…</p>') : '<p class="gs-nota">' + (tiene ? 'Sin inscripciones.' : 'Cargando…') + '</p>';
         }
-        ventana(html, function () {
+        var grupos = [{ f: ij || {}, pre: 'i-', ks: ij ? ['DORSAL', 'ESTADO', 'EN_XPORTY', 'EN_CONTACTOS_GOOGLE'] : [] },
+          { f: p, pre: 'p-', ks: ['NOMBRE', 'APELLIDO_1', 'APELLIDO_2', 'FECHA_NACIMIENTO', 'TELEFONO', 'EMAIL', 'TIPO_DOCUMENTO', 'NUM_DOCUMENTO', 'INSTAGRAM', 'NOTAS'],
+            ajustar: function (v) { if (v.NUM_DOCUMENTO !== undefined) v.NUM_DOCUMENTO = v.NUM_DOCUMENTO.toUpperCase().replace(/[\s-]/g, ''); } }];
+        ventana(texto(nombreJug(p)), html, function () {
           vent.setAttribute('data-jug', String(p.ID));
           pintada = true;
           historial();
-          var gi = vent.querySelector('#i-guardar');
-          if (gi) gi.onclick = function () {
-            var nv = { DORSAL: val('i-DORSAL'), ESTADO: val('i-ESTADO'), EN_XPORTY: val('i-EN_XPORTY'), EN_CONTACTOS_GOOGLE: val('i-EN_CONTACTOS_GOOGLE') };
-            var mal = [];
-            if (nv.DORSAL && !/^\d{1,3}$/.test(nv.DORSAL)) mal.push('El dorsal es un número.');
-            var otra = nv.DORSAL && nv.ESTADO !== 'Baja' && d.ij.filter(function (x) { return x !== ij && String(x.ID_INSCRIPCION_EQUIPO) === String(ij.ID_INSCRIPCION_EQUIPO) && x.ESTADO !== 'Baja' && txt(x.DORSAL) === nv.DORSAL; })[0];
-            if (otra) mal.push('El ' + nv.DORSAL + ' ya lo lleva ' + (nombreJug(ix.jug[otra.ID_JUGADORA]) || otra.ID_JUGADORA) + ' en este equipo.');
-            if (mal.length) { verError(mal); return; }
-            var c = cambios(ij, nv);
-            cerrar();
-            if (!Object.keys(c).length) return;
-            // El dorsal va por su función, que mira dentro del motor que nadie lo lleve ya; lo demás, directo.
-            var dorsal = 'DORSAL' in c ? { DORSAL: c.DORSAL } : null;
-            delete c.DORSAL;
-            var ps = [];
-            if (dorsal) ps.push(T.actualizar(IJ, ij.ID, dorsal, { fn: 'gestion5Dorsal', args: [ij.ID, dorsal.DORSAL] }));
-            if (Object.keys(c).length) ps.push(T.actualizar(IJ, ij.ID, c));
-            Promise.all(ps).then(function () { if (ctx.abierta()) ctx.aviso('Inscripción guardada en el Excel.'); }, function () {});
-          };
-          vent.querySelector('#p-guardar').onclick = function () {
-            var nv = {};
-            ['NOMBRE', 'APELLIDO_1', 'APELLIDO_2', 'FECHA_NACIMIENTO', 'TELEFONO', 'EMAIL', 'TIPO_DOCUMENTO', 'NUM_DOCUMENTO', 'INSTAGRAM', 'NOTAS'].forEach(function (k) { nv[k] = val('p-' + k); });
-            nv.NUM_DOCUMENTO = nv.NUM_DOCUMENTO.toUpperCase().replace(/[\s-]/g, '');
-            var mal = problemasJugadora(nv, d.jug, p.ID);
-            if (mal.length) { var e = vent.querySelector('.ges-err-p'); e.textContent = mal.join(' '); e.hidden = false; return; }
-            var c = cambios(p, nv);
-            cerrar();
-            guardar('JUGADORAS', p, c, 'Datos de la jugadora');
-          };
+          guardable('i-guardar', grupos, {
+            validar: function (cs) {
+              var mal = [];
+              if (ij && ('DORSAL' in cs[0] || 'ESTADO' in cs[0])) {
+                var dor = val('i-DORSAL'), est = val('i-ESTADO');
+                if (dor && !/^\d{1,3}$/.test(dor)) mal.push('El dorsal es un número.');
+                var otra = dor && est !== 'Baja' && d.ij.filter(function (x) { return x !== ij && String(x.ID_INSCRIPCION_EQUIPO) === String(ij.ID_INSCRIPCION_EQUIPO) && x.ESTADO !== 'Baja' && txt(x.DORSAL) === dor; })[0];
+                if (otra) mal.push('El ' + dor + ' ya lo lleva ' + (nombreJug(ix.jug[otra.ID_JUGADORA]) || otra.ID_JUGADORA) + ' en este equipo.');
+              }
+              if (Object.keys(cs[1]).length) mal = mal.concat(problemasJugadora(valores(grupos[1]), d.jug, p.ID));
+              return mal;
+            },
+            escribir: function (cs) {
+              var ci = cs[0], ps = [];
+              // El dorsal va por su función, que mira dentro del motor que nadie lo lleve ya; lo demás, directo.
+              if (ij && 'DORSAL' in ci) { ps.push(T.actualizar(IJ, ij.ID, { DORSAL: ci.DORSAL }, { fn: 'gestion5Dorsal', args: [ij.ID, ci.DORSAL] })); delete ci.DORSAL; }
+              if (ij && Object.keys(ci).length) ps.push(T.actualizar(IJ, ij.ID, ci));
+              if (Object.keys(cs[1]).length) ps.push(T.actualizar('JUGADORAS', p.ID, cs[1]));
+              return ps;
+            }
+          });
         });
       }
 
@@ -709,23 +1009,24 @@
         var cs = compsDe(d, tem.ID).map(function (c) { return [c.ID, txt(c.NOMBRE_COMERCIAL || c.NOMBRE)]; });
         if (!cs.length) { ctx.aviso('Esta temporada no tiene competiciones: añádelas en el Excel COMPETICION.'); return; }
         var eqs = d.eqs.slice().sort(function (a, b) { return txt(a.NOMBRE).localeCompare(txt(b.NOMBRE), 'es'); }).map(function (e) { return [e.ID, txt(e.NOMBRE) + ' · ' + e.ID]; });
-        var html = '<h2 id="ges-vt">Inscribir equipo · ' + texto(tem.NOMBRE) + '</h2><div class="u-campos">' +
-          campo('Competición', '<select id="n-ID_COMPETICION">' + opciones(cs, S.comp || cs[0][0]) + '</select>', 'u-ancho') +
-          campo('Equipo', '<input type="search" id="n-buscar" placeholder="Busca por nombre…"><select id="n-ID_EQUIPO">' + opciones([['+', '+ Equipo nuevo']].concat(eqs), '', 'Elige el equipo') + '</select>', 'u-ancho') +
-          campo('Nombre del equipo nuevo', '<input type="text" id="n-NOMBRE" maxlength="80">', 'ges-nuevo') +
-          campo('Tipo', '<select id="n-TIPO">' + opciones([['Liga', 'Liga'], ['Kopa di Mondo', 'Kopa di Mondo']], 'Liga') + '</select>', 'ges-nuevo') +
-          campo('Nombre este año', '<input type="text" id="n-NOMBRE_EQUIPO" maxlength="80" placeholder="El del equipo, si no se dice otro">') +
-          campo('Estado', '<select id="n-ESTADO">' + opciones([['Solicitada', 'Solicitada'], ['Confirmada', 'Confirmada']], 'Solicitada') + '</select>') +
-          campo('Liga', '<select id="n-ID_LIGA"></select>') +
-          campo('Nivel', '<select id="n-NIVEL">' + opciones(['1', '2', '3', '4', '5'].map(function (n) { return [n, n]; }), '', '—') + '</select>') +
-          '</div><p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="n-guardar">Inscribir</button><button type="button" class="u-btn" data-cerrar>Cancelar</button></div>';
-        ventana(html, function () {
+        var html = '<p class="gs-nota gs-sub">Un equipo de otros años o uno nuevo, en una competición de ' + texto(tem.NOMBRE) + '.</p>' +
+          campo({ id: 'n-ID_COMPETICION', t: 'select', et: 'Competición', v: S.comp || cs[0][0], opts: cs }) +
+          '<label class="gs-campo" for="n-buscar">Equipo<input type="search" id="n-buscar" placeholder="Busca por nombre…" autocomplete="off">' +
+          '<select id="n-ID_EQUIPO">' + opciones([['+', '+ Equipo nuevo']].concat(eqs), '', 'Elige el equipo') + '</select></label>' +
+          '<div class="gs-dos">' + campo({ id: 'n-NOMBRE', t: 'texto', et: 'Nombre del equipo nuevo', attrs: ' maxlength="80"', cls: 'gs-nuevo' }) +
+          campo({ id: 'n-TIPO', t: 'select', et: 'Tipo', v: 'Liga', opts: [['Liga', 'Liga'], ['Kopa di Mondo', 'Kopa di Mondo']], cls: 'gs-nuevo' }) +
+          campo({ id: 'n-NOMBRE_EQUIPO', t: 'texto', et: 'Nombre este año', attrs: ' maxlength="80" placeholder="El del equipo, si no se dice otro"' }) +
+          campo({ id: 'n-ESTADO', t: 'select', et: 'Estado', v: 'Solicitada', opts: [['Solicitada', 'Solicitada (sin confirmar)'], ['Confirmada', 'Confirmada']] }) +
+          campo({ id: 'n-ID_LIGA', t: 'select', et: 'Liga', opts: [] }) +
+          campo({ id: 'n-NIVEL', t: 'select', et: 'Nivel', opts: NIVELES, vacio: '—' }) + '</div>' +
+          '<div class="gs-error" id="gs-err" role="alert" hidden></div><div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-cerrar>Cancelar</button><button type="button" class="gs-b1" id="n-guardar">Inscribir</button></div>';
+        ventana('Inscribir equipo', html, function () {
           var sel = vent.querySelector('#n-ID_EQUIPO');
           function refrescar() {
             var nuevo = sel.value === '+';
-            [].forEach.call(vent.querySelectorAll('.ges-nuevo'), function (x) { x.hidden = !nuevo; });
+            [].forEach.call(vent.querySelectorAll('.gs-nuevo'), function (x) { x.hidden = !nuevo; });
             var sl = vent.querySelector('#n-ID_LIGA'), l = sl.value;
-            sl.innerHTML = opciones(ligasDe(val('n-ID_COMPETICION')), l, 'Sin liga todavía');
+            sl.innerHTML = opciones(ligasDe(val('n-ID_COMPETICION')), l, '— Sin liga todavía —');
           }
           refrescar();
           sel.addEventListener('change', refrescar);
@@ -765,38 +1066,42 @@
           .map(function (i) { return [i.ID, nomIe(i.ID) + ' · ' + nomComp(i.ID_COMPETICION)]; });
         if (!eqs.length) { ctx.aviso('Inscribe antes algún equipo en ' + tem.NOMBRE + '.'); return; }
         var elegida = idJug ? ix.jug[idJug] : null;
-        var html = '<h2 id="ges-vt">Inscribir jugadora · ' + texto(tem.NOMBRE) + '</h2><div class="u-campos">' +
-          campo('Equipo', '<select id="j-ID_INSCRIPCION_EQUIPO">' + opciones(eqs, idIe || S.ju.equipo || '', 'Elige el equipo') + '</select>', 'u-ancho') +
-          campo('Jugadora', '<input type="search" id="j-buscar" placeholder="Nombre, teléfono o DNI" value="' + texto(elegida ? nombreJug(elegida) : '') + '">', 'u-ancho') +
-          '<div class="u-ancho" id="j-lista"></div>' +
-          campo('Nombre', '<input type="text" id="j-NOMBRE" maxlength="60">', 'ges-nueva') +
-          campo('Primer apellido', '<input type="text" id="j-APELLIDO_1" maxlength="60">', 'ges-nueva') +
-          campo('Segundo apellido', '<input type="text" id="j-APELLIDO_2" maxlength="60">', 'ges-nueva') +
-          campo('Teléfono', '<input type="tel" id="j-TELEFONO" maxlength="20">', 'ges-nueva') +
-          campo('Fecha de nacimiento', '<input type="date" id="j-FECHA_NACIMIENTO">', 'ges-nueva') +
-          campo('Correo', '<input type="email" id="j-EMAIL" maxlength="100">', 'ges-nueva') +
-          campo('Dorsal', '<input type="text" id="j-DORSAL" maxlength="4" inputmode="numeric">') +
-          '</div><p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="j-guardar">Inscribir</button><button type="button" class="u-btn" data-cerrar>Cancelar</button></div>';
+        var html = '<p class="gs-nota gs-sub">Una jugadora que ya está (de otros años) o una nueva, en un equipo de ' + texto(tem.NOMBRE) + '.</p>' +
+          campo({ id: 'j-ID_INSCRIPCION_EQUIPO', t: 'select', et: 'Equipo', v: idIe || S.ju.equipo || '', opts: eqs, vacio: 'Elige el equipo' }) +
+          campo({ id: 'j-buscar', t: 'buscar', et: 'Jugadora', v: elegida ? nombreJug(elegida) : '', attrs: ' placeholder="Nombre, teléfono o DNI"' }) +
+          '<div id="j-lista"></div><div class="gs-dos">' +
+          campo({ id: 'j-NOMBRE', t: 'texto', et: 'Nombre', attrs: ' maxlength="60"', cls: 'gs-nueva' }) +
+          campo({ id: 'j-APELLIDO_1', t: 'texto', et: 'Primer apellido', attrs: ' maxlength="60"', cls: 'gs-nueva' }) +
+          campo({ id: 'j-APELLIDO_2', t: 'texto', et: 'Segundo apellido', attrs: ' maxlength="60"', cls: 'gs-nueva' }) +
+          campo({ id: 'j-TELEFONO', t: 'tel', et: 'Teléfono', attrs: ' maxlength="20"', cls: 'gs-nueva' }) +
+          campo({ id: 'j-FECHA_NACIMIENTO', t: 'fecha', et: 'Fecha de nacimiento', cls: 'gs-nueva' }) +
+          campo({ id: 'j-EMAIL', t: 'email', et: 'Correo', attrs: ' maxlength="100"', cls: 'gs-nueva' }) +
+          campo({ id: 'j-DORSAL', t: 'texto', et: 'Dorsal', attrs: ' maxlength="3" inputmode="numeric"' }) + '</div>' +
+          '<div class="gs-error" id="gs-err" role="alert" hidden></div><div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-cerrar>Cancelar</button><button type="button" class="gs-b1" id="j-guardar">Inscribir</button></div>';
         var sel = elegida ? elegida.ID : '', nueva = false;
-        ventana(html, function () {
+        ventana('Inscribir jugadora', html, function () {
           var lista = vent.querySelector('#j-lista');
           function pintarLista() {
-            [].forEach.call(vent.querySelectorAll('.ges-nueva'), function (x) { x.hidden = !nueva; });
-            if (nueva) { lista.innerHTML = '<p class="u-nota">Jugadora nueva. <button type="button" class="u-btn u-btn-texto" data-j="">Buscar entre las que ya hay</button></p>'; return; }
-            if (sel) { lista.innerHTML = '<p class="u-nota">Elegida: <b>' + texto(nombreJug(ix.jug[sel])) + '</b> (' + texto(sel) + ', ' + texto((ix.jug[sel] || {}).TELEFONO) + '). <button type="button" class="u-btn u-btn-texto" data-j="">Cambiar</button></p>'; return; }
+            [].forEach.call(vent.querySelectorAll('.gs-nueva'), function (x) { x.hidden = !nueva; });
+            if (nueva) { lista.innerHTML = '<p class="gs-nota">Jugadora nueva. <button type="button" class="gs-enl" data-j="">Buscar entre las que ya hay</button></p>'; return; }
+            if (sel) { lista.innerHTML = '<p class="gs-nota">Elegida: <b>' + texto(nombreJug(ix.jug[sel])) + '</b> (' + texto(sel) + ', ' + texto((ix.jug[sel] || {}).TELEFONO) + '). <button type="button" class="gs-enl" data-j="">Cambiar</button></p>'; return; }
             var q = val('j-buscar'), xs = q.length >= 2 ? buscarJugadoras(d.jug, q, 8) : [];
-            lista.innerHTML = (xs.length ? '<table class="u-tabla eco-tabla"><tbody>' + xs.map(function (p) {
-              return '<tr tabindex="0" data-j="' + texto(p.ID) + '"><td class="u-tabla-t">' + texto(nombreJug(p)) + '<div class="u-nota">' + texto([p.ID, p.TELEFONO, edad(p.FECHA_NACIMIENTO) !== '' ? edad(p.FECHA_NACIMIENTO) + ' años' : ''].filter(Boolean).join(' · ')) + '</div></td></tr>';
-            }).join('') + '</tbody></table>' : (q.length >= 2 ? '<p class="u-nota">Ninguna jugadora encaja.</p>' : '')) +
-              '<button type="button" class="u-btn" data-j="+">+ Jugadora nueva</button>';
+            lista.innerHTML = (xs.length ? '<div class="gs-lista gs-elegir">' + xs.map(function (p) {
+              return '<button type="button" class="gs-item" data-j="' + texto(p.ID) + '"><div class="gs-min"><div class="gs-t">' + texto(nombreJug(p)) + '</div>' +
+                '<div class="gs-s">' + texto([p.ID, p.TELEFONO, edad(p.FECHA_NACIMIENTO) !== '' ? edad(p.FECHA_NACIMIENTO) + ' años' : ''].filter(Boolean).join(' · ')) + '</div></div></button>';
+            }).join('') + '</div>' : (q.length >= 2 ? '<p class="gs-nota">Ninguna jugadora encaja.</p>' : '')) +
+              '<p class="gs-ir"><button type="button" class="gs-b2" data-j="+">+ Jugadora nueva</button></p>';
           }
           pintarLista();
           vent.querySelector('#j-buscar').addEventListener('input', function () { sel = ''; nueva = false; pintarLista(); });
           lista.addEventListener('click', function (e) {
             var b = e.target.closest('[data-j]'); if (!b) return;
             var j = b.getAttribute('data-j');
-            if (j === '+') { nueva = true; sel = ''; var q = val('j-buscar').split(/\s+/); if (!/\d/.test(q[0] || '')) { vent.querySelector('#j-NOMBRE').value = q[0] || ''; vent.querySelector('#j-APELLIDO_1').value = q[1] || ''; vent.querySelector('#j-APELLIDO_2').value = q.slice(2).join(' '); } }
-            else { nueva = false; sel = j; }
+            if (j === '+') {
+              nueva = true; sel = '';
+              var q = val('j-buscar').split(/\s+/);
+              if (!/\d/.test(q[0] || '')) { vent.querySelector('#j-NOMBRE').value = q[0] || ''; vent.querySelector('#j-APELLIDO_1').value = q[1] || ''; vent.querySelector('#j-APELLIDO_2').value = q.slice(2).join(' '); }
+            } else { nueva = false; sel = j; }
             pintarLista();
           });
           vent.querySelector('#j-guardar').onclick = function () {
@@ -830,119 +1135,178 @@
           return ies.filter(function (i) { return d.ij.some(function (x) { return String(x.ID_JUGADORA) === String(idJug) && String(x.ID_INSCRIPCION_EQUIPO) === String(i.ID); }); })
             .map(function (i) { return [i.ID, nomIe(i.ID) + ' · ' + nomComp(i.ID_COMPETICION)]; });
         };
-        var html = '<h2 id="ges-vt">' + texto(f.NOMBRE_ORIGINAL || f.ID) + '</h2><p class="u-nota">' + fecha(f.FECHA) + ' · ' + texto(f.ESTADO) + '</p>' +
-          '<div class="ges-foto" id="f-vista"><div class="u-carga"></div></div>' +
-          '<div class="u-campos"><label class="u-campo u-ancho"><span class="u-etiqueta">Jugadora</span><input type="search" id="f-buscar" placeholder="Busca por nombre o teléfono" value="' + texto(nombreJug(pj)) + '"></label>' +
-          '<div class="u-ancho" id="f-lista"></div>' +
-          campo('Equipo con el que salió', '<select id="f-ID_INSCRIPCION_EQUIPO"></select>', 'u-ancho') +
-          '<div class="u-ancho">' + casilla('f-PUBLICABLE', 'Se puede publicar', f.PUBLICABLE) + '<p class="u-nota" id="f-nota"></p></div>' +
-          '</div><p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="f-guardar">Guardar</button><button type="button" class="u-btn" data-cerrar>Cerrar</button>' +
-          (f.ARCHIVO_URL ? '<a class="u-btn u-btn-texto" href="' + texto(f.ARCHIVO_URL) + '" target="_blank" rel="noopener">Abrir en Drive</a>' : '') + '</div>';
+        var html = '<p class="gs-nota gs-sub">' + texto([fecha(f.FECHA), f.ESTADO, f.ID].filter(Boolean).join(' · ')) + '</p>' +
+          (f.ARCHIVO_URL ? '<div class="gs-btns"><a class="gs-b2" href="' + texto(f.ARCHIVO_URL) + '" target="_blank" rel="noopener">Abrir en Drive ↗</a></div>' : '') +
+          '<div class="gs-visor" id="f-vista"><div class="u-carga"></div></div>' +
+          '<div class="gs-sec">De quién es</div>' +
+          campo({ id: 'f-buscar', t: 'buscar', et: 'Jugadora', v: nombreJug(pj), attrs: ' placeholder="Busca por nombre o teléfono"' }) +
+          '<div id="f-lista"></div>' +
+          campo({ id: 'f-ID_INSCRIPCION_EQUIPO', t: 'select', et: 'Equipo con el que salió', opts: [] }) +
+          '<div class="gs-checks">' + campo({ id: 'f-PUBLICABLE', t: 'si', et: 'Se puede publicar', v: f.PUBLICABLE }) + '</div><p class="gs-nota" id="f-nota"></p>' +
+          pie('f-guardar');
         var sel = f.ID_JUGADORA ? String(f.ID_JUGADORA) : '';
-        ventana(html, function () {
-          var lista = vent.querySelector('#f-lista'), pub = vent.querySelector('#f-PUBLICABLE');
+        ventana(texto(f.NOMBRE_ORIGINAL || f.ID), html, function () {
+          var lista = vent.querySelector('#f-lista'), pub = vent.querySelector('#f-PUBLICABLE'), se = vent.querySelector('#f-ID_INSCRIPCION_EQUIPO');
+          var primera = true;
           function pintarLista() {
-            if (sel) lista.innerHTML = '<p class="u-nota">Vinculada a <b>' + texto(nombreJug(ix.jug[sel])) + '</b> (' + texto(sel) + '). <button type="button" class="u-btn u-btn-texto" data-j="">Quitar</button></p>';
+            if (sel) lista.innerHTML = '<p class="gs-nota">Vinculada a <b>' + texto(nombreJug(ix.jug[sel])) + '</b> (' + texto(sel) + '). <button type="button" class="gs-enl" data-j="">Quitar</button></p>';
             else {
               var q = val('f-buscar'), xs = q.length >= 2 ? buscarJugadoras(d.jug, q, 8) : [];
-              lista.innerHTML = xs.length ? '<table class="u-tabla eco-tabla"><tbody>' + xs.map(function (p) { return '<tr tabindex="0" data-j="' + texto(p.ID) + '"><td class="u-tabla-t">' + texto(nombreJug(p)) + '<div class="u-nota">' + texto([p.ID, p.TELEFONO].filter(Boolean).join(' · ')) + '</div></td></tr>'; }).join('') + '</tbody></table>' :
-                '<p class="u-nota">' + (q.length >= 2 ? 'Ninguna jugadora encaja.' : 'Sin vincular: busca a la jugadora de la foto.') + '</p>';
+              lista.innerHTML = xs.length ? '<div class="gs-lista gs-elegir">' + xs.map(function (p) {
+                return '<button type="button" class="gs-item" data-j="' + texto(p.ID) + '"><div class="gs-min"><div class="gs-t">' + texto(nombreJug(p)) + '</div><div class="gs-s">' + texto([p.ID, p.TELEFONO].filter(Boolean).join(' · ')) + '</div></div></button>';
+              }).join('') + '</div>' : '<p class="gs-nota">' + (q.length >= 2 ? 'Ninguna jugadora encaja.' : 'Sin vincular: busca a la jugadora de la foto.') + '</p>';
             }
-            var se = vent.querySelector('#f-ID_INSCRIPCION_EQUIPO'), ev = se.value || f.ID_INSCRIPCION_EQUIPO;
+            var ev = primera ? f.ID_INSCRIPCION_EQUIPO : se.value;
+            primera = false;
             se.innerHTML = opciones(sel ? eqsJug(sel) : [], ev, sel ? 'Sin equipo' : 'Elige antes la jugadora');
             var ok = sel && acepta(sel);
             pub.disabled = !ok; if (!ok) pub.checked = false;
             vent.querySelector('#f-nota').textContent = !sel ? 'Solo se publica una foto vinculada.' : ok ? 'Ha aceptado que se publiquen sus fotos.' : 'No consta que acepte que se publiquen sus fotos: no se puede marcar.';
           }
+          var g = { f: f, pre: 'f-', ks: ['ID_JUGADORA', 'ID_INSCRIPCION_EQUIPO', 'ESTADO', 'PUBLICABLE'] };
+          g.ajustar = function (v) { v.ID_JUGADORA = sel; v.ESTADO = sel ? 'Vinculada' : 'Sin vincular'; v.PUBLICABLE = !!(sel && pub.checked); if (!sel) v.ID_INSCRIPCION_EQUIPO = ''; };
           pintarLista();
           vent.querySelector('#f-buscar').addEventListener('input', function () { sel = ''; pintarLista(); });
-          lista.addEventListener('click', function (e) { var b = e.target.closest('[data-j]'); if (!b) return; sel = b.getAttribute('data-j'); if (!sel) vent.querySelector('#f-buscar').value = ''; pintarLista(); });
+          lista.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-j]'); if (!b) return;
+            sel = b.getAttribute('data-j'); if (!sel) vent.querySelector('#f-buscar').value = '';
+            pintarLista(); vent.dispatchEvent(new Event('change'));
+          });
           if (f.ARCHIVO_URL) ctx.llamar('gestion5Archivo', [f.ARCHIVO_URL]).then(function (r) {
-            var v = vent.querySelector('#f-vista'); if (!v) return;
-            v.innerHTML = r && r.img ? '<img src="' + texto(r.img) + '" alt="' + texto(f.NOMBRE_ORIGINAL) + '">' : '<p class="u-nota">No se puede ver aquí: ábrela en Drive.</p>';
-          }, function () { var v = vent.querySelector('#f-vista'); if (v) v.innerHTML = '<p class="u-nota">No se ha podido cargar: ábrela en Drive.</p>'; });
+            var v = vent && vent.querySelector('#f-vista'); if (!v) return;
+            v.innerHTML = r && r.img ? '<img src="' + texto(r.img) + '" alt="' + texto(f.NOMBRE_ORIGINAL) + '">' : '<p class="gs-nota">No se puede ver aquí: ábrela en Drive.</p>';
+          }, function () { var v = vent && vent.querySelector('#f-vista'); if (v) v.innerHTML = '<p class="gs-nota">No se ha podido cargar: ábrela en Drive.</p>'; });
           else vent.querySelector('#f-vista').innerHTML = '';
-          vent.querySelector('#f-guardar').onclick = function () {
-            var nv = { ID_JUGADORA: sel, ID_INSCRIPCION_EQUIPO: sel ? val('f-ID_INSCRIPCION_EQUIPO') : '', ESTADO: sel ? 'Vinculada' : 'Sin vincular', PUBLICABLE: !!(sel && pub.checked) };
-            var c = cambios(f, nv);
-            cerrar();
-            guardar('FOTOS', f, c, 'Cambios de la foto');
-          };
+          guardable('f-guardar', [g], { escribir: function (cs) { return [T.actualizar('FOTOS', f.ID, cs[0])]; } });
         });
       }
 
       /** Una revisión: el caso, sus candidatos (se abren) y marcarla resuelta o volver a abrirla. */
       function fichaRevision(r) {
         var cand = ids(r.ID_REGISTRO + ' ' + r.CANDIDATOS);
-        var html = '<h2 id="ges-vt">' + texto(r.TIPO) + ' · ' + texto(r.ID) + '</h2><dl class="ges-datos">' + dato('Registro', texto(r.ID_REGISTRO)) + dato('Candidatos', texto(r.CANDIDATOS)) +
-          dato('Motivo', texto(r.MOTIVO)) + dato('Detectado', fecha(r.FECHA)) + '</dl>' +
-          (cand.length ? '<p class="u-nota">Ver:</p><div class="n-botones">' + cand.map(function (c) {
+        var html = '<p class="gs-nota gs-sub">' + texto([fecha(r.FECHA), r.RESUELTO === true ? 'Resuelta' : 'Sin resolver'].join(' · ')) + '</p>' +
+          '<div class="gs-dl">' + fila('Registro', texto(r.ID_REGISTRO)) + fila('Candidatos', texto(r.CANDIDATOS)) + '</div>' +
+          (txt(r.MOTIVO) ? '<div class="gs-dtx"><b>Motivo</b><p>' + texto(r.MOTIVO) + '</p></div>' : '') +
+          (cand.length ? '<div class="gs-sec">Ver</div><div class="gs-btns">' + cand.map(function (c) {
             var t = ix.jug[c] ? nombreJug(ix.jug[c]) : ix.ie[c] ? nomIe(c) : ix.eqs[c] ? nom('eqs', c) : '';
-            return t ? '<button type="button" class="u-btn" data-abrir="' + texto(c) + '">' + texto(t) + ' · ' + texto(c) + '</button>' : '';
+            return t ? '<button type="button" class="gs-b2" data-abrir="' + texto(c) + '">' + texto(t) + ' · ' + texto(c) + '</button>' : '';
           }).join('') + '</div>' : '') +
-          '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="r-ok">' + (r.RESUELTO === true ? 'Volver a abrirla' : 'Marcar resuelta') + '</button><button type="button" class="u-btn" data-cerrar>Cerrar</button></div>';
-        ventana(html, function () {
-          vent.querySelector('#r-ok').onclick = function () { cerrar(); guardar('REVISIONES', r, { RESUELTO: r.RESUELTO !== true }, 'Revisión'); };
+          '<div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-cerrar>Cerrar</button><button type="button" class="gs-b1" id="r-ok">' + (r.RESUELTO === true ? 'Volver a abrirla' : 'Marcar resuelta') + '</button></div>';
+        ventana(texto(r.TIPO + ' · ' + r.ID), html, function () {
+          vent.querySelector('#r-ok').onclick = function () {
+            cerrar();
+            T.actualizar('REVISIONES', r.ID, { RESUELTO: r.RESUELTO !== true }).then(function () { if (ctx.abierta()) ctx.aviso('Revisión guardada en el Excel.'); }, function () {});
+          };
           [].forEach.call(vent.querySelectorAll('[data-abrir]'), function (b) {
-            b.onclick = function () { var c = b.getAttribute('data-abrir'); cerrar(); if (ix.jug[c]) fichaJugadora(c); else if (ix.ie[c]) fichaEquipo(ix.ie[c]); };
+            b.onclick = function () { var c = b.getAttribute('data-abrir'); if (ix.jug[c]) fichaJugadora(c); else if (ix.ie[c]) fichaEquipo(ix.ie[c]); };
           });
         });
       }
 
       /* ---------- eventos ---------- */
 
-      function irA(tab) { S.tab = tab; guardado(CLAVE + 'tab', tab); pintar(); window.scrollTo(0, 0); }
+      function irA(tab) {
+        if (pest.indexOf(tab) < 0) return;
+        S.tab = tab; guardado(CLAVE + 'tab', tab); S.filAb = false;
+        pintar(); window.scrollTo(0, 0); document.body.scrollTop = 0;
+      }
+      function ponerTem(id) { S.tem = id; guardado(CLAVE + 'tem', id); S.comp = ''; S.liga = ''; S.ju.equipo = ''; S.ju.n = VER; S.leyendo = ''; S.dia = ''; }
+      function repintarLista() {
+        var l = main.querySelector('#gs-lista'); if (!l) return;
+        l.innerHTML = S.tab === 'EQUIPOS' ? listaEquipos() : listaJugadoras();
+      }
       function abrirFila(t) {
-        var tr = t.closest('[data-ie], [data-ij], [data-jug], [data-foto], [data-rev]');
-        if (!tr) return false;
-        if (tr.hasAttribute('data-ie')) { var ie = ix.ie[tr.getAttribute('data-ie')]; if (ie && !ie._nueva) { cerrar(); fichaEquipo(ie); } }
-        else if (tr.hasAttribute('data-ij')) { var ij = T.fila(IJ, tr.getAttribute('data-ij')); if (ij && !ij._nueva) { cerrar(); fichaJugadora(ij.ID_JUGADORA, ij); } }
-        else if (tr.hasAttribute('data-jug')) { cerrar(); fichaJugadora(tr.getAttribute('data-jug')); }
-        else if (tr.hasAttribute('data-foto')) { var f = T.fila('FOTOS', tr.getAttribute('data-foto')); if (f && !f._nueva) { cerrar(); fichaFoto(f); } }
-        else if (tr.hasAttribute('data-rev')) { var r = T.fila('REVISIONES', tr.getAttribute('data-rev')); if (r) { cerrar(); fichaRevision(r); } }
+        var x = t.closest('[data-ie], [data-ij], [data-jug], [data-foto], [data-rev]');
+        if (!x) return false;
+        if (x.hasAttribute('data-ie')) { var ie = ix.ie[x.getAttribute('data-ie')]; if (ie && !ie._nueva) fichaEquipo(ie); }
+        else if (x.hasAttribute('data-ij')) { var ij = T.fila(IJ, x.getAttribute('data-ij')); if (ij && !ij._nueva) fichaJugadora(ij.ID_JUGADORA, ij); }
+        else if (x.hasAttribute('data-jug')) fichaJugadora(x.getAttribute('data-jug'));
+        else if (x.hasAttribute('data-foto')) { var f = T.fila('FOTOS', x.getAttribute('data-foto')); if (f && !f._nueva) fichaFoto(f); }
+        else if (x.hasAttribute('data-rev')) { var r = T.fila('REVISIONES', x.getAttribute('data-rev')); if (r) fichaRevision(r); }
         return true;
       }
       el.addEventListener('click', function (e) {
-        var t = e.target;
-        var b = t.closest('[data-tab]'); if (b) { irA(b.getAttribute('data-tab')); return; }
+        var t = e.target, b;
         if (t.closest('[data-cerrar]')) { cerrar(); return; }
-        var a = t.closest('[data-accion]');
-        if (a) {
-          var ac = a.getAttribute('data-accion');
+        if (vent && vent.contains(t) && t.closest('#j-lista, #f-lista')) return;
+        if ((b = t.closest('.gs-tabs [data-tab]'))) { irA(b.getAttribute('data-tab')); return; }
+        if ((b = t.closest('[data-accion]'))) {
+          var ac = b.getAttribute('data-accion');
           if (ac === 'inscribirEquipo') formInscribirEquipo();
           else if (ac === 'inscribirJugadora') formInscribirJugadora('');
-          else if (ac === 'inscribirAqui') { var id = a.getAttribute('data-id'); cerrar(); formInscribirJugadora(id); }
-          else if (ac === 'inscribirJug') { var j = a.getAttribute('data-id'); cerrar(); formInscribirJugadora('', j); }
-          else if (ac === 'vermas') { S.ju.n += VER; pintar(); }
-          else if (ac === 'todasRev') { S.rv.todas = !S.rv.todas; pintar(); }
+          else if (ac === 'inscribirAqui') formInscribirJugadora(b.getAttribute('data-id'));
+          else if (ac === 'inscribirJug') formInscribirJugadora('', b.getAttribute('data-id'));
+          else if (ac === 'vermas') { S.ju.n += VER; repintarLista(); }
           return;
         }
-        if (vent.contains(t) && t.closest('#j-lista, #f-lista')) return;
-        if (abrirFila(t)) return;
-        var tr = t.closest('tr[data-ir]');
-        if (tr && pest.indexOf(tr.getAttribute('data-ir')) >= 0) { if (tr.getAttribute('data-ver') === 'pago') S.eq.ver = 'pago'; irA(tr.getAttribute('data-ir')); }
+        if (t.closest('#gs-re')) { releer(); return; }
+        if (t.closest('#gs-fbtn')) { S.filAb = !S.filAb; pintar(); return; }
+        if (t.closest('#gs-todas')) {
+          var ls = main.querySelectorAll('details.gs-liga'), abrir = ![].some.call(ls, function (x) { return x.open; });
+          [].forEach.call(ls, function (x) { abiertas[x.getAttribute('data-liga')] = abrir; });
+          guardado(CLAVE + 'abiertas', JSON.stringify(abiertas)); pintar(); return;
+        }
+        if ((b = t.closest('#gs-verjug'))) {
+          // Ver jugadoras: Jugadoras filtrada por este equipo (en su temporada y competición).
+          var ie = ix.ie[b.getAttribute('data-id')], c = ie && ix.com[ie.ID_COMPETICION];
+          if (!ie) return;
+          cerrar();
+          if (c && String(c.ID_TEMPORADA) !== String(tem.ID)) ponerTem(String(c.ID_TEMPORADA));
+          S.comp = String(ie.ID_COMPETICION); S.liga = ''; S.ju.equipo = String(ie.ID); S.ju.filtro = 'activas'; S.ju.q = '';
+          irA('JUGADORAS'); return;
+        }
+        if ((b = t.closest('[data-quitar]'))) {
+          var k = b.getAttribute('data-quitar');
+          if (k === 'temp') { var act = temporadaActual(d); ponerTem(act ? String(act.ID) : ''); }
+          if (k === 'comp') S.comp = '';
+          if (k === 'comp' || k === 'liga') S.liga = '';
+          if (k !== 'temp') S.ju.equipo = '';
+          pintar(); return;
+        }
+        if ((b = t.closest('[data-chip]'))) {
+          var g = b.getAttribute('data-chip'), v = b.getAttribute('data-v');
+          if (g === 'eq') { S.eq.filtro = v; S.eq.q = ''; }
+          else if (g === 'ju') { S.ju.filtro = v; S.ju.q = ''; S.ju.n = VER; }
+          else if (g === 'fo') S.fo.filtro = v;
+          else if (g === 'rv') S.rv.todas = v === 'todas';
+          pintar(); return;
+        }
+        if ((b = t.closest('[data-dia]'))) { S.dia = b.getAttribute('data-dia'); pintar(); return; }
+        if ((b = t.closest('[data-ir]'))) {
+          // Las cifras y «Ver en …» llevan a la pestaña ya filtrada, con los mismos filtros.
+          var ir = b.getAttribute('data-ir'), f = b.getAttribute('data-irf') || '';
+          if (ir === 'EQUIPOS') { S.eq.filtro = f || 'inscritos'; S.eq.q = ''; }
+          else if (ir === 'JUGADORAS') { S.ju.filtro = f || 'activas'; S.ju.q = ''; S.ju.equipo = ''; S.ju.n = VER; }
+          else if (ir === 'FOTOS') S.fo.filtro = f;
+          else if (ir === 'REVISIONES') S.rv.todas = false;
+          irA(ir); return;
+        }
+        if (t.closest('[data-kpi="alertas"]')) {
+          var a = main.querySelector('#gs-alts'); if (!a) return;
+          [].forEach.call(a.querySelectorAll('details'), function (x) { if (x.querySelector('.gs-alt-i')) x.open = true; });
+          a.scrollIntoView({ behavior: 'smooth', block: 'start' }); return;
+        }
+        if (t.closest('a')) return;
+        abrirFila(t);
       });
       el.addEventListener('toggle', function (e) {
         var x = e.target; if (!x.hasAttribute || !x.hasAttribute('data-liga')) return;
-        S.abiertas = S.abiertas || {}; S.abiertas[x.getAttribute('data-liga')] = x.open;
+        abiertas[x.getAttribute('data-liga')] = x.open;
+        guardado(CLAVE + 'abiertas', JSON.stringify(abiertas));
+        var b = main.querySelector('#gs-todas');
+        if (b) b.textContent = [].some.call(main.querySelectorAll('details.gs-liga'), function (y) { return y.open; }) ? 'Cerrar todas' : 'Abrir todas';
       }, true);
       el.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && velo.classList.contains('abierto')) { cerrar(); return; }
         var tr = e.target.closest && e.target.closest('tr[tabindex]');
         if (tr && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); tr.click(); }
       });
-      velo.addEventListener('click', function (e) { if (e.target === velo) cerrar(); });
       el.addEventListener('change', function (e) {
-        var t = e.target;
-        if (t === selTem) { S.tem = t.value; guardado(CLAVE + 'tem', t.value); S.comp = ''; S.liga = ''; S.ju.equipo = ''; S.ju.n = VER; S.leyendo = ''; pintar(); return; }
-        var f = t.getAttribute && t.getAttribute('data-f');
+        var t = e.target, f = t.getAttribute && t.getAttribute('data-f');
         if (!f) return;
-        if (f === 'comp') { S.comp = t.value; S.liga = ''; }
-        else if (f === 'liga') S.liga = t.value;
-        else if (f === 'eqver') S.eq.ver = t.value;
+        if (f === 'temp') ponerTem(t.value);
+        else if (f === 'comp') { S.comp = t.value; S.liga = ''; S.ju.equipo = ''; }
+        else if (f === 'liga') { S.liga = t.value; S.ju.equipo = ''; }
         else if (f === 'juequipo') S.ju.equipo = t.value;
-        else if (f === 'juver') S.ju.ver = t.value;
-        else if (f === 'foestado') S.fo.estado = t.value;
         S.ju.n = VER;
         pintar();
       });
@@ -950,15 +1314,28 @@
       el.addEventListener('input', function (e) {
         var k = e.target.getAttribute && e.target.getAttribute('data-q');
         if (!k) return;
-        S[k].q = e.target.value; clearTimeout(tq);
-        tq = setTimeout(function () { S.ju.n = VER; S.foco = true; pintar(); }, 200);
+        var v = e.target.value;
+        clearTimeout(tq);
+        tq = setTimeout(function () { S[k].q = v; S.ju.n = VER; repintarLista(); }, 150);
       });
+      // Al pasar de móvil a ordenador (o al revés) cambia lista por tabla.
+      function alAncho() { if (ctx.abierta()) pintar(); }
+      if (MQ.addEventListener) MQ.addEventListener('change', alAncho); else if (MQ.addListener) MQ.addListener(alAncho);
 
       ctx.alCambiar(function (t) { if (tablas.indexOf(t) >= 0 || t === IJ) { if (t === 'INSCRIPCIONES_EQUIPOS') S.leyendo = ''; pintar(); } });
-      ctx.tablas.leer(tablas).then(function () { S.leido = true; pintar(); }, function (e) {
-        cont.innerHTML = '<p class="u-error">No se han podido leer los equipos.</p><p class="u-nota">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Vuelve a abrir la sección para probar otra vez.</p>';
+      // Lo guardado en el dispositivo se pinta al momento (sin pantalla de carga) y se refresca por detrás.
+      // local: lo que falta se pide al motor, pero lo que ya está no se refresca solo: lo refresca refrescar, para saber la hora.
+      T.leer(tablas, { local: true }).then(function () {
+        S.leido = true; pintar();
+        T.refrescar(tablas).then(function () { S.hora = ahora(); ponerHora(); }, function () {});
+      }, function (e) {
+        main.innerHTML = '<div class="gs-error" role="alert">No se han podido leer los equipos.</div><p class="gs-nota">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Pulsa ↻ o vuelve a abrir la sección.</p>';
       });
-      this._cerrar = cerrar;
+      this._cerrar = function () {
+        cerrar();
+        document.removeEventListener('keydown', tecla);
+        if (MQ.removeEventListener) MQ.removeEventListener('change', alAncho); else if (MQ.removeListener) MQ.removeListener(alAncho);
+      };
     },
     cerrar: function () { if (this._cerrar) this._cerrar(); }
   });
