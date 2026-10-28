@@ -469,6 +469,21 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .lg-jr-t { color: var(--estado-ec); }
 /* Un anulado por culpa de un equipo: su 0-5, en el color de anulado. */
 .u .lg-pc-an b, .u .lg-mcentro-an { color: var(--estado-bl) !important; }
+/* Un día marcado como festivo o descanso que tiene partidos: una marca roja en la esquina de la tira. */
+.u .lg-dias-tira button { position: relative; }
+.u .lg-dias-tira .lg-choque::after { content: "!"; position: absolute; top: -6px; right: -4px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--estado-bl); color: var(--color-superficie); font: 700 11px/16px var(--fuente-texto); text-align: center; }
+/* Estadísticas: cifras en fila (goles, partidos, media, máxima goleadora); en el móvil, de dos en dos. */
+.u .lg-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e2); margin: 0 0 var(--e3); }
+.u .lg-stats > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-tarjeta, var(--color-bloque)); }
+.u .lg-stats b { font: var(--peso-titulos) 22px/1.1 var(--fuente-titulos); color: var(--color-principal-oscuro); overflow-wrap: anywhere; }
+.u .lg-stats > div:last-child b { font-size: 16px; }
+.u .lg-stats span { font-size: 12px; color: var(--color-suave); }
+@media (max-width: 639px) { .u .lg-stats { grid-template-columns: 1fr 1fr; } }
+.u .n-ventana .lg-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* Cada jugadora de la lista abre su ficha. */
+.u .lg-jug { flex: 1 1 auto; min-width: 0; display: flex; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.u .lg-jug:hover b { text-decoration: underline; }
 /* Goleadoras: de la liga o de toda la competición, buscador y lista con el puesto, la jugadora (dorsal) y sus goles. */
 .u .lg-gol-cab { display: flex; flex-direction: column; gap: var(--e2); margin: 0 0 var(--e3); }
 .u .lg-gol-busca input { width: 100%; max-width: 420px; }
