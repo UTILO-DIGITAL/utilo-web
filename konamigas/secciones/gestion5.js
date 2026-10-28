@@ -221,6 +221,12 @@
   }
   function guardado(k, v) { try { if (v === undefined) return localStorage.getItem(k) || ''; localStorage.setItem(k, v); } catch (e) {} return ''; }
   function chips(av) { return av.map(function (a) { return ' <span class="u-chip">' + texto(a.t) + '</span>'; }).join(''); }
+  /** Enlace de WhatsApp a un teléfono (a uno de 9 cifras se le pone el 34 de España), o '' si no hay teléfono. */
+  function whatsapp(tel, et) {
+    var n = String(tel || '').replace(/\D/g, '');
+    if (n.length === 9) n = '34' + n;
+    return n.length >= 9 ? '<a class="u-btn" href="https://wa.me/' + n + '" target="_blank" rel="noopener">' + et + '</a>' : '';
+  }
   function plural(n, uno, varios) { return n + ' ' + (n === 1 ? uno : varios); }
 
   window.UN.registrar('GESTION', {
@@ -544,6 +550,7 @@
         var cols = d.col.map(function (c) { return [c.ID, txt(c.NOMBRE || c.CODIGO || c.ID)]; });
         var html = '<h2 id="ges-vt">' + punto(ie.ID_COLOR) + texto(nomIe(ie.ID)) + '</h2>' +
           '<p class="u-nota">' + texto([nomComp(ie.ID_COMPETICION), nom('lig', ie.ID_LIGA), ie.ID].filter(Boolean).join(' · ')) + chips(av) + '</p>' +
+          (ix.jug[ie.ID_CAPITANA] && ix.jug[ie.ID_CAPITANA].TELEFONO ? '<div class="n-botones">' + whatsapp(ix.jug[ie.ID_CAPITANA].TELEFONO, 'Escribir a la capitana') + '</div>' : '') +
           '<h3 class="n-grupo">Esta temporada</h3><div class="u-campos">' +
           campo('Nombre este año', '<input type="text" id="e-NOMBRE_EQUIPO" value="' + texto(ie.NOMBRE_EQUIPO) + '" maxlength="80">') +
           campo('Estado', '<select id="e-ESTADO">' + opciones([['Solicitada', 'Solicitada'], ['Confirmada', 'Confirmada'], ['Baja', 'Baja']], ie.ESTADO) + '</select>') +
@@ -615,7 +622,8 @@
         var pintada = false;
         T.leer([IJ], { partes: o }).then(function () { if (pintada && velo.classList.contains('abierto') && vent.getAttribute('data-jug') === String(p.ID)) historial(); }, function () {});
         var ie = ij ? ix.ie[ij.ID_INSCRIPCION_EQUIPO] || {} : null, av = ij ? avisosJugadora(d, ij, cx) : [];
-        var html = '<h2 id="ges-vt">' + texto(nombreJug(p)) + '</h2><p class="u-nota">' + texto(p.ID) + (edad(p.FECHA_NACIMIENTO) !== '' ? ' · ' + edad(p.FECHA_NACIMIENTO) + ' años' : '') + chips(av) + '</p>';
+        var html = '<h2 id="ges-vt">' + texto(nombreJug(p)) + '</h2><p class="u-nota">' + texto(p.ID) + (edad(p.FECHA_NACIMIENTO) !== '' ? ' · ' + edad(p.FECHA_NACIMIENTO) + ' años' : '') + chips(av) + '</p>' +
+          (p.TELEFONO ? '<div class="n-botones">' + whatsapp(p.TELEFONO, 'WhatsApp') + '</div>' : '');
         if (ij) {
           html += '<h3 class="n-grupo">' + punto(ie.ID_COLOR) + texto(nomIe(ij.ID_INSCRIPCION_EQUIPO)) + ' · ' + texto(nomComp(ie.ID_COMPETICION)) + '</h3><div class="u-campos">' +
             campo('Dorsal', '<input type="text" id="i-DORSAL" value="' + texto(ij.DORSAL) + '" maxlength="4" inputmode="numeric">') +
