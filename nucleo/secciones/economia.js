@@ -129,16 +129,27 @@
       return { f: f, total: t, pagado: p, falta: t - p, cobrar: f.TIPO === 'Emitida' };
     }).sort(function (a, b) { return String(a.f.FECHA) < String(b.f.FECHA) ? -1 : 1; });
   }
+  /** Ingresos y gastos del periodo con una categoría del otro tipo (para corregirlos en el Excel). */
+  function cruzados(d, p) {
+    var ix = indice(d.cat);
+    return movDe(d, p).filter(function (m) { var c = ix[m.ID_CATEGORIA]; return c && (m.TIPO === 'Ingreso' || m.TIPO === 'Gasto') && c.TIPO !== m.TIPO; });
+  }
   /** Gastos del periodo sin factura ni ticket. */
   function sinFactura(d, p) { return movDe(d, p).filter(function (m) { return m.TIPO === 'Gasto' && !m.ID_FACTURA; }); }
 
   /**
    * Presupuesto del periodo por categoría: [{ cat, tipo, grupo, previsto, real, dif, filas }]. dif > 0 es bueno: en un
    * gasto, lo que queda; en un ingreso, lo que se ha ganado de más. En céntimos, sin IVA.
+   * Un movimiento del tipo contrario a su categoría (un gasto en una categoría de ingreso: una devolución) resta de ella;
+   * así ingresos menos gastos da lo mismo que el resultado del resumen.
    */
   function presupuesto(d, p) {
-    var real = {}, prev = {}, filas = {};
-    movDe(d, p).forEach(function (m) { if (m.ID_CATEGORIA && m.TIPO !== 'Interno') real[m.ID_CATEGORIA] = (real[m.ID_CATEGORIA] || 0) + importe(m).base; });
+    var real = {}, prev = {}, filas = {}, ix = indice(d.cat);
+    movDe(d, p).forEach(function (m) {
+      var c = ix[m.ID_CATEGORIA];
+      if (!c || (m.TIPO !== 'Ingreso' && m.TIPO !== 'Gasto')) return;
+      real[c.ID] = (real[c.ID] || 0) + (m.TIPO === c.TIPO ? 1 : -1) * importe(m).base;
+    });
     preDe(d, p).forEach(function (r) {
       var c = String(r.ID_CATEGORIA || '');
       prev[c] = (prev[c] || 0) + cts(r.IMPORTE);
@@ -188,7 +199,7 @@
 
   var CALC = { cts: cts, pct: pct, importe: importe, eur: eur, fecha: fecha, periodos: periodos, periodoActual: periodoActual,
     movDe: movDe, facDe: facDe, preDe: preDe, resumen: resumen, saldos: saldos, pendientes: pendientes, sinFactura: sinFactura,
-    presupuesto: presupuesto, desglose: desglose, problemasMov: problemasMov };
+    presupuesto: presupuesto, cruzados: cruzados, desglose: desglose, problemasMov: problemasMov };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -286,7 +297,7 @@
           '<tr><td class="u-tabla-t">Gastos</td><td class="num">' + eur(r.gastos.base) + '</td><td class="num u-solo-ancho">' + eur(r.gastos.iva) + '</td><td class="num">' + eur(r.gastos.total) + '</td></tr>' +
           '<tr class="eco-total"><td class="u-tabla-t">Resultado</td><td class="num">' + cifra(r.resultado, true) + '</td><td class="num u-solo-ancho">' + eur(r.iva) + '</td><td class="num"></td></tr>' +
           '</tbody></table><p class="u-nota">' + (r.iva >= 0 ? 'IVA a pagar del periodo: ' + eur(r.iva) : 'IVA a devolver del periodo: ' + eur(-r.iva)) +
-          ' (el de los ingresos menos el de los gastos). ' + r.n + (r.n === 1 ? ' movimiento.' : ' movimientos.') + '</p>';
+          ' (el de los ingresos menos el de los gastos). ' + r.n + (r.n === 1 ? ' ingreso o gasto' : ' ingresos y gastos') + '; los internos no cuentan.</p>';
         var ds = desglose(d, per);
         if (ds && ds.length) {
           h += '<h2 class="n-grupo">Por ' + texto(nomDes.toLowerCase()) + '</h2><table class="u-tabla eco-tabla"><thead><tr><th>' + texto(nomDes) + '</th><th class="num u-solo-ancho">Ingresos</th><th class="num u-solo-ancho">Gastos</th><th class="num">Resultado</th></tr></thead><tbody>' +
@@ -313,6 +324,7 @@
           if (f.cat && String(m.ID_CATEGORIA) !== f.cat) return false;
           if (f.cue && String(m.ID_CUENTA) !== f.cue && String(m.ID_CUENTA_DESTINO) !== f.cue) return false;
           if (f.sinFac && (m.TIPO !== 'Gasto' || m.ID_FACTURA)) return false;
+          if (f.cruz && !(ix.cat[m.ID_CATEGORIA] && (m.TIPO === 'Ingreso' || m.TIPO === 'Gasto') && ix.cat[m.ID_CATEGORIA].TIPO !== m.TIPO)) return false;
           if (q && norm([m.CONCEPTO, m.NOTAS, nombre('ctr', m.ID_CONTRAPARTE), nombre('cat', m.ID_CATEGORIA), m.ID].join(' ')).indexOf(q) < 0) return false;
           return true;
         }).sort(function (a, b) { return String(a.FECHA) < String(b.FECHA) ? 1 : String(a.FECHA) > String(b.FECHA) ? -1 : String(a.ID) < String(b.ID) ? 1 : -1; });
@@ -330,7 +342,8 @@
           '<label class="u-campo"><span class="u-etiqueta">Tipo</span><select data-filtro="tipo">' + opciones([['Ingreso', 'Ingresos'], ['Gasto', 'Gastos'], ['Interno', 'Internos']], f.tipo, 'Todos') + '</select></label>' +
           '<label class="u-campo"><span class="u-etiqueta">Categoría</span><select data-filtro="cat">' + opciones(cats, f.cat, 'Todas') + '</select></label>' +
           '<label class="u-campo"><span class="u-etiqueta">Cuenta</span><select data-filtro="cue">' + opciones(d.cue.map(function (c) { return [c.ID, c.NOMBRE]; }), f.cue, 'Todas') + '</select></label>' +
-          '<label class="u-check"><input type="checkbox" data-filtro="sinFac"' + (f.sinFac ? ' checked' : '') + '> Gastos sin factura</label></div>';
+          '<label class="u-check"><input type="checkbox" data-filtro="sinFac"' + (f.sinFac ? ' checked' : '') + '> Gastos sin factura</label>' +
+          (f.cruz ? '<label class="u-check"><input type="checkbox" data-filtro="cruz" checked> Con categoría del otro tipo</label>' : '') + '</div>';
         if (!ms.length) return h + '<p class="u-vacio">' + (movDe(d, per).length ? 'Ningún movimiento cumple el filtro. Quita algún filtro para ver más.' :
           'Todavía no hay movimientos en ' + texto(per ? per.nombre : 'este periodo') + '. Los que apuntes aparecen aquí al momento.') + '</p>';
         h += '<table class="u-tabla eco-tabla"><thead><tr><th>Movimiento</th><th class="num">Importe</th></tr></thead><tbody>' + ms.slice(0, f.ver).map(function (m) {
@@ -393,10 +406,15 @@
             xs.map(function (x) {
               tp += x.previsto; tr += x.real;
               return '<tr tabindex="0" data-pre="' + texto(x.cat.ID) + '"><td class="u-tabla-t">' + texto(x.cat.NOMBRE) + (x.filas.some(function (r) { return r._pendiente || r._nueva; }) ? ' <span class="u-chip">Guardando</span>' : '') +
-                '<div class="u-nota">' + [x.grupo, '<span class="u-solo-movil">real ' + eur(x.real) + '</span>'].filter(Boolean).join(' · ') + '</div></td><td class="num">' + eur(x.previsto) + '</td><td class="num u-solo-ancho">' + eur(x.real) + '</td>' +
+                '<div class="u-nota">' + texto(x.grupo) + '<span class="u-solo-movil">' + (x.grupo ? ' · ' : '') + 'real ' + eur(x.real) + '</span></div></td><td class="num">' + eur(x.previsto) + '</td><td class="num u-solo-ancho">' + eur(x.real) + '</td>' +
                 '<td class="num">' + (x.previsto ? cifra(x.dif, true) : '<span class="u-nota">Sin prever</span>') + '</td></tr>';
-            }).join('') + '<tr class="eco-total"><td class="u-tabla-t">Total<div class="u-nota u-solo-movil">real ' + eur(tr) + '</div></td><td class="num">' + eur(tp) + '</td><td class="num u-solo-ancho">' + eur(tr) + '</td><td class="num">' + cifra(tipo === 'Gasto' ? tp - tr : tr - tp, true) + '</td></tr></tbody></table>';
+            }).join('') + '<tr class="eco-total"><td class="u-tabla-t">Total<div class="u-nota u-solo-movil">real ' + eur(tr) + '</div></td><td class="num">' + eur(tp) + '</td><td class="num u-solo-ancho">' + eur(tr) + '</td><td class="num">' + (tp ? cifra(tipo === 'Gasto' ? tp - tr : tr - tp, true) : '<span class="u-nota">Sin prever</span>') + '</td></tr></tbody></table>';
         });
+        var cz = cruzados(d, per), tcz = 0;
+        cz.forEach(function (m) { tcz += importe(m).base; });
+        if (cz.length) h += '<p class="u-nota">' + cz.length + (cz.length === 1 ? ' movimiento tiene' : ' movimientos tienen') + ' una categoría del otro tipo (' + eur(tcz) +
+          ', p. ej. un gasto en una categoría de ingreso): restan de su categoría. Si no son devoluciones, cámbiales la categoría.</p>' +
+          (pest.indexOf('MOVIMIENTOS') >= 0 ? '<button type="button" class="u-btn" data-accion="cruzados">Ver esos movimientos</button> ' : '');
         return h + '<button type="button" class="u-btn" data-accion="ceros">' + (S.ceros ? 'Ver solo las que tienen algo' : 'Ver todas las categorías') + '</button>';
       }
 
@@ -607,6 +625,7 @@
           else if (ac === 'factura') formFac(null);
           else if (ac === 'vermas') { S.mov.ver += VER; pintar(); }
           else if (ac === 'ceros') { S.ceros = !S.ceros; pintar(); }
+          else if (ac === 'cruzados') { S.mov = { tipo: '', cat: '', cue: '', q: '', sinFac: false, cruz: true, ver: VER }; irA('MOVIMIENTOS'); }
           else if (ac === 'sinfac') { S.mov = { tipo: 'Gasto', cat: '', cue: '', q: '', sinFac: true, ver: VER }; if (pest.indexOf('MOVIMIENTOS') >= 0) irA('MOVIMIENTOS'); }
           return;
         }
