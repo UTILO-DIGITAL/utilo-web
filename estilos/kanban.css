@@ -559,6 +559,6 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
 .u .kb-ficha .est .fpill { font-size: 14px; }
 .u .kb-ficha .claude-fila .claude-texto { flex: 1 1 240px; }
 .u .kb-ficha .edit .pie { padding: 0; }
-.u #alta-form .edit { padding: 0; gap: var(--e3); }
-.u #alta-error:not(:empty) { display: block; }
+.u .kb #alta-form .edit { padding: 0; gap: var(--e3); }
+.u .kb #alta-error:not(:empty) { display: block; }
 @media (min-width: 900px) { .u .n-main.kb .filtros, .u .n-main.kb .tablero { padding-left: var(--e5); padding-right: var(--e5); } }
