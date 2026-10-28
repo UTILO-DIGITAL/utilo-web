@@ -9,8 +9,8 @@
  * - Stock: por modelo, color, dorsal y talla, calculado aquí con las tablas (las mismas cuentas que el motor,
  *   CAMISETAS5_CUENTAS.js). «Sacar del local» apunta una regalada, donada, perdida… (T0247).
  * - Pedidos: lo que falta de un modelo, dar las libres del local, preparar el pedido con el resto (proveedor de
- *   CONTRAPARTES, con su contacto), el extracto para enviárselo, confirmado y ha llegado, y la lista de proveedores
- *   (alta y cambios de nombre, contacto y notas).
+ *   CONTRAPARTES, con su contacto), el extracto para enviárselo, confirmado y ha llegado, lo pagado (la factura del
+ *   pedido, de FACTURAS) y el precio por camiseta, y la lista de proveedores (alta, contacto y su último precio).
  * - Recuento: lo que debería haber suelto en el local (en la caja, sin bolsa); se cambia lo que no cuadra y se aplica. Lo contado se guarda en
  *   este dispositivo hasta aplicarlo.
  * Los nombres de jugadoras, equipos y competiciones los da el motor (camisetas5Nombres), solo de las inscripciones con
@@ -135,7 +135,7 @@
 
   /* ======================= pantalla ======================= */
 
-  var TABLAS = ['CAMISETAS', 'MODELOS', 'COLORES', 'PEDIDOS', 'PEDIDOS_LINEAS', 'AJUSTES_STOCK', 'CONTRAPARTES'];
+  var TABLAS = ['CAMISETAS', 'MODELOS', 'COLORES', 'PEDIDOS', 'PEDIDOS_LINEAS', 'AJUSTES_STOCK', 'CONTRAPARTES', 'FACTURAS'];
   var VISTAS = [['entregas', 'Entregas'], ['stock', 'Stock'], ['pedidos', 'Pedidos'], ['recuento', 'Recuento']];
   // [estado, en plural para los filtros, color de base.css]
   var ESTADOS = [['Por pedir', 'Por pedir', 'bl'], ['Pedida', 'Pedidas', 'x'], ['Por preparar', 'Por preparar', 'pr'], ['Preparada', 'Preparadas', 'ec'],
@@ -643,6 +643,7 @@
       var b = e.target.closest('[data-cm-p]'); if (!b) return;
       var id = b.getAttribute('data-cm-p'), acc = b.getAttribute('data-cm-acc');
       if (acc === 'extracto') ventanaExtracto(id);
+      else if (acc === 'factura') ventanaFactura(id);
       else if (acc === 'confirmar') S.T.actualizar('PEDIDOS', id, { CONFIRMADO: true }).catch(function () {});
       else if (acc === 'llegado') {
         var f = hoy();
@@ -678,12 +679,14 @@
         return jug[e] + ' ' + (jug[e] === 1 || !x ? e : x[1]).toLowerCase();
       }).join(' · ') + '</p>' : '') +
       (p.ID_PROVEEDOR ? '<p class="u-nota">Proveedor: ' + texto(nombreProveedor(p.ID_PROVEEDOR)) + '</p>' : '') +
+      htmlCoste(p) +
       (p.NOTAS ? '<p class="u-nota">' + texto(p.NOTAS) + '</p>' : '') +
       (/^https?:\/\//.test(String(p.ARCHIVO_URL || '')) ? '<p><a href="' + texto(p.ARCHIVO_URL) + '" target="_blank" rel="noopener">Ver el documento del pedido</a></p>' : '') +
       (nuevo ? '<p class="u-nota">Creando el pedido, sus líneas y las camisetas en el Excel…</p>' : '<div class="n-botones">' +
         (paso === 'sinConfirmar' ? '<button type="button" class="u-btn" data-cm-p="' + texto(p.ID) + '" data-cm-acc="confirmar">Marcar confirmado</button>' :
           paso === 'confirmado' ? '<button type="button" class="u-btn" data-cm-p="' + texto(p.ID) + '" data-cm-acc="llegado">Ha llegado</button>' : '') +
-        '<button type="button" class="u-btn u-btn-texto" data-cm-p="' + texto(p.ID) + '" data-cm-acc="extracto">Extracto para el proveedor</button></div>') + '</li>';
+        '<button type="button" class="u-btn u-btn-texto" data-cm-p="' + texto(p.ID) + '" data-cm-acc="extracto">Extracto para el proveedor</button>' +
+        '<button type="button" class="u-btn u-btn-texto" data-cm-p="' + texto(p.ID) + '" data-cm-acc="factura">' + (p.ID_FACTURA ? 'Cambiar factura' : 'Enlazar factura') + '</button></div>') + '</li>';
   }
 
   function darLibres(b, m) {
@@ -700,9 +703,43 @@
       .sort(function (a, b) { return norm(a.NOMBRE) < norm(b.NOMBRE) ? -1 : 1; });
   }
   function nombreProveedor(id) { var x = S.T.fila('CONTRAPARTES', id); return x ? x.NOMBRE || id : id; }
+  /*
+   * El contacto de un proveedor va en una sola columna (CONTRAPARTES · CONTACTO), con cada dato con su etiqueta:
+   * «Persona: Marc · Teléfono: 612… · Correo: … · Prefiere: WhatsApp · Otros: …». Lo que no lleva etiqueta (lo escrito a
+   * mano en el Excel) se reparte: lo que parece un correo, a Correo; un teléfono, a Teléfono; lo primero que queda, a
+   * Persona, y el resto, a Otros.
+   */
+  var CONTACTO = [['persona', 'Persona'], ['tel', 'Teléfono'], ['correo', 'Correo'], ['prefiere', 'Prefiere'], ['otros', 'Otros']];
+  var PREFIERE = ['WhatsApp', 'Correo', 'Teléfono', 'Web', 'En persona'];
+  function leerContacto(t) {
+    var o = {};
+    String(t || '').split(' · ').forEach(function (parte) {
+      parte = parte.trim(); if (!parte) return;
+      var e = CONTACTO.filter(function (c) { return parte.indexOf(c[1] + ':') === 0; })[0];
+      if (e) { o[e[0]] = parte.slice(e[1].length + 1).trim(); return; }
+      var k = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parte) ? 'correo' : /^\+?[\d\s().-]{7,}$/.test(parte) ? 'tel' : 'persona';
+      if (o[k] && k !== 'otros') k = 'otros';
+      o[k] = (o[k] ? o[k] + ' · ' : '') + parte;
+    });
+    return o;
+  }
+  function escribirContacto(o) {
+    return CONTACTO.filter(function (c) { return o[c[0]]; }).map(function (c) { return c[1] + ': ' + String(o[c[0]]).replace(/\s+·\s+/g, ', '); }).join(' · ');
+  }
+  /** El contacto en líneas, con el teléfono y el correo como enlace. */
+  function htmlContacto(t) {
+    var o = leerContacto(t);
+    var l = CONTACTO.filter(function (c) { return o[c[0]]; }).map(function (c) {
+      var v = texto(o[c[0]]);
+      if (c[0] === 'tel') v = '<a href="tel:' + texto(String(o.tel).replace(/[^\d+]/g, '')) + '">' + v + '</a>';
+      if (c[0] === 'correo' && /@/.test(o.correo)) v = '<a href="mailto:' + texto(o.correo) + '">' + v + '</a>';
+      return '<span><span class="u-etiqueta">' + c[1] + '</span> ' + v + '</span>';
+    });
+    return l.length ? '<span class="cm-contacto">' + l.join('') + '</span>' : '<span class="u-nota">Sin contacto</span>';
+  }
   function contactoProveedor(id) {
     var x = S.T.fila('CONTRAPARTES', id);
-    return x && x.CONTACTO ? '<p class="cm-contacto"><span class="u-etiqueta">Contacto</span> ' + texto(x.CONTACTO) + '</p>' :
+    return x && x.CONTACTO ? '<div class="cm-contacto-b">' + htmlContacto(x.CONTACTO) + '</div>' :
       '<p class="u-nota">Este proveedor no tiene contacto apuntado: se pone en «Proveedores», abajo en la pestaña Pedidos.</p>';
   }
   function codigoColor(id) { return color(id).CODIGO || ''; }
@@ -716,7 +753,10 @@
     var v = ventana('<h2>Preparar pedido</h2><p class="u-nota">' + texto(nombreModelo(m)) + ': ' + plural(plan.pedir.length, 'camiseta', 'camisetas') +
       (plan.local.length === 1 ? '. Antes se da la que tiene una libre en el local.' : plan.local.length ? '. Antes se dan las ' + plan.local.length + ' que tienen una libre en el local.' : '.') + ' El pedido queda sin confirmar hasta que lo confirme el proveedor.</p>' +
       (provs.length ? '<div class="u-campos">' + campo('Proveedor', '<select id="pp-prov">' + (habitual ? '' : '<option value="">Elige el proveedor</option>') +
-        opciones(provs.map(function (x) { return [x.ID, x.NOMBRE + (String(x.ID) === habitual ? ' (el habitual)' : '')]; }), habitual) + '</select>') + '</div><div id="pp-contacto"></div>' :
+        opciones(provs.map(function (x) {
+          var u = ultimoPrecio(x.ID, m) || ultimoPrecio(x.ID);
+          return [x.ID, x.NOMBRE + (String(x.ID) === habitual ? ' (el habitual)' : '') + (u ? ' · ' + eur(u.unidad) + '/camiseta' : '')];
+        }), habitual) + '</select>') + '</div><div id="pp-contacto"></div>' :
         '<p class="u-mal">No hay ningún proveedor apuntado. Añádelo en «Proveedores», abajo en la pestaña Pedidos, y después prepara el pedido.</p>') +
       '<div class="u-tabla-caja"><table class="u-tabla"><thead><tr><th>Color (código)</th><th>Dorsal</th><th>Talla</th><th class="num">Cuántas</th></tr></thead><tbody>' +
       lin.map(function (l) { return '<tr><td>' + punto(l.ID_COLOR) + texto(nombreColor(l.ID_COLOR)) + (codigoColor(l.ID_COLOR) ? ' <span class="u-nota">' + texto(codigoColor(l.ID_COLOR)) + '</span>' : '') + '</td><td>' + texto(l.DORSAL || '—') + '</td><td>' + texto(l.TALLA) + '</td><td class="num">' + l.CANTIDAD + '</td></tr>'; }).join('') +
@@ -742,6 +782,68 @@
     };
   }
 
+  /* ---------- lo pagado: la factura del pedido (PEDIDOS · ID_FACTURA → FACTURAS) ---------- */
+
+  /** Importe → céntimos (acepta número, «1.234,56», «1234.56» o «12 €»), como Economía. */
+  function cts(v) {
+    var n = typeof v === 'number' ? v : Number(String(v == null ? '' : v).replace(/\s|€/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'));
+    return isFinite(n) ? Math.round(n * 100) : 0;
+  }
+  function pct(t) { var n = parseFloat(String(t == null ? '' : t).replace(',', '.')); return isFinite(n) ? n : 0; }
+  function eur(c) {
+    c = Math.round(c || 0);
+    var s = c < 0 ? '−' : '', a = Math.abs(c), e = Math.floor(a / 100), d = a % 100;
+    return s + String(e).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + (d < 10 ? '0' : '') + d + ' €';
+  }
+  function unidadesPedido(id) {
+    return S.T.filas('PEDIDOS_LINEAS').reduce(function (n, l) { return n + (String(l.ID_PEDIDO) === String(id) ? Number(l.CANTIDAD) || 0 : 0); }, 0);
+  }
+  /**
+   * Lo pagado por un pedido y a cuánto sale la camiseta, sin IVA (para comparar proveedores) y con IVA. Si una factura
+   * paga varios pedidos, se reparte por camisetas. null si el pedido no tiene factura (o no tiene camisetas).
+   */
+  function costePedido(p) {
+    var f = p && p.ID_FACTURA ? S.T.fila('FACTURAS', p.ID_FACTURA) : null; if (!f) return null;
+    var juntos = S.T.filas('PEDIDOS').filter(function (x) { return String(x.ID_FACTURA) === String(p.ID_FACTURA); });
+    var total = juntos.reduce(function (n, x) { return n + unidadesPedido(x.ID); }, 0), u = unidadesPedido(p.ID);
+    if (!total || !u) return null;
+    var base = cts(f.BASE), iva = pct(f.TIPO_IVA), mia = Math.round(base * u / total);
+    return { f: f, base: mia, total: Math.round(mia * (1 + iva / 100)), unidad: base / total, unidadIva: base * (1 + iva / 100) / total, juntos: juntos.length };
+  }
+  /** El precio por camiseta del último pedido con factura de un proveedor (de un modelo, si se dice). */
+  function ultimoPrecio(prov, modelo) {
+    var l = S.T.filas('PEDIDOS').filter(function (p) { return String(p.ID_PROVEEDOR) === String(prov) && (!modelo || String(p.ID_MODELO) === String(modelo)) && p.ID_FACTURA; })
+      .sort(function (a, b) { return String(b.FECHA_PEDIDO || '') < String(a.FECHA_PEDIDO || '') ? -1 : 1; });
+    for (var i = 0; i < l.length; i++) { var c = costePedido(l[i]); if (c) return { unidad: c.unidad, p: l[i] }; }
+    return null;
+  }
+  function htmlCoste(p) {
+    if (p._nueva) return '';
+    var c = costePedido(p);
+    if (!c) return p.ID_FACTURA ? '<p class="u-nota">Factura ' + texto(p.ID_FACTURA) + ' (no la encuentro en Economía)</p>' : '<p class="u-nota">Sin factura: enlázala para ver lo pagado y el precio por camiseta.</p>';
+    return '<p class="cm-coste">Pagado <b>' + eur(c.base) + '</b> sin IVA (' + eur(c.total) + ' con IVA) · <b>' + eur(c.unidad) + '/camiseta</b> (' + eur(c.unidadIva) + ' con IVA)' +
+      '<span class="u-nota"> · Factura ' + texto(c.f.NUMERO || c.f.ID) + (c.juntos > 1 ? ', repartida entre ' + c.juntos + ' pedidos' : '') + '</span></p>';
+  }
+
+  function ventanaFactura(id) {
+    var p = S.T.fila('PEDIDOS', id); if (!p) return;
+    var fs = S.T.filas('FACTURAS').filter(function (f) { return f.TIPO !== 'Emitida'; })
+      .sort(function (a, b) { return String(b.FECHA || '') < String(a.FECHA || '') ? -1 : 1; });
+    var suyas = fs.filter(function (f) { return String(f.ID_CONTRAPARTE) === String(p.ID_PROVEEDOR); }), otras = fs.filter(function (f) { return suyas.indexOf(f) < 0; });
+    var op = function (f) { return [f.ID, [f.NUMERO || f.ID, fecha(f.FECHA), eur(cts(f.BASE)) + ' sin IVA', f.ID_CONTRAPARTE && String(f.ID_CONTRAPARTE) !== String(p.ID_PROVEEDOR) ? nombreProveedor(f.ID_CONTRAPARTE) : ''].filter(String).join(' · ')]; };
+    var v = ventana('<h2>Factura del pedido ' + texto(p.ID) + '</h2>' +
+      '<p class="u-nota">' + plural(unidadesPedido(p.ID), 'camiseta', 'camisetas') + ' de ' + texto(nombreProveedor(p.ID_PROVEEDOR)) + '. Con su factura se ve lo pagado y a cuánto sale cada camiseta. Si la factura todavía no está, se da de alta en Economía › Facturas.</p>' +
+      '<div class="u-campos cm-una">' + campo('Factura', '<select id="pf-f"><option value="">Sin factura</option>' +
+        (suyas.length ? '<optgroup label="De ' + texto(nombreProveedor(p.ID_PROVEEDOR)) + '">' + opciones(suyas.map(op), p.ID_FACTURA) + '</optgroup>' : '') +
+        (otras.length ? '<optgroup label="Otras facturas recibidas">' + opciones(otras.map(op), p.ID_FACTURA) + '</optgroup>' : '') + '</select>') + '</div>' +
+      '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="pf-ok">Guardar</button><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cancelar</button></div>');
+    v.querySelector('#pf-ok').onclick = function () {
+      var f = v.querySelector('#pf-f').value;
+      cerrarVentana();
+      if (f !== String(p.ID_FACTURA || '')) S.T.actualizar('PEDIDOS', p.ID, { ID_FACTURA: f }).then(function () { S.ctx.aviso(f ? 'Factura enlazada al pedido ' + p.ID + '.' : 'El pedido ' + p.ID + ' ya no tiene factura.'); }, function () {});
+    };
+  }
+
   /** Proveedores: la lista, con su contacto, para verlos, darlos de alta y cambiarlos sin ir al Excel. */
   function htmlProveedores() {
     var l = proveedores();
@@ -751,8 +853,9 @@
       (l.length ? '<ul class="cm-prov-l">' + l.map(function (x) {
         var usos = S.T.filas('MODELOS').filter(function (m) { return String(m.ID_PROVEEDOR) === String(x.ID); }).map(function (m) { return m.NOMBRE || m.ID; });
         return '<li><div class="cm-rec-c"><b>' + texto(x.NOMBRE) + '</b>' +
-          '<span class="cm-contacto">' + (x.CONTACTO ? texto(x.CONTACTO) : '<span class="u-nota">Sin contacto</span>') + '</span>' +
+          htmlContacto(x.CONTACTO) +
           (usos.length ? '<span class="u-nota">Habitual de ' + texto(usos.join(', ')) + '</span>' : '') +
+          (function () { var u = ultimoPrecio(x.ID); return u ? '<span class="u-nota">Último precio: ' + eur(u.unidad) + '/camiseta sin IVA (' + texto(nombreModelo(u.p.ID_MODELO)) + ', ' + texto(u.p.ID) + ')</span>' : ''; })() +
           (x.NOTAS ? '<span class="u-nota">' + texto(x.NOTAS) + '</span>' : '') + '</div>' +
           '<button type="button" class="u-btn u-btn-texto" data-cm-prov="' + texto(x.ID) + '">Cambiar</button></li>';
       }).join('') + '</ul>' : '<p class="u-vacio">Todavía no hay ningún proveedor.</p>') + '</section>';
@@ -760,16 +863,24 @@
 
   function ventanaProveedor(id) {
     var x = id ? S.T.fila('CONTRAPARTES', id) : null;
-    var v = ventana('<h2>' + (x ? 'Cambiar proveedor' : 'Añadir proveedor') + '</h2><div class="u-campos">' +
+    var o = leerContacto(x ? x.CONTACTO : '');
+    var v = ventana('<h2>' + (x ? 'Cambiar proveedor' : 'Añadir proveedor') + '</h2><div class="u-campos cm-una">' +
       campo('Nombre', '<input type="text" id="pv-nom" maxlength="120" value="' + texto(x ? x.NOMBRE : '') + '">') +
-      campo('Contacto (persona, teléfono o correo)', '<input type="text" id="pv-con" maxlength="200" value="' + texto(x ? x.CONTACTO : '') + '">') +
+      campo('Persona de contacto', '<input type="text" id="pv-persona" maxlength="80" autocomplete="off" value="' + texto(o.persona || '') + '">') +
+      campo('Teléfono', '<input type="tel" id="pv-tel" maxlength="40" autocomplete="off" value="' + texto(o.tel || '') + '">') +
+      campo('Correo', '<input type="email" id="pv-correo" maxlength="120" autocomplete="off" value="' + texto(o.correo || '') + '">') +
+      campo('Cómo prefiere los pedidos', '<select id="pv-prefiere"><option value="">Sin decir</option>' + opciones(PREFIERE.concat(o.prefiere && PREFIERE.indexOf(o.prefiere) < 0 ? [o.prefiere] : []), o.prefiere) + '</select>') +
+      campo('Otros datos (web, horario, dirección…)', '<input type="text" id="pv-otros" maxlength="200" value="' + texto(o.otros || '') + '">') +
       campo('Notas (opcional)', '<input type="text" id="pv-not" maxlength="200" value="' + texto(x ? x.NOTAS : '') + '">') + '</div>' +
       '<p class="u-nota">Sin datos bancarios: esos van en Economía.</p><p class="u-error" hidden></p>' +
       '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="pv-ok">' + (x ? 'Guardar' : 'Añadir') + '</button><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cancelar</button></div>');
     v.querySelector('#pv-ok').onclick = function () {
-      var d = { NOMBRE: v.querySelector('#pv-nom').value.trim(), CONTACTO: v.querySelector('#pv-con').value.trim(), NOTAS: v.querySelector('#pv-not').value.trim() };
+      var val = function (k) { return v.querySelector('#pv-' + k).value.trim(); };
+      var d = { NOMBRE: val('nom'), CONTACTO: escribirContacto({ persona: val('persona'), tel: val('tel'), correo: val('correo'), prefiere: val('prefiere'), otros: val('otros') }), NOTAS: val('not') };
       var err = v.querySelector('.u-error'), mal = function (t) { err.textContent = t; err.hidden = false; };
       if (!d.NOMBRE) return mal('Falta el nombre.');
+      if (val('correo') && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val('correo'))) return mal('El correo no parece bien escrito.');
+      if (d.CONTACTO.length > 500) return mal('El contacto es demasiado largo: acorta «Otros datos».');
       // El nombre es único entre todas las contrapartes (también las que no son proveedores).
       if (S.T.filas('CONTRAPARTES').some(function (y) { return norm(y.NOMBRE) === norm(d.NOMBRE) && (!x || String(y.ID) !== String(x.ID)); })) return mal('Ya hay alguien con ese nombre en Economía.');
       cerrarVentana();
