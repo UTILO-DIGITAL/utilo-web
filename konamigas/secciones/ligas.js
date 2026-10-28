@@ -140,6 +140,22 @@
       return { fecha: f, jornadas: js, jr: !js.length, jugado: de.every(function (p) { return p.ESTADO !== 'Programado'; }), ps: de };
     });
   }
+  /**
+   * Cómo va un día de juego, para su barrita: cuántos partidos hay jugados, anulados, aplazados (o suspendidos) y por
+   * jugar. Los de campo libre no cuentan. { jugado, anulado, aplazado, pendiente, total }.
+   */
+  function resumenDia(ps) {
+    var r = { jugado: 0, anulado: 0, aplazado: 0, pendiente: 0, total: 0 };
+    ps.forEach(function (p) {
+      if (p.ESTADO === 'Libre' || !p.ID_INSCRIPCION_LOCAL || !p.ID_INSCRIPCION_VISITANTE) return;
+      r.total++;
+      if (p.ESTADO === 'Jugado') r.jugado++;
+      else if (p.ESTADO === 'Anulado') r.anulado++;
+      else if (p.ESTADO === 'Aplazado' || p.ESTADO === 'Suspendido') r.aplazado++;
+      else r.pendiente++;
+    });
+    return r;
+  }
   /** El día que se abre: el primero de hoy en adelante; si no hay, el último. */
   function diaInicial(dias, h) {
     var x = dias.filter(function (d) { return d.fecha >= h; })[0] || dias[dias.length - 1];
@@ -328,7 +344,7 @@
     descansan: descansan, equiposDe: equiposDe, puedeActa: puedeActa, conResultado: conResultado, huecosMover: huecosMover, jornadaMovible: jornadaMovible,
     textoAviso: textoAviso, fechaLarga: fechaLarga, recuperacionDe: recuperacionDe, aplazadosPendientes: aplazadosPendientes, huecosLibres: huecosLibres,
     planRecuperar: planRecuperar, diasRecuperar: diasRecuperar, repetidos: repetidos, resultadoAnulado: resultadoAnulado, diasDeJuego: diasDeJuego,
-    diaInicial: diaInicial };
+    diaInicial: diaInicial, resumenDia: resumenDia };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -531,6 +547,20 @@
           return !(S.mios && quien.yo) || esMio(p);
         });
       }
+      /**
+       * La barrita de un día de la tira: un trozo por partido, en orden: verde los jugados, rojo los anulados, gris los
+       * aplazados y vacío los que faltan por jugar. Toda verde: la jornada se ha jugado entera.
+       */
+      function barraDia(ps) {
+        var r = resumenDia(ps);
+        if (!r.total) return '';
+        var trozo = function (n, c) { return n ? '<i class="lg-s-' + c + '" style="flex-grow:' + n + '"></i>' : ''; };
+        return '<span class="lg-barrita" role="img" aria-label="' + texto([r.jugado + ' jugados', r.anulado ? r.anulado + ' anulados' : '', r.aplazado ? r.aplazado + ' aplazados' : '',
+          r.pendiente ? r.pendiente + ' por jugar' : ''].filter(String).join(', ')) + '">' +
+          trozo(r.jugado, 'jugado') + trozo(r.anulado, 'anulado') + trozo(r.aplazado, 'aplazado') + trozo(r.pendiente, 'pendiente') + '</span>';
+      }
+      /** ¿Se ha jugado el día entero? Sin nada por jugar ni aplazado (un anulado ya está resuelto). */
+      function completa(ps) { var r = resumenDia(ps); return r.total > 0 && !r.pendiente && !r.aplazado; }
       /** Nombre de un día de juego en la tira: «J9», «JR» (solo recuperaciones) o, con todas las ligas, el día de la semana. */
       function nombreDia(x) {
         if (todas) return DIAS[deIso(x.fecha).getDay()].slice(0, 3);
@@ -562,10 +592,11 @@
         h += '<div class="lg-dias"><button type="button" class="u-btn u-btn-icono" data-dias="-1" aria-label="Días anteriores">‹</button>' +
           '<div class="lg-dias-tira" role="group" aria-label="Días de juego">' + dias.map(function (x) {
             var dt = deIso(x.fecha);
-            return '<button type="button" data-fecha="' + x.fecha + '" aria-pressed="' + (x.fecha === S.fecha) + '" class="' + [x.jr ? 'lg-jr' : '', x.jugado ? 'lg-jugado' : '', x.fecha === hoy() ? 'lg-hoy' : ''].join(' ').trim() + '"' +
+            return '<button type="button" data-fecha="' + x.fecha + '" aria-pressed="' + (x.fecha === S.fecha) + '" class="' + [x.jr ? 'lg-jr' : '', completa(x.ps) ? 'lg-completa' : '', x.fecha === hoy() ? 'lg-hoy' : ''].join(' ').trim() + '"' +
               ' aria-label="' + texto((x.jr ? 'Jornada de recuperación' : todas ? '' : 'Jornada ' + x.jornadas.join(' y ')) + ' ' + fechaDia(x.fecha)) + '">' +
-              '<b>' + texto(nombreDia(x)) + '</b><small>' + dt.getDate() + ' ' + MESES[dt.getMonth()] + '</small></button>';
-          }).join('') + '</div><button type="button" class="u-btn u-btn-icono" data-dias="1" aria-label="Días siguientes">›</button></div>';
+              '<b>' + texto(nombreDia(x)) + '</b><small>' + dt.getDate() + ' ' + MESES[dt.getMonth()] + '</small>' + barraDia(x.ps) + '</button>';
+          }).join('') + '</div><button type="button" class="u-btn u-btn-icono" data-dias="1" aria-label="Días siguientes">›</button></div>' +
+          '<p class="lg-leyenda" aria-hidden="true"><span><i class="lg-s-jugado"></i>Jugado</span><span><i class="lg-s-anulado"></i>Anulado</span><span><i class="lg-s-aplazado"></i>Aplazado</span><span><i class="lg-s-pendiente"></i>Por jugar</span></p>';
         // El día abierto: qué jornada es, lo que se puede hacer con ella y sus partidos.
         var titu = todas ? fechaDia(dia.fecha) : (dia.jr ? 'Jornada de recuperación' : 'Jornada ' + dia.jornadas.join(' y ')) + ' · ' + fechaDia(dia.fecha);
         S.jornada = !todas && dia.jornadas.length === 1 ? dia.jornadas[0] : null;

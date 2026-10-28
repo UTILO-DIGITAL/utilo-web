@@ -422,12 +422,27 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
   border: 1.5px solid var(--color-borde-campo); border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto); cursor: pointer; font: inherit; }
 .u .lg-dias-tira b { font: 700 16px/1.1 var(--fuente-texto); font-variant-numeric: tabular-nums; }
 .u .lg-dias-tira small { font-size: 11px; color: var(--color-suave); white-space: nowrap; }
-.u .lg-dias-tira .lg-jugado:not([aria-pressed=true]) { border-color: var(--color-linea); color: var(--color-suave); }
+/* Un día jugado entero: en verde suave (el color de Jugado), para verlo de un vistazo. */
+.u .lg-dias-tira .lg-completa:not([aria-pressed=true]) { border-color: var(--estado-co); background: color-mix(in srgb, var(--estado-co) 10%, var(--color-superficie)); color: var(--estado-co); }
 .u .lg-dias-tira .lg-jr { border-color: var(--estado-ec); color: var(--estado-ec); background: color-mix(in srgb, var(--estado-ec) 8%, var(--color-superficie)); }
 .u .lg-dias-tira .lg-hoy:not([aria-pressed=true]) { box-shadow: inset 0 -3px 0 var(--color-accion); }
 .u .lg-dias-tira [aria-pressed=true] { background: var(--color-principal); border-color: var(--color-principal); color: var(--color-sobre-principal); }
 .u .lg-dias-tira [aria-pressed=true] small { color: var(--color-sobre-principal); }
 .u .lg-dias-tira .lg-jr[aria-pressed=true] { background: var(--estado-ec); border-color: var(--estado-ec); }
+/* La barrita de cada día: un trozo por partido (verde jugado, rojo anulado, gris aplazado, vacío por jugar), con los
+   colores de estado comunes. Sobre el día abierto, el vacío se ve en el color del texto claro. */
+.u .lg-dias-tira button { padding-bottom: 6px; }
+.u .lg-barrita { display: flex; gap: 1px; width: 36px; height: 5px; margin-top: 3px; border-radius: 3px; overflow: hidden; }
+.u .lg-barrita i, .u .lg-leyenda i { display: block; min-width: 3px; }
+.u .lg-s-jugado { background: var(--estado-co); }
+.u .lg-s-anulado { background: var(--estado-bl); }
+.u .lg-s-aplazado { background: color-mix(in srgb, var(--estado-x) 55%, var(--color-superficie)); }
+.u .lg-s-pendiente { background: transparent; box-shadow: inset 0 0 0 1px var(--color-borde-campo); }
+.u .lg-dias-tira [aria-pressed=true] .lg-s-pendiente { box-shadow: inset 0 0 0 1px var(--color-sobre-principal); }
+.u .lg-dias-tira [aria-pressed=true] .lg-barrita { outline: 1px solid var(--color-sobre-principal); }
+.u .lg-leyenda { display: flex; flex-wrap: wrap; gap: 0 var(--e3); margin: calc(var(--e2) * -1) 0 var(--e3); font-size: 11px; color: var(--color-suave); }
+.u .lg-leyenda span { display: inline-flex; align-items: center; gap: var(--e1); }
+.u .lg-leyenda i { width: 10px; height: 5px; border-radius: 2px; }
 /* En el móvil, sin flechas (se desliza con el dedo) y más estrechos: caben siete, el abierto en medio. */
 @media (max-width: 639px) { .u .lg-dias .u-btn-icono { display: none; } .u .lg-dias-tira { gap: 6px; } .u .lg-dias-tira button { width: 44px; min-height: 48px; } .u .lg-dias-tira b { font-size: 15px; } .u .lg-dias-tira small { font-size: 10px; } }
 .u .lg-jr-t { color: var(--estado-ec); }
