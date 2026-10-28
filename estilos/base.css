@@ -323,6 +323,18 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .pf-cab .n-grupo { margin: 0; }
 .u .pf-ver { display: flex; align-items: center; gap: var(--e2); font-size: 13px; color: var(--color-suave); min-width: 0; }
 .u .pf-ver select { min-width: 0; max-width: 100%; }
+.u .pf-detalle { margin-top: var(--e3); border-top: 1px solid var(--color-linea); padding-top: var(--e2); }
+.u .pf-detalle > summary { cursor: pointer; padding: var(--e2) 0; font-weight: 700; color: var(--color-principal-oscuro); min-height: 44px; display: flex; align-items: center; gap: var(--e2); }
+.u .pf-detalle[open] > summary { margin-bottom: var(--e2); }
+.u .pf-marca { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--color-bloque); color: var(--color-texto); white-space: nowrap; }
+.u .pf-marca[data-m="pagado"] { background: var(--color-bien); color: var(--color-superficie, #fff); }
+.u .pf-marca[data-m="por"] { box-shadow: inset 0 0 0 2px var(--color-accion); background: transparent; }
+@media (max-width: 639px) {
+  /* En el móvil, las celdas vacías no salen y el «·» va delante de cada dato (no detrás), para que no quede uno suelto al final. */
+  .u .pf-bloque .n-lista td.pf-vacia { display: none; }
+  .u .pf-bloque .n-lista tbody td::after { content: none; }
+  .u .pf-bloque .n-lista tbody td:nth-child(n+3):not(.pf-vacia)::before { content: '  ·  '; white-space: pre; color: var(--color-suave); }
+}
 
 /* ---------- Piezas de las secciones del núcleo (T0257) ----------
  * Pestañas de una sección, filtros encima de una lista, formulario en dos columnas en la ventana, una cifra mala

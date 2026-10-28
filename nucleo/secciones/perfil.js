@@ -86,7 +86,7 @@
     });
     if (grupo) ops += '</optgroup>';
     var ver = '<label class="pf-ver"><span>Ver</span><select data-pfvista="' + i + '">' + ops + '</select></label>';
-    return htmlUno(Object.assign({}, b, v, { titulo: b.titulo, vistas: null }), ver, i);
+    return htmlUno(Object.assign({}, b, v, { titulo: b.titulo, vistas: null, _vista: v.id }), ver, i);
   }
 
   function htmlUno(b, ver, i) {
@@ -95,22 +95,47 @@
     var h = '<section class="pf-bloque" data-pfb="' + i + '"><div class="pf-cab"><h2 class="n-grupo">' + texto(b.titulo) + (b.cuantas != null ? ' <span class="u-cifra">' + b.cuantas + '</span>' : '') + '</h2>' + (ver || '') + '</div>';
     if (b.cifras && b.cifras.length) h += htmlCifras(b.cifras);
     if (b.nota) h += '<p class="u-nota">' + texto(b.nota) + '</p>';
-    if (!filas.length) return h + (b.nota ? '' : '<p class="u-vacio">' + texto(b.vacio || 'No hay nada tuyo aquí por ahora.') + '</p>') + htmlAccion(b.accion) + '</section>';
-    var suma = b.sumar ? cols.filter(function (c) { return c.nombre === b.sumar; })[0] : null;
-    h += '<table class="u-tabla n-lista"><thead><tr>' + cols.map(function (c) { return '<th' + (num(c.tipo) ? ' class="num"' : '') + '>' + texto(c.titulo) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    if (!filas.length) h += b.nota ? '' : '<p class="u-vacio">' + texto(b.vacio || 'No hay nada tuyo aquí por ahora.') + '</p>';
+    else {
+      h += htmlTabla(cols, filas, b.sumar, b.total);
+      if (b.cuantas > filas.length) h += '<p class="u-nota">Y ' + plural(b.cuantas - filas.length, 'más', 'más') + '.</p>';
+    }
+    return h + htmlAccion(b.accion) + htmlDetalle(b.detalle, b._vista, b.id || b.titulo) + '</section>';
+  }
+
+  /** Una tabla de un bloque; con sumar, el total debajo. Una columna de tipo «marca» sale como una etiqueta (Pagado, Por cobrar…). */
+  function htmlTabla(cols, filas, sumar, total) {
+    var suma = sumar ? cols.filter(function (c) { return c.nombre === sumar; })[0] : null;
+    return '<table class="u-tabla n-lista"><thead><tr>' + cols.map(function (c) { return '<th' + (num(c.tipo) ? ' class="num"' : '') + '>' + texto(c.titulo) + '</th>'; }).join('') + '</tr></thead><tbody>' +
       filas.map(function (f) {
         return '<tr>' + cols.map(function (c, i) {
           var v = valor(f[c.nombre], c.tipo);
-          return '<td' + (num(c.tipo) ? ' class="num"' : i === 0 ? ' class="u-tabla-t"' : '') + ' data-t="' + texto(c.titulo) + '">' + (v ? texto(v) : '<span class="u-tabla-s">—</span>') + '</td>';
+          if (c.tipo === 'marca' && v) v = '<span class="pf-marca" data-m="' + texto(String(v).split(' ')[0].toLowerCase()) + '">' + texto(v) + '</span>';
+          else v = v ? texto(v) : '';
+          var cl = [num(c.tipo) ? 'num' : i === 0 ? 'u-tabla-t' : '', v ? '' : 'pf-vacia'].filter(Boolean).join(' '); // vacía: en el móvil no sale
+          return '<td' + (cl ? ' class="' + cl + '"' : '') + ' data-t="' + texto(c.titulo) + '">' + (v || '<span class="u-tabla-s">—</span>') + '</td>';
         }).join('') + '</tr>';
       }).join('') + '</tbody>' +
-      (suma && b.total != null ? '<tfoot><tr>' + cols.map(function (c, i) {
-        return c === suma ? '<td class="num" data-t="Total">' + texto(valor(b.total, suma.tipo)) + '</td>' : '<td>' + (i === 0 ? 'Total' : '') + '</td>';
+      (suma && total != null ? '<tfoot><tr>' + cols.map(function (c, i) {
+        return c === suma ? '<td class="num" data-t="Total">' + texto(valor(total, suma.tipo)) + '</td>' : '<td>' + (i === 0 ? 'Total' : '') + '</td>';
       }).join('') + '</tr></tfoot>' : '') +
       '</table>';
-    if (b.cuantas > filas.length) h += '<p class="u-nota">Y ' + plural(b.cuantas - filas.length, 'más', 'más') + '.</p>';
-    return h + htmlAccion(b.accion) + '</section>';
   }
+
+  /** Lo que se despliega, abierto o no (por bloque), mientras la página está abierta. */
+  var ABIERTO = {};
+  /**
+   * El detalle de un bloque, plegado debajo (T0255): { titulo, columnas, filas, nota }. Si las filas llevan _en (las vistas en
+   * las que salen), solo las de la vista elegida.
+   */
+  function htmlDetalle(d, vista, k) {
+    if (!d || !d.filas) return '';
+    var filas = d.filas.filter(function (f) { return !f._en || !vista || f._en.indexOf(vista) >= 0; });
+    if (!filas.length) return '';
+    return '<details class="pf-detalle" data-pfdet="' + texto(k) + '"' + (ABIERTO[k] ? ' open' : '') + '><summary>' + texto(d.titulo || 'Ver el detalle') + ' <span class="u-cifra">' + filas.length + '</span></summary>' +
+      (d.nota ? '<p class="u-nota">' + texto(d.nota) + '</p>' : '') + htmlTabla(d.columnas || [], filas) + '</details>';
+  }
+
 
   /** Las cifras de un bloque, grandes y arriba: [{ titulo, valor, tipo, destacar }]. */
   function htmlCifras(cs) {
@@ -148,6 +173,8 @@
         sec.outerHTML = htmlBloque(b, i);
         var n = el.querySelector('[data-pfvista="' + i + '"]'); if (n) n.focus();
       });
+      // Si el detalle de un bloque está desplegado, sigue así al cambiar de vista o al ponerse al día.
+      el.addEventListener('toggle', function (e) { var d = e.target; if (d.getAttribute && d.hasAttribute('data-pfdet')) ABIERTO[d.getAttribute('data-pfdet')] = d.open; }, true);
       function pintar(d) {
         visto = d;
         el.innerHTML = '<div class="pf">' + htmlQuien(ctx) +
