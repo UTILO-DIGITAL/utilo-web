@@ -353,12 +353,17 @@
       '<b>' + texto(x.q.jugadora || c.ID_INSCRIPCION_JUGADORA) + '</b>' +
       '<span class="u-nota">' + punto(c.ID_COLOR) + texto([talla(c), nombreColor(c.ID_COLOR)].join(' · ')) + '</span>' +
       '<span class="cm-jug-e">' + est + (c._pendiente ? ' <span class="u-nota">Guardando…</span>' : c.ESTADO === 'Entregada' && c.FECHA_ENTREGA ? ' <span class="u-nota">' + fecha(c.FECHA_ENTREGA) + '</span>' : '') + '</span></button>' +
-      (sig ? '<button type="button" class="u-btn cm-sig" data-cm-sig="' + texto(c.ID) + '">' + texto(sig[1]) + '</button>' : '') + '</li>';
+      (sig ? '<button type="button" class="u-btn cm-sig' + (sig[2] ? ' cm-sig-' + sig[2] : '') + '" data-cm-sig="' + texto(c.ID) + '"' +
+        (sig[2] ? ' aria-label="' + texto(sig[1] + ' la camiseta de ' + (x.q.jugadora || c.ID)) + '"' : '') + '>' + texto(sig[1]) + '</button>' : '') + '</li>';
   }
-  /** El paso siguiente desde la lista: [acción, texto del botón]. */
+  /**
+   * El paso siguiente desde la lista: [estado al que pasa, verbo del botón, color de ese estado]. El botón dice lo que va a
+   * hacer (Preparar, Entregar) y lleva el color del estado al que lleva, el mismo que el cuadrado de la jugadora cuando ya
+   * está así. Recuperar y Quitar abren la ficha: no se hacen de un toque.
+   */
   function siguiente(s) {
-    return s === 'Por preparar' ? ['Preparada', 'Preparada'] : s === 'Preparada' ? ['Entregada', 'Entregada'] :
-      s === 'recuperar' ? ['recuperar', 'Recuperar'] : s === 'quitar' ? ['Sin camiseta', 'Quitar'] : null;
+    return s === 'Por preparar' ? ['Preparada', 'Preparar', 'ec'] : s === 'Preparada' ? ['Entregada', 'Entregar', 'co'] :
+      s === 'recuperar' ? ['ficha', 'Recuperar'] : s === 'quitar' ? ['ficha', 'Quitar'] : null;
   }
 
   function clicLista(e) {
@@ -369,20 +374,73 @@
       var c = S.T.fila('CAMISETAS', id); if (!c) return;
       var sig = siguiente(situacion(c, quien(c)));
       if (!sig) return;
-      if (sig[0] === 'recuperar') ventanaCamiseta(c); else marcar(c, sig[0]);
+      if (sig[0] === 'ficha') ventanaCamiseta(c); else marcar(c, sig[0], true);
     } else if ((id = b.getAttribute('data-cm-cam'))) {
       var f = S.T.fila('CAMISETAS', id); if (f) ventanaCamiseta(f);
     } else if ((id = b.getAttribute('data-cm-todo'))) {
       S.todo[id] = !S.todo[id]; pintar(false);
     } else if ((id = b.getAttribute('data-cm-todas'))) {
-      S.T.filas('CAMISETAS').filter(function (x) { return x.ESTADO === 'Preparada' && quien(x).ie === id && !quien(x).baja; }).forEach(function (x) { marcar(x, 'Entregada'); });
+      ventanaEntregarEquipo(id);
     }
   }
 
-  /** Preparada, Entregada, Por preparar o Sin camiseta: directo a la tabla, al momento. */
-  function marcar(c, estado) {
+  /** Preparada, Entregada, Por preparar o Sin camiseta: directo a la tabla, al momento. Con aviso, se puede deshacer. */
+  function marcar(c, estado, conAviso) {
+    var antes = { ESTADO: c.ESTADO, FECHA_ENTREGA: c.FECHA_ENTREGA || '' };
     var cambios = { ESTADO: estado, FECHA_ENTREGA: estado === 'Entregada' ? (c.ESTADO === 'Entregada' && c.FECHA_ENTREGA ? c.FECHA_ENTREGA : hoy()) : '' };
+    if (conAviso) avisoDeshacer((quien(c).jugadora || c.ID) + ': ' + estado.toLowerCase() + '.', [[c.ID, cambios, antes]]);
     return S.T.actualizar('CAMISETAS', c.ID, cambios).catch(function () {});
+  }
+
+  /**
+   * Un toque sin querer no puede perder una camiseta: cada marca deja abajo, unos segundos, «Deshacer», que la vuelve a
+   * dejar como estaba (si nadie la ha cambiado mientras). l: [[ID, cambios hechos, como estaba]].
+   */
+  var tDeshacer = 0;
+  function avisoDeshacer(t, l) {
+    var d = S.el.querySelector('.cm-deshacer');
+    if (!d) { d = document.createElement('div'); d.className = 'cm-deshacer'; d.setAttribute('role', 'status'); S.el.appendChild(d); }
+    d.innerHTML = '<span>' + texto(t) + '</span><button type="button" class="u-btn u-btn-texto">Deshacer</button>';
+    d.hidden = false;
+    clearTimeout(tDeshacer);
+    tDeshacer = setTimeout(function () { d.hidden = true; }, 8000);
+    d.querySelector('button').onclick = function () {
+      clearTimeout(tDeshacer); d.hidden = true;
+      l.forEach(function (x) {
+        var f = S.T.fila('CAMISETAS', x[0]);
+        // Solo si sigue como la dejó este toque: no se pisa lo que haya cambiado otra persona.
+        if (f && f.ESTADO === x[1].ESTADO) S.T.actualizar('CAMISETAS', x[0], x[2]).catch(function () {});
+      });
+      S.ctx.aviso(l.length === 1 ? 'Deshecho: vuelve a estar ' + l[0][2].ESTADO.toLowerCase() + '.' : 'Deshecho: ' + plural(l.length, 'camiseta vuelve', 'camisetas vuelven') + ' a como estaban.');
+    };
+  }
+
+  /** Entregar las preparadas de un equipo: antes, la lista para revisarla (se puede quitar alguna). */
+  function ventanaEntregarEquipo(ie) {
+    var l = S.T.filas('CAMISETAS').filter(function (x) { var q = quien(x); return x.ESTADO === 'Preparada' && q.ie === ie && !q.baja; })
+      .sort(function (a, b) { return cam5Orden_(a, b); });
+    if (!l.length) return;
+    var eq = quien(l[0]).equipo;
+    var v = ventana('<h2>Entregar a ' + texto(eq) + '</h2><p class="u-nota">Marca como entregadas las camisetas preparadas de este equipo. Quita las que no estés entregando ahora.</p>' +
+      '<ul class="cm-lista-ok">' + l.map(function (c) {
+        return '<li><label class="u-check"><input type="checkbox" checked data-cm-id="' + texto(c.ID) + '"> <span><b>' + texto(quien(c).jugadora || c.ID) + '</b> <span class="u-nota">' + texto(talla(c)) + '</span></span></label></li>';
+      }).join('') + '</ul>' +
+      '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="ce-ok"></button><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cancelar</button></div>');
+    var ok = v.querySelector('#ce-ok');
+    var marcadas = function () { return [].filter.call(v.querySelectorAll('[data-cm-id]'), function (x) { return x.checked; }).map(function (x) { return x.getAttribute('data-cm-id'); }); };
+    var cuenta = function () { var n = marcadas().length; ok.disabled = !n; ok.textContent = n ? 'Entregar ' + plural(n, 'camiseta', 'camisetas') : 'Elige alguna camiseta'; };
+    v.onchange = cuenta; cuenta();
+    ok.onclick = function () {
+      var ids = marcadas(), f = hoy(), hechos = [];
+      cerrarVentana();
+      ids.forEach(function (id) {
+        var c = S.T.fila('CAMISETAS', id);
+        if (!c || c.ESTADO !== 'Preparada') return;
+        hechos.push([id, { ESTADO: 'Entregada', FECHA_ENTREGA: f }, { ESTADO: c.ESTADO, FECHA_ENTREGA: c.FECHA_ENTREGA || '' }]);
+        S.T.actualizar('CAMISETAS', id, { ESTADO: 'Entregada', FECHA_ENTREGA: f }).catch(function () {});
+      });
+      if (hechos.length) avisoDeshacer(eq + ': ' + plural(hechos.length, 'camiseta entregada', 'camisetas entregadas') + '.', hechos);
+    };
   }
   /** No llegó o Defectuosa: con su −1 en el stock (camisetas5Marcar). */
   function marcarMotor(c, estado) {
@@ -427,12 +485,12 @@
     } else if (s === 'quitar') {
       botones.push(['Sin camiseta', 'Quitar la camiseta', true]);
     } else {
-      if (e === 'Por preparar' || e === 'Entregada') botones.push(['Preparada', 'Preparada']);
-      if (e === 'Por preparar' || e === 'Preparada') botones.push(['Entregada', 'Entregada']);
+      if (e === 'Por preparar' || e === 'Entregada') botones.push(['Preparada', 'Marcar preparada']);
+      if (e === 'Por preparar' || e === 'Preparada') botones.push(['Entregada', 'Marcar entregada']);
       if (e === 'Preparada' || e === 'Entregada') botones.push(['Por preparar', 'Volver a Por preparar']);
-      if (e !== 'No llegó' && e !== 'Sin camiseta') botones.push(['No llegó', 'No llegó']);
-      if (e !== 'Defectuosa' && e !== 'Sin camiseta') botones.push(['Defectuosa', 'Defectuosa']);
-      if (e !== 'Sin camiseta') botones.push(['Sin camiseta', q.baja ? 'Quitar la camiseta' : 'Sin camiseta']);
+      if (e !== 'No llegó' && e !== 'Sin camiseta') botones.push(['No llegó', 'Marcar no llegó']);
+      if (e !== 'Defectuosa' && e !== 'Sin camiseta') botones.push(['Defectuosa', 'Marcar defectuosa']);
+      if (e !== 'Sin camiseta') botones.push(['Sin camiseta', 'Marcar sin camiseta']);
     }
     var ped = c.ID_PEDIDO ? S.T.fila('PEDIDOS', c.ID_PEDIDO) : null;
     var v = ventana('<h2>' + texto(q.jugadora || c.ID_INSCRIPCION_JUGADORA) + '</h2>' +
@@ -453,7 +511,7 @@
       cerrarVentana();
       if (m === 'recuperar') recuperar(f, rota && rota.checked);
       else if (m === 'No llegó' || m === 'Defectuosa') marcarMotor(f, m);
-      else marcar(f, m);
+      else marcar(f, m, true);
     };
   }
 

@@ -441,6 +441,20 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .cm-jug-n .u-nota { display: flex; align-items: center; }
 .u .cm-jug-e { font-size: 13px; }
 .u .cm-sig { flex: none; min-width: 108px; }
+/* El botón lleva el color del estado al que pasa la camiseta (colores funcionales de los estados, texto blanco > 4,5:1). */
+.u .cm-sig-ec, .u .cm-sig-co { color: var(--color-superficie); }
+.u .cm-sig-ec { background: var(--estado-ec); border-color: var(--estado-ec); }
+.u .cm-sig-co { background: var(--estado-co); border-color: var(--estado-co); }
+/* «Deshacer» después de cada marca, encima de la barra de secciones (lo que flota lleva sombra). Lima solo sobre el azul. */
+.u .cm-deshacer { position: fixed; z-index: 50; left: max(var(--e4), env(safe-area-inset-left, 0px)); right: max(var(--e4), env(safe-area-inset-right, 0px));
+  bottom: calc(var(--alto-barra) + var(--e3) + env(safe-area-inset-bottom, 0px)); max-width: 560px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e3); padding: var(--e1) var(--e1) var(--e1) var(--e4);
+  border-radius: var(--radio); background: var(--color-principal); color: var(--color-sobre-principal); box-shadow: var(--sombra-flota); font-size: 14px; }
+.u .cm-deshacer[hidden] { display: none; }
+.u .cm-deshacer .u-btn { color: var(--color-destacado); flex: none; }
+.u .cm-lista-ok { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
+.u .cm-lista-ok li { border-bottom: 1px solid var(--color-linea); }
+.u .cm-lista-ok .u-check { width: 100%; }
 .u .cm-guardando { opacity: .65; }
 .u .cm-eq-pie:not(:empty) { margin-top: var(--e2); }
 .u .cm-dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--e2) var(--e4); margin: 0; }
@@ -489,6 +503,7 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
   .u .cm-filtros .u-campo, .u .cm-filtros .u-campo:first-child { flex: 1 1 100%; max-width: none; }
 }
 @media (min-width: 900px) {
+  .u .cm-deshacer { left: calc(var(--ancho-menu) + var(--e4)); bottom: var(--e4); }
   .u .cm-otra { grid-template-columns: 2fr 1fr 1fr 1fr auto; }
   .u .cm-otra .u-campo:first-child { grid-column: auto; }
   .u .cm-eqs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e3); }
