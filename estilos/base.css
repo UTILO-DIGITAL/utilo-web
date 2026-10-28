@@ -490,12 +490,39 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
 .u .gs5 .gs-color { display: inline-block; width: 13px; height: 13px; border-radius: 50%; border: 1px solid var(--color-borde-campo); vertical-align: -2px;
   margin-right: var(--e2); flex: none; }
 
-/* Avisos: cada uno con «Dar por bueno», que abre «Por qué (opcional)» y «Confirmar»; los ya dados por buenos, con «Volver a avisar». */
-.u .gs5 .gs-avs { display: flex; flex-direction: column; gap: var(--e1); margin-top: var(--e1); }
-.u .gs5 .gs-av { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--e3); padding: var(--e1) var(--e2) var(--e1) var(--e3);
-  border-left: 3px solid var(--gs-am); background: var(--color-superficie); border-radius: var(--radio-peq); font-size: 14px; }
-.u .gs5 .gs-av-t { flex: 1 1 auto; min-width: 0; font-weight: 700; color: var(--gs-am); }
-.u .gs5 .gs-av .gs-enl { font-size: 13px; font-weight: 700; min-height: 36px; }
+/* Tarjetas de lo que hay que revisar (avisos y revisiones): título, qué pasa, los datos, botones de solución y, al final,
+ * «Ver la ficha» y «Dar por bueno» (que abre «Por qué (opcional)» y «Confirmar»). Franja de 4 px con el color de aviso. */
+.u .gs5 .gs-tjs { display: flex; flex-direction: column; gap: var(--e2); margin: var(--e2) 0 var(--e1); }
+.u .gs5 .gs-tarjeta { background: var(--color-superficie); border: 1px solid var(--gs-l); border-left: 4px solid var(--gs-am); border-radius: var(--radio);
+  padding: var(--e3); font-size: 14px; min-width: 0; }
+.u .gs5 .gs-tj-t { font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }
+.u .gs5 .gs-tj-t .gs-color { margin-right: var(--e1); }
+.u .gs5 .gs-tj-p { margin: var(--e1) 0 0; }
+.u .gs5 .gs-tj-d { margin-top: var(--e2); font-size: 13px; color: var(--gs-g); overflow-wrap: anywhere; }
+.u .gs5 .gs-tj-d .gs-df { color: var(--color-texto); }
+.u .gs5 .gs-tj-s { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--e2); margin-top: var(--e3); }
+.u .gs5 .gs-tj-s .gs-b2, .u .gs5 .gs-tj-s a.gs-b2 { font-size: 14px; }
+.u .gs5 .gs-tj-c { margin-top: 0; flex: 1 1 200px; }
+.u .gs5 .gs-tj-c.gs-ancho, .u .gs5 .gs-tj-s .gs-ancho { flex-basis: 100%; }
+.u .gs5 .gs-tj-cols { margin-top: var(--e1); }
+.u .gs5 .gs-tj-cols .gs-chip { display: inline-flex; align-items: center; text-transform: none; letter-spacing: 0; font-size: 13px; }
+.u .gs5 .gs-tj-err { margin: var(--e2) 0 0; color: var(--gs-r); font-weight: 700; }
+.u .gs5 .gs-tj-pie { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e1) var(--e4); margin-top: var(--e2); }
+.u .gs5 .gs-tj-pie .gs-enl { font-size: 13px; font-weight: 700; min-height: 36px; }
+.u .gs5 .gs-tj-pie .gs-ult { color: var(--gs-g); margin-left: auto; }
+.u .gs5 .gs-tj-dec { margin: var(--e2) 0 0; color: var(--color-texto); }
+.u .gs5 .gs-tj-foto .gs-foto-g { min-height: 160px; max-width: 480px; }
+.u .gs5 .gs-tj-foto .gs-foto-g img { max-height: 360px; }
+.u .gs5 .gs-tj-cols .gs-chip .gs-opc { margin-left: var(--e1); }
+.u .gs5 .gs-cands { display: flex; flex-direction: column; flex: 1 1 100%; border-top: 1px solid var(--gs-l); }
+.u .gs5 .gs-cand { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2); padding: var(--e2) 0; border-bottom: 1px solid var(--gs-l); }
+.u .gs5 .gs-cand .gs-t { font-weight: 700; }
+.u .gs5 .gs-cand .gs-s { font-size: 13px; color: var(--gs-g); }
+.u .gs5 .gs-cand .gs-minis { margin-top: var(--e1); }
+.u .gs5 .gs-comp { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--e3); color: var(--color-texto); font-size: 14px; }
+.u .gs5 .gs-comp-i { border: 1px solid var(--gs-l); border-radius: var(--radio); padding: var(--e2) var(--e3); min-width: 0; }
+.u .gs5 .gs-comp-i .gs-t { font-weight: 700; margin-bottom: var(--e1); }
+.u .gs5 .gs-comp-i .gs-df span:last-child { font-weight: 600; }
 .u .gs5 .gs-bueno { flex: 1 1 100%; display: flex; gap: var(--e2); padding: var(--e1) 0 var(--e2); }
 .u .gs5 .gs-bueno input { flex: 1 1 auto; min-width: 0; }
 .u .gs5 .gs-bueno .gs-b2 { flex: none; }
