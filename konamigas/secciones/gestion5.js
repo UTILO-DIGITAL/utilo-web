@@ -74,9 +74,22 @@
   }
   /** Cuenta como equipo de la temporada: no es Baja ni una fila de Clasificación (copas y supercopas). */
   function cuenta(ie) { return ie.ESTADO !== 'Baja' && ie.ORIGEN !== 'Clasificación'; }
-  /** Plantilla de una inscripción de equipo: sus inscripciones de jugadora (Activas primero, por dorsal). */
+  /**
+   * Las inscripciones de jugadora que valen: si una jugadora tiene varias en el mismo equipo inscrito (volvió a rellenar el
+   * formulario), solo la más reciente (FECHA_INSCRIPCION y, si empatan, el ID mayor). Las anteriores no salen, no cuentan
+   * ni dan avisos, y no son un problema a revisar.
+   */
+  function ijsValidas(lista) {
+    var ult = {}, k = function (j) { return j.ID_JUGADORA + '|' + j.ID_INSCRIPCION_EQUIPO; };
+    (lista || []).forEach(function (j) {
+      var u = ult[k(j)], x = String(j.FECHA_INSCRIPCION || ''), y = u ? String(u.FECHA_INSCRIPCION || '') : '';
+      if (!u || x > y || (x === y && String(j.ID) > String(u.ID))) ult[k(j)] = j;
+    });
+    return (lista || []).filter(function (j) { return ult[k(j)] === j; });
+  }
+  /** Plantilla de una inscripción de equipo: sus inscripciones de jugadora que valen (Activas primero, por dorsal). */
   function plantilla(d, idIe) {
-    return d.ij.filter(function (j) { return String(j.ID_INSCRIPCION_EQUIPO) === String(idIe); }).sort(function (a, b) {
+    return ijsValidas(d.ij).filter(function (j) { return String(j.ID_INSCRIPCION_EQUIPO) === String(idIe); }).sort(function (a, b) {
       if ((a.ESTADO === 'Baja') !== (b.ESTADO === 'Baja')) return a.ESTADO === 'Baja' ? 1 : -1;
       var x = parseInt(a.DORSAL, 10), y = parseInt(b.DORSAL, 10);
       if (isFinite(x) !== isFinite(y)) return isFinite(x) ? -1 : 1;
@@ -157,7 +170,9 @@
     var d0 = txt(ij.DORSAL);
     if (!d0) out.push({ id: 'dorsal-sin', k: 'dorsal', t: 'Sin dorsal' });
     else if ((ctxT.dorsal[ij.ID_INSCRIPCION_EQUIPO + '|' + d0] || 0) > 1) out.push({ id: 'dorsal-rep', k: 'dorsal', t: 'Dorsal ' + d0 + ' repetido' });
-    if (ie && (ctxT.enComp[ij.ID_JUGADORA + '|' + ie.ID_COMPETICION] || 0) > 1) out.push({ id: 'doble', k: 'doble', t: 'En dos equipos de la competición' });
+    if (ctxT.superada && ctxT.superada[ij.ID]) return [];
+    // Puede jugar en dos equipos de la misma competición, pero no en dos de la misma liga.
+    if (ie && ie.ID_LIGA && (ctxT.enLiga[ij.ID_JUGADORA + '|' + ie.ID_LIGA] || 0) > 1) out.push({ id: 'doble', k: 'doble', t: 'En dos equipos de la misma liga' });
     var falta = ['ACEPTA_NORMAS', 'ACEPTA_DATOS', 'ACEPTA_RESPONSABILIDAD'].filter(function (c) { return ij[c] !== true; });
     if (falta.length) out.push({ id: 'acepta', k: 'acepta', t: 'Sin aceptar ' + falta.map(function (c) { return { ACEPTA_NORMAS: 'normas', ACEPTA_DATOS: 'datos', ACEPTA_RESPONSABILIDAD: 'responsabilidad' }[c]; }).join(', ') });
     return sinResueltos(out, ij.ID, ctxT);
@@ -165,7 +180,7 @@
   /** Lo que comparten los avisos de una temporada: cuántos hay de cada color por liga, nombres, dorsales… */
   function contexto(d, tem, o) {
     o = o || {};
-    var ies = iesDe(d, tem), ix = indice(ies), c = { ie: ix, colorLiga: {}, nombre: {}, dorsal: {}, enComp: {}, pagos: !!o.pagos, ijLeidas: o.ijLeidas !== false, resueltos: {} };
+    var ies = iesDe(d, tem), ix = indice(ies), c = { ie: ix, colorLiga: {}, nombre: {}, dorsal: {}, enLiga: {}, superada: {}, pagos: !!o.pagos, ijLeidas: o.ijLeidas !== false, resueltos: {} };
     // Avisos dados por buenos: REVISIONES con TIPO «Aviso: <id>» y RESUELTO, por «inscripción|id».
     (d.rev || []).forEach(function (r) { if (r.RESUELTO === true && esAviso(r)) c.resueltos[r.ID_REGISTRO + '|' + txt(r.TIPO).slice(7)] = true; });
     ies.forEach(function (i) {
@@ -173,13 +188,15 @@
       if (i.ID_LIGA && i.ID_COLOR) c.colorLiga[i.ID_LIGA + '|' + i.ID_COLOR] = (c.colorLiga[i.ID_LIGA + '|' + i.ID_COLOR] || 0) + 1;
       var n = norm(i.NOMBRE_EQUIPO); if (n) c.nombre[i.ID_COMPETICION + '|' + n] = (c.nombre[i.ID_COMPETICION + '|' + n] || 0) + 1;
     });
-    d.ij.forEach(function (j) {
+    var validas = ijsValidas(d.ij), vale = {};
+    validas.forEach(function (j) { vale[j.ID] = true; });
+    d.ij.forEach(function (j) { if (!vale[j.ID]) c.superada[j.ID] = true; });
+    validas.forEach(function (j) {
       var ie = ix[j.ID_INSCRIPCION_EQUIPO];
       if (!ie || j.ESTADO !== 'Activa' || ie.ESTADO === 'Baja') return;
       var dd = txt(j.DORSAL);
       if (dd) c.dorsal[j.ID_INSCRIPCION_EQUIPO + '|' + dd] = (c.dorsal[j.ID_INSCRIPCION_EQUIPO + '|' + dd] || 0) + 1;
-      var k = j.ID_JUGADORA + '|' + ie.ID_COMPETICION;
-      c.enComp[k] = (c.enComp[k] || 0) + 1;
+      if (ie.ID_LIGA) { var k = j.ID_JUGADORA + '|' + ie.ID_LIGA; c.enLiga[k] = (c.enLiga[k] || 0) + 1; }
     });
     return c;
   }
@@ -219,7 +236,7 @@
   var CALC = { cts: cts, eur: eur, edad: edad, fecha: fecha, ids: ids, norm: norm, temporadas: temporadas, temporadaActual: temporadaActual,
     compsDe: compsDe, iesDe: iesDe, cuenta: cuenta, plantilla: plantilla, pago: pago, contexto: contexto, avisosEquipo: avisosEquipo,
     avisosJugadora: avisosJugadora, buscarJugadoras: buscarJugadoras, problemasJugadora: problemasJugadora, nombreJug: nombreJug,
-    avisosResueltos: avisosResueltos, esAviso: esAviso };
+    avisosResueltos: avisosResueltos, esAviso: esAviso, ijsValidas: ijsValidas };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
 
@@ -258,14 +275,15 @@
   }
   function esMovil() { return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (window.matchMedia && matchMedia('(pointer:coarse)').matches); }
   /** WhatsApp a un teléfono (a uno de 9 cifras se le pone el 34): en el móvil, la app; en el ordenador, WhatsApp Web. */
-  function wa(tel) {
+  /** msg (opcional): el mensaje ya escrito. */
+  function wa(tel, msg) {
     var n = String(tel || '').replace(/\D/g, '');
     if (n.length === 9) n = '34' + n;
     if (n.length < 9) return '';
-    return (esMovil() ? 'whatsapp://send?phone=' : 'https://web.whatsapp.com/send?phone=') + n;
+    return (esMovil() ? 'whatsapp://send?phone=' : 'https://web.whatsapp.com/send?phone=') + n + (msg ? '&text=' + encodeURIComponent(msg) : '');
   }
-  function aWa(tel, et, clase) {
-    var u = wa(tel);
+  function aWa(tel, et, clase, msg) {
+    var u = wa(tel, msg);
     return u ? '<a class="' + (clase || 'gs-b2') + '" href="' + texto(u) + '"' + (/^whatsapp:/.test(u) ? '' : ' target="_blank" rel="noopener"') + '>' + texto(et) + '</a>' : '';
   }
   function porAlta(a, b) {
@@ -325,6 +343,7 @@
       var d, tem, ix, ies, cx, memo, porIe;
       function preparar() {
         d = datos();
+        d.ij = ijsValidas(d.ij); // una jugadora que se inscribió dos veces en el mismo equipo: solo la última
         tem = temporadas(d).filter(function (t) { return String(t.ID) === S.tem; })[0] || temporadaActual(d);
         ix = { tem: indice(d.tem), com: indice(d.com), lig: indice(d.lig), eqs: indice(d.eqs), ie: indice(d.ie), jug: indice(d.jug), stf: indice(d.stf), col: indice(d.col), ij: indice(d.ij) };
         ies = tem ? iesDe(d, tem.ID) : [];
@@ -502,7 +521,9 @@
           (c.datos ? '<div class="gs-tj-d">' + c.datos + '</div>' : '') +
           (c.sol ? '<div class="gs-tj-s">' + c.sol + '</div>' : '') + '<p class="gs-tj-err" role="alert" hidden></p>' +
           '<div class="gs-tj-pie">' + (!enFicha && ver ? '<button type="button" class="gs-enl" ' + ver + '>Ver la ficha</button>' : '') +
-          (c.bueno === 'no' ? '' : c.bueno === 'principal' ? '<button type="button" class="gs-b2" data-bueno>Ya lo sabemos</button>' : '<button type="button" class="gs-enl gs-ult" data-bueno>Dar por bueno</button>') +
+          (c.bueno === 'no' ? '' : c.bueno === 'principal' ? '<button type="button" class="gs-b2" data-bueno>' + texto(c.buenoEt || 'No avisar más') + '</button>' +
+            (c.buenoNota ? '<p class="gs-nota gs-ancho">' + c.buenoNota + '</p>' : '')
+            : '<button type="button" class="gs-enl gs-ult" data-bueno>' + texto(c.buenoEt || 'No avisar más: lo dejamos así') + '</button>') +
           (c.bueno === 'no' ? '' : '<div class="gs-bueno" hidden><input type="text" maxlength="200" placeholder="Por qué (opcional)" aria-label="Por qué (opcional)">' +
             '<button type="button" class="gs-b2" data-confirmar>Confirmar</button></div>') + (c.pie || '') + '</div></div>';
       }
@@ -511,10 +532,20 @@
           .map(function (x) { return parseInt(x.DORSAL, 10); }).filter(isFinite).sort(function (a, b) { return a - b; });
         return ds.length ? 'Dorsales ocupados en el equipo: ' + ds.join(', ') + '.' : '';
       }
+      /** Dorsales libres del 1 al 99 en un equipo (sin los de sus activas), ordenados; como mucho los 20 primeros. */
+      function dorsalesLibres(idIe) {
+        var oc = {}; (porIe[idIe] || []).forEach(function (x) { if (x.ESTADO === 'Activa' && txt(x.DORSAL)) oc[parseInt(x.DORSAL, 10)] = true; });
+        var o = []; for (var i = 1; i <= 99 && o.length < 20; i++) if (!oc[i]) o.push(i);
+        return o;
+      }
       function plantillaOps(ie) { return activas(ie.ID).map(function (j) { return [j.ID_JUGADORA, (nombreJug(ix.jug[j.ID_JUGADORA]) || j.ID_JUGADORA) + (txt(j.DORSAL) ? ' · ' + txt(j.DORSAL) : '')]; }); }
       /** La tarjeta de un aviso (de equipo o de jugadora). */
+      /** Qué pasa al dar por bueno cada aviso (el botón lo dice). */
+      var NO_AVISAR = { solicitada: 'se queda sin confirmar', liga: 'va sin liga', mensaje: 'no hace falta el mensaje', grupo: 'no hace falta el grupo',
+        color: 'el color se queda así', nombre: 'el nombre se queda así', 'capitana-fuera': 'la capitana se queda así', 'capitana-sin': 'va sin capitana',
+        'dorsal-sin': 'juega sin dorsal', 'dorsal-rep': 'el dorsal se queda repetido', doble: 'puede jugar en los dos', acepta: 'ya lo ha aceptado de otra forma' };
       function tarjetaAviso(a, reg, enFicha) {
-        var ie = ix.ie[reg], ij = ie ? null : T.fila(IJ, reg), c = { bueno: '' };
+        var ie = ix.ie[reg], ij = ie ? null : T.fila(IJ, reg), c = { bueno: '', buenoEt: NO_AVISAR[a.id] ? 'No avisar más: ' + NO_AVISAR[a.id] : '' };
         var attrs = 'data-reg="' + texto(reg) + '" data-av="' + texto(a.id) + '" data-t="' + texto(a.t) + '"';
         if (ie) {
           var n = '<b>' + punto(ie.ID_COLOR) + texto(nomIe(ie.ID)) + '</b>', cap = ix.jug[ie.ID_CAPITANA], waCap = cap ? aWa(cap.TELEFONO, 'Escribir a la capitana') : '';
@@ -566,7 +597,8 @@
             c.texto = 'Faltan ' + eurC(p.falta || 0) + ' de la inscripción: precio ' + eurC(p.precio || 0) + ' − descuento ' + eurC(p.descuento || 0) + ' − cobrado ' + eurC(p.cobrado || 0) + '.';
             c.datos = 'Los cobros se apuntan en Economía con la referencia «Inscripción» · ' + texto(ie.ID) + ': cuando se apunte lo que falta, el aviso se va solo.';
             c.sol = waCap + (r ? (wa(r.TELEFONO) ? aWa(r.TELEFONO, 'Escribir al responsable (' + txt(r.APODO || r.NOMBRE) + ')') : '<span class="gs-sintel">Responsable ' + texto(r.APODO || r.NOMBRE) + ': sin teléfono en STAFF</span>') : '');
-            c.bueno = 'principal';
+            c.bueno = 'principal'; c.buenoEt = 'No avisar más de este pago';
+            c.buenoNota = 'Úsalo si ya estáis en ello con el equipo (p. ej. pagará más tarde). Sigue contando en Por pagar hasta que se apunte el cobro en Economía.';
           } else { c.titulo = n + ' · ' + texto(a.t); }
           return tarjeta(c, attrs, enFicha, 'data-ie="' + texto(ie.ID) + '"');
         }
@@ -584,13 +616,21 @@
           c.titulo = nb + ' · Dorsal ' + texto(txt(ij.DORSAL)) + ' repetido';
           c.texto = nj + ' y ' + no + ' llevan el mismo dorsal (' + texto(txt(ij.DORSAL)) + ') en ' + eq + '. Cambia el de una de las dos.';
           c.datos = texto(dorsalesOcupados(ij.ID_INSCRIPCION_EQUIPO, [String(ij.ID)].concat(otra ? [String(otra.ID)] : [])));
-          c.sol = inpCampo('dorsal', txt(ij.DORSAL), 'Dorsal de ' + (nombreJug(pj) || ij.ID_JUGADORA), ' maxlength="3" inputmode="numeric"') +
+          var libres = dorsalesLibres(ij.ID_INSCRIPCION_EQUIPO), escribir = function (x) {
+            var p2 = ix.jug[x.ID_JUGADORA] || {}, nom2 = txt(p2.NOMBRE) || nombreJug(p2);
+            var msg = 'Hola ' + nom2 + ', en ' + nomIe(ij.ID_INSCRIPCION_EQUIPO) + ' hay dos jugadoras con el dorsal ' + txt(ij.DORSAL) + '. Los dorsales que quedan libres en tu equipo son: ' +
+              libres.join(', ') + '. ¿Cuál te quedas?';
+            return aWa(p2.TELEFONO, 'Escribir a ' + (nombreJug(p2) || x.ID_JUGADORA), 'gs-b2', msg) || '<span class="gs-sintel">' + texto(nombreJug(p2)) + ': sin teléfono</span>';
+          };
+          c.sol = '<div class="gs-tj-was">' + escribir(ij) + (otra ? escribir(otra) : '') + '</div>' +
+            inpCampo('dorsal', txt(ij.DORSAL), 'Dorsal de ' + (nombreJug(pj) || ij.ID_JUGADORA), ' maxlength="3" inputmode="numeric"') +
             (otra ? inpCampo('dorsal2', txt(otra.DORSAL), 'Dorsal de ' + (nombreJug(ix.jug[otra.ID_JUGADORA]) || otra.ID_JUGADORA), ' maxlength="3" inputmode="numeric" data-otra="' + texto(otra.ID) + '"') : '') +
             btnSol('dorsales', 'Guardar');
         } else if (a.id === 'doble') {
-          var dobles = d.ij.filter(function (x) { var e2 = ix.ie[x.ID_INSCRIPCION_EQUIPO]; return String(x.ID_JUGADORA) === String(ij.ID_JUGADORA) && x.ESTADO === 'Activa' && e2 && e2.ESTADO !== 'Baja' && String(e2.ID_COMPETICION) === String(iej.ID_COMPETICION); });
-          c.titulo = nb + ' · En dos equipos';
-          c.texto = 'Está activa en dos equipos de la misma competición (' + texto(nomComp(iej.ID_COMPETICION)) + '): ' + texto(dobles.map(function (x) { return nomIe(x.ID_INSCRIPCION_EQUIPO); }).join(' y ')) + '. Solo puede jugar en uno.';
+          var dobles = d.ij.filter(function (x) { var e2 = ix.ie[x.ID_INSCRIPCION_EQUIPO]; return String(x.ID_JUGADORA) === String(ij.ID_JUGADORA) && x.ESTADO === 'Activa' && e2 && e2.ESTADO !== 'Baja' && e2.ID_LIGA && String(e2.ID_LIGA) === String(iej.ID_LIGA); });
+          c.titulo = nb + ' · En dos equipos de la misma liga';
+          c.texto = 'Está activa en dos equipos de la misma liga (' + texto(nom('lig', iej.ID_LIGA)) + '): ' + texto(dobles.map(function (x) { return nomIe(x.ID_INSCRIPCION_EQUIPO); }).join(' y ')) +
+            '. En dos ligas distintas sí puede jugar, pero en la misma liga se enfrentarían sus dos equipos: tiene que quedarse en uno.';
           c.datos = texto(dobles.map(function (x) { return nomIe(x.ID_INSCRIPCION_EQUIPO) + ': inscrita el ' + fecha(x.FECHA_INSCRIPCION) + (txt(x.DORSAL) ? ', dorsal ' + txt(x.DORSAL) : ''); }).join(' · '));
           c.sol = dobles.map(function (x) { return btnSol('baja-ij', 'Dar de baja en ' + nomIe(x.ID_INSCRIPCION_EQUIPO), ' data-pide data-ijb="' + texto(x.ID) + '"'); }).join('');
         } else if (a.id === 'acepta') {
@@ -614,7 +654,7 @@
       function revIds(r) { return ids(txt(r.ID_REGISTRO) + ' ' + txt(r.CANDIDATOS)); }
       function insDeTem(idJug, idTem) {
         var dt = indice(iesDe(d, idTem));
-        return T.filas(IJ).filter(function (x) { return String(x.ID_JUGADORA) === String(idJug) && dt[x.ID_INSCRIPCION_EQUIPO]; })
+        return ijsValidas(T.filas(IJ)).filter(function (x) { return String(x.ID_JUGADORA) === String(idJug) && dt[x.ID_INSCRIPCION_EQUIPO]; })
           .sort(function (a, b) { return (a.ESTADO === 'Activa' ? 0 : 1) - (b.ESTADO === 'Activa' ? 0 : 1); })[0] || null;
       }
       function parteRev(r, js) { return { clave: 'R:' + r.ID, col: 'ID_JUGADORA', valores: js }; }
@@ -661,7 +701,7 @@
           c.texto = 'Al pasar los datos, estas fichas parecían la misma persona. Compara y decide.' + (txt(r.MOTIVO) && !resuelta ? ' <span class="gs-opc">(' + texto(r.MOTIVO) + ')</span>' : '');
           c.datos = '<div class="gs-comp">' + jj.map(function (id) {
             var p = ix.jug[id], doc = txt(p.NUM_DOCUMENTO).replace(/\s/g, '');
-            var temps = T.filas(IJ).filter(function (x) { return String(x.ID_JUGADORA) === id; }).map(function (x) {
+            var temps = ijsValidas(T.filas(IJ)).filter(function (x) { return String(x.ID_JUGADORA) === id; }).map(function (x) {
               var e2 = ix.ie[x.ID_INSCRIPCION_EQUIPO] || {}, cc = ix.com[e2.ID_COMPETICION] || {};
               return (nom('tem', cc.ID_TEMPORADA) || '') + ' ' + nomIe(x.ID_INSCRIPCION_EQUIPO) + (x.ESTADO === 'Baja' ? ' (baja)' : '');
             });
@@ -674,6 +714,43 @@
           else c.sol = btnSol('distintas', 'Son distintas') + btnSol('misma', 'Son la misma') + '<p class="gs-nota gs-ancho">Unirlas se hace fuera de Gestión: queda apuntado para hacerlo.</p>';
           return tarjeta(c, attrs, true);
         }
+        if (tipo === 'Equipo') {
+          var es = equiposRev(r), ieIds = [];
+          es.forEach(function (e) { d.ie.forEach(function (x) { if (String(x.ID_EQUIPO) === e) ieIds.push(String(x.ID)); }); });
+          if (es.length) {
+            // Las inscripciones de jugadora de sus equipos (de todas las temporadas), para contar las que comparten.
+            if (ieIds.length && !pedidasRev['E' + r.ID]) {
+              pedidasRev['E' + r.ID] = true;
+              var oe = {}; oe[IJ] = { clave: 'RE:' + r.ID, col: 'ID_INSCRIPCION_EQUIPO', valores: ieIds };
+              if (!(T.tiene && T.tiene(IJ, oe[IJ]))) T.leer([IJ], { partes: oe }).then(function () { if (ctx.abierta()) pintar(); }, function () {});
+            }
+            var jugsDe = function (e) {
+              var mios = {}; d.ie.forEach(function (x) { if (String(x.ID_EQUIPO) === e) mios[x.ID] = 1; });
+              var o = {}; ijsValidas(T.filas(IJ)).forEach(function (x) { if (mios[x.ID_INSCRIPCION_EQUIPO]) o[x.ID_JUGADORA] = 1; });
+              return o;
+            };
+            var js2 = {}; es.forEach(function (e) { js2[e] = jugsDe(e); });
+            c.titulo = '<b>¿El mismo equipo?</b> <span class="gs-opc">· ' + texto(r.ID) + '</span>';
+            c.texto = 'Al pasar los datos, estos equipos parecían el mismo con otro nombre. Compara y decide.' + (txt(r.MOTIVO) && !resuelta ? ' <span class="gs-opc">(' + texto(r.MOTIVO) + ')</span>' : '');
+            c.datos = '<div class="gs-comp">' + es.map(function (e) {
+              var eq = ix.eqs[e] || {}, insc = d.ie.filter(function (x) { return String(x.ID_EQUIPO) === e; }).map(function (x) { var cc = ix.com[x.ID_COMPETICION] || {}; return { x: x, t: nom('tem', cc.ID_TEMPORADA) || '' }; })
+                .sort(function (a, b) { return a.t < b.t ? 1 : -1; });
+              var ult = insc[0] && insc[0].x, cap = ult && ix.jug[ult.ID_CAPITANA];
+              var comparten = es.filter(function (o) { return o !== e; }).map(function (o) {
+                var n2 = Object.keys(js2[e]).filter(function (j) { return js2[o][j]; }).length;
+                return n2 + ' con ' + (txt((ix.eqs[o] || {}).NOMBRE) || o);
+              }).join(' · ');
+              return '<div class="gs-comp-i"><div class="gs-t">' + texto(eq.NOMBRE || e) + '</div><div class="gs-dl">' + fila('ID', texto(e)) +
+                fila('Temporadas', insc.length ? insc.map(function (y) { return texto(y.t + ': ' + (txt(y.x.NOMBRE_EQUIPO) || eq.NOMBRE)) + (y.x.ESTADO === 'Baja' ? ' <span class="gs-opc">(baja)</span>' : ''); }).join('<br>') : 'Ninguna') +
+                fila('Capitana', cap ? texto(nombreJug(cap) + (cap.TELEFONO ? ' · ' + cap.TELEFONO : '')) : '') +
+                fila('Jugadoras en común', comparten ? texto(comparten) : '') + '</div>' +
+                (ult && !resuelta ? '<button type="button" class="gs-enl" data-ie="' + texto(ult.ID) + '">Ver la ficha</button>' : '') + '</div>';
+            }).join('') + '</div>' + hecha;
+            if (resuelta) c.pie = reabrir;
+            else c.sol = btnSol('distintos', 'Son distintos') + btnSol('mismo', 'Son el mismo') + '<p class="gs-nota gs-ancho">Unirlos se hace fuera de Gestión: queda apuntado para hacerlo.</p>';
+            return tarjeta(c, attrs, true);
+          }
+        }
         c.titulo = '<b>' + texto(tipo || 'Revisión') + '</b> <span class="gs-opc">· ' + texto(r.ID) + '</span>';
         c.texto = texto(r.MOTIVO);
         var quien = function (id) { return ix.jug[id] ? nombreJug(ix.jug[id]) : ix.ie[id] ? nomIe(id) : ix.eqs[id] ? nom('eqs', id) : ''; };
@@ -684,6 +761,25 @@
         }).join('') + btnSol('resolver', 'Marcar resuelta');
         if (resuelta) c.pie = reabrir;
         return tarjeta(c, attrs, true);
+      }
+
+      /**
+       * Los equipos (EQUIPOS.ID) de una revisión de TIPO Equipo: por su ID, o por el nombre si viene sin él («LAS CHICAS
+       * PICANTONAS»): primero EQUIPOS.NOMBRE y si no, el NOMBRE_EQUIPO de alguna inscripción.
+       */
+      function equiposRev(r) {
+        var o = [];
+        [txt(r.ID_REGISTRO)].concat(txt(r.CANDIDATOS).split(/\s*[\/,;|]\s*/)).forEach(function (parte) {
+          parte = txt(parte); if (!parte) return;
+          var porId = ids(parte).filter(function (x) { return ix.eqs[x]; });
+          if (porId.length) { porId.forEach(function (x) { if (o.indexOf(x) < 0) o.push(x); }); return; }
+          var n = norm(parte.replace(/\b[A-Z]{1,3}-?\d{3,6}\b/g, '')).trim();
+          if (!n) return;
+          var e = d.eqs.filter(function (x) { return norm(x.NOMBRE).trim() === n; })[0];
+          var id = e ? String(e.ID) : ((d.ie.filter(function (x) { return norm(x.NOMBRE_EQUIPO).trim() === n; })[0] || {}).ID_EQUIPO || '');
+          if (id && ix.eqs[id] && o.indexOf(String(id)) < 0) o.push(String(id));
+        });
+        return o;
       }
 
       /** Lo que hace cada botón de solución de una tarjeta. Devuelve el texto del aviso, o un error. */
@@ -735,6 +831,8 @@
           if (fn && fn.ESTADO !== 'Sin vincular') ps.push(desvincular(fn));
           cerrarRev('ninguna; queda para asignar'); hecho = 'Queda para asignar desde el Resumen.';
         } else if (sol === 'distintas') { cerrarRev('son distintas'); hecho = 'Apuntado: son distintas.'; }
+        else if (sol === 'distintos') { cerrarRev('son distintos'); hecho = 'Apuntado: son distintos.'; }
+        else if (sol === 'mismo') { cerrarRev('son el mismo; unir ' + equiposRev(rev).join(' y ')); hecho = 'Apuntado: son el mismo (unirlos se hace fuera de Gestión).'; }
         else if (sol === 'misma') { var jj = revIds(rev).filter(function (x) { return ix.jug[x]; }); cerrarRev('son la misma; unir ' + jj.join(' y ')); hecho = 'Apuntado: son la misma (unirlas se hace fuera de Gestión).'; }
         else if (sol === 'resolver') { cerrarRev(''); hecho = 'Revisión resuelta.'; }
         else if (sol === 'reabrir') { ps.push(T.actualizar('REVISIONES', rev.ID, { RESUELTO: false })); hecho = 'Revisión abierta otra vez.'; }
@@ -1246,7 +1344,7 @@
         html += '<div class="gs-sec">Sus temporadas</div><div id="gs-hist"></div>' + pie('i-guardar');
         function historial() {
           var h = vent && vent.querySelector('#gs-hist'); if (!h) return;
-          var xs = T.filas(IJ).filter(function (x) { return String(x.ID_JUGADORA) === String(p.ID); }).map(function (x) {
+          var xs = ijsValidas(T.filas(IJ)).filter(function (x) { return String(x.ID_JUGADORA) === String(p.ID); }).map(function (x) {
             var ee = ix.ie[x.ID_INSCRIPCION_EQUIPO] || T.fila('INSCRIPCIONES_EQUIPOS', x.ID_INSCRIPCION_EQUIPO) || {}, cc = ix.com[ee.ID_COMPETICION] || {};
             return { x: x, e: ee, c: cc, t: ix.tem[cc.ID_TEMPORADA] || {} };
           }).sort(function (a, b) { return String(b.x.FECHA_INSCRIPCION) < String(a.x.FECHA_INSCRIPCION) ? -1 : 1; });
@@ -1295,7 +1393,7 @@
       /** La inscripción de jugadora de una foto (por su jugadora y su inscripción de equipo), o null. */
       function ijDeFoto(f) {
         if (!f.ID_JUGADORA) return null;
-        var suyas = T.filas(IJ).filter(function (x) { return String(x.ID_JUGADORA) === String(f.ID_JUGADORA); });
+        var suyas = ijsValidas(T.filas(IJ)).filter(function (x) { return String(x.ID_JUGADORA) === String(f.ID_JUGADORA); });
         if (f.ID_INSCRIPCION_EQUIPO) return suyas.filter(function (x) { return String(x.ID_INSCRIPCION_EQUIPO) === String(f.ID_INSCRIPCION_EQUIPO); })[0] || null;
         // Las migradas tienen jugadora y no equipo: su inscripción de la temporada de la foto, si solo hay una.
         var deTem = indice(iesDe(d, String(f.ID_TEMPORADA || tem.ID)));
