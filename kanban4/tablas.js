@@ -19,6 +19,10 @@
  *   T.actualizar('CAMISETAS', 'CMS000123', { ESTADO: 'Entregada', FECHA_ENTREGA: '2026-10-28' });
  * Cada fila es un objeto { COLUMNA: valor }; mientras tiene un cambio sin confirmar lleva _pendiente (cuántos) y una
  * fila nueva lleva _nueva hasta que el motor le da su ID.
+ * T0254: actualizar y crear aceptan op = { fn, args }: la pantalla cambia igual al momento, pero el cambio va a una
+ * función de la sección (su «api») en lugar de tablasActualizar o tablasCrear, para lo que toca más de una cosa (un
+ * cambio de estado con su HISTORIAL y su registro). Esa función devuelve lo mismo ({ fila } o { id, fila }) y, si ha
+ * cambiado otras filas de paso, otras: { TABLA: [filas] }, que se ponen al día en la copia sin volver a leer.
  * Valores: texto; números; true/false; fecha 'aaaa-mm-dd'; fecha y hora 'aaaa-mm-ddThh:mm'; hora 'hh:mm'; vacío ''.
  */
 (function () {
@@ -95,6 +99,22 @@
       bdGuardar(clave + nombre, { cols: m.cols, filas: filas, v: m.v, leido: m.leido });
     }
 
+    /** T0254: filas que el motor ha cambiado de paso (r.otras = { TABLA: [filas] }) → a la copia, salvo lo que sigue en vuelo. */
+    function otras(r) {
+      var o = (r && r.otras) || {};
+      Object.keys(o).forEach(function (n) {
+        var m = mem[n];
+        if (!m || !Array.isArray(o[n])) return;
+        o[n].forEach(function (x) {
+          var id = String(x[m.clave]), f = m.ids[id], kq = n + '|' + id;
+          if (!f) { f = {}; m.filas.push(f); m.ids[id] = f; }
+          for (var c in x) if (!(enVuelo[kq] || []).some(function (y) { return c in y; })) f[c] = x[c];
+        });
+        guardarLocal(n);
+        emitir('cambio', n, { otras: true });
+      });
+    }
+
     /** Pide al motor las tablas (solo las que han cambiado vienen enteras) y avisa de las que han cambiado. */
     function refrescar(nombres, fresco) {
       var desde = {};
@@ -152,8 +172,11 @@
       /** Cambios sin confirmar todavía (para avisar antes de cerrar la página). */
       pendientes: function () { return pendientes; },
 
-      /** Cambia columnas de una fila: la pantalla, al momento; el Excel, por detrás. Devuelve la promesa del motor. */
-      actualizar: function (n, id, cambios) {
+      /**
+       * Cambia columnas de una fila: la pantalla, al momento; el Excel, por detrás. Devuelve la promesa del motor.
+       * op (T0254): { fn, args } para que el cambio lo haga una función de la sección en lugar de tablasActualizar.
+       */
+      actualizar: function (n, id, cambios, op) {
         id = String(id);
         var f = api.fila(n, id);
         if (!f) return Promise.reject(new Error('No tengo ' + id + ' en ' + n + ': actualiza la página.'));
@@ -177,13 +200,14 @@
           return g;
         };
         var p = (colas[kq] || Promise.resolve()).catch(function () {}).then(function () {
-          return llamar('tablasActualizar', [n, id, cambios, { antes: antes }]);
+          return op && op.fn ? llamar(op.fn, op.args || []) : llamar('tablasActualizar', [n, id, cambios, { antes: antes }]);
         }).then(function (r) {
           var g = fin();
           // Lo que ha quedado en el Excel (puede traer columnas que ha cambiado otra persona), salvo lo que sigue en vuelo.
           for (var c in r.fila) if (!(enVuelo[kq] || []).some(function (x) { return c in x; })) g[c] = r.fila[c];
           guardarLocal(n);
           emitir('cambio', n, { id: id, confirmado: true });
+          otras(r);
           return r;
         }, function (e) {
           var g = fin();
@@ -202,8 +226,9 @@
 
       /**
        * Alta: la fila sale al momento (con _nueva y un ID provisional) y toma su ID cuando lo da el motor.
-       * T0257 · op.fn (opcional): una función de la sección que hace el alta en el motor (p. ej. economiaEmitir, que pone
-       * el número de la factura). Recibe [valores] y devuelve lo mismo que tablasCrear ({ id, fila, v }).
+       * op.fn (opcional): una función de la sección que hace el alta en el motor y devuelve lo mismo que tablasCrear
+       * ({ id, fila, v }), con otras si ha cambiado más filas. Recibe op.args (T0254) o, si no hay, [valores] (T0257:
+       * economiaEmitir, que pone el número de la factura).
        */
       crear: function (n, valores, op) {
         op = op || {};
@@ -213,7 +238,7 @@
         m.filas.push(f); m.ids[tmp] = f;
         pendientes++;
         emitir('cambio', n, { id: tmp, optimista: true });
-        return (op.fn ? llamar(op.fn, [valores]) : llamar('tablasCrear', [n, valores])).then(function (r) {
+        return (op.fn ? llamar(op.fn, op.args || [valores]) : llamar('tablasCrear', [n, valores])).then(function (r) {
           pendientes--;
           delete m.ids[tmp];
           delete f._nueva; delete f._pendiente;
@@ -223,6 +248,7 @@
           else m.ids[r.id] = f;
           guardarLocal(n);
           emitir('cambio', n, { id: r.id, antes: tmp, confirmado: true });
+          otras(r);
           return r;
         }, function (e) {
           pendientes--;
