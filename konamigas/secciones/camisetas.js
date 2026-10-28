@@ -857,7 +857,9 @@
 
   /* ---------- modelos: qué se encarga y en qué competiciones va (MODELOS y MODELOS_COMPETICION) ---------- */
 
-  function nombreComp(id) { var x = S.N && S.N.comp && S.N.comp[id]; return x ? x[0] : id; }
+  /** Las competiciones se llaman igual cada año (LIGA, SENIOR…): siempre con su temporada. */
+  function nombreTemp(t) { var x = ((S.N && S.N.temp) || []).filter(function (y) { return y[0] === t; })[0]; return x ? x[1] : t; }
+  function nombreComp(id) { var x = S.N && S.N.comp && S.N.comp[id]; return x ? x[0] + ' ' + nombreTemp(x[1]) : id; }
   function compsDeModelo(m) {
     return S.T.filas('MODELOS_COMPETICION').filter(function (x) { return String(x.ID_MODELO) === String(m); })
       .sort(function (a, b) { return norm(nombreComp(a.ID_COMPETICION)) < norm(nombreComp(b.ID_COMPETICION)) ? -1 : 1; });
@@ -891,10 +893,10 @@
       campo('Prenda', '<input type="text" id="md-pre" maxlength="60" list="md-prendas" value="' + texto(m ? m.PRENDA : 'Camiseta') + '"><datalist id="md-prendas"><option value="Camiseta"><option value="Peto"><option value="Sudadera"></datalist>') +
       campo('Proveedor habitual', '<select id="md-prov"><option value="">Sin proveedor habitual</option>' + opciones(provs.map(function (x) { return [x.ID, x.NOMBRE]; }), m ? m.ID_PROVEEDOR : '') + '</select>') +
       campo('Notas (opcional)', '<input type="text" id="md-not" maxlength="200" value="' + texto(m ? m.NOTAS : '') + '">') + '</div>' +
-      '<h3 class="cm-sub">Competiciones que lo llevan</h3><p class="u-nota">Al lado, cuántas camisetas tiene cada jugadora con la inscripción (normalmente 1). El pack de tallas y dorsales que se ofrece (1S, 2S, 3S, 4M…) todavía no se define aquí.</p>' +
-      (S.N ? (comps.length ? '<ul class="cm-lista-ok cm-md-comps">' + comps.map(function (k) {
-        var x = ya[k];
-        return '<li><label class="u-check"><input type="checkbox" data-md-comp="' + texto(k) + '"' + (x ? ' checked' : '') + '> ' + texto(S.N.comp[k][0]) + '</label>' +
+      '<h3 class="cm-sub">Competiciones que lo llevan</h3><p class="u-nota">Cada competición es de una temporada: marca solo las del año en que se usa este modelo. Al lado, cuántas camisetas tiene cada jugadora con la inscripción (normalmente 1). El pack de tallas y dorsales que se ofrece (1S, 2S, 3S, 4M…) todavía no se define aquí.</p>' +
+      (S.N ? (comps.length ? '<ul class="cm-lista-ok cm-md-comps">' + comps.map(function (k, i) {
+        var x = ya[k], t = S.N.comp[k][1];
+        return (i === 0 || S.N.comp[comps[i - 1]][1] !== t ? '<li class="cm-md-temp">Temporada ' + texto(nombreTemp(t)) + '</li>' : '') + '<li><label class="u-check"><input type="checkbox" data-md-comp="' + texto(k) + '"' + (x ? ' checked' : '') + '> ' + texto(S.N.comp[k][0]) + '</label>' +
           '<label class="cm-md-n"><input type="number" min="0" step="1" inputmode="numeric" data-md-n="' + texto(k) + '" value="' + texto(x ? Number(x.CAMISETAS_INCLUIDAS) || 0 : 1) + '" aria-label="Camisetas por jugadora en ' + texto(S.N.comp[k][0]) + '"> por jugadora</label></li>';
       }).join('') + '</ul>' : '<p class="u-nota">No hay competiciones en las últimas temporadas.</p>') : '<p class="u-nota">Cargando las competiciones…</p>') +
       '<p class="u-error" hidden></p>' +
