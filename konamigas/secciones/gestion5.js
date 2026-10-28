@@ -150,10 +150,31 @@
     }
     return sinResueltos(out, ie.ID, ctxT);
   }
-  /** Quita los avisos que se han dado por buenos (REVISIONES con TIPO «Aviso: <id>» y RESUELTO). */
+  /**
+   * Quita los avisos que se han dado por buenos (REVISIONES con TIPO «Aviso: <id>» y RESUELTO) y los pospuestos que siguen
+   * activos (TIPO «Pospuesto: <id>», sin RESUELTO y con FECHA posterior a hoy).
+   */
   function sinResueltos(out, idRegistro, ctxT) {
-    var r = (ctxT && ctxT.resueltos) || {};
-    return out.filter(function (a) { return !r[idRegistro + '|' + a.id]; });
+    var r = (ctxT && ctxT.resueltos) || {}, p = (ctxT && ctxT.pospuestos) || {};
+    return out.filter(function (a) { return !r[idRegistro + '|' + a.id] && !p[idRegistro + '|' + a.id]; });
+  }
+  /** ¿Es una fila de REVISIONES de un aviso pospuesto? */
+  function esPospuesto(r) { return /^Pospuesto: /.test(txt(r && r.TIPO)); }
+  /** Un pospuesto sigue activo si no se ha vuelto a avisar (RESUELTO) y su fecha es posterior a hoy ('aaaa-mm-dd'). */
+  function pospuestoActivo(r, h) { return esPospuesto(r) && r.RESUELTO !== true && String(r.FECHA || '').slice(0, 10) > (h || hoy()); }
+  /**
+   * Los avisos pospuestos activos de una inscripción: [{ id, fila, hasta, motivo, filas }]. Si se pospuso varias veces,
+   * vale la fecha más lejana (filas: todas las activas de ese aviso).
+   */
+  function avisosPospuestos(d, idRegistro, h) {
+    var por = {};
+    (d.rev || []).forEach(function (r) {
+      if (String(r.ID_REGISTRO) !== String(idRegistro) || !pospuestoActivo(r, h)) return;
+      var id = txt(r.TIPO).slice(11), x = por[id] = por[id] || { id: id, filas: [] };
+      x.filas.push(r);
+      if (!x.fila || String(r.FECHA) > String(x.fila.FECHA)) { x.fila = r; x.hasta = String(r.FECHA).slice(0, 10); x.motivo = txt(r.MOTIVO); }
+    });
+    return Object.keys(por).map(function (k) { return por[k]; });
   }
   /** Los avisos dados por buenos de una inscripción (de equipo IE… o de jugadora IJ…): [{ id, fila, motivo }]. */
   function avisosResueltos(d, idRegistro) {
@@ -180,7 +201,10 @@
   /** Lo que comparten los avisos de una temporada: cuántos hay de cada color por liga, nombres, dorsales… */
   function contexto(d, tem, o) {
     o = o || {};
-    var ies = iesDe(d, tem), ix = indice(ies), c = { ie: ix, colorLiga: {}, nombre: {}, dorsal: {}, enLiga: {}, superada: {}, pagos: !!o.pagos, ijLeidas: o.ijLeidas !== false, resueltos: {} };
+    var ies = iesDe(d, tem), ix = indice(ies), c = { ie: ix, colorLiga: {}, nombre: {}, dorsal: {}, enLiga: {}, superada: {}, pagos: !!o.pagos, ijLeidas: o.ijLeidas !== false, resueltos: {}, pospuestos: {} };
+    // Avisos pospuestos activos a la fecha de hoy (o la de o.hoy, 'aaaa-mm-dd', para probar).
+    var h = o.hoy || hoy();
+    (d.rev || []).forEach(function (r) { if (pospuestoActivo(r, h)) c.pospuestos[r.ID_REGISTRO + '|' + txt(r.TIPO).slice(11)] = String(r.FECHA).slice(0, 10); });
     // Avisos dados por buenos: REVISIONES con TIPO «Aviso: <id>» y RESUELTO, por «inscripción|id».
     (d.rev || []).forEach(function (r) { if (r.RESUELTO === true && esAviso(r)) c.resueltos[r.ID_REGISTRO + '|' + txt(r.TIPO).slice(7)] = true; });
     ies.forEach(function (i) {
@@ -236,7 +260,8 @@
   var CALC = { cts: cts, eur: eur, edad: edad, fecha: fecha, ids: ids, norm: norm, temporadas: temporadas, temporadaActual: temporadaActual,
     compsDe: compsDe, iesDe: iesDe, cuenta: cuenta, plantilla: plantilla, pago: pago, contexto: contexto, avisosEquipo: avisosEquipo,
     avisosJugadora: avisosJugadora, buscarJugadoras: buscarJugadoras, problemasJugadora: problemasJugadora, nombreJug: nombreJug,
-    avisosResueltos: avisosResueltos, esAviso: esAviso, ijsValidas: ijsValidas };
+    avisosResueltos: avisosResueltos, esAviso: esAviso, ijsValidas: ijsValidas,
+    avisosPospuestos: avisosPospuestos, esPospuesto: esPospuesto };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
 
@@ -521,11 +546,35 @@
           (c.datos ? '<div class="gs-tj-d">' + c.datos + '</div>' : '') +
           (c.sol ? '<div class="gs-tj-s">' + c.sol + '</div>' : '') + '<p class="gs-tj-err" role="alert" hidden></p>' +
           '<div class="gs-tj-pie">' + (!enFicha && ver ? '<button type="button" class="gs-enl" ' + ver + '>Ver la ficha</button>' : '') +
-          (c.bueno === 'no' ? '' : c.bueno === 'principal' ? '<button type="button" class="gs-b2" data-bueno>' + texto(c.buenoEt || 'No avisar más') + '</button>' +
-            (c.buenoNota ? '<p class="gs-nota gs-ancho">' + c.buenoNota + '</p>' : '')
-            : '<button type="button" class="gs-enl gs-ult" data-bueno>' + texto(c.buenoEt || 'No avisar más: lo dejamos así') + '</button>') +
+          (c.posponer ? '<button type="button" class="gs-b2 gs-tj-pos" data-posponer>Posponer</button>' : '') +
+          (c.bueno === 'no' ? '' : '<button type="button" class="gs-enl gs-ult" data-bueno>' + texto(c.buenoEt || 'No avisar más: lo dejamos así') + '</button>') +
+          (c.posponer ? htmlPosponer(c.posponerNota) : '') +
           (c.bueno === 'no' ? '' : '<div class="gs-bueno" hidden><input type="text" maxlength="200" placeholder="Por qué (opcional)" aria-label="Por qué (opcional)">' +
             '<button type="button" class="gs-b2" data-confirmar>Confirmar</button></div>') + (c.pie || '') + '</div></div>';
+      }
+      /** El panel de «Posponer»: 1 semana, 2 semanas, 1 mes o hasta una fecha, y por qué. */
+      function htmlPosponer(nota) {
+        return '<div class="gs-posp" hidden><div class="gs-chips">' + [['7', '1 semana'], ['14', '2 semanas'], ['30', '1 mes'], ['fecha', 'Hasta…']].map(function (x) {
+          return '<button type="button" class="gs-chip" data-plazo="' + x[0] + '" aria-pressed="' + (x[0] === '7') + '">' + x[1] + '</button>';
+        }).join('') + '</div><input type="date" data-hasta hidden aria-label="Hasta">' +
+          '<input type="text" data-porque maxlength="200" placeholder="Por qué (opcional)" aria-label="Por qué (opcional)">' +
+          '<button type="button" class="gs-b2" data-pospone>Posponer hasta el ' + fechaCorta(masDias(7)) + '</button>' +
+          (nota ? '<p class="gs-nota gs-ancho">' + nota + '</p>' : '<p class="gs-nota gs-ancho">Mientras esté pospuesto no sale en Alertas. Ese día vuelve a avisar solo.</p>') + '</div>';
+      }
+      function masDias(n) { var f = new Date(); f.setDate(f.getDate() + n); var p = function (x) { return (x < 10 ? '0' : '') + x; }; return f.getFullYear() + '-' + p(f.getMonth() + 1) + '-' + p(f.getDate()); }
+      function fechaCorta(s) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || '')); return m ? m[3] + '/' + m[2] : ''; }
+      function hastaDe(panel) {
+        var b = panel.querySelector('[data-plazo][aria-pressed=true]'), v = b ? b.getAttribute('data-plazo') : '7';
+        return v === 'fecha' ? String(panel.querySelector('[data-hasta]').value || '') : masDias(Number(v));
+      }
+      function posponer(reg, id, t, hasta, por) {
+        return T.crear('REVISIONES', { TIPO: 'Pospuesto: ' + id, ID_REGISTRO: reg, FECHA: hasta, MOTIVO: t + (por ? ' · ' + por : ''), RESUELTO: false });
+      }
+      /** «Volver a avisar ya»: cierra todas las filas activas de ese aviso pospuesto. */
+      function avisarYa(reg, id) {
+        var h = hoy();
+        return Promise.all(avisosPospuestos(d, reg, h).filter(function (x) { return x.id === id; }).reduce(function (a, x) { return a.concat(x.filas); }, []).filter(function (r) { return !r._nueva; })
+          .map(function (r) { return T.actualizar('REVISIONES', r.ID, { RESUELTO: true, MOTIVO: txt(r.MOTIVO) + ' · Vuelve a avisar el ' + fecha(h) }); }));
       }
       function dorsalesOcupados(idIe, menos) {
         var ds = (porIe[idIe] || []).filter(function (x) { return x.ESTADO === 'Activa' && menos.indexOf(String(x.ID)) < 0 && txt(x.DORSAL); })
@@ -543,9 +592,10 @@
       /** Qué pasa al dar por bueno cada aviso (el botón lo dice). */
       var NO_AVISAR = { solicitada: 'se queda sin confirmar', liga: 'va sin liga', mensaje: 'no hace falta el mensaje', grupo: 'no hace falta el grupo',
         color: 'el color se queda así', nombre: 'el nombre se queda así', 'capitana-fuera': 'la capitana se queda así', 'capitana-sin': 'va sin capitana',
-        'dorsal-sin': 'juega sin dorsal', 'dorsal-rep': 'el dorsal se queda repetido', doble: 'puede jugar en los dos', acepta: 'ya lo ha aceptado de otra forma' };
+        'dorsal-sin': 'juega sin dorsal', 'dorsal-rep': 'el dorsal se queda repetido', doble: 'puede jugar en los dos', acepta: 'ya lo ha aceptado de otra forma',
+        pago: 'este pago no se va a cobrar' };
       function tarjetaAviso(a, reg, enFicha) {
-        var ie = ix.ie[reg], ij = ie ? null : T.fila(IJ, reg), c = { bueno: '', buenoEt: NO_AVISAR[a.id] ? 'No avisar más: ' + NO_AVISAR[a.id] : '' };
+        var ie = ix.ie[reg], ij = ie ? null : T.fila(IJ, reg), c = { bueno: '', posponer: true, buenoEt: NO_AVISAR[a.id] ? 'No avisar más: ' + NO_AVISAR[a.id] : '' };
         var attrs = 'data-reg="' + texto(reg) + '" data-av="' + texto(a.id) + '" data-t="' + texto(a.t) + '"';
         if (ie) {
           var n = '<b>' + punto(ie.ID_COLOR) + texto(nomIe(ie.ID)) + '</b>', cap = ix.jug[ie.ID_CAPITANA], waCap = cap ? aWa(cap.TELEFONO, 'Escribir a la capitana') : '';
@@ -597,8 +647,7 @@
             c.texto = 'Faltan ' + eurC(p.falta || 0) + ' de la inscripción: precio ' + eurC(p.precio || 0) + ' − descuento ' + eurC(p.descuento || 0) + ' − cobrado ' + eurC(p.cobrado || 0) + '.';
             c.datos = 'Los cobros se apuntan en Economía con la referencia «Inscripción» · ' + texto(ie.ID) + ': cuando se apunte lo que falta, el aviso se va solo.';
             c.sol = waCap + (r ? (wa(r.TELEFONO) ? aWa(r.TELEFONO, 'Escribir al responsable (' + txt(r.APODO || r.NOMBRE) + ')') : '<span class="gs-sintel">Responsable ' + texto(r.APODO || r.NOMBRE) + ': sin teléfono en STAFF</span>') : '');
-            c.bueno = 'principal'; c.buenoEt = 'No avisar más de este pago';
-            c.buenoNota = 'Úsalo si ya estáis en ello con el equipo (p. ej. pagará más tarde). Sigue contando en Por pagar hasta que se apunte el cobro en Economía.';
+            c.posponerNota = 'Úsalo si ya estáis en ello con el equipo (p. ej. pagará más tarde). El dinero sigue contando en Por pagar hasta que se apunte el cobro en Economía; ese día vuelve a avisar solo.';
           } else { c.titulo = n + ' · ' + texto(a.t); }
           return tarjeta(c, attrs, enFicha, 'data-ie="' + texto(ie.ID) + '"');
         }
@@ -851,11 +900,14 @@
       }
       /** Los avisos dados por buenos de una inscripción, con su motivo y «Volver a avisar». */
       function htmlResueltos(reg) {
-        var rs = avisosResueltos(d, reg);
-        return rs.length ? '<div class="gs-sec">Avisos dados por buenos</div><div class="gs-resu">' + rs.map(function (r) {
+        var rs = avisosResueltos(d, reg), ps = avisosPospuestos(d, reg);
+        return (ps.length ? '<div class="gs-sec">Avisos pospuestos</div><div class="gs-resu">' + ps.map(function (x) {
+          return '<div class="gs-resu-i"><span><b>Pospuesto hasta el ' + texto(fechaCorta(x.hasta)) + '</b> · ' + texto(x.motivo || x.id) + '</span>' +
+            (x.fila._nueva ? '<span class="gs-opc">Guardando</span>' : '<button type="button" class="gs-enl" data-ya="' + texto(x.id) + '" data-reg="' + texto(reg) + '">Volver a avisar ya</button>') + '</div>';
+        }).join('') + '</div>' : '') + (rs.length ? '<div class="gs-sec">Avisos dados por buenos</div><div class="gs-resu">' + rs.map(function (r) {
           return '<div class="gs-resu-i"><span>' + texto(r.motivo || r.id) + (r.fila.FECHA ? ' <span class="gs-opc">· ' + texto(fecha(r.fila.FECHA)) + '</span>' : '') + '</span>' +
             (r.fila._nueva ? '<span class="gs-opc">Guardando</span>' : '<button type="button" class="gs-enl" data-volver="' + texto(r.fila.ID) + '">Volver a avisar</button>') + '</div>';
-        }).join('') + '</div>' : '';
+        }).join('') + '</div>' : '');
       }
       function darPorBueno(reg, id, t, por) {
         var ya = d.rev.filter(function (r) { return esAviso(r) && txt(r.TIPO) === 'Aviso: ' + id && String(r.ID_REGISTRO) === String(reg); })[0];
@@ -879,7 +931,7 @@
         var jAl = [];
         if (leidas) eqs.forEach(function (i) { activas(i.ID).forEach(function (j) { if (avJ(j).length) jAl.push(j); }); });
         var fotos = sinVincular();
-        var revs = pest.indexOf('REVISIONES') >= 0 ? d.rev.filter(function (r) { return r.RESUELTO !== true && !esAviso(r); }) : [];
+        var revs = pest.indexOf('REVISIONES') >= 0 ? d.rev.filter(function (r) { return r.RESUELTO !== true && !esAviso(r) && !esPospuesto(r); }) : [];
         var nAl = alPago.length + sinConf.length + problemas.length + sinLiga.length + jAl.length + fotos.length + revs.length;
 
         var h = '<div class="gs-filtrar">' + filtrosPlegables() + '</div><div class="gs-res-top">' +
@@ -1099,7 +1151,7 @@
 
       function htmlRevisiones() {
         // Las filas «Aviso: …» son avisos dados por buenos, no casos dudosos: van aparte.
-        var casos = d.rev.filter(function (r) { return !esAviso(r); });
+        var casos = d.rev.filter(function (r) { return !esAviso(r) && !esPospuesto(r); });
         var pend = casos.filter(function (r) { return r.RESUELTO !== true; }).length;
         var rs = casos.filter(function (r) { return S.rv.todas || r.RESUELTO !== true; }).sort(function (a, b) {
           if ((a.RESUELTO === true) !== (b.RESUELTO === true)) return a.RESUELTO === true ? 1 : -1;
@@ -1108,6 +1160,20 @@
         var h = '<div class="gs-filtrar">' + chips([['', 'Sin resolver', pend], ['todas', 'Todas', casos.length]], S.rv.todas ? 'todas' : '', 'rv') + '</div>' +
           '<p class="gs-cuenta">Dudas de la migración y de los formularios: cada tarjeta explica el caso y se decide ahí mismo.</p><div id="gs-lista">';
         h += rs.length ? '<div class="gs-tjs">' + rs.map(tarjetaRev).join('') + '</div>' : '<div class="gs-card"><div class="gs-vacio">No hay revisiones pendientes.</div></div>';
+        // Avisos pospuestos (los activos; si un aviso se pospuso varias veces, la fecha más lejana).
+        var hh = hoy(), regs = {};
+        d.rev.forEach(function (r) { if (pospuestoActivo(r, hh)) regs[r.ID_REGISTRO] = 1; });
+        var pps = []; Object.keys(regs).forEach(function (reg) { avisosPospuestos(d, reg, hh).forEach(function (x) { x.reg = reg; pps.push(x); }); });
+        pps.sort(function (a, b) { return a.hasta < b.hasta ? -1 : 1; });
+        h += '<div class="gs-sec" id="gs-pospuestos">Avisos pospuestos (' + pps.length + ')</div>' +
+          '<p class="gs-nota">No salen en Alertas hasta la fecha; ese día vuelven a avisar solos.</p>' +
+          (pps.length ? '<div class="gs-card"><div class="gs-resu gs-resu-p">' + pps.map(function (x) {
+            var ie = ix.ie[x.reg], ij = !ie && T.fila(IJ, x.reg);
+            var quien = ie ? punto(ie.ID_COLOR) + texto(nomIe(x.reg)) : ij ? texto(nombreJug(ix.jug[ij.ID_JUGADORA]) || ij.ID_JUGADORA) + ' <span class="gs-opc">· ' + texto(nomIe(ij.ID_INSCRIPCION_EQUIPO)) + '</span>' : texto(x.reg);
+            return '<div class="gs-resu-i"><span><b>Hasta el ' + texto(fechaCorta(x.hasta)) + '</b> · ' + quien + '<br><span class="gs-opc">' + texto(x.motivo) + '</span></span>' +
+              '<span class="gs-resu-b">' + (ie || ij ? '<button type="button" class="gs-enl" ' + (ie ? 'data-ie' : 'data-ij') + '="' + texto(x.reg) + '">Ver la ficha</button>' : '') +
+              (x.fila._nueva ? '<span class="gs-opc">Guardando</span>' : '<button type="button" class="gs-enl" data-ya="' + texto(x.id) + '" data-reg="' + texto(x.reg) + '">Volver a avisar ya</button>') + '</span></div>';
+          }).join('') + '</div></div>' : '<div class="gs-card"><div class="gs-vacio">Ningún aviso pospuesto.</div></div>');
         // Avisos dados por buenos: cada uno abre la ficha de su equipo o de su jugadora, donde se puede volver a avisar.
         var avs = d.rev.filter(function (r) { return esAviso(r) && r.RESUELTO === true; }).sort(function (a, b) { return String(b.FECHA) < String(a.FECHA) ? -1 : 1; });
         h += '<div class="gs-sec">Avisos dados por buenos (' + avs.length + ')</div>' +
@@ -1600,8 +1666,40 @@
           return;
         }
         if ((b = t.closest('[data-sol]'))) { resolver(b); return; }
+        if ((b = t.closest('[data-posponer]'))) {
+          var pp = b.parentNode.querySelector('.gs-posp'); pp.hidden = !pp.hidden; b.setAttribute('aria-expanded', !pp.hidden);
+          var bq = b.parentNode.querySelector('.gs-bueno'); if (bq) bq.hidden = true;
+          return;
+        }
+        if ((b = t.closest('[data-plazo]'))) {
+          var pn = b.closest('.gs-posp');
+          [].forEach.call(pn.querySelectorAll('[data-plazo]'), function (x) { x.setAttribute('aria-pressed', x === b); });
+          var fe = pn.querySelector('[data-hasta]'); fe.hidden = b.getAttribute('data-plazo') !== 'fecha';
+          if (!fe.hidden) { fe.min = masDias(1); if (!fe.value) fe.value = masDias(60); fe.focus(); }
+          pn.querySelector('[data-pospone]').textContent = 'Posponer hasta el ' + fechaCorta(hastaDe(pn));
+          return;
+        }
+        if ((b = t.closest('[data-pospone]'))) {
+          var pc = b.closest('.gs-tarjeta'), pn2 = b.closest('.gs-posp'), hs = hastaDe(pn2), rg = pc.getAttribute('data-reg');
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(hs) || hs <= hoy()) { var er = pc.querySelector('.gs-tj-err'); er.textContent = 'Elige una fecha a partir de mañana.'; er.hidden = false; return; }
+          posponer(rg, pc.getAttribute('data-av'), pc.getAttribute('data-t'), hs, pn2.querySelector('[data-porque]').value.trim()).then(function () {}, function () {});
+          ctx.aviso('Pospuesto hasta el ' + fechaCorta(hs) + '.');
+          if (vent && vent.contains(pc)) {
+            var cn = pc.parentNode; pc.remove();
+            if (cn && !cn.children.length) { var sc = cn.previousElementSibling; if (sc && sc.classList.contains('gs-sec')) sc.remove(); cn.remove(); }
+            var rz2 = vent.querySelector('[data-resueltos="' + rg + '"]'); if (rz2) rz2.innerHTML = htmlResueltos(rg);
+          }
+          return;
+        }
+        if ((b = t.closest('[data-ya]'))) {
+          var rg2 = b.getAttribute('data-reg'), it2 = b.closest('.gs-resu-i');
+          if (it2) it2.innerHTML = '<span>' + texto(it2.textContent.replace(/Volver a avisar ya$/, '')) + '</span><span class="gs-opc">Vuelve a avisar</span>';
+          avisarYa(rg2, b.getAttribute('data-ya')).then(function () { if (ctx.abierta()) ctx.aviso('Vuelve a avisar.'); }, function () {});
+          return;
+        }
         if ((b = t.closest('[data-bueno]'))) {
           var fm = b.parentNode.querySelector('.gs-bueno'); fm.hidden = !fm.hidden; b.hidden = !fm.hidden;
+          var pq = b.parentNode.querySelector('.gs-posp'); if (pq) pq.hidden = true;
           if (!fm.hidden) fm.querySelector('input').focus();
           return;
         }
@@ -1686,11 +1784,13 @@
         if (b) b.textContent = [].some.call(main.querySelectorAll('details.gs-liga'), function (y) { return y.open; }) ? 'Cerrar todas' : 'Abrir todas';
       }, true);
       el.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && e.target.closest && e.target.closest('.gs-posp') && e.target.matches('input')) { e.preventDefault(); e.target.closest('.gs-posp').querySelector('[data-pospone]').click(); return; }
         if (e.key === 'Enter' && e.target.closest && e.target.closest('.gs-bueno')) { e.preventDefault(); e.target.closest('.gs-bueno').querySelector('[data-confirmar]').click(); return; }
         var tr = e.target.closest && e.target.closest('tr[tabindex]');
         if (tr && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); tr.click(); }
       });
       el.addEventListener('change', function (e) {
+        if (e.target.matches && e.target.matches('[data-hasta]')) { var pn = e.target.closest('.gs-posp'); pn.querySelector('[data-pospone]').textContent = 'Posponer hasta el ' + fechaCorta(hastaDe(pn)); return; }
         var t = e.target, f = t.getAttribute && t.getAttribute('data-f');
         if (!f) return;
         if (f === 'temp') ponerTem(t.value);

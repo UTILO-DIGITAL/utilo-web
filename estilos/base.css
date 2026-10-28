@@ -512,6 +512,17 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
 .u .gs5 .gs-tj-pie { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e1) var(--e4); margin-top: var(--e2); }
 .u .gs5 .gs-tj-pie .gs-enl { font-size: 13px; font-weight: 700; min-height: 36px; }
 .u .gs5 .gs-tj-pie .gs-ult { color: var(--gs-g); margin-left: auto; }
+.u .gs5 .gs-tj-pos { min-height: 36px; padding: 0 var(--e3); font-size: 14px; }
+.u .gs5 .gs-tj-pos[aria-expanded=true] { background: var(--gs-f); }
+/* Posponer: plazo (1 semana, 2 semanas, 1 mes o hasta una fecha), por qué y el botón que dice hasta cuándo. */
+.u .gs5 .gs-posp { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); padding: var(--e2) 0 var(--e1); }
+.u .gs5 .gs-posp > .gs-chips { flex: 1 1 100%; margin-top: 0; }
+.u .gs5 .gs-posp .gs-chip { min-height: 36px; font-size: 13px; }
+.u .gs5 .gs-posp input[type=date] { flex: 0 1 180px; width: auto; }
+.u .gs5 .gs-posp input[data-porque] { flex: 1 1 200px; min-width: 0; }
+.u .gs5 .gs-posp .gs-b2 { flex: none; }
+.u .gs5 .gs-resu-b { display: flex; flex-wrap: wrap; gap: 0 var(--e3); flex: none; }
+.u .gs5 .gs-resu-p .gs-resu-i { align-items: flex-start; padding: var(--e2) 0; }
 .u .gs5 .gs-tj-dec { margin: var(--e2) 0 0; color: var(--color-texto); }
 .u .gs5 .gs-tj-foto .gs-foto-g { min-height: 160px; max-width: 480px; }
 .u .gs5 .gs-tj-foto .gs-foto-g img { max-height: 360px; }
