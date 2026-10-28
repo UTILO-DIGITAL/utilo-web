@@ -430,7 +430,7 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
   body.u-con-barra .gs5 .gs-tabs button[aria-selected=true] { color: var(--color-principal-oscuro); border-bottom-color: var(--color-principal-oscuro); }
 }
 
-.u .gs5 .gs-main { max-width: 760px; margin: 0 auto; padding: var(--e4) var(--e4) 120px; }
+.u .gs5 .gs-main { max-width: 760px; margin: 0 auto; padding: var(--e4) var(--e4) var(--e7); }
 .u .gs5 .gs-ayuda { margin: 0 0 var(--e3); }
 .u .gs5 .gs-fila { display: flex; gap: var(--e2); flex-wrap: wrap; align-items: center; }
 .u .gs5 input[type=date] { -webkit-appearance: none; appearance: none; width: 100%; }
@@ -490,12 +490,25 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
 .u .gs5 .gs-color { display: inline-block; width: 13px; height: 13px; border-radius: 50%; border: 1px solid var(--color-borde-campo); vertical-align: -2px;
   margin-right: var(--e2); flex: none; }
 
-/* Botón de inscribir: el único que flota, con el color de acción. */
-.u .gs5 .gs-fab { position: fixed; right: var(--e4); bottom: calc(72px + env(safe-area-inset-bottom, 0px)); z-index: 44; min-height: 52px; padding: 0 var(--e5);
-  border: 0; border-radius: var(--radio); background: var(--gs-a); color: var(--color-sobre-accion); font: 800 17px/1 var(--fuente-texto);
-  box-shadow: var(--sombra-flota); cursor: pointer; }
+/* Avisos: cada uno con «Dar por bueno», que abre «Por qué (opcional)» y «Confirmar»; los ya dados por buenos, con «Volver a avisar». */
+.u .gs5 .gs-avs { display: flex; flex-direction: column; gap: var(--e1); margin-top: var(--e1); }
+.u .gs5 .gs-av { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--e3); padding: var(--e1) var(--e2) var(--e1) var(--e3);
+  border-left: 3px solid var(--gs-am); background: var(--color-superficie); border-radius: var(--radio-peq); font-size: 14px; }
+.u .gs5 .gs-av-t { flex: 1 1 auto; min-width: 0; font-weight: 700; color: var(--gs-am); }
+.u .gs5 .gs-av .gs-enl { font-size: 13px; font-weight: 700; min-height: 36px; }
+.u .gs5 .gs-bueno { flex: 1 1 100%; display: flex; gap: var(--e2); padding: var(--e1) 0 var(--e2); }
+.u .gs5 .gs-bueno input { flex: 1 1 auto; min-width: 0; }
+.u .gs5 .gs-bueno .gs-b2 { flex: none; }
+.u .gs5 .gs-resu { border-top: 1px solid var(--gs-l); margin-top: var(--e1); }
+.u .gs5 .gs-resu-i { display: flex; justify-content: space-between; align-items: center; gap: var(--e3); padding: var(--e1) 0; border-bottom: 1px solid var(--gs-l); font-size: 14px; }
+.u .gs5 .gs-resu-i > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.u .gs5 .gs-resu-i .gs-enl { flex: none; font-size: 13px; font-weight: 700; }
+.u .gs5 .gs-sintel { display: inline-flex; align-items: center; min-height: 44px; font-size: 13px; color: var(--gs-g); }
+/* Foto: la inscripción elegida y si se puede publicar (sale de esa inscripción). */
+.u .gs5 .gs-elegida { margin-top: var(--e2); }
+.u .gs5 .gs-pub { margin: var(--e2) 0 0; font-size: 14px; }
 
-/* Ventanas (fichas y altas): hoja sobre un velo; pie fijo con «Cerrar» y «Guardar N cambios». */
+/* Ventanas (fichas): hoja sobre un velo; pie fijo con «Cerrar» y «Guardar N cambios». */
 .u .gs5 .gs-velo { position: fixed; inset: 0; z-index: 60; background: var(--color-velo); display: flex; align-items: flex-start; justify-content: center;
   padding: 6vh var(--e3); overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .u .gs5 .gs-hoja { background: var(--color-fondo); color: var(--color-texto); width: 100%; max-width: 600px; border-radius: var(--radio); padding: var(--e5);
@@ -515,7 +528,7 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
   letter-spacing: .02em; min-width: 0; }
 .u .gs5 .gs-campo > select, .u .gs5 .gs-campo > input, .u .gs5 .gs-campo > textarea { display: block; width: 100%; margin-top: var(--e1); text-transform: none; letter-spacing: 0; }
 .u .gs5 .gs-campo > input + select { margin-top: var(--e2); }
-.u .gs5 .gs-dos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 var(--e3); }
+.u .gs5 .gs-dos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 var(--e3); align-items: end; }
 .u .gs5 .gs-dos > .gs-ancho { grid-column: 1 / -1; }
 .u .gs5 .gs-check { display: flex; align-items: center; gap: var(--e2); margin-top: var(--e2); font-weight: 600; font-size: 15px; min-height: 32px; }
 .u .gs5 .gs-check input { flex: none; }
@@ -590,8 +603,9 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
 .u .gs5 .gs-alt summary::-webkit-details-marker { display: none; }
 .u .gs5 .gs-alt summary em { font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
 .u .gs5 .gs-alt[data-vacio] summary { cursor: default; color: var(--gs-g); }
-.u .gs5 .gs-alt-i { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; width: 100%; background: none; border: 0; border-top: 1px solid var(--gs-l);
-  padding: var(--e2) 0; text-align: left; color: inherit; cursor: pointer; font-size: 14px; }
+.u .gs5 .gs-alt-i { border-top: 1px solid var(--gs-l); padding: var(--e2) 0; }
+.u .gs5 .gs-alt-a { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; width: 100%; background: none; border: 0; padding: 0;
+  text-align: left; color: inherit; cursor: pointer; font-size: 14px; min-height: 32px; }
 .u .gs5 .gs-alt-i b { display: flex; align-items: center; min-width: 0; }
 .u .gs5 .gs-alt-i b span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .u .gs5 .gs-alt-i small { color: var(--gs-g); font-size: 13px; }
@@ -622,7 +636,6 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
 
 /* Ordenador (desde 900 px): todo el ancho junto al menú; las listas, en tabla (u-tabla); cifras junto a Alertas; los días en columnas. */
 @media (min-width: 900px) {
-  .u .gs5 .gs-fab { bottom: var(--e4); right: var(--e5); }
   .u .gs5 .gs-main { max-width: none; margin: 0; padding: var(--e5) var(--e5) var(--e7); }
   .u .gs5 .gs-res-top { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: var(--e3); align-items: start; margin-top: var(--e3); }
   .u .gs5 .gs-res-top > .gs-mini { margin-top: 0; grid-template-columns: repeat(2, 1fr); }
