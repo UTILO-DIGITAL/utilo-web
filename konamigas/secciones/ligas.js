@@ -394,9 +394,12 @@
       if (arbitra && !S.comp) S.comp = '*';
 
       el.innerHTML = (cfg.AYUDA ? '<p class="u-nota n-ayuda">' + texto(cfg.AYUDA) + '</p>' : '') +
+        // Filtros: en el ordenador, a la vista; en el móvil, recogidos en una línea con lo que se ve y «Cambiar».
+        '<div class="lg-filtros" id="lg-filtros"><button type="button" class="lg-filtros-res" id="lg-fres" aria-expanded="false" aria-controls="lg-fcuerpo"></button>' +
+        '<div class="lg-filtros-cuerpo" id="lg-fcuerpo">' +
         '<div class="lg-barra"><label class="u-campo lg-temp"><span class="u-etiqueta">Temporada</span><select id="lg-temp"></select></label>' +
         '<label class="u-check lg-mios" hidden><input type="checkbox" id="lg-mios"> Solo mis partidos</label></div>' +
-        '<div class="lg-elige" id="lg-elige"></div>' +
+        '<div class="lg-elige" id="lg-elige"></div></div></div>' +
         '<div class="u-pestanas" role="tablist">' + pest.map(function (p) { return '<button type="button" role="tab" data-tab="' + p + '">' + PESTANAS[p] + '</button>'; }).join('') + '</div>' +
         '<div id="lg-cont" class="lg-cont"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div>' +
         '<div class="u-velo" id="lg-velo"><div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="lg-vt"><div class="n-ventana" id="lg-vent"></div></div></div>';
@@ -460,6 +463,7 @@
         el.querySelector('.lg-mios').hidden = S.tab !== 'PARTIDOS' || !quien.yo;
         chkMios.checked = S.mios;
         elige.innerHTML = htmlElige();
+        pintarResumen();
         if (!temp) { cont.innerHTML = '<p class="u-vacio">Todavía no hay temporadas. Añade la primera en la tabla TEMPORADAS del Excel COMPETICION.</p>'; return; }
         if (!actual) { cont.innerHTML = '<p class="u-vacio">Esta temporada todavía no tiene ligas. Se crean en las tablas COMPETICIONES y LIGAS del Excel COMPETICION.</p>'; return; }
         cont.innerHTML = ({ PARTIDOS: htmlPartidos, CLASIFICACION: htmlClasificacion, GOLEADORAS: htmlGoleadoras })[S.tab]();
@@ -471,6 +475,16 @@
         var tira = cont.querySelector('.lg-dias-tira'), abierto = tira && tira.querySelector('[aria-pressed=true]');
         if (abierto) tira.scrollLeft = Math.max(0, abierto.offsetLeft - tira.offsetLeft - (tira.clientWidth - abierto.offsetWidth) / 2);
         if (S.tab === 'GOLEADORAS') cargarGoleadoras();
+      }
+
+      /** La línea de los filtros en el móvil: qué se está viendo (competición y liga, temporada) y «Cambiar». */
+      function pintarResumen() {
+        var f = el.querySelector('#lg-filtros'), b = el.querySelector('#lg-fres');
+        f.classList.toggle('abierto', !!S.filtros);
+        b.setAttribute('aria-expanded', S.filtros ? 'true' : 'false');
+        var que = !temp ? 'Sin temporadas' : todas ? 'Todas las competiciones' : actual ? nomComp(actual.comp) + ' · ' + nomLiga(actual.liga) : 'Sin ligas';
+        var mas = [temp ? temp.NOMBRE : '', S.tab === 'PARTIDOS' && S.mios && quien.yo ? 'solo mis partidos' : ''].filter(String).join(' · ');
+        b.innerHTML = '<span><b>' + texto(que) + '</b><small>' + texto(mas) + '</small></span><span class="lg-filtros-cambiar">' + (S.filtros ? 'Cerrar' : 'Cambiar') + '</span>';
       }
 
       /** Competición y liga, en botones (en Partidos, también «Todas» las competiciones, sin liga). */
@@ -609,7 +623,10 @@
         if (S.jornada !== null) {
           var pj = partidosLiga(actual.liga.ID).filter(function (p) { return num(p.JORNADA) === S.jornada && !p.ID_PARTIDO_ORIGEN; });
           var des = descansan(pj, equiposLiga(actual.liga.ID));
-          if (des.length) h += '<p class="u-nota">Descansa' + (des.length > 1 ? 'n' : '') + ': ' + texto(des.map(equipo).sort().join(', ')) + '.</p>';
+          // Con un número impar de equipos, en cada jornada descansa uno: va como una línea más, debajo de los partidos.
+          if (des.length) h = h.replace(/<\/div>$/, '') + des.sort(function (a, b) { return equipo(a).localeCompare(equipo(b), 'es'); }).map(function (e) {
+            return '<div class="lg-p lg-p-descansa"><span class="lg-pi"><b>Descansa</b></span><span class="lg-pdes">' + punto(e) + '<span class="lg-nom">' + texto(equipo(e)) + '</span></span></div>';
+          }).join('') + '</div>';
         }
         return h;
       }
@@ -1214,10 +1231,16 @@
         var t = e.target;
         if (t.closest('[data-cerrar]')) { cerrar(); return; }
         if (velo.contains(t)) return;
-        var b = t.closest('[data-tab]'); if (b) { irA(b.getAttribute('data-tab')); return; }
+        var b = t.closest('#lg-fres'); if (b) { S.filtros = !S.filtros; pintarResumen(); return; }
+        b = t.closest('[data-tab]'); if (b) { irA(b.getAttribute('data-tab')); return; }
         b = t.closest('[data-comp]');
-        if (b) { S.comp = b.getAttribute('data-comp'); S.liga = ''; S.fecha = ''; guardado(CLAVE + 'comp', S.comp); guardado(CLAVE + 'liga', ''); pintar(); return; }
-        b = t.closest('[data-liga]'); if (b) { S.liga = b.getAttribute('data-liga'); S.fecha = ''; guardado(CLAVE + 'liga', S.liga); pintar(); return; }
+        if (b) {
+          S.comp = b.getAttribute('data-comp'); S.liga = ''; S.fecha = ''; guardado(CLAVE + 'comp', S.comp); guardado(CLAVE + 'liga', '');
+          // En el móvil, los filtros se recogen solos si ya no hay liga que elegir.
+          if (S.comp === '*' || ligas.filter(function (x) { return x.comp.ID === S.comp; }).length < 2) S.filtros = false;
+          pintar(); return;
+        }
+        b = t.closest('[data-liga]'); if (b) { S.liga = b.getAttribute('data-liga'); S.fecha = ''; S.filtros = false; guardado(CLAVE + 'liga', S.liga); pintar(); return; }
         b = t.closest('[data-fecha]'); if (b) { S.fecha = b.getAttribute('data-fecha'); pintar(); return; }
         b = t.closest('[data-dias]');
         if (b) { var tira = cont.querySelector('.lg-dias-tira'), una = tira && tira.firstElementChild; if (una) tira.scrollBy({ left: Number(b.getAttribute('data-dias')) * 3 * (una.offsetWidth + 8), behavior: 'smooth' }); return; }

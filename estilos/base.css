@@ -395,6 +395,27 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
  * negrita), y el estado y el árbitro. Los de quien ha entrado llevan una franja del color principal. La ficha es un
  * marcador: cada equipo con su color arriba y, debajo, quién marcó. El color de cada equipo es un dato (--c), no de la
  * marca. Solo variables. */
+/* Filtros: en el ordenador, a la vista (la línea de resumen no sale); en el móvil, recogidos en esa línea, que los abre. */
+.u .lg-filtros-res { display: none; }
+@media (max-width: 639px) {
+  .u .lg-filtros { margin: 0 0 var(--e3); border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); }
+  .u .lg-filtros-res { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); width: 100%; min-height: 52px; padding: var(--e2) var(--e3);
+    border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .u .lg-filtros-res > span:first-child { display: flex; flex-direction: column; min-width: 0; }
+  .u .lg-filtros-res b { font-size: 15px; overflow-wrap: anywhere; }
+  .u .lg-filtros-res small { font-size: 12px; color: var(--color-suave); }
+  .u .lg-filtros-cambiar { flex: none; font-weight: 700; font-size: 14px; color: var(--color-principal-oscuro); text-decoration: underline; }
+  .u .lg-filtros-cuerpo { display: none; padding: 0 var(--e3) var(--e3); border-top: 1px solid var(--color-linea); }
+  .u .lg-filtros.abierto .lg-filtros-cuerpo { display: block; padding-top: var(--e3); }
+  .u .lg-filtros .lg-barra, .u .lg-filtros .lg-elige { margin-bottom: var(--e2); }
+  .u .lg-filtros .lg-fila-chips { flex-wrap: wrap; overflow: visible; }
+}
+/* Un equipo que descansa en la jornada (ligas con un número impar de equipos): una línea más, sin marcador. */
+.u .lg-p-descansa { cursor: default; color: var(--color-suave); }
+.u .lg-p-descansa:hover { background: none; }
+.u .lg-p-descansa .lg-pi b { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; }
+.u .lg-pdes { grid-column: 2 / 5; justify-self: center; display: flex; align-items: center; gap: var(--e2); font-size: 15px; }
+@media (max-width: 639px) { .u .lg-pdes { grid-column: 2 / 5; } }
 .u .lg-barra { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--e3); margin: 0 0 var(--e3); }
 .u .lg-barra .lg-temp { flex: 0 1 180px; }
 .u .lg-barra .lg-temp select { width: 100%; }
