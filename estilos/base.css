@@ -389,23 +389,336 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
   white-space: pre-wrap; overflow-wrap: anywhere; }
 .u .pd-r b { display: block; font-size: 12px; color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .02em; }
 
-/* ---------- Gestión de Konamigas (T0256, konamigas/secciones/gestion5.js) ----------
- * El color de camiseta de un equipo como un punto (su color sale del Excel COLORES, es un dato), grupos plegables del
- * resumen, casillas seguidas en la ficha, datos de solo lectura en dos columnas y la foto dentro de la ventana. */
-.u .ges-punto { display: inline-block; width: 12px; height: 12px; margin-right: var(--e2); vertical-align: -1px;
-  border-radius: var(--radio-punto, 50%); border: 1px solid var(--color-borde-campo); }
-.u .ges-grupo { margin: 0 0 var(--e2); border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); }
-.u .ges-grupo > summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e1) var(--e2); min-height: 44px; padding: var(--e2) var(--e3);
-  cursor: pointer; font-weight: 700; color: var(--color-principal-oscuro); }
-.u .ges-grupo > .u-tabla-caja, .u .ges-grupo > .u-nota { margin: 0 var(--e3) var(--e3); }
-.u .ges-checks { display: flex; flex-wrap: wrap; gap: 0 var(--e4); }
-.u .ges-datos { display: grid; grid-template-columns: 1fr; gap: var(--e2) var(--e4); margin: var(--e2) 0 var(--e3); font-size: 14px; }
-.u .ges-datos dt { font: 700 12px/1.3 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .02em; }
-.u .ges-datos dd { margin: 0; overflow-wrap: anywhere; }
-@media (min-width: 640px) { .u .ges-datos { grid-template-columns: 1fr 1fr; } }
-.u .ges-foto { display: flex; justify-content: center; margin: var(--e3) 0; }
-.u .ges-foto img { max-width: 100%; max-height: 60vh; border-radius: var(--radio); }
+
 .u .n-ventana .n-grupo { margin-top: var(--e4); }
+
+/* ---------- Gestión de Konamigas (T0256, konamigas/secciones/gestion5.js) ----------
+ * Copia del aspecto de la Gestión publicada (kanban4/gestion.js, sus css() y cssExtra() con el prefijo gs-), sin Camisetas.
+ * Solo variables de marca.css y de esta hoja; el único color que viene de fuera es el de la camiseta de cada equipo
+ * (COLORES.COLOR_HEX del Excel), que es un dato. La sección ocupa todo el ancho del contenido: su barra (la temporada
+ * pintada, la hora de los datos, ↻ y las pestañas) sigue a la cabecera del marco, en azul en el móvil y sobre el fondo
+ * claro junto al menú del ordenador, sin repetir el título. Todo va dentro de .gs5 (la raíz de la sección): la Gestión
+ * publicada (4.1) también usa clases gs- con sus estilos propios y carga esta hoja, y así no le cambia nada. */
+.u .n-main:has(> .gs5) { max-width: none; padding: 0; }
+.u .n-cab:has(+ .n-main > .gs5) { padding-bottom: var(--e1); border-bottom: 0; }
+.u .gs5 { --gs-c: var(--color-principal); --gs-a: var(--color-accion); --gs-v: var(--color-bien); --gs-r: var(--color-error);
+  --gs-g: var(--color-suave); --gs-l: var(--color-linea); --gs-f: var(--color-tarjeta-cab, var(--color-bloque)); --gs-am: var(--estado-pr);
+  font: 400 14px/1.45 var(--fuente-texto); color: var(--color-texto); }
+.u .gs5 button { font-family: var(--fuente-texto); }
+.u .gs5 [hidden] { display: none !important; }
+html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
+
+/* Barra de la sección: la temporada (la palabra pintada de la marca, una vez), la hora de los datos, ↻ y las pestañas. */
+.u .gs5 .gs-cab { background: var(--color-principal); color: var(--color-sobre-principal); padding: 0 var(--e4); display: flex; flex-wrap: wrap;
+  align-items: center; gap: var(--e1) var(--e3); }
+.u .gs5 .gs-cab > p { flex: 1 1 100%; margin: 0; font-size: 13px; display: flex; align-items: center; gap: var(--e3); font-variant-numeric: tabular-nums; }
+.u .gs5 .gs-pint { font: 400 22px/1.1 var(--fuente-destacar, var(--fuente-titulos)); color: var(--color-destacado); transform: rotate(-3deg); display: inline-block; }
+.u .gs5 .gs-re { min-width: 44px; min-height: 36px; margin-left: calc(-1 * var(--e2)); background: transparent; border: 0; color: inherit; font-size: 18px; padding: 0; cursor: pointer; }
+.u .gs5 .gs-re:disabled { opacity: .5; cursor: wait; }
+.u .gs5 .gs-tabs { flex: 1 1 100%; display: flex; gap: 2px; margin: 0 calc(-1 * var(--e4)); padding: 0 var(--e2); overflow-x: auto; scrollbar-width: none; }
+.u .gs5 .gs-tabs::-webkit-scrollbar { display: none; }
+.u .gs5 .gs-tabs button { flex: 0 0 auto; min-height: 44px; background: transparent; border: 0; color: var(--color-sobre-principal); opacity: .75;
+  font: 700 14px/1 var(--fuente-texto); padding: 0 var(--e3); border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; }
+.u .gs5 .gs-tabs button[aria-selected=true] { opacity: 1; border-bottom-color: var(--color-destacado); }
+@media (min-width: 900px) {
+  body.u-con-barra .gs5 .gs-cab { background: var(--color-fondo); color: var(--color-texto); border-bottom: 1px solid var(--color-linea); padding: 0 var(--e5); }
+  body.u-con-barra .gs5 .gs-pint { color: var(--color-principal-oscuro); }
+  body.u-con-barra .gs5 .gs-cab > p { color: var(--color-suave); }
+  body.u-con-barra .gs5 .gs-re { color: var(--color-principal-oscuro); }
+  body.u-con-barra .gs5 .gs-tabs { margin: 0 calc(-1 * var(--e5)); padding: 0 var(--e3); }
+  body.u-con-barra .gs5 .gs-tabs button { color: var(--color-suave); opacity: 1; }
+  body.u-con-barra .gs5 .gs-tabs button[aria-selected=true] { color: var(--color-principal-oscuro); border-bottom-color: var(--color-principal-oscuro); }
+}
+
+.u .gs5 .gs-main { max-width: 760px; margin: 0 auto; padding: var(--e4) var(--e4) var(--e7); }
+.u .gs5 .gs-ayuda { margin: 0 0 var(--e3); }
+.u .gs5 .gs-fila { display: flex; gap: var(--e2); flex-wrap: wrap; align-items: center; }
+.u .gs5 input[type=date] { -webkit-appearance: none; appearance: none; width: 100%; }
+.u .gs5 textarea { width: 100%; }
+.u .gs5 .gs-sel { flex: 1 1 140px; min-width: 0; }
+.u .gs5 .gs-min { min-width: 0; }
+.u .gs5 .gs-card { background: var(--color-tarjeta, var(--color-superficie)); border: 1px solid var(--gs-l); border-radius: var(--radio); padding: var(--e3) var(--e4); margin-top: var(--e3); }
+.u .gs5 .gs-mini { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--e2); margin-top: var(--e3); }
+.u .gs5 .gs-mini-3 { grid-template-columns: repeat(3, 1fr); }
+.u .gs5 .gs-mini button { background: var(--gs-f); border: 0; border-radius: var(--radio); padding: var(--e2); text-align: center; color: inherit; cursor: pointer; min-height: 44px; }
+.u .gs5 .gs-mini b { display: block; font: var(--peso-titulos) 20px/1.2 var(--fuente-titulos); font-variant-numeric: tabular-nums; }
+.u .gs5 .gs-mini small { font-size: 12px; color: var(--gs-g); font-weight: 600; }
+.u .gs5 .gs-mini button.gs-alerta b { color: var(--gs-r); }
+.u .gs5 .gs-pos { color: var(--gs-v); } .u .gs5 .gs-neg { color: var(--gs-r); } .u .gs5 .gs-amb { color: var(--gs-am); }
+
+/* Listas: filas separadas por una línea, cifras a la derecha. Una inscripción de Baja no cuenta: fondo rojizo y raya roja. */
+.u .gs5 .gs-lista { list-style: none; margin: 0; padding: 0; }
+.u .gs5 .gs-item { display: flex; justify-content: space-between; gap: var(--e3); width: 100%; padding: var(--e3) 0; border: 0; border-top: 1px solid var(--gs-l);
+  align-items: center; background: none; color: inherit; text-align: left; cursor: pointer; font-size: 14px; }
+.u .gs5 .gs-item:first-child { border-top: 0; }
+.u .gs5 .gs-item .gs-t { font-weight: 700; font-size: 15px; display: flex; align-items: center; }
+.u .gs5 .gs-item .gs-s { font-size: 13px; color: var(--gs-g); margin-top: 2px; }
+.u .gs5 .gs-item .gs-d { text-align: right; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.u .gs5 .gs-item.gs-err { background: color-mix(in srgb, var(--gs-r) 13%, var(--color-superficie)); border-left: 4px solid var(--gs-r);
+  padding-left: var(--e3); padding-right: var(--e3); border-radius: var(--radio); }
+.u .gs5 .gs-tabla tr.gs-err td { background: color-mix(in srgb, var(--gs-r) 13%, var(--color-superficie)); }
+.u .gs5 .gs-tabla tr.gs-err td:first-child { box-shadow: inset 4px 0 0 var(--gs-r); }
+.u .gs5 .gs-tabla tr.gs-err:hover td { background: color-mix(in srgb, var(--gs-r) 19%, var(--color-superficie)); }
+.u .gs5 .gs-alta { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--gs-g); }
+.u .gs5 .gs-s .gs-alta { opacity: .75; font-size: .92em; }
+.u .gs5 .gs-cuenta { margin: var(--e3) 2px 0; font-size: 13px; color: var(--gs-g); }
+
+/* Botones de filtro (con su contador) y etiquetas pequeñas. */
+.u .gs5 .gs-chips { display: flex; gap: var(--e2); flex-wrap: wrap; margin-top: var(--e1); }
+.u .gs5 .gs-chip { min-height: 40px; border: 1.5px solid var(--color-borde-campo); background: var(--color-superficie); border-radius: var(--radio); padding: 0 var(--e3);
+  font: 600 14px/1 var(--fuente-texto); color: inherit; cursor: pointer; font-variant-numeric: tabular-nums; }
+.u .gs5 .gs-chip[aria-pressed=true] { background: var(--gs-c); border-color: var(--gs-c); color: var(--color-sobre-principal); }
+.u .gs5 .gs-tags { display: flex; gap: var(--e1); flex-wrap: wrap; margin-top: var(--e1); }
+.u .gs5 .gs-tag { display: inline-flex; align-items: center; gap: var(--e1); padding: 1px var(--e2); border-radius: var(--radio-peq); background: var(--gs-f);
+  color: var(--color-texto); font: 700 12px/1.6 var(--fuente-texto); }
+.u .gs5 .gs-tag-g { background: transparent; border: 1px solid var(--gs-l); color: var(--gs-g); }
+.u .gs5 .gs-tag-r { background: transparent; border: 1px solid var(--gs-r); color: var(--gs-r); }
+.u .gs5 .gs-tag-v { background: transparent; border: 1px solid var(--gs-v); color: var(--gs-v); }
+.u .gs5 .gs-tag-a { background: transparent; border: 1px solid var(--gs-am); color: var(--gs-am); }
+.u .gs5 .gs-tag.gs-tag-err { background: var(--gs-r); border: 1px solid var(--gs-r); color: var(--color-superficie); }
+.u .gs5 .gs-opc { font-weight: 400; color: var(--gs-g); text-transform: none; letter-spacing: 0; }
+.u .gs5 .gs-nota { font-size: 13px; color: var(--gs-g); font-weight: 400; margin: var(--e1) 0 0; text-transform: none; letter-spacing: 0; }
+.u .gs5 .gs-aviso-b { font-size: 13px; color: var(--gs-g); margin: var(--e2) 0 0; }
+.u .gs5 .gs-mas-n { text-align: center; color: var(--gs-g); font-size: 13px; padding: var(--e3) 0 2px; }
+.u .gs5 .gs-ir { margin: var(--e2) 0 2px; }
+.u .gs5 .gs-vacio { color: var(--gs-g); padding: var(--e6) var(--e2); text-align: center; }
+.u .gs5 .gs-cargando { text-align: center; color: var(--gs-g); padding: var(--e7) var(--e2); display: flex; flex-direction: column; gap: var(--e3); }
+.u .gs5 .gs-error { border: 1px solid var(--gs-r); border-left-width: 4px; color: var(--gs-r); background: var(--color-superficie); font-weight: 700;
+  border-radius: var(--radio); padding: var(--e3); margin-top: var(--e3); }
+.u .gs5 .gs-enl { background: none; border: 0; padding: 0; font: inherit; color: var(--color-principal-oscuro); text-decoration: underline; cursor: pointer; min-height: 32px; }
+/* El color de la camiseta del equipo: es un dato, no un adorno. */
+.u .gs5 .gs-color { display: inline-block; width: 13px; height: 13px; border-radius: 50%; border: 1px solid var(--color-borde-campo); vertical-align: -2px;
+  margin-right: var(--e2); flex: none; }
+
+/* Tarjetas de lo que hay que revisar (avisos y revisiones): título, qué pasa, los datos, botones de solución y, al final,
+ * «Ver la ficha» y «Dar por bueno» (que abre «Por qué (opcional)» y «Confirmar»). Franja de 4 px con el color de aviso. */
+.u .gs5 .gs-tjs { display: flex; flex-direction: column; gap: var(--e2); margin: var(--e2) 0 var(--e1); }
+.u .gs5 .gs-tarjeta { background: var(--color-superficie); border: 1px solid var(--gs-l); border-left: 4px solid var(--gs-am); border-radius: var(--radio);
+  padding: var(--e3); font-size: 14px; min-width: 0; }
+.u .gs5 .gs-tj-t { font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }
+.u .gs5 .gs-tj-t .gs-color { margin-right: var(--e1); }
+.u .gs5 .gs-tj-p { margin: var(--e1) 0 0; }
+.u .gs5 .gs-tj-d { margin-top: var(--e2); font-size: 13px; color: var(--gs-g); overflow-wrap: anywhere; }
+.u .gs5 .gs-tj-d .gs-df { color: var(--color-texto); }
+.u .gs5 .gs-tj-s { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--e2); margin-top: var(--e3); }
+.u .gs5 .gs-tj-s .gs-b2, .u .gs5 .gs-tj-s a.gs-b2 { font-size: 14px; }
+.u .gs5 .gs-tj-c { margin-top: 0; flex: 1 1 200px; }
+.u .gs5 .gs-tj-c.gs-ancho, .u .gs5 .gs-tj-s .gs-ancho { flex-basis: 100%; }
+.u .gs5 .gs-tj-cols { margin-top: var(--e1); }
+.u .gs5 .gs-tj-was { display: flex; flex-wrap: wrap; gap: var(--e2); flex: 1 1 100%; }
+.u .gs5 .gs-tj-was .gs-b2 { font-size: 14px; }
+.u .gs5 .gs-tj-cols .gs-chip { display: inline-flex; align-items: center; text-transform: none; letter-spacing: 0; font-size: 13px; }
+.u .gs5 .gs-tj-err { margin: var(--e2) 0 0; color: var(--gs-r); font-weight: 700; }
+.u .gs5 .gs-tj-pie { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e1) var(--e4); margin-top: var(--e2); }
+.u .gs5 .gs-tj-pie .gs-enl { font-size: 13px; font-weight: 700; min-height: 36px; }
+.u .gs5 .gs-tj-pie .gs-ult { color: var(--gs-g); margin-left: auto; }
+.u .gs5 .gs-tj-pos { min-height: 36px; padding: 0 var(--e3); font-size: 14px; }
+.u .gs5 .gs-tj-pos[aria-expanded=true] { background: var(--gs-f); }
+/* Posponer: plazo (1 semana, 2 semanas, 1 mes o hasta una fecha), por qué y el botón que dice hasta cuándo. */
+.u .gs5 .gs-posp { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); padding: var(--e2) 0 var(--e1); }
+.u .gs5 .gs-posp > .gs-chips { flex: 1 1 100%; margin-top: 0; }
+.u .gs5 .gs-posp .gs-chip { min-height: 36px; font-size: 13px; }
+.u .gs5 .gs-posp input[type=date] { flex: 0 1 180px; width: auto; }
+.u .gs5 .gs-posp input[data-porque] { flex: 1 1 200px; min-width: 0; }
+.u .gs5 .gs-posp .gs-b2 { flex: none; }
+.u .gs5 .gs-resu-b { display: flex; flex-wrap: wrap; gap: 0 var(--e3); flex: none; }
+.u .gs5 .gs-resu-p .gs-resu-i { align-items: flex-start; padding: var(--e2) 0; }
+.u .gs5 .gs-tj-dec { margin: var(--e2) 0 0; color: var(--color-texto); }
+.u .gs5 .gs-tj-foto .gs-foto-g { min-height: 160px; max-width: 480px; }
+.u .gs5 .gs-tj-foto .gs-foto-g img { max-height: 360px; }
+.u .gs5 .gs-tj-cols .gs-chip .gs-opc { margin-left: var(--e1); }
+.u .gs5 .gs-cands { display: flex; flex-direction: column; flex: 1 1 100%; border-top: 1px solid var(--gs-l); }
+.u .gs5 .gs-cand { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2); padding: var(--e2) 0; border-bottom: 1px solid var(--gs-l); }
+.u .gs5 .gs-cand .gs-t { font-weight: 700; }
+.u .gs5 .gs-cand .gs-s { font-size: 13px; color: var(--gs-g); }
+.u .gs5 .gs-cand .gs-minis { margin-top: var(--e1); }
+.u .gs5 .gs-comp { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--e3); color: var(--color-texto); font-size: 14px; }
+.u .gs5 .gs-comp-i { border: 1px solid var(--gs-l); border-radius: var(--radio); padding: var(--e2) var(--e3); min-width: 0; }
+.u .gs5 .gs-comp-i .gs-t { font-weight: 700; margin-bottom: var(--e1); }
+.u .gs5 .gs-comp-i .gs-df span:last-child { font-weight: 600; }
+.u .gs5 .gs-bueno { flex: 1 1 100%; display: flex; gap: var(--e2); padding: var(--e1) 0 var(--e2); }
+.u .gs5 .gs-bueno input { flex: 1 1 auto; min-width: 0; }
+.u .gs5 .gs-bueno .gs-b2 { flex: none; }
+.u .gs5 .gs-resu { border-top: 1px solid var(--gs-l); margin-top: var(--e1); }
+.u .gs5 .gs-resu-i { display: flex; justify-content: space-between; align-items: center; gap: var(--e3); padding: var(--e1) 0; border-bottom: 1px solid var(--gs-l); font-size: 14px; }
+.u .gs5 .gs-resu-i > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.u .gs5 .gs-resu-i .gs-enl { flex: none; font-size: 13px; font-weight: 700; }
+.u .gs5 .gs-sintel { display: inline-flex; align-items: center; min-height: 44px; font-size: 13px; color: var(--gs-g); }
+/* Fotos: miniaturas en cuadrícula (ficha de la jugadora), la foto grande (visor y asignador) y las pequeñas para comparar. */
+.u .gs5 .gs-foto { display: flex; align-items: center; justify-content: center; overflow: hidden; background: var(--gs-f); border-radius: var(--radio-peq); }
+.u .gs5 .gs-foto img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.u .gs5 .gs-foto .u-carga { width: 24px; height: 24px; }
+.u .gs5 .gs-foto-no { padding: var(--e2); text-align: center; font-size: 13px; }
+.u .gs5 .gs-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--e3); margin-top: var(--e2); }
+.u .gs5 .gs-fig { margin: 0; display: flex; flex-direction: column; gap: var(--e1); min-width: 0; }
+.u .gs5 .gs-fbtn-ver { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.u .gs5 .gs-fbtn-ver .gs-foto { aspect-ratio: 1; width: 100%; }
+.u .gs5 .gs-fig figcaption { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.u .gs5 .gs-fig .gs-enl { align-self: flex-start; font-size: 13px; font-weight: 700; }
+.u .gs5 .gs-grande { display: flex; justify-content: center; margin: var(--e2) 0; }
+.u .gs5 .gs-foto-g { width: 100%; min-height: 200px; max-height: 60vh; }
+.u .gs5 .gs-foto-g img { width: auto; height: auto; max-width: 100%; max-height: 60vh; object-fit: contain; }
+.u .gs5 .gs-velo-foto { z-index: 61; }
+.u .gs5 .gs-hoja-foto { max-width: 900px; padding: var(--e4); }
+.u .gs5 .gs-hoja-ancha { max-width: 760px; }
+.u .gs5 .gs-as-cab { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e1) var(--e3); margin-top: var(--e2); }
+.u .gs5 .gs-as-cab b { font: var(--peso-titulos) 17px/1.2 var(--fuente-titulos); color: var(--color-principal-oscuro); }
+.u .gs5 .gs-as-nav { justify-content: center; }
+.u .gs5 .gs-cols .gs-chip { display: inline-flex; align-items: center; }
+.u .gs5 .gs-cols .gs-chip .gs-color { margin-right: var(--e1); }
+.u .gs5 .gs-as-j { align-items: center; }
+.u .gs5 .gs-minis { display: flex; align-items: center; gap: var(--e1); flex: none; }
+.u .gs5 .gs-foto-p { width: 52px; height: 52px; }
+.u .gs5 .gs-mas-f { font-size: 13px; font-weight: 700; color: var(--gs-g); padding-left: 2px; }
+.u .gs5 .gs-alt-s { display: flex; justify-content: space-between; align-items: center; gap: var(--e2); width: 100%; min-height: 32px; padding: 0; border: 0;
+  background: none; color: inherit; text-align: left; cursor: pointer; font-size: 15px; }
+.u .gs5 .gs-alt-s em { font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
+@media (max-width: 520px) { .u .gs5 .gs-fotos { grid-template-columns: repeat(2, minmax(0, 1fr)); } .u .gs5 .gs-foto-p { width: 44px; height: 44px; } }
+
+/* Ventanas (fichas): hoja sobre un velo; pie fijo con «Cerrar» y «Guardar N cambios». */
+.u .gs5 .gs-velo { position: fixed; inset: 0; z-index: 60; background: var(--color-velo); display: flex; align-items: flex-start; justify-content: center;
+  padding: 6vh var(--e3); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.u .gs5 .gs-hoja { background: var(--color-fondo); color: var(--color-texto); width: 100%; max-width: 600px; border-radius: var(--radio); padding: var(--e5);
+  font-size: 15px; margin-bottom: var(--e5); box-shadow: var(--sombra-flota); }
+.u .gs5 .gs-hoja h2 { margin: 0 0 var(--e2); font: var(--peso-titulos) 24px/1.2 var(--fuente-titulos); color: var(--color-principal-oscuro);
+  display: flex; justify-content: space-between; align-items: flex-start; gap: var(--e2); }
+.u .gs5 .gs-hoja h2 > span { min-width: 0; overflow-wrap: anywhere; }
+.u .gs5 .gs-hoja h2 .gs-color { width: 16px; height: 16px; vertical-align: 0; }
+.u .gs5 .gs-x { flex: none; width: 44px; height: 44px; margin: -10px -10px 0 0; background: none; border: 0; font-size: 28px; line-height: 1; cursor: pointer; color: var(--gs-g); padding: 0; }
+.u .gs5 .gs-sub { margin: -4px 0 var(--e2); }
+.u .gs5 .gs-sub2 { margin: -4px 0 var(--e2); }
+.u .gs5 .gs-sec { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--color-principal-oscuro); margin: var(--e5) 0 2px; font-weight: 700; }
+.u .gs5 .gs-sec .gs-color { margin: 0 var(--e1) 0 0; }
+.u .gs5 .gs-btns { display: flex; gap: var(--e2); flex-wrap: wrap; margin: 2px 0 var(--e2); }
+.u .gs5 .gs-btns a, .u .gs5 .gs-btns button { font-size: 14px; }
+.u .gs5 .gs-campo { display: block; margin-top: var(--e3); font: 700 12px/1.3 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase;
+  letter-spacing: .02em; min-width: 0; }
+.u .gs5 .gs-campo > select, .u .gs5 .gs-campo > input, .u .gs5 .gs-campo > textarea { display: block; width: 100%; margin-top: var(--e1); text-transform: none; letter-spacing: 0; }
+.u .gs5 .gs-campo > input + select { margin-top: var(--e2); }
+.u .gs5 .gs-dos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 var(--e3); align-items: end; }
+.u .gs5 .gs-dos > .gs-ancho { grid-column: 1 / -1; }
+.u .gs5 .gs-check { display: flex; align-items: center; gap: var(--e2); margin-top: var(--e2); font-weight: 600; font-size: 15px; min-height: 32px; }
+.u .gs5 .gs-check input { flex: none; }
+.u .gs5 .gs-acc { display: flex; justify-content: flex-end; gap: var(--e2); flex-wrap: wrap; margin-top: var(--e4); }
+.u .gs5 .gs-pie { position: sticky; bottom: calc(-1 * var(--e5)); background: var(--color-fondo); padding: var(--e3) 0 var(--e1); margin-top: var(--e4);
+  border-top: 1px solid var(--gs-l); }
+/* Un solo botón con el color de acción por pantalla (-b1); los demás, con contorno (-b2). */
+.u .gs5 .gs-b1, .u .gs5 .gs-b2 { display: inline-flex; align-items: center; justify-content: center; gap: var(--e2); min-height: 44px; border-radius: var(--radio); cursor: pointer; text-decoration: none; }
+.u .gs5 .gs-b1 { background: var(--gs-a); color: var(--color-sobre-accion); border: 0; padding: 0 var(--e5); font: 800 17px/1.2 var(--fuente-texto); }
+.u .gs5 .gs-b1:disabled, .u .gs5 .gs-b2:disabled { opacity: .6; cursor: default; }
+.u .gs5 .gs-b2 { background: transparent; color: var(--color-principal-oscuro); border: 1.5px solid var(--color-principal-oscuro); padding: 0 var(--e4); font: 700 15px/1.2 var(--fuente-texto); }
+.u .gs5 .gs-dl { border-top: 1px solid var(--gs-l); margin-top: var(--e2); }
+.u .gs5 .gs-df { display: flex; justify-content: space-between; gap: var(--e3); padding: var(--e2) 0; border-bottom: 1px solid var(--gs-l); font-size: 14px; }
+.u .gs5 .gs-df span:first-child { color: var(--gs-g); flex: none; }
+.u .gs5 .gs-df span:last-child { text-align: right; font-weight: 600; word-break: break-word; }
+.u .gs5 .gs-dtx { margin-top: var(--e3); font-size: 14px; }
+.u .gs5 .gs-dtx p { margin: var(--e1) 0 0; white-space: pre-wrap; }
+.u .gs5 .gs-hoja .gs-lista { margin-top: var(--e1); }
+.u .gs5 .gs-hoja .gs-item { padding: var(--e2) 0; min-height: 44px; }
+.u .gs5 .gs-hoja .gs-item.gs-err { padding-left: var(--e3); padding-right: var(--e3); }
+.u .gs5 .gs-hoja .gs-item .gs-t { font-size: 14px; }
+.u .gs5 .gs-elegir { border: 1px solid var(--gs-l); border-radius: var(--radio); padding: 0 var(--e3); margin-top: var(--e2); }
+@media (max-width: 640px) {
+  .u .gs5 .gs-velo { padding: 0; }
+  .u .gs5 .gs-hoja { border-radius: 0; min-height: 100%; max-width: none; margin: 0; padding: var(--e4); }
+  .u .gs5 .gs-pie { bottom: calc(-1 * var(--e4)); }
+}
+
+/* Filtros: temporada, competición y liga en una fila; en el móvil, plegados tras «Filtros» con los puestos debajo (✕ los quita). */
+.u .gs5 .gs-filtros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e2); }
+.u .gs5 .gs-filtros select { width: 100%; }
+.u .gs5 .gs-filtros-1 { grid-template-columns: minmax(0, 1fr); max-width: 280px; }
+@media (max-width: 520px) {
+  .u .gs5 .gs-filtros { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .u .gs5 .gs-filtros select:first-child { grid-column: 1 / -1; }
+  .u .gs5 .gs-filtros-1 { max-width: none; }
+}
+.u .gs5 .gs-fbtn { display: inline-flex; align-items: center; gap: var(--e2); flex: none; }
+.u .gs5 .gs-fbtn[aria-expanded=true] { background: var(--gs-f); }
+.u .gs5 .gs-fbtn::after { content: ""; width: 8px; height: 8px; margin-top: -4px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(45deg); transition: transform .15s; }
+.u .gs5 .gs-fbtn[aria-expanded=true]::after { margin-top: 4px; transform: rotate(-135deg); }
+.u .gs5 .gs-fn { min-width: 22px; padding: 0 6px; border-radius: var(--radio-peq); background: var(--color-texto); color: var(--color-fondo); font: 700 12px/1.7 var(--fuente-texto); text-align: center; }
+.u .gs5 .gs-puestos { display: flex; flex-wrap: wrap; gap: var(--e1); }
+.u .gs5 .gs-puesto { display: inline-flex; align-items: center; gap: var(--e2); min-height: 32px; max-width: 100%; padding: 0 var(--e2) 0 var(--e3);
+  border: 1px solid var(--gs-l); border-radius: var(--radio); background: var(--gs-f); color: inherit; font: 600 13px/1.2 var(--fuente-texto); cursor: pointer; }
+.u .gs5 .gs-puesto span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u .gs5 .gs-puesto i { font-style: normal; color: var(--gs-g); font-size: 15px; }
+@media (max-width: 899px) {
+  .u .gs5 .gs-filtrar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); }
+  .u .gs5 .gs-filtrar > .gs-busca { order: 1; flex: 1 1 0; min-width: 0; }
+  .u .gs5 .gs-busca input { width: 100%; min-width: 0; }
+  .u .gs5 .gs-filtrar > .gs-fbtn { order: 2; }
+  .u .gs5 .gs-filtrar > .gs-puestos { order: 3; flex: 1 1 100%; }
+  .u .gs5 .gs-filtrar > .gs-mas { order: 4; flex: 1 1 100%; }
+  .u .gs5 .gs-mas.gs-cerr { display: none; }
+  .u .gs5 .gs-mas > .gs-fila { margin-top: var(--e2); }
+  .u .gs5 .gs-filtrar > .gs-chips { order: 5; flex: 1 1 100%; margin-top: var(--e1); }
+  .u .gs5 .gs-filtrar > .gs-chips, .u .gs5 .gs-dias { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-left: calc(-1 * var(--e4)); margin-right: calc(-1 * var(--e4)); padding: 0 var(--e4); }
+  .u .gs5 .gs-filtrar > .gs-chips::-webkit-scrollbar, .u .gs5 .gs-dias::-webkit-scrollbar { display: none; }
+  .u .gs5 .gs-chips .gs-chip, .u .gs5 .gs-dias .gs-chip { flex: none; white-space: nowrap; }
+}
+
+/* Resumen: cifras y Alertas; debajo, por día, cada liga plegable con su gestor y sus equipos por nivel. */
+.u .gs5 .gs-pag { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.u .gs5 .gs-alts { padding-top: var(--e3); padding-bottom: var(--e2); }
+.u .gs5 .gs-alts-t { font: var(--peso-titulos) 16px/1.2 var(--fuente-titulos); margin-bottom: var(--e1); }
+.u .gs5 .gs-alt { border-top: 1px solid var(--gs-l); padding: var(--e2) 0; }
+.u .gs5 .gs-alt summary { display: flex; justify-content: space-between; gap: var(--e2); cursor: pointer; list-style: none; font-size: 15px; min-height: 32px; align-items: center; }
+.u .gs5 .gs-alt summary::-webkit-details-marker { display: none; }
+.u .gs5 .gs-alt summary em { font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
+.u .gs5 .gs-alt[data-vacio] summary { cursor: default; color: var(--gs-g); }
+.u .gs5 .gs-alt-i { border-top: 1px solid var(--gs-l); padding: var(--e2) 0; }
+.u .gs5 .gs-alt-a { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; width: 100%; background: none; border: 0; padding: 0;
+  text-align: left; color: inherit; cursor: pointer; font-size: 14px; min-height: 32px; }
+.u .gs5 .gs-alt-i b { display: flex; align-items: center; min-width: 0; }
+.u .gs5 .gs-alt-i b span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u .gs5 .gs-alt-i small { color: var(--gs-g); font-size: 13px; }
+.u .gs5 .gs-alt-i .gs-pag span { display: block; }
+.u .gs5 .gs-dias { display: flex; gap: var(--e2); flex-wrap: wrap; margin-top: var(--e4); }
+.u .gs5 .gs-dia-h { font: var(--peso-titulos) 20px/1.2 var(--fuente-titulos); color: var(--color-principal-oscuro); margin: var(--e5) 0 0; }
+.u .gs5 .gs-liga { padding: 0; overflow: hidden; border-color: var(--color-borde-campo); }
+.u .gs5 .gs-liga[open] { padding-bottom: var(--e1); }
+.u .gs5 .gs-liga summary { list-style: none; cursor: pointer; position: relative; padding: var(--e3) calc(var(--e4) + 28px) var(--e3) var(--e4); background: var(--gs-f); }
+.u .gs5 .gs-liga summary::-webkit-details-marker { display: none; }
+.u .gs5 .gs-liga summary::after { content: "\25BE"; position: absolute; right: var(--e4); top: var(--e3); font-size: 20px; color: var(--color-principal-oscuro); transition: transform .15s; }
+.u .gs5 .gs-liga[open] summary::after { transform: rotate(180deg); }
+.u .gs5 .gs-liga[open] summary { border-bottom: 1px solid var(--color-borde-campo); }
+.u .gs5 .gs-liga-n { font: var(--peso-titulos) 20px/1.2 var(--fuente-titulos); color: var(--color-principal-oscuro); }
+.u .gs5 .gs-liga-n small { display: block; font: 700 12px/1.3 var(--fuente-texto); letter-spacing: .04em; text-transform: uppercase; color: var(--gs-g); margin-bottom: 2px; }
+.u .gs5 .gs-liga-g { display: flex; align-items: center; gap: var(--e2); flex-wrap: wrap; margin-top: var(--e2); font-size: 14px; }
+.u .gs5 .gs-wa { display: inline-flex; align-items: center; min-height: 36px; padding: 0 var(--e3); border-radius: var(--radio); border: 1.5px solid var(--color-principal-oscuro);
+  color: var(--color-principal-oscuro); background: var(--color-superficie); text-decoration: none; font: 700 13px/1 var(--fuente-texto); }
+.u .gs5 .gs-liga-s { font-size: 13px; color: var(--gs-g); margin-top: var(--e1); }
+.u .gs5 .gs-eqr { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--e1) var(--e2); align-items: center; width: calc(100% - 2 * var(--e4)); margin: 0 var(--e4);
+  background: none; border: 0; border-top: 1px solid var(--gs-l); padding: var(--e2) 0; min-height: 44px; text-align: left; color: inherit; cursor: pointer; font-size: 14px; }
+.u .gs5 .gs-liga summary + .gs-eqr { border-top: 0; }
+.u .gs5 .gs-eqr .gs-n { font-weight: 700; font-size: 12px; background: var(--gs-f); border-radius: var(--radio-peq); padding: 2px var(--e1); text-align: center; min-width: 24px; font-variant-numeric: tabular-nums; }
+.u .gs5 .gs-eqr b { display: flex; align-items: center; min-width: 0; }
+.u .gs5 .gs-eqr b span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u .gs5 .gs-eqr small { grid-column: 2 / 4; color: var(--gs-g); font-size: 13px; }
+.u .gs5 .gs-eqr small .gs-tag { margin-left: var(--e2); }
+
+/* Ordenador (desde 900 px): todo el ancho junto al menú; las listas, en tabla (u-tabla); cifras junto a Alertas; los días en columnas. */
+@media (min-width: 900px) {
+  .u .gs5 .gs-main { max-width: none; margin: 0; padding: var(--e5) var(--e5) var(--e7); }
+  .u .gs5 .gs-res-top { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: var(--e3); align-items: start; margin-top: var(--e3); }
+  .u .gs5 .gs-res-top > .gs-mini { margin-top: 0; grid-template-columns: repeat(2, 1fr); }
+  .u .gs5 .gs-res-top > .gs-mini button { min-height: 72px; }
+  .u .gs5 .gs-res-top > .gs-alts { margin-top: 0; }
+  .u .gs5 .gs-semana { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0 var(--e4); align-items: start; }
+  .u .gs5 .gs-ligas > .gs-liga { margin-top: var(--e3); }
+  .u .gs5 .gs-tabla { margin-top: var(--e3); }
+  .u .gs5 .gs-tabla .gs-tags { margin-top: 0; }
+  .u .gs5 .gs-tabla td.u-tabla-t .gs-color { margin-right: var(--e2); }
+  .u .gs5 .gs-filtrar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); }
+  .u .gs5 .gs-filtrar > .gs-filtros, .u .gs5 .gs-filtrar > .gs-fila, .u .gs5 .gs-filtrar > .gs-mas, .u .gs5 .gs-mas > .gs-filtros, .u .gs5 .gs-mas > .gs-fila { display: contents; }
+  .u .gs5 .gs-fbtn, .u .gs5 .gs-puestos { display: none !important; }
+  .u .gs5 .gs-filtrar .gs-sel { flex: 1 1 200px; min-width: 200px; max-width: 280px; }
+  .u .gs5 .gs-filtrar #gs-temp { flex: 0 0 140px; min-width: 0; }
+  .u .gs5 .gs-filtrar input[type=search] { order: 1; flex: 2 1 260px; min-width: 260px; max-width: none; }
+  .u .gs5 .gs-filtrar > .gs-chips { order: 2; flex: 1 1 100%; margin-top: var(--e1); }
+
 .u .n-ventana .u-campo > input[type=search] + select { margin-top: var(--e2); }
 /* El recurso propio de la marca (su letra «pintada», si la tiene), una vez: la temporada del resumen. */
 .u .ges-destacar { font-family: var(--fuente-destacar, inherit); font-weight: 400; letter-spacing: .01em; }
