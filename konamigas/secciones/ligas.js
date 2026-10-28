@@ -28,6 +28,7 @@
   var DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
   var CON_MOTIVO = ['Aplazado', 'Suspendido', 'Anulado'];
+  var PUNTUALIDAD = 'Puntualidad'; // GOLES · NOTAS de un gol de puntualidad (ligasActa del motor)
   function dos(n) { return (n < 10 ? '0' : '') + n; }
   function iso(d) { return d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()); }
   function hoy() { return iso(new Date()); }
@@ -123,16 +124,46 @@
     return Object.keys(g).map(function (k) { return g[k]; }).sort(function (a, b) { return b.goles - a.goles || orden(a.jugadora, b.jugadora); });
   }
 
-  /** Los goles de un equipo en un partido, juntos por jugadora: [{ jugadora ('' = en propia del rival), goles }]. */
+  /** ¿Es un gol de puntualidad (el que se da al equipo cuando el rival llega muy tarde)? Sin jugadora y «Puntualidad» en NOTAS. */
+  function esPuntualidad(g) { return !g.ID_INSCRIPCION_JUGADORA && String(g.NOTAS || '').trim() === PUNTUALIDAD; }
+  /**
+   * Los goles de un equipo en un partido, juntos: [{ jugadora, tipo, goles }]. tipo: 'jugadora', 'puntualidad' o
+   * 'nadie' (sin asignar: en propia del rival o de una sustituta que no es del equipo). Primero las jugadoras.
+   */
   function golesEquipo(goles, eq) {
-    var o = {}, l = [];
+    var o = {}, l = [], peso = { jugadora: 0, nadie: 1, puntualidad: 2 };
     (goles || []).forEach(function (g) {
       if (String(g.ID_INSCRIPCION_EQUIPO) !== String(eq)) return;
-      var k = String(g.ID_INSCRIPCION_JUGADORA || '');
-      if (!o[k]) { o[k] = { jugadora: k, goles: 0 }; l.push(o[k]); }
+      var tipo = g.ID_INSCRIPCION_JUGADORA ? 'jugadora' : esPuntualidad(g) ? 'puntualidad' : 'nadie', k = tipo + '|' + String(g.ID_INSCRIPCION_JUGADORA || '');
+      if (!o[k]) { o[k] = { jugadora: String(g.ID_INSCRIPCION_JUGADORA || ''), tipo: tipo, goles: 0 }; l.push(o[k]); }
       o[k].goles++;
     });
-    return l.sort(function (a, b) { return b.goles - a.goles || (a.jugadora ? 0 : 1) - (b.jugadora ? 0 : 1); });
+    return l.sort(function (a, b) { return peso[a.tipo] - peso[b.tipo] || b.goles - a.goles; });
+  }
+
+  var MESES_LARGOS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  /** «2026-11-09» → «lunes 9 de noviembre». */
+  function fechaLarga(s) { var d = deIso(s); return d ? DIAS[d.getDay()].toLowerCase() + ' ' + d.getDate() + ' de ' + MESES_LARGOS[d.getMonth()] : String(s || ''); }
+  /**
+   * El WhatsApp para la capitana de un equipo cuando cambian sus partidos: un bloque por partido con lo que cambia, cómo
+   * estaba y cómo queda (lo que cambia, en negrita de WhatsApp). a: { capitana, liga, partidos: [{ titulo, jornada,
+   * antes: { dia, hora, campo }, ahora: { dia, hora, campo } }] }; dia en aaaa-mm-dd.
+   */
+  function textoAviso(a) {
+    var ps = a.partidos || [], nombre = String(a.capitana || '').trim().split(/\s+/)[0];
+    var l = ['Hola' + (nombre ? ' ' + nombre : '') + ', te escribo de Konamigas.', '',
+      (ps.length === 1 ? 'Cambia vuestro partido de ' : 'Cambian ' + ps.length + ' partidos vuestros de ') + a.liga + ':'];
+    ps.forEach(function (p) {
+      var c = { dia: p.antes.dia !== p.ahora.dia, hora: p.antes.hora !== p.ahora.hora, campo: p.antes.campo !== p.ahora.campo };
+      var que = [c.dia ? 'el día' : '', c.hora ? 'la hora' : '', c.campo ? 'el campo' : ''].filter(String);
+      var cosa = function (x, k) { var t = k === 'dia' ? fechaLarga(x.dia) : k === 'hora' ? 'a las ' + x.hora : 'en ' + x.campo; return t; };
+      l.push('', '*' + p.titulo + '* (jornada ' + p.jornada + ')',
+        'Cambia ' + (que.length > 1 ? que.slice(0, -1).join(', ') + ' y ' + que[que.length - 1] : que[0] || 'nada') + '.',
+        'Antes: ' + ['dia', 'hora', 'campo'].map(function (k) { return cosa(p.antes, k); }).join(', '),
+        'Ahora: ' + ['dia', 'hora', 'campo'].map(function (k) { return c[k] ? '*' + cosa(p.ahora, k) + '*' : cosa(p.ahora, k); }).join(', '));
+    });
+    l.push('', '¡Gracias! Cualquier duda, me dices.');
+    return l.join('\n');
   }
 
   /** Los equipos inscritos en una liga que no juegan en esa jornada (descansan). */
@@ -193,7 +224,8 @@
 
   var CALC = { hoy: hoy, fecha: fecha, fechaDia: fechaDia, lunes: lunes, sumarDias: sumarDias, temporadaActual: temporadaActual, ligasDe: ligasDe,
     jornadas: jornadas, jornadaInicial: jornadaInicial, clasificacion: clasificacion, goleadoras: goleadoras, golesEquipo: golesEquipo,
-    descansan: descansan, equiposDe: equiposDe, puedeActa: puedeActa, conResultado: conResultado, huecosMover: huecosMover, jornadaMovible: jornadaMovible };
+    descansan: descansan, equiposDe: equiposDe, puedeActa: puedeActa, conResultado: conResultado, huecosMover: huecosMover, jornadaMovible: jornadaMovible,
+    textoAviso: textoAviso, fechaLarga: fechaLarga };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -486,9 +518,10 @@
           '<span class="lg-mcolor' + (colorEq(eq) ? '' : ' lg-color-no') + '" aria-hidden="true"></span>' +
           '<b>' + texto(equipo(eq)) + '</b><small>' + texto(que + (nomColor(eq) ? ' · ' + nomColor(eq) : '')) + '</small>' +
           (gs.length ? '<ul class="lg-mgoles">' + gs.map(function (g) {
-            return '<li>' + (g.jugadora ? '<span class="lg-dorsal u-cifra" data-dorsal="' + texto(g.jugadora) + '" data-eq="' + texto(eq) + '">' + texto(dorsal(eq, g.jugadora)) + '</span>' +
+            return '<li' + (g.tipo !== 'jugadora' ? ' class="lg-gol-otro"' : '') + '>' + (g.tipo === 'jugadora' ? '<span class="lg-dorsal u-cifra" data-dorsal="' + texto(g.jugadora) + '" data-eq="' + texto(eq) + '">' + texto(dorsal(eq, g.jugadora)) + '</span>' +
               '<span data-jugadora="' + texto(g.jugadora) + '" data-eq="' + texto(eq) + '">' + texto(nomJugadora(eq, g.jugadora)) + '</span>'
-              : '<span class="lg-dorsal">–</span><span>En propia de ' + texto(equipo(rival)) + '</span>') +
+              : g.tipo === 'puntualidad' ? '<span class="lg-dorsal">P</span><span>Puntualidad (llegó tarde ' + texto(equipo(rival)) + ')</span>'
+              : '<span class="lg-dorsal">–</span><span>Sin asignar</span>') +
               (g.goles > 1 ? '<span class="lg-veces u-cifra">×' + g.goles + '</span>' : '') + '</li>';
           }).join('') + '</ul>' : '') + '</div>';
       }
@@ -541,7 +574,7 @@
       function formActa(p) {
         var L = p.ID_INSCRIPCION_LOCAL, V = p.ID_INSCRIPCION_VISITANTE, gs = golesDe(p.ID);
         var elegidos = {}; elegidos[L] = []; elegidos[V] = [];
-        gs.forEach(function (g) { if (elegidos[g.ID_INSCRIPCION_EQUIPO]) elegidos[g.ID_INSCRIPCION_EQUIPO].push(g.ID_INSCRIPCION_JUGADORA || '_propia'); });
+        gs.forEach(function (g) { if (elegidos[g.ID_INSCRIPCION_EQUIPO]) elegidos[g.ID_INSCRIPCION_EQUIPO].push(g.ID_INSCRIPCION_JUGADORA || (esPuntualidad(g) ? '_puntualidad' : '_nadie')); });
         var marcador = {}; marcador[L] = conResultado(p) ? num(p.GOLES_LOCAL) : elegidos[L].length; marcador[V] = conResultado(p) ? num(p.GOLES_VISITANTE) : elegidos[V].length;
         var arbs = staff.staff.filter(function (s) { return s.ARBITRO && s.ACTIVO; }).map(function (s) { return s.ID; });
         [p.ID_ARBITRO, p.ID_ARBITRO_REAL].forEach(function (x) { if (x && arbs.indexOf(x) < 0) arbs.push(x); });
@@ -568,7 +601,7 @@
               var v = elegidos[e][i] || '';
               var ops = (js || []).filter(function (j) { return j.ACTIVA || j.ID === v; }).map(function (j) { return [j.ID, (j.DORSAL !== '' ? j.DORSAL + ' · ' : '') + j.NOMBRE]; });
               h += '<label class="u-campo"><span class="u-oculto">Gol ' + (i + 1) + ' de ' + texto(equipo(e)) + '</span><select data-gol="' + i + '">' +
-                opciones(ops.concat([['_propia', 'En propia (de ' + rival + ')']]), v, js ? 'Gol ' + (i + 1) + ': ¿quién marcó?' : 'Cargando jugadoras…') + '</select></label>';
+                opciones(ops.concat([['_nadie', 'Sin asignar (en propia o una sustituta)'], ['_puntualidad', 'Puntualidad (llega tarde ' + rival + ')']]), v, js ? 'Gol ' + (i + 1) + ': ¿quién marcó?' : 'Cargando jugadoras…') + '</select></label>';
             }
             caja.innerHTML = h;
           }
@@ -594,7 +627,8 @@
               for (var i = 0; i < (x[1] || 0); i++) {
                 var v = elegidos[x[0]][i];
                 if (!v) { mal.push('Falta quién marcó algún gol de ' + equipo(x[0]) + '.'); break; }
-                goles.push({ ID_INSCRIPCION_EQUIPO: x[0], ID_INSCRIPCION_JUGADORA: v === '_propia' ? '' : v });
+                goles.push(v === '_puntualidad' ? { ID_INSCRIPCION_EQUIPO: x[0], ID_INSCRIPCION_JUGADORA: '', TIPO: PUNTUALIDAD }
+                  : { ID_INSCRIPCION_EQUIPO: x[0], ID_INSCRIPCION_JUGADORA: v === '_nadie' ? '' : v });
               }
             });
             verError(mal);
@@ -613,6 +647,8 @@
 
       /* ---------- mover partidos y avisar a las capitanas ---------- */
 
+      /** Día, hora y campo de un partido antes de cambiarlo (la fila cambia en la pantalla al guardar). */
+      function foto(p) { return { FECHA: p.FECHA, HORA: p.HORA, ID_CAMPO: p.ID_CAMPO }; }
       /** Lo que cambia en un partido, en palabras: «20:00 SCS1 → 21:00 SCS2». */
       function deA(antes, despues) {
         var a = [antes.FECHA !== despues.FECHA ? fechaDia(antes.FECHA) : '', antes.HORA, campo(antes.ID_CAMPO)].filter(String).join(' ');
@@ -623,18 +659,21 @@
       function htmlCambios(cambios) {
         var eqs = equiposDe(cambios.map(function (c) { return c.p; }));
         return '<div class="lg-cambios"><h3 class="lg-sub">Qué cambia</h3><ul>' + cambios.map(function (c) {
-          return '<li><b>' + texto(titulo(c.p)) + '</b><span class="u-cifra">' + texto(deA(c.p, c.nuevo)) + '</span></li>';
+          return '<li><b>' + texto(titulo(c.p)) + '</b><span class="u-cifra">' + texto(deA(c.antes, c.nuevo)) + '</span></li>';
         }).join('') + '</ul></div>' +
           '<div class="lg-avisar-ya" role="note"><b>Tendrás que avisar a ' + eqs.length + (eqs.length === 1 ? ' capitana' : ' capitanas') + '</b>' +
           '<span>' + texto(eqs.map(equipo).join(', ')) + '. Al guardar te saldrá la lista con el mensaje ya escrito para enviárselo por WhatsApp.</span></div>';
       }
-      /** Mensaje para la capitana de un equipo con los cambios de sus partidos. */
+      /** Mensaje para la capitana de un equipo con los cambios de sus partidos (textoAviso). */
       function mensaje(eq, capitana, cambios) {
         var suyos = cambios.filter(function (c) { return c.p.ID_INSCRIPCION_LOCAL === eq || c.p.ID_INSCRIPCION_VISITANTE === eq; });
-        return 'Hola' + (capitana ? ' ' + capitana.split(' ')[0] : '') + ', soy de Konamigas. Cambio en ' + ligaCompleta(suyos[0].p.ID_LIGA) + ': ' + suyos.map(function (c) {
-          return 'vuestro partido ' + titulo(c.p) + ' de la jornada ' + c.p.JORNADA + ' pasa al ' + fechaDia(c.nuevo.FECHA).toLowerCase() + ' a las ' + c.nuevo.HORA + ' en ' + campoLargo(c.nuevo.ID_CAMPO);
-        }).join('; y ') + '. ¡Gracias!';
+        var l = ix.liga[suyos[0].p.ID_LIGA], co = l && ix.comp[l.ID_COMPETICION];
+        var fecha = function (x) { return { dia: x.FECHA, hora: x.HORA, campo: campoLargo(x.ID_CAMPO) }; };
+        return textoAviso({ capitana: capitana, liga: 'la ' + (co ? nomComp(co) : 'liga') + (l ? ' (' + String(l.NOMBRE || l.ID) + ')' : ''),
+          partidos: suyos.map(function (c) { return { titulo: titulo(c.p), jornada: c.p.JORNADA, antes: fecha(c.antes), ahora: fecha(c.nuevo) }; }) });
       }
+      /** Un mensaje de WhatsApp en la pantalla: sus saltos de línea y su *negrita*. */
+      function htmlMsg(m) { return texto(m).replace(/\*([^*\n]+)\*/g, '<b>$1</b>'); }
       /**
        * Al guardar un cambio: la lista de capitanas afectadas, cada una con su WhatsApp y el mensaje ya escrito, y una
        * casilla para marcarla como avisada. Arriba, si el cambio se está guardando o ya está guardado; si el motor dice
@@ -649,7 +688,7 @@
             return '<li><label class="u-check"><input type="checkbox" data-avisada="' + texto(eq) + '"><span class="lg-eqt">' + punto(eq) + '<span><b>' + texto(equipo(eq)) + '</b>' +
               '<small>' + texto(!caps ? 'Buscando a su capitana…' : c.CAPITANA ? c.CAPITANA + (c.TELEFONO ? ' · ' + c.TELEFONO : ' · sin teléfono') : 'Sin capitana en la inscripción') + '</small></span></span></label>' +
               (enlace ? '<a class="u-btn" href="' + texto(enlace) + '" target="_blank" rel="noopener" data-wa="' + texto(eq) + '">WhatsApp</a>' : '') +
-              '<p class="lg-msg">' + texto(m) + '</p></li>';
+              '<p class="lg-msg">' + htmlMsg(m) + '</p></li>';
           }).join('') + '</ul>';
         }
         var html = '<h2 id="lg-vt">Avisa a las capitanas</h2>' +
@@ -722,8 +761,8 @@
             if (!b || b.disabled) return;
             [].forEach.call(vent.querySelectorAll('[data-h]'), function (x) { x.setAttribute('aria-checked', x === b ? 'true' : 'false'); });
             elegido = hs[Number(b.getAttribute('data-h'))];
-            var cambios = [{ p: p, nuevo: { FECHA: p.FECHA, HORA: elegido.hueco.HORA, ID_CAMPO: elegido.hueco.ID_CAMPO } }];
-            if (elegido.otro) cambios.push({ p: elegido.otro, nuevo: { FECHA: p.FECHA, HORA: p.HORA, ID_CAMPO: p.ID_CAMPO } });
+            var cambios = [{ p: p, antes: foto(p), nuevo: { FECHA: p.FECHA, HORA: elegido.hueco.HORA, ID_CAMPO: elegido.hueco.ID_CAMPO } }];
+            if (elegido.otro) cambios.push({ p: elegido.otro, antes: foto(elegido.otro), nuevo: { FECHA: p.FECHA, HORA: p.HORA, ID_CAMPO: p.ID_CAMPO } });
             vent.querySelector('#lg-conf').innerHTML = htmlCambios(cambios);
             var g = vent.querySelector('#lg-guardar');
             g.disabled = false; g.textContent = elegido.otro ? 'Intercambiar los dos partidos' : 'Mover el partido';
@@ -765,8 +804,8 @@
             if (!b || b.disabled) return;
             [].forEach.call(vent.querySelectorAll('[data-j]'), function (x) { x.setAttribute('aria-checked', x === b ? 'true' : 'false'); });
             var bj = Number(b.getAttribute('data-j')), B = jornadaMovible(ps, bj, hoy());
-            var cambios = A.ps.map(function (p) { return { p: p, nuevo: { FECHA: B.fecha, HORA: p.HORA, ID_CAMPO: p.ID_CAMPO } }; })
-              .concat(B.ps.map(function (p) { return { p: p, nuevo: { FECHA: A.fecha, HORA: p.HORA, ID_CAMPO: p.ID_CAMPO } }; }));
+            var cambios = A.ps.map(function (p) { return { p: p, antes: foto(p), nuevo: { FECHA: B.fecha, HORA: p.HORA, ID_CAMPO: p.ID_CAMPO } }; })
+              .concat(B.ps.map(function (p) { return { p: p, antes: foto(p), nuevo: { FECHA: A.fecha, HORA: p.HORA, ID_CAMPO: p.ID_CAMPO } }; }));
             var esp = [especial(B.fecha) ? 'Ojo: el ' + fechaDia(B.fecha).toLowerCase() + ' es ' + especial(B.fecha).toLowerCase() + '.' : '',
               especial(A.fecha) ? 'Ojo: el ' + fechaDia(A.fecha).toLowerCase() + ' es ' + especial(A.fecha).toLowerCase() + '.' : ''].filter(String).join(' ');
             vent.querySelector('#lg-conf').innerHTML = '<p class="lg-regla"><b>J' + a + '</b> pasa al ' + texto(fechaDia(B.fecha).toLowerCase()) + ' y <b>J' + bj + '</b> al ' + texto(fechaDia(A.fecha).toLowerCase()) + '. ' + texto(esp) + '</p>' + htmlCambios(cambios);

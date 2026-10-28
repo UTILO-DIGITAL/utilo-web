@@ -469,6 +469,7 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .lg-mlado:last-child .lg-mgoles li { flex-direction: row-reverse; }
 .u .lg-dorsal { flex: none; min-width: 1.9em; padding: 0 var(--e1); border-radius: var(--radio-peq); background: var(--color-bloque); text-align: center; font-weight: 700; font-size: 12px; line-height: 1.6; }
 .u .lg-veces { flex: none; font-weight: 700; }
+.u .lg-gol-otro { color: var(--color-suave); }
 @media (max-width: 639px) { .u .lg-mcentro > b { font-size: 28px; } .u .lg-mlado > b { font-size: 15px; } .u .lg-marcador { gap: var(--e2); } }
 .u .lg-datos { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: var(--e2) var(--e4); }
 .u .lg-datos dt { font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; }
@@ -504,7 +505,9 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .lg-capitanas { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
 .u .lg-capitanas li { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--e1) var(--e3); padding: var(--e3) 0; border-bottom: 1px solid var(--color-linea); }
 .u .lg-capitanas .u-check { min-height: 44px; }
-.u .lg-msg { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--color-suave); }
+.u .lg-msg { grid-column: 1 / -1; margin: 0; padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-superficie);
+  border: 1px solid var(--color-linea); font-size: 13px; line-height: 1.5; white-space: pre-line; }
+.u .lg-msg b { color: var(--color-principal-oscuro); }
 .u .n-ventana [hidden] { display: none; }
 /* El título de la ventana recibe el foco al abrirla (para el lector de pantalla), sin recuadro. */
 .u .n-ventana h2[tabindex="-1"]:focus { outline: none; }
