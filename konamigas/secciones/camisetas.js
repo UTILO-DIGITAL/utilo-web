@@ -308,7 +308,10 @@
     var es = function (k) { return function (x) {
       return k === 'todas' ? true : k === 'hacer' ? x.s === 'recuperar' || x.s === 'quitar' : k === 'pendientes' ? !x.q.baja && !hecha(x.s) : x.s === k;
     }; };
-    var cuenta = function (k) { return base.filter(es(k)).length; };
+    var qn = norm(S.q).trim();
+    var busca = function (x) { return !qn || norm([x.q.equipo, x.q.jugadora, x.c.DORSAL, x.q.liga, nombreColor(x.c.ID_COLOR), x.c.TALLA].join(' ')).indexOf(qn) >= 0; };
+    // Los contadores y el resumen cuentan solo lo que encaja con la búsqueda.
+    var cuenta = function (k) { return base.filter(function (x) { return es(k)(x) && busca(x); }).length; };
     var chips = [['hacer', 'Para hacer'], ['pendientes', 'Por entregar']].concat(ESTADOS.map(function (e) { return [e[0], e[1]]; })).concat([['todas', 'Todas']])
       .map(function (x) { return [x[0], x[1], cuenta(x[0])]; })
       .filter(function (x) { return x[2] || x[0] === S.filtro || x[0] === 'pendientes' || x[0] === 'todas'; });
@@ -316,8 +319,6 @@
       return '<button type="button" class="cm-chip" data-cm-f="' + texto(x[0]) + '" aria-pressed="' + (S.filtro === x[0]) + '">' + texto(x[1]) + ' <span class="u-cifra">' + x[2] + '</span></button>';
     }).join('');
 
-    var qn = norm(S.q).trim();
-    var busca = function (x) { return !qn || norm([x.q.equipo, x.q.jugadora, x.c.DORSAL, x.q.liga, nombreColor(x.c.ID_COLOR), x.c.TALLA].join(' ')).indexOf(qn) >= 0; };
     var grupos = {}, orden = [];
     base.forEach(function (x) { var k = x.q.ie || '—'; if (!grupos[k]) { grupos[k] = []; orden.push(k); } grupos[k].push(x); });
     var eqs = orden.filter(function (k) { return grupos[k].some(function (x) { return es(S.filtro)(x) && busca(x); }); });
@@ -405,7 +406,7 @@
     d.innerHTML = '<span>' + texto(t) + '</span><button type="button" class="u-btn u-btn-texto">Deshacer</button>';
     d.hidden = false;
     clearTimeout(tDeshacer);
-    tDeshacer = setTimeout(function () { d.hidden = true; }, 8000);
+    tDeshacer = setTimeout(function () { d.hidden = true; }, 15000);
     d.querySelector('button').onclick = function () {
       clearTimeout(tDeshacer); d.hidden = true;
       l.forEach(function (x) {
@@ -628,7 +629,7 @@
     var peds = Dd.PEDIDOS.filter(function (p) { return String(p.ID_MODELO) === String(m); })
       .sort(function (a, b) { return String(b.FECHA_PEDIDO || '') < String(a.FECHA_PEDIDO || '') ? -1 : String(b.FECHA_PEDIDO || '') > String(a.FECHA_PEDIDO || '') ? 1 : String(b.ID) < String(a.ID) ? -1 : 1; });
     h += '<h2 class="n-grupo">Pedidos de ' + texto(nombreModelo(m)) + ' <span class="u-cifra">' + peds.length + '</span></h2>';
-    if (!peds.length) h += '<p class="u-vacio">Este modelo no tiene pedidos. Con «Preparar pedido» se hace el primero con lo que falta.</p>';
+    if (!peds.length) h += '<p class="u-vacio">Este modelo no tiene pedidos' + (plan && plan.pedir.length ? '. Con «Preparar pedido» se hace el primero con lo que falta.' : ' todavía.') + '</p>';
     h += '<ul class="cm-peds">' + peds.map(function (p) { return htmlPedido(p, lineas[p.ID] || [], jug[p.ID] || {}); }).join('') + '</ul>';
     h += htmlProveedores();
     c.innerHTML = h;
@@ -680,6 +681,8 @@
       }).join(' · ') + '</p>' : '') +
       (p.ID_PROVEEDOR ? '<p class="u-nota">Proveedor: ' + texto(nombreProveedor(p.ID_PROVEEDOR)) + '</p>' : '') +
       htmlCoste(p) +
+      (paso !== 'recibido' && !p._nueva && (jug['Por preparar'] || jug['Preparada'] || jug['Entregada']) ?
+        '<p class="u-mal">Tiene camisetas ya en el local (por preparar, preparadas o entregadas) y el pedido no consta como llegado: si ya llegó, márcalo con «Ha llegado»' + (paso === 'sinConfirmar' ? ' (antes, «Marcar confirmado»)' : '') + '. Mientras, las cuentas del stock no cuadran.</p>' : '') +
       (p.NOTAS ? '<p class="u-nota">' + texto(p.NOTAS) + '</p>' : '') +
       (/^https?:\/\//.test(String(p.ARCHIVO_URL || '')) ? '<p><a href="' + texto(p.ARCHIVO_URL) + '" target="_blank" rel="noopener">Ver el documento del pedido</a></p>' : '') +
       (nuevo ? '<p class="u-nota">Creando el pedido, sus líneas y las camisetas en el Excel…</p>' : '<div class="n-botones">' +
@@ -755,7 +758,7 @@
       (provs.length ? '<div class="u-campos">' + campo('Proveedor', '<select id="pp-prov">' + (habitual ? '' : '<option value="">Elige el proveedor</option>') +
         opciones(provs.map(function (x) {
           var u = ultimoPrecio(x.ID, m) || ultimoPrecio(x.ID);
-          return [x.ID, x.NOMBRE + (String(x.ID) === habitual ? ' (el habitual)' : '') + (u ? ' · ' + eur(u.unidad) + '/camiseta' : '')];
+          return [x.ID, x.NOMBRE + (String(x.ID) === habitual ? ' · habitual' : '') + (u ? ' · ' + eur(u.unidad) : '')];
         }), habitual) + '</select>') + '</div><div id="pp-contacto"></div>' :
         '<p class="u-mal">No hay ningún proveedor apuntado. Añádelo en «Proveedores», abajo en la pestaña Pedidos, y después prepara el pedido.</p>') +
       '<div class="u-tabla-caja"><table class="u-tabla"><thead><tr><th>Color (código)</th><th>Dorsal</th><th>Talla</th><th class="num">Cuántas</th></tr></thead><tbody>' +
@@ -767,7 +770,11 @@
       '<p class="u-error" hidden></p>' +
       '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="pp-ok"' + (provs.length ? '' : ' disabled') + '>Crear pedido</button><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cancelar</button></div>');
     var sp = v.querySelector('#pp-prov'), pc = v.querySelector('#pp-contacto');
-    var verContacto = function () { if (pc) pc.innerHTML = sp && sp.value ? contactoProveedor(sp.value) : ''; };
+    var verContacto = function () {
+      if (!pc) return;
+      var u = sp && sp.value ? ultimoPrecio(sp.value, m) || ultimoPrecio(sp.value) : null;
+      pc.innerHTML = sp && sp.value ? contactoProveedor(sp.value) + '<p class="u-nota">' + (u ? 'Último precio: <b>' + eur(u.unidad) + '/camiseta</b> sin IVA (' + texto(nombreModelo(u.p.ID_MODELO)) + ', ' + texto(u.p.ID) + ').' : 'Sin precio todavía: ningún pedido suyo tiene factura.') + '</p>' : '';
+    };
     if (sp) sp.onchange = verContacto;
     verContacto();
     v.querySelector('#pp-ok').onclick = function () {
@@ -968,7 +975,9 @@
       campo('Dorsal', '<input type="text" id="ro-dor" inputmode="numeric" maxlength="4">') + campo('Talla', '<select id="ro-tal">' + opciones(CAM5_TALLAS, 'M') + '</select>') +
       campo('Cuántas', '<input type="number" id="ro-n" min="1" value="1" inputmode="numeric">') + '<button type="button" class="u-btn" id="ro-add">Añadir</button></div></section>';
     var difs = filas.filter(function (f) { return contado(f) !== f.debe; });
-    h += '<div class="cm-rec-pie"><p class="u-nota">' + revisados + ' de ' + cols.length + ' colores contados · ' + plural(difs.length + R.otras.length, 'cambio', 'cambios') + '</p>' +
+    var tuyos = difs.filter(function (f) { return f.k in R.cont; }).length + R.otras.length, noCuadran = difs.length - difs.filter(function (f) { return f.k in R.cont; }).length;
+    h += '<div class="cm-rec-pie"><p class="u-nota">' + revisados + ' de ' + cols.length + ' colores contados · ' + plural(tuyos, 'cambio tuyo', 'cambios tuyos') +
+      (noCuadran ? ' · ' + plural(noCuadran, 'que no cuadra se corrige', 'que no cuadran se corrigen') + ' al aplicar' : '') + '</p>' +
       '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="cm-aplicar"' + (revisados < cols.length || !(difs.length + R.otras.length) ? ' disabled' : '') + '>Aplicar recuento</button>' +
       (Object.keys(R.cont).length || R.otras.length || revisados ? '<button type="button" class="u-btn u-btn-texto" id="cm-borrar">Empezar de cero</button>' : '') + '</div></div>';
     c.innerHTML = h;
