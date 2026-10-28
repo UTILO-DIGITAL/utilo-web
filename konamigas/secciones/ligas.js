@@ -29,6 +29,7 @@
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
   var CON_MOTIVO = ['Aplazado', 'Suspendido', 'Anulado'];
   var PUNTUALIDAD = 'Puntualidad'; // GOLES · NOTAS de un gol de puntualidad (ligasActa del motor)
+  var EN_PROPIA = 'En propia'; // GOLES · NOTAS de un gol que no marca nadie del equipo
   function dos(n) { return (n < 10 ? '0' : '') + n; }
   function iso(d) { return d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()); }
   function hoy() { return iso(new Date()); }
@@ -237,7 +238,7 @@
   function esPuntualidad(g) { return !g.ID_INSCRIPCION_JUGADORA && String(g.NOTAS || '').trim() === PUNTUALIDAD; }
   /**
    * Los goles de un equipo en un partido, juntos: [{ jugadora, tipo, goles }]. tipo: 'jugadora', 'puntualidad' o
-   * 'nadie' (sin asignar: en propia del rival o de una sustituta que no es del equipo). Primero las jugadoras.
+   * 'nadie' (en propia: no lo marca nadie del equipo). Primero las jugadoras.
    */
   function golesEquipo(goles, eq) {
     var o = {}, l = [], peso = { jugadora: 0, nadie: 1, puntualidad: 2 };
@@ -335,6 +336,19 @@
     return { ok: true, fecha: Object.keys(dias)[0], ps: mover };
   }
 
+  /**
+   * El hueco de una liga un día a una hora y en un campo (como ligasHuecoEn_ del motor), o null. Su ID_ARBITRO es el árbitro
+   * de esa instalación a esa hora: el que se lleva por defecto el partido que llega ahí.
+   */
+  function huecoEn(huecos, idLiga, f, hora, campo) {
+    var dia = diaSemana(f);
+    return (huecos || []).filter(function (h) {
+      return String(h.ID_LIGA) === String(idLiga) && (!h.DIA_SEMANA || !dia || h.DIA_SEMANA === dia) && String(h.HORA) === String(hora) && String(h.ID_CAMPO) === String(campo);
+    })[0] || null;
+  }
+  /** El árbitro que se lleva un partido al llegar a un día, hora y campo: el de su hueco o, si no tiene, el suyo. */
+  function arbitroEn(huecos, p, f, hora, campo) { var h = huecoEn(huecos, p.ID_LIGA, f, hora, campo); return (h && h.ID_ARBITRO) || p.ID_ARBITRO || ''; }
+
   /** La recuperación de un aplazado (el partido con ID_PARTIDO_ORIGEN = su ID, que no esté anulado), o null. */
   function recuperacionDe(ps, id) { return ps.filter(function (p) { return p.ID_PARTIDO_ORIGEN === id && p.ESTADO !== 'Anulado'; })[0] || null; }
   /** Los aplazados de una liga que aún no tienen recuperación, por jornada y fecha. */
@@ -400,7 +414,7 @@
 
   var CALC = { hoy: hoy, fecha: fecha, fechaDia: fechaDia, lunes: lunes, sumarDias: sumarDias, temporadaActual: temporadaActual, ligasDe: ligasDe,
     jornadas: jornadas, jornadaInicial: jornadaInicial, clasificacion: clasificacion, goleadoras: goleadoras, golesEquipo: golesEquipo,
-    descansan: descansan, equiposDe: equiposDe, puedeActa: puedeActa, conResultado: conResultado, huecosMover: huecosMover, jornadaMovible: jornadaMovible,
+    descansan: descansan, equiposDe: equiposDe, puedeActa: puedeActa, conResultado: conResultado, huecosMover: huecosMover, huecoEn: huecoEn, arbitroEn: arbitroEn, jornadaMovible: jornadaMovible,
     textoAviso: textoAviso, fechaLarga: fechaLarga, recuperacionDe: recuperacionDe, aplazadosPendientes: aplazadosPendientes, huecosLibres: huecosLibres,
     planRecuperar: planRecuperar, diasRecuperar: diasRecuperar, repetidos: repetidos, resultadoAnulado: resultadoAnulado, diasDeJuego: diasDeJuego,
     diaInicial: diaInicial, resumenDia: resumenDia, rankingPersonas: rankingPersonas, resumenGoles: resumenGoles, estadisticasJugadora: estadisticasJugadora,
@@ -921,7 +935,7 @@
             return '<li' + (g.tipo !== 'jugadora' ? ' class="lg-gol-otro"' : '') + '>' + (g.tipo === 'jugadora' ? '<span class="lg-dorsal u-cifra" data-dorsal="' + texto(g.jugadora) + '" data-eq="' + texto(eq) + '">' + texto(dorsal(eq, g.jugadora)) + '</span>' +
               '<span data-jugadora="' + texto(g.jugadora) + '" data-eq="' + texto(eq) + '">' + texto(nomJugadora(eq, g.jugadora)) + '</span>'
               : g.tipo === 'puntualidad' ? '<span class="lg-dorsal">P</span><span>Puntualidad (llegó tarde ' + texto(equipo(rival)) + ')</span>'
-              : '<span class="lg-dorsal">–</span><span>Sin asignar</span>') +
+              : '<span class="lg-dorsal">–</span><span>En propia</span>') +
               (g.goles > 1 ? '<span class="lg-veces u-cifra">×' + g.goles + '</span>' : '') + '</li>';
           }).join('') + '</ul>' : '') + '</div>';
       }
@@ -1005,7 +1019,7 @@
               var v = elegidos[e][i] || '';
               var ops = (js || []).filter(function (j) { return j.ACTIVA || j.ID === v; }).map(function (j) { return [j.ID, (j.DORSAL !== '' ? j.DORSAL + ' · ' : '') + j.NOMBRE]; });
               h += '<label class="u-campo"><span class="u-oculto">Gol ' + (i + 1) + ' de ' + texto(equipo(e)) + '</span><select data-gol="' + i + '">' +
-                opciones(ops.concat([['_nadie', 'Sin asignar (en propia o una sustituta)'], ['_puntualidad', 'Puntualidad (llega tarde ' + rival + ')']]), v, js ? 'Gol ' + (i + 1) + ': ¿quién marcó?' : 'Cargando jugadoras…') + '</select></label>';
+                opciones(ops.concat([['_nadie', 'En propia'], ['_puntualidad', 'Puntualidad (llega tarde ' + rival + ')']]), v, js ? 'Gol ' + (i + 1) + ': ¿quién marcó?' : 'Cargando jugadoras…') + '</select></label>';
             }
             caja.innerHTML = h;
           }
@@ -1030,9 +1044,10 @@
             [[L, gl], [V, gv]].forEach(function (x) {
               for (var i = 0; i < (x[1] || 0); i++) {
                 var v = elegidos[x[0]][i];
-                if (!v) { mal.push('Falta quién marcó algún gol de ' + equipo(x[0]) + '.'); break; }
+                if (!v) { mal.push('Falta quién marcó algún gol de ' + equipo(x[0]) + ': una jugadora, en propia o puntualidad.'); break; }
                 goles.push(v === '_puntualidad' ? { ID_INSCRIPCION_EQUIPO: x[0], ID_INSCRIPCION_JUGADORA: '', TIPO: PUNTUALIDAD }
-                  : { ID_INSCRIPCION_EQUIPO: x[0], ID_INSCRIPCION_JUGADORA: v === '_nadie' ? '' : v });
+                  : v === '_nadie' ? { ID_INSCRIPCION_EQUIPO: x[0], ID_INSCRIPCION_JUGADORA: '', TIPO: EN_PROPIA }
+                  : { ID_INSCRIPCION_EQUIPO: x[0], ID_INSCRIPCION_JUGADORA: v });
               }
             });
             verError(mal);
@@ -1052,7 +1067,9 @@
       /* ---------- mover partidos y avisar a las capitanas ---------- */
 
       /** Día, hora y campo de un partido antes de cambiarlo (la fila cambia en la pantalla al guardar). */
-      function foto(p) { return { FECHA: p.FECHA, HORA: p.HORA, ID_CAMPO: p.ID_CAMPO }; }
+      function foto(p) { return { FECHA: p.FECHA, HORA: p.HORA, ID_CAMPO: p.ID_CAMPO, ID_ARBITRO: p.ID_ARBITRO || '' }; }
+      /** Dónde queda un partido en un día, hora y campo, con el árbitro de ese hueco (arbitroEn). */
+      function nuevoEn(p, f, hora, cam) { return { FECHA: f, HORA: hora, ID_CAMPO: cam, ID_ARBITRO: arbitroEn(d.hue, p, f, hora, cam) }; }
       /** Lo que cambia en un partido, en palabras: «20:00 SCS1 → 21:00 SCS2». */
       function deA(antes, despues) {
         var a = [antes.FECHA !== despues.FECHA ? fechaDia(antes.FECHA) : '', antes.HORA, campo(antes.ID_CAMPO)].filter(String).join(' ');
@@ -1063,7 +1080,8 @@
       function htmlCambios(cambios) {
         var eqs = equiposDe(cambios.map(function (c) { return c.p; }));
         return '<div class="lg-cambios"><h3 class="lg-sub">Qué cambia</h3><ul>' + cambios.map(function (c) {
-          return '<li><b>' + texto(titulo(c.p) + ' · J' + c.p.JORNADA) + '</b><span class="u-cifra">' + texto((c.recupera ? 'Aplazado ' : '') + deA(c.antes, c.nuevo)) + '</span></li>';
+          var arb = c.nuevo.ID_ARBITRO && c.nuevo.ID_ARBITRO !== c.antes.ID_ARBITRO ? ' · arbitra ' + persona(c.nuevo.ID_ARBITRO) : '';
+          return '<li><b>' + texto(titulo(c.p) + ' · J' + c.p.JORNADA) + '</b><span class="u-cifra">' + texto((c.recupera ? 'Aplazado ' : '') + deA(c.antes, c.nuevo) + arb) + '</span></li>';
         }).join('') + '</ul></div>' +
           '<div class="lg-avisar-ya" role="note"><b>Tendrás que avisar a ' + eqs.length + (eqs.length === 1 ? ' capitana' : ' capitanas') + '</b>' +
           '<span>' + texto(eqs.map(equipo).join(', ')) + '. Al guardar te saldrá la lista con el mensaje ya escrito para enviárselo por WhatsApp.</span></div>';
@@ -1150,7 +1168,7 @@
         var hs = huecosMover(d.par, d.hue, p), elegido = null;
         var html = '<h2 id="lg-vt">Mover dentro del día</h2>' +
           '<p class="u-nota">' + texto(titulo(p) + ' · ' + fechaDia(p.FECHA) + ' · ahora a las ' + p.HORA + ' en ' + campo(p.ID_CAMPO)) + '</p>' +
-          '<p class="lg-regla">Solo a los campos reservados para ' + texto(ligaCompleta(p.ID_LIGA)) + ' esta temporada. Si eliges uno ocupado, los dos partidos se intercambian.</p>' +
+          '<p class="lg-regla">Solo a los campos reservados para ' + texto(ligaCompleta(p.ID_LIGA)) + ' esta temporada. Si eliges uno ocupado, los dos partidos se intercambian. Cada partido se lleva el árbitro de su campo y hora nuevos (luego lo puedes cambiar en «Árbitro y estado»).</p>' +
           (hs.length ? '<div class="lg-huecos" role="radiogroup" aria-label="Hueco">' + hs.map(function (x, i) {
             var h = x.hueco, que = x.estado === 'actual' ? 'Ahora está aquí' : x.estado === 'libre' ? 'Libre' : x.estado === 'cambio' ? 'Se intercambia con ' + titulo(x.otro) : 'Ocupado: ' + titulo(x.otro) + ' (' + String(x.otro.ESTADO).toLowerCase() + ')';
             return '<button type="button" role="radio" aria-checked="false" data-h="' + i + '"' + (x.estado === 'actual' || x.estado === 'ocupado' ? ' disabled' : '') + ' class="lg-h lg-h-' + x.estado + '">' +
@@ -1165,13 +1183,13 @@
             if (!b || b.disabled) return;
             [].forEach.call(vent.querySelectorAll('[data-h]'), function (x) { x.setAttribute('aria-checked', x === b ? 'true' : 'false'); });
             elegido = hs[Number(b.getAttribute('data-h'))];
-            var cambios = [{ p: p, antes: foto(p), nuevo: { FECHA: p.FECHA, HORA: elegido.hueco.HORA, ID_CAMPO: elegido.hueco.ID_CAMPO } }];
-            if (elegido.otro) cambios.push({ p: elegido.otro, antes: foto(elegido.otro), nuevo: { FECHA: p.FECHA, HORA: p.HORA, ID_CAMPO: p.ID_CAMPO } });
+            var cambios = [{ p: p, antes: foto(p), nuevo: { FECHA: p.FECHA, HORA: elegido.hueco.HORA, ID_CAMPO: elegido.hueco.ID_CAMPO, ID_ARBITRO: elegido.hueco.ID_ARBITRO || p.ID_ARBITRO || '' } }];
+            if (elegido.otro) cambios.push({ p: elegido.otro, antes: foto(elegido.otro), nuevo: nuevoEn(elegido.otro, p.FECHA, p.HORA, p.ID_CAMPO) });
             vent.querySelector('#lg-conf').innerHTML = htmlCambios(cambios);
             var g = vent.querySelector('#lg-guardar');
             g.disabled = false; g.textContent = elegido.otro ? 'Intercambiar los dos partidos' : 'Mover el partido';
             g.onclick = function () {
-              guardarCambio(cambios, { fn: 'ligasMover', args: [p.ID, elegido.hueco.ID] }, { HORA: elegido.hueco.HORA, ID_CAMPO: elegido.hueco.ID_CAMPO, ID_HUECO: elegido.hueco.ID },
+              guardarCambio(cambios, { fn: 'ligasMover', args: [p.ID, elegido.hueco.ID] }, { HORA: elegido.hueco.HORA, ID_CAMPO: elegido.hueco.ID_CAMPO, ID_HUECO: elegido.hueco.ID, ID_ARBITRO: cambios[0].nuevo.ID_ARBITRO },
                 capitanas || ctx.llamar('ligasCapitanas', [equiposDe(cambios.map(function (c) { return c.p; }))]),
                 elegido.otro ? 'Partidos intercambiados.' : 'Partido movido.');
             };
@@ -1292,7 +1310,7 @@
         no.forEach(function (x) { (porQue[x.m.motivo] = porQue[x.m.motivo] || []).push('J' + x.j); });
         var html = '<h2 id="lg-vt">Intercambiar la fecha de la jornada ' + a + '</h2>' +
           '<p class="u-nota">' + texto(ligaCompleta(actual.liga.ID) + ' · jornada ' + a + ': ' + fechaDia(A.fecha) + ' · ' + fecha(A.fecha)) + '</p>' +
-          '<p class="lg-regla">Los partidos de las dos jornadas cambian de día y se quedan en su hora y su campo. Solo jornadas sin jugar, de hoy en adelante y en un solo día.</p>' +
+          '<p class="lg-regla">Los partidos de las dos jornadas cambian de día y se quedan en su hora y su campo, con el árbitro que tiene ese campo a esa hora. Solo jornadas sin jugar, de hoy en adelante y en un solo día.</p>' +
           (si.length ? '' : '<p class="u-vacio">No hay ninguna otra jornada con la que se pueda intercambiar.</p>') +
           '<div class="lg-huecos" role="radiogroup" aria-label="Jornada">' + si.map(function (x) {
             var esp = x.m.ok ? especial(x.m.fecha) : '';
@@ -1309,8 +1327,8 @@
             if (!b || b.disabled) return;
             [].forEach.call(vent.querySelectorAll('[data-j]'), function (x) { x.setAttribute('aria-checked', x === b ? 'true' : 'false'); });
             var bj = Number(b.getAttribute('data-j')), B = jornadaMovible(ps, bj, hoy());
-            var cambios = A.ps.map(function (p) { return { p: p, antes: foto(p), nuevo: { FECHA: B.fecha, HORA: p.HORA, ID_CAMPO: p.ID_CAMPO } }; })
-              .concat(B.ps.map(function (p) { return { p: p, antes: foto(p), nuevo: { FECHA: A.fecha, HORA: p.HORA, ID_CAMPO: p.ID_CAMPO } }; }));
+            var cambios = A.ps.map(function (p) { return { p: p, antes: foto(p), nuevo: nuevoEn(p, B.fecha, p.HORA, p.ID_CAMPO) }; })
+              .concat(B.ps.map(function (p) { return { p: p, antes: foto(p), nuevo: nuevoEn(p, A.fecha, p.HORA, p.ID_CAMPO) }; }));
             var esp = [especial(B.fecha) ? 'Ojo: el ' + fechaDia(B.fecha).toLowerCase() + ' es ' + especial(B.fecha).toLowerCase() + '.' : '',
               especial(A.fecha) ? 'Ojo: el ' + fechaDia(A.fecha).toLowerCase() + ' es ' + especial(A.fecha).toLowerCase() + '.' : ''].filter(String).join(' ');
             vent.querySelector('#lg-conf').innerHTML = '<p class="lg-regla"><b>J' + a + '</b> pasa al ' + texto(fechaDia(B.fecha).toLowerCase()) + ' y <b>J' + bj + '</b> al ' + texto(fechaDia(A.fecha).toLowerCase()) + '. ' + texto(esp) + '</p>' + htmlCambios(cambios);
@@ -1319,7 +1337,7 @@
             capitanas = ctx.llamar('ligasCapitanas', [equiposDe(cambios.map(function (c) { return c.p; }))]);
             capitanas.catch(function () {});
             g.onclick = function () {
-              guardarCambio(cambios, { fn: 'ligasJornadas', args: [actual.liga.ID, a, bj, A.ps[0].ID] }, { FECHA: B.fecha }, capitanas, 'Jornadas ' + a + ' y ' + bj + ' intercambiadas.');
+              guardarCambio(cambios, { fn: 'ligasJornadas', args: [actual.liga.ID, a, bj, A.ps[0].ID] }, { FECHA: B.fecha, ID_ARBITRO: cambios[0].nuevo.ID_ARBITRO }, capitanas, 'Jornadas ' + a + ' y ' + bj + ' intercambiadas.');
               S.fecha = B.fecha; // la jornada que se estaba viendo, en su día nuevo
             };
           };
@@ -1367,6 +1385,10 @@
             var pierde = p.ESTADO === 'Jugado' && v.ESTADO !== 'Jugado';
             if (pierde && !g.getAttribute('data-ok')) { g.setAttribute('data-ok', '1'); g.textContent = 'Se borra el resultado y sus goles: pulsa otra vez'; return; }
             var pantalla = Object.assign({}, c, pierde ? { GOLES_LOCAL: '', GOLES_VISITANTE: '' } : {});
+            // Como el motor: un anulado por culpa de un equipo se queda con su 0-5 en el Excel; si deja de estarlo, sin resultado.
+            var an = resultadoAnulado(Object.assign({}, p, v), nAnulado());
+            if (an) { pantalla.GOLES_LOCAL = an.gl; pantalla.GOLES_VISITANTE = an.gv; }
+            else if (p.ESTADO === 'Anulado') { pantalla.GOLES_LOCAL = ''; pantalla.GOLES_VISITANTE = ''; }
             cerrar(true);
             T.actualizar('PARTIDOS', p.ID, pantalla, { fn: 'ligasPartido', args: [p.ID, c] }).then(function (r) {
               if (r && r.quitados) T.refrescar(['GOLES']).catch(function () {});
