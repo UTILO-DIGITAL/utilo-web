@@ -102,7 +102,7 @@
   /** El botón de un bloque ({ texto, enlace }): un enlace https que se abre aparte (p. ej. un WhatsApp con el mensaje escrito). */
   function htmlAccion(a) {
     if (!a || !/^https:\/\//.test(String(a.enlace || ''))) return '';
-    return '<div class="n-botones"><a class="u-btn u-btn-accion" href="' + texto(a.enlace) + '" target="_blank" rel="noopener">' + texto(a.texto || 'Abrir') + '</a></div>';
+    return '<div class="n-botones pf-accion"><a class="u-btn u-btn-accion" href="' + texto(a.enlace) + '" target="_blank" rel="noopener">' + texto(a.texto || 'Abrir') + '</a></div>';
   }
 
   function htmlCuenta(ctx) {

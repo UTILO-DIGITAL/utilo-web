@@ -318,6 +318,7 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .pf-cifras .pf-destacar { box-shadow: inset 0 0 0 2px var(--color-accion); }
 .u .pf-cifras .pf-destacar b { color: var(--color-texto); }
 @media (max-width: 639px) { .u .pf-cifras { grid-template-columns: 1fr 1fr; } }
+.u .pf-accion { margin-top: var(--e3); }
 
 /* ---------- Piezas de las secciones del núcleo (T0257) ----------
  * Pestañas de una sección, filtros encima de una lista, formulario en dos columnas en la ventana, una cifra mala
