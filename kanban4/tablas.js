@@ -23,6 +23,10 @@
  * función de la sección (su «api») en lugar de tablasActualizar o tablasCrear, para lo que toca más de una cosa (un
  * cambio de estado con su HISTORIAL y su registro). Esa función devuelve lo mismo ({ fila } o { id, fila }) y, si ha
  * cambiado otras filas de paso, otras: { TABLA: [filas] }, que se ponen al día en la copia sin volver a leer.
+ * T0256 · Partes de una tabla grande: leer(['INSCRIPCIONES_JUGADORAS'], { partes: { INSCRIPCIONES_JUGADORAS: { clave: 'T:TEM-2026',
+ * col: 'ID_INSCRIPCION_EQUIPO', valores: ['IE00001', …] } } }) trae solo las filas cuya col es uno de esos valores. Las
+ * partes que se van leyendo se juntan en la misma copia (filas, fila, actualizar… funcionan igual) y cada una se refresca
+ * por su cuenta. Así no se baja entera una tabla de miles de filas para ver una temporada o una jugadora.
  * Valores: texto; números; true/false; fecha 'aaaa-mm-dd'; fecha y hora 'aaaa-mm-ddThh:mm'; hora 'hh:mm'; vacío ''.
  */
 (function () {
@@ -31,6 +35,7 @@
   /* ---------- IndexedDB (si no se puede, solo memoria) ---------- */
 
   var BD = null;
+  var PARTES = 6; // T0256: partes de una tabla que se refrescan solas (las últimas leídas)
   function bd() {
     if (BD) return BD;
     BD = new Promise(function (ok) {
@@ -76,19 +81,50 @@
     function llamar(fn, args) { return Promise.resolve().then(function () { return o.llamar(fn, args); }); }
     function avisar(t) { if (o.aviso) try { o.aviso(t); } catch (e) {} }
 
-    /** Lo que manda el motor (cols + filas en listas) → objetos, con los cambios aún en vuelo puestos encima. */
-    function deMotor(nombre, t) {
-      var ki = t.cols.indexOf('ID'), m = { cols: t.cols, filas: [], ids: {}, v: t.v, leido: t.leido, clave: t.cols[ki >= 0 ? ki : 0] };
-      t.filas.forEach(function (r) {
+    function claveDe(cols) { var ki = cols.indexOf('ID'); return cols[ki >= 0 ? ki : 0]; }
+    /** Filas del motor (listas) → objetos, con los cambios aún en vuelo puestos encima. */
+    function filasDe(nombre, t, k) {
+      return t.filas.map(function (r) {
         var f = {};
         t.cols.forEach(function (c, j) { f[c] = r[j]; });
-        var id = String(f[m.clave]);
-        (enVuelo[nombre + '|' + id] || []).forEach(function (x) { for (var k in x) f[k] = x[k]; f._pendiente = (f._pendiente || 0) + 1; });
-        m.filas.push(f); m.ids[id] = f;
+        (enVuelo[nombre + '|' + String(f[k])] || []).forEach(function (x) { for (var c in x) f[c] = x[c]; f._pendiente = (f._pendiente || 0) + 1; });
+        return f;
       });
+    }
+    /**
+     * Lo que manda el motor (cols + filas en listas) → la copia de la tabla entera. T0256: lo guardado en el dispositivo
+     * puede ser solo partes (entera: false, con sus partes), y se recupera así.
+     */
+    function deMotor(nombre, t) {
+      var m = { cols: t.cols, filas: [], ids: {}, v: t.v, leido: t.leido, clave: claveDe(t.cols), entera: t.entera !== false, partes: t.partes || {} };
+      filasDe(nombre, t, m.clave).forEach(function (f) { m.filas.push(f); m.ids[String(f[m.clave])] = f; });
       // Las altas que aún no ha confirmado el motor siguen en la lista.
       var ant = mem[nombre];
-      if (ant) ant.filas.forEach(function (f) { if (f._nueva) m.filas.push(f); });
+      if (ant) ant.filas.forEach(function (f) { if (f._nueva) { m.filas.push(f); m.ids[String(f[m.clave])] = f; } });
+      return m;
+    }
+    /**
+     * T0256 · Una parte que manda el motor (p = { clave, col, valores }) → a la copia: se quitan las filas que eran de esa
+     * parte (su col es uno de los valores) y se ponen las que llegan. Lo de otras partes y las altas sin confirmar se quedan.
+     */
+    function deParte(nombre, t, p) {
+      var m = mem[nombre];
+      if (!m) m = mem[nombre] = { cols: t.cols, filas: [], ids: {}, v: '', leido: t.leido, clave: claveDe(t.cols), entera: false, partes: {} };
+      var de = {}, nuevas = filasDe(nombre, t, m.clave), llegan = {};
+      [].concat(p.valores || []).forEach(function (x) { de[String(x)] = 1; });
+      nuevas.forEach(function (f) { llegan[String(f[m.clave])] = 1; });
+      m.filas = m.filas.filter(function (f) { return f._nueva || (!de[String(f[p.col] == null ? '' : f[p.col])] && !llegan[String(f[m.clave])]); }).concat(nuevas);
+      m.ids = {};
+      m.filas.forEach(function (f) { m.ids[String(f[m.clave])] = f; });
+      m.cols = t.cols;
+      if (!m.entera) {
+        delete m.partes[p.clave];
+        m.partes[p.clave] = { col: p.col, valores: [].concat(p.valores || []), v: t.v };
+        // Se recuerdan las últimas PARTES: las filas de las más viejas se quedan, pero ya no se refrescan solas (se vuelven
+        // a pedir al leerlas otra vez). Así abrir muchas fichas no multiplica las llamadas de cada refresco.
+        var ks = Object.keys(m.partes);
+        while (ks.length > PARTES) delete m.partes[ks.shift()];
+      }
       return m;
     }
     /** Copia del dispositivo, en listas (ocupa menos), sin lo que está en vuelo. */
@@ -96,8 +132,10 @@
       var m = mem[nombre];
       if (!m) return;
       var filas = m.filas.filter(function (f) { return !f._nueva; }).map(function (f) { return m.cols.map(function (c) { return f[c]; }); });
-      bdGuardar(clave + nombre, { cols: m.cols, filas: filas, v: m.v, leido: m.leido });
+      bdGuardar(clave + nombre, { cols: m.cols, filas: filas, v: m.v, leido: m.leido, entera: m.entera !== false, partes: m.partes || {} });
     }
+    /** ¿Tiene ya la copia esa tabla (entera, o la parte que se pide)? */
+    function tiene(n, p) { var m = mem[n]; return !!m && (m.entera !== false || (!!p && !!(m.partes || {})[p.clave])); }
 
     /** T0254: filas que el motor ha cambiado de paso (r.otras = { TABLA: [filas] }) → a la copia, salvo lo que sigue en vuelo. */
     function otras(r) {
@@ -115,22 +153,42 @@
       });
     }
 
-    /** Pide al motor las tablas (solo las que han cambiado vienen enteras) y avisa de las que han cambiado. */
-    function refrescar(nombres, fresco) {
-      var desde = {};
-      nombres.forEach(function (n) { if (mem[n] && mem[n].v) desde[n] = mem[n].v; });
-      return llamar('tablasLeer', [nombres, { desde: desde, fresco: !!fresco }]).then(function (r) {
+    /**
+     * Pide al motor las tablas (solo las que han cambiado vienen enteras) y avisa de las que han cambiado.
+     * T0256 · partes: { TABLA: { clave, col, valores } } para traer solo esa parte de esas tablas.
+     */
+    function refrescar(nombres, fresco, partes) {
+      partes = partes || {};
+      var desde = {}, pm = {};
+      nombres.forEach(function (n) {
+        var m = mem[n], p = partes[n];
+        if (p) { pm[n] = { col: p.col, valores: p.valores }; if (m && m.entera === false && m.partes[p.clave] && m.partes[p.clave].v) desde[n] = m.partes[p.clave].v; }
+        else if (m && m.entera !== false && m.v) desde[n] = m.v;
+      });
+      return llamar('tablasLeer', [nombres, { desde: desde, fresco: !!fresco, partes: pm }]).then(function (r) {
         var cambiadas = [];
         nombres.forEach(function (n) {
           var t = (r.tablas || {})[n];
           if (!t || t.igual) return;
-          mem[n] = deMotor(n, t);
+          if (partes[n] && t.parte) mem[n] = deParte(n, t, partes[n]);
+          else mem[n] = deMotor(n, t);
           guardarLocal(n);
           cambiadas.push(n);
         });
         cambiadas.forEach(function (n) { emitir('cambio', n, { refresco: true }); });
         return cambiadas;
       });
+    }
+    /** Refresca lo que hay en la copia: las tablas enteras de una vez y, de las que solo tienen partes, cada parte. */
+    function refrescarTodo(nombres, fresco) {
+      var enteras = [], ps = [];
+      nombres.forEach(function (n) {
+        var m = mem[n];
+        if (!m || m.entera !== false) { enteras.push(n); return; }
+        Object.keys(m.partes || {}).forEach(function (k) { var o = {}; o[n] = { clave: k, col: m.partes[k].col, valores: m.partes[k].valores }; ps.push(refrescar([n], fresco, o)); });
+      });
+      if (enteras.length) ps.unshift(refrescar(enteras, fresco));
+      return Promise.all(ps).then(function (rs) { return [].concat.apply([], rs); });
     }
 
     var api = {
@@ -140,30 +198,45 @@
       /**
        * Las tablas para pintar: al momento si están en memoria o en el dispositivo (y se refrescan por detrás), o
        * esperando al motor la primera vez. op: { fresco } para ir al Excel aunque el motor lo tenga guardado; { local }
-       * para no refrescar por detrás (quien llama lo hará con refrescar).
-       * Devuelve { TABLA: [filas] }.
+       * para no refrescar por detrás (quien llama lo hará con refrescar). T0256 · op.partes: { TABLA: { clave, col,
+       * valores } } para leer solo esa parte de una tabla grande (clave: un nombre para esa parte, p. ej. 'T:TEM-2026').
+       * Devuelve { TABLA: [filas] } (de una tabla con partes, todas las que ya hay en la copia).
        */
       leer: function (nombres, op) {
         op = op || {};
         nombres = [].concat(nombres);
+        var partes = op.partes || {};
         return Promise.all(nombres.map(function (n) {
-          if (mem[n]) return true;
+          if (tiene(n, partes[n])) return true;
+          if (mem[n]) return false;
           return bdLeer(clave + n).then(function (g) {
             if (g && !mem[n]) mem[n] = deMotor(n, g);
-            return !!mem[n];
+            return tiene(n, partes[n]);
           });
         })).then(function (hay) {
           var faltan = nombres.filter(function (n, i) { return !hay[i]; });
           var fuera = function () { var r = {}; nombres.forEach(function (n) { r[n] = mem[n] ? mem[n].filas : []; }); return r; };
+          var pedir = function (ns) {
+            var sin = ns.filter(function (n) { return !partes[n]; });
+            var ps = sin.length ? [refrescar(sin, op.fresco)] : [];
+            ns.forEach(function (n) { if (partes[n]) { var o = {}; o[n] = partes[n]; ps.push(refrescar([n], op.fresco, o)); } });
+            return Promise.all(ps);
+          };
           if (!faltan.length && !op.fresco) {
-            if (!op.local) refrescar(nombres).catch(function (e) { emitir('error', e, { leer: nombres }); });
+            if (!op.local) pedir(nombres).catch(function (e) { emitir('error', e, { leer: nombres }); });
             return fuera();
           }
-          return refrescar(nombres, op.fresco).then(fuera);
+          return pedir(op.fresco ? nombres : faltan).then(function () {
+            // Lo que ya estaba se refresca por detrás, como siempre.
+            var resto = nombres.filter(function (n) { return faltan.indexOf(n) < 0; });
+            if (!op.fresco && resto.length && !op.local) pedir(resto).catch(function (e) { emitir('error', e, { leer: resto }); });
+          }).then(fuera);
         });
       },
-      /** Vuelve a pedir al motor (p. ej. con el botón ↻). fresco: además, que lo lea del Excel. */
-      refrescar: function (nombres, fresco) { return refrescar([].concat(nombres), fresco); },
+      /** Vuelve a pedir al motor (p. ej. con el botón ↻). fresco: además, que lo lea del Excel. T0256: de una tabla con partes, cada parte. */
+      refrescar: function (nombres, fresco) { return refrescarTodo([].concat(nombres), fresco); },
+      /** T0256 · ¿Tiene ya la copia esa tabla, o esa parte ({ clave })? Para pintar al momento sin esperar. */
+      tiene: function (n, p) { return tiene(n, p); },
       /** Filas de la copia (las que ya se han leído). */
       filas: function (n) { return mem[n] ? mem[n].filas : []; },
       fila: function (n, id) { return mem[n] ? mem[n].ids[String(id)] || null : null; },
@@ -216,7 +289,7 @@
           emitir('cambio', n, { id: id, deshecho: true });
           emitir('error', e, { tabla: n, id: id, cambios: cambios });
           avisar('No se ha guardado: ' + limpio(e.message));
-          if (/^CAMBIADO:/.test(e.message)) refrescar([n], true).catch(function () {});
+          if (/^CAMBIADO:/.test(e.message)) refrescarTodo([n], true).catch(function () {});
           throw e;
         });
         colas[kq] = p;
@@ -232,7 +305,7 @@
        */
       crear: function (n, valores, op) {
         op = op || {};
-        var m = mem[n] || (mem[n] = { cols: Object.keys(valores), filas: [], ids: {}, v: '', clave: 'ID' });
+        var m = mem[n] || (mem[n] = { cols: Object.keys(valores), filas: [], ids: {}, v: '', clave: 'ID', entera: true, partes: {} });
         var tmp = 'nueva-' + (++nuevos), f = copia(valores);
         f[m.clave] = tmp; f._nueva = true; f._pendiente = 1;
         m.filas.push(f); m.ids[tmp] = f;
@@ -300,7 +373,7 @@
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState !== 'visible') return;
       var ns = Object.keys(mem);
-      if (ns.length) refrescar(ns).catch(function () {});
+      if (ns.length) refrescarTodo(ns).catch(function () {});
     });
     window.addEventListener('beforeunload', function (e) { if (pendientes) { e.preventDefault(); e.returnValue = ''; } });
     return api;
