@@ -873,7 +873,7 @@
         var cs = compsDeModelo(m.ID);
         return '<li><div class="cm-rec-c"><b>' + texto(m.NOMBRE || m.ID) + '</b>' +
           '<span class="u-nota">' + texto([m.PRENDA, m.ID_PROVEEDOR ? 'Proveedor habitual: ' + nombreProveedor(m.ID_PROVEEDOR) : 'Sin proveedor habitual', plural(n[m.ID] || 0, 'camiseta', 'camisetas')].filter(String).join(' · ')) + '</span>' +
-          '<span class="u-nota">' + (cs.length ? 'Va en: ' + texto(cs.map(function (x) { return nombreComp(x.ID_COMPETICION) + ' (' + plural(Number(x.CAMISETAS_INCLUIDAS) || 0, 'incluida', 'incluidas') + ')'; }).join(', ')) : 'No está en ninguna competición') + '</span>' +
+          '<span class="u-nota">' + (cs.length ? 'Va en: ' + texto(cs.map(function (x) { return nombreComp(x.ID_COMPETICION) + ' (' + plural(Number(x.CAMISETAS_INCLUIDAS) || 0, 'camiseta', 'camisetas') + ' por jugadora)'; }).join(', ')) : 'No está en ninguna competición') + '</span>' +
           (m.NOTAS ? '<span class="u-nota">' + texto(m.NOTAS) + '</span>' : '') + '</div>' +
           '<button type="button" class="u-btn u-btn-texto" data-cm-mod="' + texto(m.ID) + '">Cambiar</button></li>';
       }).join('') + '</ul>' : '<p class="u-vacio">Todavía no hay ningún modelo.</p>') + '</section>';
@@ -891,11 +891,11 @@
       campo('Prenda', '<input type="text" id="md-pre" maxlength="60" list="md-prendas" value="' + texto(m ? m.PRENDA : 'Camiseta') + '"><datalist id="md-prendas"><option value="Camiseta"><option value="Peto"><option value="Sudadera"></datalist>') +
       campo('Proveedor habitual', '<select id="md-prov"><option value="">Sin proveedor habitual</option>' + opciones(provs.map(function (x) { return [x.ID, x.NOMBRE]; }), m ? m.ID_PROVEEDOR : '') + '</select>') +
       campo('Notas (opcional)', '<input type="text" id="md-not" maxlength="200" value="' + texto(m ? m.NOTAS : '') + '">') + '</div>' +
-      '<h3 class="cm-sub">Competiciones que lo llevan</h3>' +
+      '<h3 class="cm-sub">Competiciones que lo llevan</h3><p class="u-nota">Al lado, cuántas camisetas tiene cada jugadora con la inscripción (normalmente 1). El pack de tallas y dorsales que se ofrece (1S, 2S, 3S, 4M…) todavía no se define aquí.</p>' +
       (S.N ? (comps.length ? '<ul class="cm-lista-ok cm-md-comps">' + comps.map(function (k) {
         var x = ya[k];
         return '<li><label class="u-check"><input type="checkbox" data-md-comp="' + texto(k) + '"' + (x ? ' checked' : '') + '> ' + texto(S.N.comp[k][0]) + '</label>' +
-          '<label class="cm-md-n"><input type="number" min="0" step="1" inputmode="numeric" data-md-n="' + texto(k) + '" value="' + texto(x ? Number(x.CAMISETAS_INCLUIDAS) || 0 : 1) + '" aria-label="Camisetas incluidas en ' + texto(S.N.comp[k][0]) + '"> incluidas</label></li>';
+          '<label class="cm-md-n"><input type="number" min="0" step="1" inputmode="numeric" data-md-n="' + texto(k) + '" value="' + texto(x ? Number(x.CAMISETAS_INCLUIDAS) || 0 : 1) + '" aria-label="Camisetas por jugadora en ' + texto(S.N.comp[k][0]) + '"> por jugadora</label></li>';
       }).join('') + '</ul>' : '<p class="u-nota">No hay competiciones en las últimas temporadas.</p>') : '<p class="u-nota">Cargando las competiciones…</p>') +
       '<p class="u-error" hidden></p>' +
       '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="md-ok">' + (m ? 'Guardar' : 'Añadir') + '</button><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cancelar</button></div>');
@@ -913,7 +913,7 @@
         if (!(n >= 0 && n === Math.round(n))) malN = true;
         quiero[k] = n;
       });
-      if (malN) return mal('Las camisetas incluidas son un número entero, 0 o más.');
+      if (malN) return mal('Las camisetas por jugadora son un número entero, 0 o más.');
       cerrarVentana();
       var comps = function (mid) {
         var p = [];
