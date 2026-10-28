@@ -74,8 +74,9 @@
     if (b.error) return htmlError(b);
     var cols = b.columnas || [], filas = b.filas || [];
     var h = '<section class="pf-bloque"><h2 class="n-grupo">' + texto(b.titulo) + (b.cuantas != null ? ' <span class="u-cifra">' + b.cuantas + '</span>' : '') + '</h2>';
+    if (b.cifras && b.cifras.length) h += htmlCifras(b.cifras);
     if (b.nota) h += '<p class="u-nota">' + texto(b.nota) + '</p>';
-    if (!filas.length) return h + (b.nota ? '' : '<p class="u-vacio">' + texto(b.vacio || 'No hay nada tuyo aquí por ahora.') + '</p>') + '</section>';
+    if (!filas.length) return h + (b.nota ? '' : '<p class="u-vacio">' + texto(b.vacio || 'No hay nada tuyo aquí por ahora.') + '</p>') + htmlAccion(b.accion) + '</section>';
     var suma = b.sumar ? cols.filter(function (c) { return c.nombre === b.sumar; })[0] : null;
     h += '<table class="u-tabla n-lista"><thead><tr>' + cols.map(function (c) { return '<th' + (num(c.tipo) ? ' class="num"' : '') + '>' + texto(c.titulo) + '</th>'; }).join('') + '</tr></thead><tbody>' +
       filas.map(function (f) {
@@ -89,7 +90,19 @@
       }).join('') + '</tr></tfoot>' : '') +
       '</table>';
     if (b.cuantas > filas.length) h += '<p class="u-nota">Y ' + plural(b.cuantas - filas.length, 'más', 'más') + '.</p>';
-    return h + '</section>';
+    return h + htmlAccion(b.accion) + '</section>';
+  }
+
+  /** Las cifras de un bloque, grandes y arriba: [{ titulo, valor, tipo, destacar }]. */
+  function htmlCifras(cs) {
+    return '<div class="pf-cifras">' + cs.map(function (c) {
+      return '<div' + (c.destacar ? ' class="pf-destacar"' : '') + '><b class="u-cifra">' + texto(valor(c.valor, c.tipo) || '0') + '</b><span>' + texto(c.titulo) + '</span></div>';
+    }).join('') + '</div>';
+  }
+  /** El botón de un bloque ({ texto, enlace }): un enlace https que se abre aparte (p. ej. un WhatsApp con el mensaje escrito). */
+  function htmlAccion(a) {
+    if (!a || !/^https:\/\//.test(String(a.enlace || ''))) return '';
+    return '<div class="n-botones"><a class="u-btn u-btn-accion" href="' + texto(a.enlace) + '" target="_blank" rel="noopener">' + texto(a.texto || 'Abrir') + '</a></div>';
   }
 
   function htmlCuenta(ctx) {
