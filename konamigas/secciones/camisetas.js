@@ -10,7 +10,8 @@
  *   CAMISETAS5_CUENTAS.js). «Sacar del local» apunta una regalada, donada, perdida… (T0247).
  * - Pedidos: lo que falta de un modelo, dar las libres del local, preparar el pedido con el resto (proveedor de
  *   CONTRAPARTES, con su contacto), el extracto para enviárselo, confirmado y ha llegado, lo pagado (la factura del
- *   pedido, de FACTURAS) y el precio por camiseta, y la lista de proveedores (alta, contacto y su último precio).
+ *   pedido, de FACTURAS) y el precio por camiseta, los modelos (alta, proveedor habitual y en qué competiciones va cada
+ *   uno, con sus camisetas incluidas) y la lista de proveedores (alta, contacto y su último precio).
  * - Recuento: lo que debería haber suelto en el local (en la caja, sin bolsa); se cambia lo que no cuadra y se aplica. Lo contado se guarda en
  *   este dispositivo hasta aplicarlo.
  * Los nombres de jugadoras, equipos y competiciones los da el motor (camisetas5Nombres), solo de las inscripciones con
@@ -135,7 +136,7 @@
 
   /* ======================= pantalla ======================= */
 
-  var TABLAS = ['CAMISETAS', 'MODELOS', 'COLORES', 'PEDIDOS', 'PEDIDOS_LINEAS', 'AJUSTES_STOCK', 'CONTRAPARTES', 'FACTURAS'];
+  var TABLAS = ['CAMISETAS', 'MODELOS', 'COLORES', 'PEDIDOS', 'PEDIDOS_LINEAS', 'AJUSTES_STOCK', 'CONTRAPARTES', 'FACTURAS', 'MODELOS_COMPETICION'];
   var VISTAS = [['entregas', 'Entregas'], ['stock', 'Stock'], ['pedidos', 'Pedidos'], ['recuento', 'Recuento']];
   // [estado, en plural para los filtros, color de base.css]
   var ESTADOS = [['Por pedir', 'Por pedir', 'bl'], ['Pedida', 'Pedidas', 'x'], ['Por preparar', 'Por preparar', 'pr'], ['Preparada', 'Preparadas', 'ec'],
@@ -631,12 +632,15 @@
     h += '<h2 class="n-grupo">Pedidos de ' + texto(nombreModelo(m)) + ' <span class="u-cifra">' + peds.length + '</span></h2>';
     if (!peds.length) h += '<p class="u-vacio">Este modelo no tiene pedidos' + (plan && plan.pedir.length ? '. Con «Preparar pedido» se hace el primero con lo que falta.' : ' todavía.') + '</p>';
     h += '<ul class="cm-peds">' + peds.map(function (p) { return htmlPedido(p, lineas[p.ID] || [], jug[p.ID] || {}); }).join('') + '</ul>';
-    h += htmlProveedores();
+    h += htmlModelos() + htmlProveedores();
     c.innerHTML = h;
     engancharModelo(c);
     var bl = c.querySelector('#cm-libres'), bp = c.querySelector('#cm-pedir');
     if (bl) bl.onclick = function () { darLibres(bl, m); };
     if (bp) bp.onclick = function () { ventanaPedir(m, plan); };
+    c.querySelector('.cm-mods').onclick = function (e) {
+      var b = e.target.closest('[data-cm-mod]'); if (b) ventanaModelo(b.getAttribute('data-cm-mod'));
+    };
     c.querySelector('.cm-provs').onclick = function (e) {
       var b = e.target.closest('[data-cm-prov]'); if (b) ventanaProveedor(b.getAttribute('data-cm-prov'));
     };
@@ -848,6 +852,85 @@
       var f = v.querySelector('#pf-f').value;
       cerrarVentana();
       if (f !== String(p.ID_FACTURA || '')) S.T.actualizar('PEDIDOS', p.ID, { ID_FACTURA: f }).then(function () { S.ctx.aviso(f ? 'Factura enlazada al pedido ' + p.ID + '.' : 'El pedido ' + p.ID + ' ya no tiene factura.'); }, function () {});
+    };
+  }
+
+  /* ---------- modelos: qué se encarga y en qué competiciones va (MODELOS y MODELOS_COMPETICION) ---------- */
+
+  function nombreComp(id) { var x = S.N && S.N.comp && S.N.comp[id]; return x ? x[0] : id; }
+  function compsDeModelo(m) {
+    return S.T.filas('MODELOS_COMPETICION').filter(function (x) { return String(x.ID_MODELO) === String(m); })
+      .sort(function (a, b) { return norm(nombreComp(a.ID_COMPETICION)) < norm(nombreComp(b.ID_COMPETICION)) ? -1 : 1; });
+  }
+  function htmlModelos() {
+    var n = {};
+    S.T.filas('CAMISETAS').forEach(function (c) { if (c.ESTADO !== 'Sin camiseta') n[c.ID_MODELO] = (n[c.ID_MODELO] || 0) + 1; });
+    var l = S.T.filas('MODELOS').slice().sort(function (a, b) { return norm(a.NOMBRE) < norm(b.NOMBRE) ? -1 : 1; });
+    return '<section class="u-bloque cm-mods"><div class="cm-eq-cab"><h2 class="n-grupo">Modelos <span class="u-cifra">' + l.length + '</span></h2>' +
+      '<button type="button" class="u-btn" data-cm-mod="">Añadir modelo</button></div>' +
+      '<p class="u-nota">Cada modelo es una camiseta distinta que se encarga (p. ej. la combinación de sponsors de una temporada), con su proveedor habitual y las competiciones que la llevan.</p>' +
+      (l.length ? '<ul class="cm-prov-l">' + l.map(function (m) {
+        var cs = compsDeModelo(m.ID);
+        return '<li><div class="cm-rec-c"><b>' + texto(m.NOMBRE || m.ID) + '</b>' +
+          '<span class="u-nota">' + texto([m.PRENDA, m.ID_PROVEEDOR ? 'Proveedor habitual: ' + nombreProveedor(m.ID_PROVEEDOR) : 'Sin proveedor habitual', plural(n[m.ID] || 0, 'camiseta', 'camisetas')].filter(String).join(' · ')) + '</span>' +
+          '<span class="u-nota">' + (cs.length ? 'Va en: ' + texto(cs.map(function (x) { return nombreComp(x.ID_COMPETICION) + ' (' + plural(Number(x.CAMISETAS_INCLUIDAS) || 0, 'camiseta', 'camisetas') + ' por jugadora)'; }).join(', ')) : 'No está en ninguna competición') + '</span>' +
+          (m.NOTAS ? '<span class="u-nota">' + texto(m.NOTAS) + '</span>' : '') + '</div>' +
+          '<button type="button" class="u-btn u-btn-texto" data-cm-mod="' + texto(m.ID) + '">Cambiar</button></li>';
+      }).join('') + '</ul>' : '<p class="u-vacio">Todavía no hay ningún modelo.</p>') + '</section>';
+  }
+
+  function ventanaModelo(id) {
+    var m = id ? S.T.fila('MODELOS', id) : null, provs = proveedores();
+    var ya = {}; if (m) compsDeModelo(m.ID).forEach(function (x) { ya[x.ID_COMPETICION] = x; });
+    // Las competiciones de las dos temporadas más recientes y, además, las que ya lleva el modelo.
+    var temps = ((S.N && S.N.temp) || []).slice(0, 2).map(function (t) { return t[0]; });
+    var comps = Object.keys((S.N && S.N.comp) || {}).filter(function (k) { return temps.indexOf(S.N.comp[k][1]) >= 0 || ya[k]; })
+      .sort(function (a, b) { return (temps.indexOf(S.N.comp[a][1]) - temps.indexOf(S.N.comp[b][1])) || (norm(S.N.comp[a][0]) < norm(S.N.comp[b][0]) ? -1 : 1); });
+    var v = ventana('<h2>' + (m ? 'Cambiar modelo' : 'Añadir modelo') + '</h2><div class="u-campos cm-una">' +
+      campo('Nombre (p. ej. VAPIANO-SALERM 25-26)', '<input type="text" id="md-nom" maxlength="120" value="' + texto(m ? m.NOMBRE : '') + '">') +
+      campo('Prenda', '<input type="text" id="md-pre" maxlength="60" list="md-prendas" value="' + texto(m ? m.PRENDA : 'Camiseta') + '"><datalist id="md-prendas"><option value="Camiseta"><option value="Peto"><option value="Sudadera"></datalist>') +
+      campo('Proveedor habitual', '<select id="md-prov"><option value="">Sin proveedor habitual</option>' + opciones(provs.map(function (x) { return [x.ID, x.NOMBRE]; }), m ? m.ID_PROVEEDOR : '') + '</select>') +
+      campo('Notas (opcional)', '<input type="text" id="md-not" maxlength="200" value="' + texto(m ? m.NOTAS : '') + '">') + '</div>' +
+      '<h3 class="cm-sub">Competiciones que lo llevan</h3><p class="u-nota">Al lado, cuántas camisetas tiene cada jugadora con la inscripción (normalmente 1). El pack de tallas y dorsales que se ofrece (1S, 2S, 3S, 4M…) todavía no se define aquí.</p>' +
+      (S.N ? (comps.length ? '<ul class="cm-lista-ok cm-md-comps">' + comps.map(function (k) {
+        var x = ya[k];
+        return '<li><label class="u-check"><input type="checkbox" data-md-comp="' + texto(k) + '"' + (x ? ' checked' : '') + '> ' + texto(S.N.comp[k][0]) + '</label>' +
+          '<label class="cm-md-n"><input type="number" min="0" step="1" inputmode="numeric" data-md-n="' + texto(k) + '" value="' + texto(x ? Number(x.CAMISETAS_INCLUIDAS) || 0 : 1) + '" aria-label="Camisetas por jugadora en ' + texto(S.N.comp[k][0]) + '"> por jugadora</label></li>';
+      }).join('') + '</ul>' : '<p class="u-nota">No hay competiciones en las últimas temporadas.</p>') : '<p class="u-nota">Cargando las competiciones…</p>') +
+      '<p class="u-error" hidden></p>' +
+      '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="md-ok">' + (m ? 'Guardar' : 'Añadir') + '</button><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cancelar</button></div>');
+    v.querySelector('#md-ok').onclick = function () {
+      var val = function (k) { return v.querySelector('#md-' + k).value.trim(); };
+      var d = { NOMBRE: val('nom'), PRENDA: val('pre'), ID_PROVEEDOR: val('prov'), NOTAS: val('not') };
+      var err = v.querySelector('.u-error'), mal = function (t) { err.textContent = t; err.hidden = false; };
+      if (!d.NOMBRE) return mal('Falta el nombre.');
+      if (!d.PRENDA) return mal('Falta la prenda (Camiseta, Peto…).');
+      if (S.T.filas('MODELOS').some(function (y) { return norm(y.NOMBRE) === norm(d.NOMBRE) && (!m || String(y.ID) !== String(m.ID)); })) return mal('Ya hay un modelo con ese nombre.');
+      var quiero = {}, malN = false;
+      [].forEach.call(v.querySelectorAll('[data-md-comp]'), function (b) {
+        if (!b.checked) return;
+        var k = b.getAttribute('data-md-comp'), n = Number(v.querySelector('[data-md-n="' + k + '"]').value);
+        if (!(n >= 0 && n === Math.round(n))) malN = true;
+        quiero[k] = n;
+      });
+      if (malN) return mal('Las camisetas por jugadora son un número entero, 0 o más.');
+      cerrarVentana();
+      var comps = function (mid) {
+        var p = [];
+        Object.keys(quiero).forEach(function (k) {
+          if (!ya[k]) p.push(S.T.crear('MODELOS_COMPETICION', { ID_COMPETICION: k, ID_MODELO: mid, CAMISETAS_INCLUIDAS: quiero[k] }));
+          else if (Number(ya[k].CAMISETAS_INCLUIDAS) !== quiero[k]) p.push(S.T.actualizar('MODELOS_COMPETICION', ya[k].ID, { CAMISETAS_INCLUIDAS: quiero[k] }));
+        });
+        Object.keys(ya).forEach(function (k) { if (!(k in quiero)) p.push(S.T.borrar('MODELOS_COMPETICION', ya[k].ID)); });
+        return Promise.all(p);
+      };
+      if (m) {
+        var cambios = {}; Object.keys(d).forEach(function (k) { if (String(m[k] || '') !== d[k]) cambios[k] = d[k]; });
+        (Object.keys(cambios).length ? S.T.actualizar('MODELOS', m.ID, cambios) : Promise.resolve()).then(function () { return comps(m.ID); })
+          .then(function () { S.ctx.aviso('Modelo guardado.'); }, function () {});
+      } else {
+        S.T.crear('MODELOS', d).then(function (r) { return comps(r.id); }).then(function () { S.ctx.aviso(d.NOMBRE + ' añadido a los modelos.'); }, function () {});
+      }
     };
   }
 
