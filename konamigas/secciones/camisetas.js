@@ -9,7 +9,8 @@
  * - Stock: por modelo, color, dorsal y talla, calculado aquí con las tablas (las mismas cuentas que el motor,
  *   CAMISETAS5_CUENTAS.js). «Sacar del local» apunta una regalada, donada, perdida… (T0247).
  * - Pedidos: lo que falta de un modelo, dar las libres del local, preparar el pedido con el resto (proveedor de
- *   CONTRAPARTES, con su contacto), el extracto para enviárselo, confirmado y ha llegado.
+ *   CONTRAPARTES, con su contacto), el extracto para enviárselo, confirmado y ha llegado, y la lista de proveedores
+ *   (alta y cambios de nombre, contacto y notas).
  * - Recuento: lo que debería haber suelto en el local (en la caja, sin bolsa); se cambia lo que no cuadra y se aplica. Lo contado se guarda en
  *   este dispositivo hasta aplicarlo.
  * Los nombres de jugadoras, equipos y competiciones los da el motor (camisetas5Nombres), solo de las inscripciones con
@@ -501,7 +502,7 @@
         ['Entregada', c.FECHA_ENTREGA ? fecha(c.FECHA_ENTREGA) : ''], ['Inscripción', q.baja ? '<span class="u-mal">De baja</span>' : '']]) +
       (s === 'recuperar' ? '<p class="u-nota">La inscripción está de baja y su camiseta está ' + (e === 'Entregada' ? 'entregada: hay que pedírsela al equipo.' : 'en un pack: hay que sacarla.') +
         ' Al recuperarla vuelve al local como libre.</p><label class="u-check"><input type="checkbox" id="cm-rota"> Vuelve rota (cuenta como defectuosa)</label>' :
-        s === 'quitar' ? '<p class="u-nota">La inscripción está de baja: a esta jugadora ya no se le dará camiseta. Al quitarla deja de contar como pendiente y, si estaba apartada en el local, vuelve a quedar libre.</p>' :
+        s === 'quitar' ? '<p class="u-nota">La inscripción está de baja: a esta jugadora ya no se le dará camiseta. Al quitarla deja de contar como pendiente y, si estaba asignada en el local, vuelve a quedar libre.</p>' :
         '<p class="u-nota">No llegó y Defectuosa la vuelven a dejar por pedir y, si estaba en el local, apuntan su −1 en el stock. Sin camiseta: a esta jugadora no se le hará.</p>') +
       '<div class="n-botones cm-marcas">' + botones.map(function (b) {
         return '<button type="button" class="u-btn' + (b[2] ? ' u-btn-accion' : '') + '" data-cm-m="' + texto(b[0]) + '">' + texto(b[1]) + '</button>';
@@ -529,7 +530,7 @@
       '</div></div>' +
       '<div class="n-botones cm-acciones"><button type="button" class="u-btn u-btn-accion" id="cm-sacar">Sacar del local</button><button type="button" class="u-btn" id="cm-arec">Hacer recuento</button></div>' +
       '<p class="u-nota">' + (k === 'libres' ? '<b>Libres</b>: las sueltas que no son de nadie; se pueden dar a cualquier jugadora.' :
-        '<b>Sueltas</b>: las que hay en la caja del local, sin bolsa. Incluye las <b>apartadas</b> para una jugadora (Por preparar), que aún hay que meter en su bolsa. Las Preparadas ya están en su bolsa y no cuentan aquí.') +
+        '<b>Sueltas</b>: las que hay en la caja del local, sin bolsa. Incluye las <b>asignadas</b> a una jugadora (Por preparar): ya son suyas, pero aún hay que meterlas en su bolsa. Las Preparadas ya están en su bolsa y no cuentan aquí.') +
       ' Sueltas = las de los pedidos que han llegado, menos las preparadas y entregadas, más o menos los ajustes (recuentos y sacadas).</p>' +
       (neg ? '<p class="u-mal">' + plural(neg, 'combinación no cuadra', 'combinaciones no cuadran') + ' (en negativo): consta que han salido más camisetas de las que han llegado. ' +
         'Pasa con una camiseta que ya estaba antes de la web, un pedido sin marcar «Ha llegado» o una marcada por error. El recuento lo corrige con lo que haya de verdad.</p>' : '');
@@ -629,11 +630,15 @@
     h += '<h2 class="n-grupo">Pedidos de ' + texto(nombreModelo(m)) + ' <span class="u-cifra">' + peds.length + '</span></h2>';
     if (!peds.length) h += '<p class="u-vacio">Este modelo no tiene pedidos. Con «Preparar pedido» se hace el primero con lo que falta.</p>';
     h += '<ul class="cm-peds">' + peds.map(function (p) { return htmlPedido(p, lineas[p.ID] || [], jug[p.ID] || {}); }).join('') + '</ul>';
+    h += htmlProveedores();
     c.innerHTML = h;
     engancharModelo(c);
     var bl = c.querySelector('#cm-libres'), bp = c.querySelector('#cm-pedir');
     if (bl) bl.onclick = function () { darLibres(bl, m); };
     if (bp) bp.onclick = function () { ventanaPedir(m, plan); };
+    c.querySelector('.cm-provs').onclick = function (e) {
+      var b = e.target.closest('[data-cm-prov]'); if (b) ventanaProveedor(b.getAttribute('data-cm-prov'));
+    };
     c.querySelector('.cm-peds').onclick = function (e) {
       var b = e.target.closest('[data-cm-p]'); if (!b) return;
       var id = b.getAttribute('data-cm-p'), acc = b.getAttribute('data-cm-acc');
@@ -698,7 +703,7 @@
   function contactoProveedor(id) {
     var x = S.T.fila('CONTRAPARTES', id);
     return x && x.CONTACTO ? '<p class="cm-contacto"><span class="u-etiqueta">Contacto</span> ' + texto(x.CONTACTO) + '</p>' :
-      '<p class="u-nota">Este proveedor no tiene contacto apuntado: se pone en Economía (CONTRAPARTES · CONTACTO).</p>';
+      '<p class="u-nota">Este proveedor no tiene contacto apuntado: se pone en «Proveedores», abajo en la pestaña Pedidos.</p>';
   }
   function codigoColor(id) { return color(id).CODIGO || ''; }
 
@@ -712,7 +717,7 @@
       (plan.local.length === 1 ? '. Antes se da la que tiene una libre en el local.' : plan.local.length ? '. Antes se dan las ' + plan.local.length + ' que tienen una libre en el local.' : '.') + ' El pedido queda sin confirmar hasta que lo confirme el proveedor.</p>' +
       (provs.length ? '<div class="u-campos">' + campo('Proveedor', '<select id="pp-prov">' + (habitual ? '' : '<option value="">Elige el proveedor</option>') +
         opciones(provs.map(function (x) { return [x.ID, x.NOMBRE + (String(x.ID) === habitual ? ' (el habitual)' : '')]; }), habitual) + '</select>') + '</div><div id="pp-contacto"></div>' :
-        '<p class="u-mal">No hay ningún proveedor apuntado. Se añade en Economía (CONTRAPARTES, tipo Proveedor) y después se puede pedir.</p>') +
+        '<p class="u-mal">No hay ningún proveedor apuntado. Añádelo en «Proveedores», abajo en la pestaña Pedidos, y después prepara el pedido.</p>') +
       '<div class="u-tabla-caja"><table class="u-tabla"><thead><tr><th>Color (código)</th><th>Dorsal</th><th>Talla</th><th class="num">Cuántas</th></tr></thead><tbody>' +
       lin.map(function (l) { return '<tr><td>' + punto(l.ID_COLOR) + texto(nombreColor(l.ID_COLOR)) + (codigoColor(l.ID_COLOR) ? ' <span class="u-nota">' + texto(codigoColor(l.ID_COLOR)) + '</span>' : '') + '</td><td>' + texto(l.DORSAL || '—') + '</td><td>' + texto(l.TALLA) + '</td><td class="num">' + l.CANTIDAD + '</td></tr>'; }).join('') +
       '</tbody></table></div><div class="u-campos">' +
@@ -734,6 +739,42 @@
         { fn: 'camisetas5Pedir', args: [m, d] }).then(function (r) {
         S.ctx.aviso('Pedido ' + r.id + ' preparado' + (r.dadas ? '; ' + plural(r.dadas, 'camiseta sale', 'camisetas salen') + ' del local' : '') + '. El extracto para el proveedor, en su tarjeta.');
       }, function () { S.T.refrescar(['CAMISETAS']).catch(function () {}); });
+    };
+  }
+
+  /** Proveedores: la lista, con su contacto, para verlos, darlos de alta y cambiarlos sin ir al Excel. */
+  function htmlProveedores() {
+    var l = proveedores();
+    return '<section class="u-bloque cm-provs"><div class="cm-eq-cab"><h2 class="n-grupo">Proveedores <span class="u-cifra">' + l.length + '</span></h2>' +
+      '<button type="button" class="u-btn" data-cm-prov="">Añadir proveedor</button></div>' +
+      '<p class="u-nota">A quién se le hacen los pedidos. Se guardan con los demás proveedores de Konamigas (Excel ECONOMIA), así que también los ve Economía.</p>' +
+      (l.length ? '<ul class="cm-prov-l">' + l.map(function (x) {
+        var usos = S.T.filas('MODELOS').filter(function (m) { return String(m.ID_PROVEEDOR) === String(x.ID); }).map(function (m) { return m.NOMBRE || m.ID; });
+        return '<li><div class="cm-rec-c"><b>' + texto(x.NOMBRE) + '</b>' +
+          '<span class="cm-contacto">' + (x.CONTACTO ? texto(x.CONTACTO) : '<span class="u-nota">Sin contacto</span>') + '</span>' +
+          (usos.length ? '<span class="u-nota">Habitual de ' + texto(usos.join(', ')) + '</span>' : '') +
+          (x.NOTAS ? '<span class="u-nota">' + texto(x.NOTAS) + '</span>' : '') + '</div>' +
+          '<button type="button" class="u-btn u-btn-texto" data-cm-prov="' + texto(x.ID) + '">Cambiar</button></li>';
+      }).join('') + '</ul>' : '<p class="u-vacio">Todavía no hay ningún proveedor.</p>') + '</section>';
+  }
+
+  function ventanaProveedor(id) {
+    var x = id ? S.T.fila('CONTRAPARTES', id) : null;
+    var v = ventana('<h2>' + (x ? 'Cambiar proveedor' : 'Añadir proveedor') + '</h2><div class="u-campos">' +
+      campo('Nombre', '<input type="text" id="pv-nom" maxlength="120" value="' + texto(x ? x.NOMBRE : '') + '">') +
+      campo('Contacto (persona, teléfono o correo)', '<input type="text" id="pv-con" maxlength="200" value="' + texto(x ? x.CONTACTO : '') + '">') +
+      campo('Notas (opcional)', '<input type="text" id="pv-not" maxlength="200" value="' + texto(x ? x.NOTAS : '') + '">') + '</div>' +
+      '<p class="u-nota">Sin datos bancarios: esos van en Economía.</p><p class="u-error" hidden></p>' +
+      '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="pv-ok">' + (x ? 'Guardar' : 'Añadir') + '</button><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cancelar</button></div>');
+    v.querySelector('#pv-ok').onclick = function () {
+      var d = { NOMBRE: v.querySelector('#pv-nom').value.trim(), CONTACTO: v.querySelector('#pv-con').value.trim(), NOTAS: v.querySelector('#pv-not').value.trim() };
+      var err = v.querySelector('.u-error'), mal = function (t) { err.textContent = t; err.hidden = false; };
+      if (!d.NOMBRE) return mal('Falta el nombre.');
+      // El nombre es único entre todas las contrapartes (también las que no son proveedores).
+      if (S.T.filas('CONTRAPARTES').some(function (y) { return norm(y.NOMBRE) === norm(d.NOMBRE) && (!x || String(y.ID) !== String(x.ID)); })) return mal('Ya hay alguien con ese nombre en Economía.');
+      cerrarVentana();
+      if (x) S.T.actualizar('CONTRAPARTES', x.ID, d).then(function () { S.ctx.aviso('Proveedor guardado.'); }, function () {});
+      else S.T.crear('CONTRAPARTES', { NOMBRE: d.NOMBRE, TIPO: 'Proveedor', CONTACTO: d.CONTACTO, NOTAS: d.NOTAS }).then(function () { S.ctx.aviso(d.NOMBRE + ' añadido a los proveedores.'); }, function () {});
     };
   }
 
@@ -791,7 +832,7 @@
     var contado = function (f) { return f.k in R.cont ? R.cont[f.k] : Math.max(f.debe, 0); };
     var revisados = cols.filter(function (x) { return R.rev[x]; }).length;
     var h = '<div class="u-filtros cm-filtros">' + selModelo() + '</div>' +
-      '<p class="u-nota">Cuenta las camisetas sueltas de ' + texto(nombreModelo(m)) + ': las de la caja, también las apartadas para una jugadora; las de las bolsas (Preparadas), no. Cambia solo lo que no coincida y marca cada color como contado. Lo que cuentes se guarda en este móvil hasta aplicarlo.</p>' +
+      '<p class="u-nota">Cuenta las camisetas sueltas de ' + texto(nombreModelo(m)) + ': las de la caja, también las asignadas a una jugadora (Por preparar); las de las bolsas (Preparadas), no. Cambia solo lo que no coincida y marca cada color como contado. Lo que cuentes se guarda en este móvil hasta aplicarlo.</p>' +
       (filas.some(function (f) { return f.debe < 0; }) ? '<p class="u-nota">Donde pone «no cuadra», las cuentas salen en negativo: consta que han salido más de las que llegaron. Pon lo que cuentes y, al aplicar, se corrige.</p>' : '');
     if (!cols.length) h += '<p class="u-vacio">No consta ninguna camiseta en el local de este modelo. Si encuentras alguna, añádela abajo.</p>';
     h += cols.map(function (col) {

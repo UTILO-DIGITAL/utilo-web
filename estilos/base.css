@@ -483,6 +483,10 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .cm-ped-l .cm-color { align-self: center; margin-right: 0; }
 .u .cm-contacto { margin: 0; overflow-wrap: anywhere; user-select: text; }
 .u .cm-contacto .u-etiqueta { margin-right: var(--e1); }
+.u .cm-provs { margin-top: var(--e6); }
+.u .cm-prov-l { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
+.u .cm-prov-l li { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); padding: var(--e3) 0; border-bottom: 1px solid var(--color-linea); }
+.u .cm-prov-l .cm-rec-c { display: grid; gap: 2px; min-width: 0; }
 .u .cm-extracto { margin: 0; padding: var(--e3); max-height: 50vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
   font: inherit; font-size: .95em; line-height: 1.5; user-select: text;
   background: var(--color-fondo); border: 1px solid var(--color-linea); border-radius: var(--radio); }
