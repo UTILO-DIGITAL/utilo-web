@@ -412,11 +412,36 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .lg-jornadas button { min-width: 48px; padding: 0 var(--e2); font-variant-numeric: tabular-nums; }
 .u .lg-jornadas button.lg-hecha:not([aria-pressed=true]) { color: var(--color-suave); border-color: var(--color-linea); }
 .u .lg-cont { padding-top: var(--e4); }
-/* Jornadas: la anterior, la siguiente y un desplegable con todas (una liga tiene hasta 18). */
-.u .lg-jnav { display: flex; align-items: center; gap: var(--e2); margin: 0 0 var(--e2); }
-.u .lg-jnav .u-campo { flex: 0 1 320px; min-width: 0; }
-.u .lg-jnav select { width: 100%; font-weight: 700; }
-.u .lg-jnav .u-btn-icono { font-size: 22px; flex: none; }
+/* Partidos: una tira con los días de juego (J1, J2… y JR, la jornada de recuperación, en el color de «En curso»), que se
+   desplaza a los lados; el día abierto, en el color principal. Los ya jugados, más suaves. */
+.u .lg-dias { display: flex; align-items: center; gap: var(--e1); margin: 0 0 var(--e3); }
+.u .lg-dias .u-btn-icono { flex: none; font-size: 22px; }
+.u .lg-dias-tira { flex: 1 1 auto; min-width: 0; display: flex; gap: var(--e2); overflow-x: auto; scrollbar-width: none; padding: 2px; }
+.u .lg-dias-tira::-webkit-scrollbar { display: none; }
+.u .lg-dias-tira button { flex: none; width: 64px; min-height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  border: 1.5px solid var(--color-borde-campo); border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto); cursor: pointer; font: inherit; }
+.u .lg-dias-tira b { font: 700 16px/1.1 var(--fuente-texto); font-variant-numeric: tabular-nums; }
+.u .lg-dias-tira small { font-size: 11px; color: var(--color-suave); white-space: nowrap; }
+.u .lg-dias-tira .lg-jugado:not([aria-pressed=true]) { border-color: var(--color-linea); color: var(--color-suave); }
+.u .lg-dias-tira .lg-jr { border-color: var(--estado-ec); color: var(--estado-ec); background: color-mix(in srgb, var(--estado-ec) 8%, var(--color-superficie)); }
+.u .lg-dias-tira .lg-hoy:not([aria-pressed=true]) { box-shadow: inset 0 -3px 0 var(--color-accion); }
+.u .lg-dias-tira [aria-pressed=true] { background: var(--color-principal); border-color: var(--color-principal); color: var(--color-sobre-principal); }
+.u .lg-dias-tira [aria-pressed=true] small { color: var(--color-sobre-principal); }
+.u .lg-dias-tira .lg-jr[aria-pressed=true] { background: var(--estado-ec); border-color: var(--estado-ec); }
+/* En el móvil, sin flechas (se desliza con el dedo) y más estrechos: caben siete, el abierto en medio. */
+@media (max-width: 639px) { .u .lg-dias .u-btn-icono { display: none; } .u .lg-dias-tira { gap: 6px; } .u .lg-dias-tira button { width: 44px; min-height: 48px; } .u .lg-dias-tira b { font-size: 15px; } .u .lg-dias-tira small { font-size: 10px; } }
+.u .lg-jr-t { color: var(--estado-ec); }
+/* Un anulado por culpa de un equipo: su 0-5, en el color de anulado. */
+.u .lg-pc-an b, .u .lg-mcentro-an { color: var(--estado-bl) !important; }
+/* Goleadoras: de la liga o de toda la competición, buscador y lista con el puesto, la jugadora (dorsal) y sus goles. */
+.u .lg-gol-cab { display: flex; flex-direction: column; gap: var(--e2); margin: 0 0 var(--e3); }
+.u .lg-gol-busca input { width: 100%; max-width: 420px; }
+.u .lg-gol-eq { margin: 0 0 var(--e4); }
+.u .lg-gol-eq .lg-sub { display: flex; justify-content: space-between; gap: var(--e3); }
+.u .lg-pos { flex: none; width: 2em; color: var(--color-suave); font-size: 13px; }
+.u .lg-cero { color: var(--color-suave); }
+.u .lg-cero .lg-n { color: var(--color-suave); }
+.u .lg-n small { font: 400 12px/1 var(--fuente-texto); color: var(--color-suave); }
 /* Recuperar: la hora y el campo de cada partido. */
 .u .lg-rec-horas { display: grid; grid-template-columns: 1fr; gap: var(--e3); }
 @media (min-width: 640px) { .u .lg-rec-horas { grid-template-columns: 1fr 1fr; } }
@@ -487,10 +512,10 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .lg-clas td.num:last-child { font-size: 15px; }
 @media (max-width: 639px) { .u .lg-clas th, .u .lg-clas td { padding-left: var(--e1); padding-right: var(--e1); } .u .lg-clas td:first-child, .u .lg-clas th:first-child { padding-left: var(--e2); } }
 .u .lg-clas td:first-child, .u .lg-clas th:first-child { width: 1%; }
-.u .lg-ranking { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); counter-reset: lg; }
-.u .lg-ranking li { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); padding: var(--e2) 0; border-bottom: 1px solid var(--color-linea); counter-increment: lg; }
-.u .lg-ranking li::before { content: counter(lg); flex: none; width: 1.6em; color: var(--color-suave); font-variant-numeric: tabular-nums; font-size: 13px; }
+.u .lg-ranking { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
+.u .lg-ranking li { display: flex; align-items: center; gap: var(--e3); padding: var(--e2) 0; border-bottom: 1px solid var(--color-linea); }
 .u .lg-ranking .lg-eqt { flex: 1 1 auto; }
+.u .lg-ranking .lg-dorsal { display: inline-block; margin-right: 2px; }
 .u .lg-n { flex: none; font: var(--peso-titulos) 20px/1 var(--fuente-titulos); color: var(--color-principal-oscuro); }
 .u .lg-semana { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e2); }
 .u .lg-semana .n-grupo { margin: 0; min-width: 9em; text-align: center; font-variant-numeric: tabular-nums; }
