@@ -504,9 +504,36 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
 .u .gs5 .gs-resu-i > span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .u .gs5 .gs-resu-i .gs-enl { flex: none; font-size: 13px; font-weight: 700; }
 .u .gs5 .gs-sintel { display: inline-flex; align-items: center; min-height: 44px; font-size: 13px; color: var(--gs-g); }
-/* Foto: la inscripción elegida y si se puede publicar (sale de esa inscripción). */
-.u .gs5 .gs-elegida { margin-top: var(--e2); }
-.u .gs5 .gs-pub { margin: var(--e2) 0 0; font-size: 14px; }
+/* Fotos: miniaturas en cuadrícula (ficha de la jugadora), la foto grande (visor y asignador) y las pequeñas para comparar. */
+.u .gs5 .gs-foto { display: flex; align-items: center; justify-content: center; overflow: hidden; background: var(--gs-f); border-radius: var(--radio-peq); }
+.u .gs5 .gs-foto img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.u .gs5 .gs-foto .u-carga { width: 24px; height: 24px; }
+.u .gs5 .gs-foto-no { padding: var(--e2); text-align: center; font-size: 13px; }
+.u .gs5 .gs-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--e3); margin-top: var(--e2); }
+.u .gs5 .gs-fig { margin: 0; display: flex; flex-direction: column; gap: var(--e1); min-width: 0; }
+.u .gs5 .gs-fbtn-ver { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.u .gs5 .gs-fbtn-ver .gs-foto { aspect-ratio: 1; width: 100%; }
+.u .gs5 .gs-fig figcaption { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.u .gs5 .gs-fig .gs-enl { align-self: flex-start; font-size: 13px; font-weight: 700; }
+.u .gs5 .gs-grande { display: flex; justify-content: center; margin: var(--e2) 0; }
+.u .gs5 .gs-foto-g { width: 100%; min-height: 200px; max-height: 60vh; }
+.u .gs5 .gs-foto-g img { width: auto; height: auto; max-width: 100%; max-height: 60vh; object-fit: contain; }
+.u .gs5 .gs-velo-foto { z-index: 61; }
+.u .gs5 .gs-hoja-foto { max-width: 900px; padding: var(--e4); }
+.u .gs5 .gs-hoja-ancha { max-width: 760px; }
+.u .gs5 .gs-as-cab { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e1) var(--e3); margin-top: var(--e2); }
+.u .gs5 .gs-as-cab b { font: var(--peso-titulos) 17px/1.2 var(--fuente-titulos); color: var(--color-principal-oscuro); }
+.u .gs5 .gs-as-nav { justify-content: center; }
+.u .gs5 .gs-cols .gs-chip { display: inline-flex; align-items: center; }
+.u .gs5 .gs-cols .gs-chip .gs-color { margin-right: var(--e1); }
+.u .gs5 .gs-as-j { align-items: center; }
+.u .gs5 .gs-minis { display: flex; align-items: center; gap: var(--e1); flex: none; }
+.u .gs5 .gs-foto-p { width: 52px; height: 52px; }
+.u .gs5 .gs-mas-f { font-size: 13px; font-weight: 700; color: var(--gs-g); padding-left: 2px; }
+.u .gs5 .gs-alt-s { display: flex; justify-content: space-between; align-items: center; gap: var(--e2); width: 100%; min-height: 32px; padding: 0; border: 0;
+  background: none; color: inherit; text-align: left; cursor: pointer; font-size: 15px; }
+.u .gs5 .gs-alt-s em { font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
+@media (max-width: 520px) { .u .gs5 .gs-fotos { grid-template-columns: repeat(2, minmax(0, 1fr)); } .u .gs5 .gs-foto-p { width: 44px; height: 44px; } }
 
 /* Ventanas (fichas): hoja sobre un velo; pie fijo con «Cerrar» y «Guardar N cambios». */
 .u .gs5 .gs-velo { position: fixed; inset: 0; z-index: 60; background: var(--color-velo); display: flex; align-items: flex-start; justify-content: center;
@@ -551,8 +578,6 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
 .u .gs5 .gs-hoja .gs-item.gs-err { padding-left: var(--e3); padding-right: var(--e3); }
 .u .gs5 .gs-hoja .gs-item .gs-t { font-size: 14px; }
 .u .gs5 .gs-elegir { border: 1px solid var(--gs-l); border-radius: var(--radio); padding: 0 var(--e3); margin-top: var(--e2); }
-.u .gs5 .gs-visor { display: flex; justify-content: center; margin: var(--e2) 0; }
-.u .gs5 .gs-visor img { display: block; max-width: 100%; max-height: 60vh; margin: 0 auto; border-radius: var(--radio); background: var(--gs-f); }
 @media (max-width: 640px) {
   .u .gs5 .gs-velo { padding: 0; }
   .u .gs5 .gs-hoja { border-radius: 0; min-height: 100%; max-width: none; margin: 0; padding: var(--e4); }
