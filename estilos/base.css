@@ -390,29 +390,41 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .pd-r b { display: block; font-size: 12px; color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .02em; }
 
 /* ---------- Ligas de Konamigas (T0255, konamigas/secciones/ligas.js) ----------
- * Temporada y liga arriba, pestañas, jornadas en una fila que se desplaza y los partidos como una lista con líneas: hora y
- * campo a la izquierda, los dos equipos uno debajo del otro con su resultado a la derecha (gana en negrita) y debajo el
- * estado y el árbitro. Los partidos de quien ha entrado llevan una franja del color principal. Solo variables. */
+ * Arriba la temporada y, en botones, la competición y su liga; debajo las pestañas. Los partidos, una lista con líneas:
+ * hora y campo a la izquierda, los dos equipos uno debajo del otro con el color de su camiseta y su resultado (gana en
+ * negrita), y el estado y el árbitro. Los de quien ha entrado llevan una franja del color principal. La ficha es un
+ * marcador: cada equipo con su color arriba y, debajo, quién marcó. El color de cada equipo es un dato (--c), no de la
+ * marca. Solo variables. */
 .u .lg-barra { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--e3); margin: 0 0 var(--e3); }
-.u .lg-barra .u-campo { flex: 1 1 200px; max-width: 360px; }
-.u .lg-barra .u-campo select { width: 100%; }
 .u .lg-barra .lg-temp { flex: 0 1 180px; }
+.u .lg-barra .lg-temp select { width: 100%; }
 .u .lg-barra [hidden] { display: none; }
+.u .lg-elige { display: flex; flex-direction: column; gap: var(--e2); margin: 0 0 var(--e3); }
+.u .lg-elige:empty { display: none; }
+.u .lg-fila-chips, .u .lg-jornadas { display: flex; gap: var(--e2); overflow-x: auto; padding: 2px 0 var(--e1); scrollbar-width: none; }
+.u .lg-fila-chips::-webkit-scrollbar, .u .lg-jornadas::-webkit-scrollbar { display: none; }
+.u .lg-fila-chips button, .u .lg-jornadas button { flex: none; min-height: 44px; padding: 0 var(--e3); border-radius: var(--radio); cursor: pointer;
+  border: 1.5px solid var(--color-borde-campo); background: var(--color-superficie); color: var(--color-texto); font: 700 14px/1.2 var(--fuente-texto); }
+.u .lg-fila-chips button[aria-pressed=true], .u .lg-jornadas button[aria-pressed=true] { background: var(--color-principal); border-color: var(--color-principal); color: var(--color-sobre-principal); }
+/* La liga va debajo de su competición, más pequeña: se ve que es de ella. */
+.u .lg-chips-liga button { min-height: 40px; font-size: 13px; font-weight: 600; border-width: 1px; }
+.u .lg-chips-liga button[aria-pressed=true] { background: var(--color-bloque); border-color: var(--color-principal-oscuro); color: var(--color-principal-oscuro); }
+.u .lg-jornadas button { min-width: 48px; padding: 0 var(--e2); font-variant-numeric: tabular-nums; }
+.u .lg-jornadas button.lg-hecha:not([aria-pressed=true]) { color: var(--color-suave); border-color: var(--color-linea); }
 .u .lg-cont { padding-top: var(--e4); }
-.u .lg-cab { margin: 0 0 var(--e3); }
+.u .lg-cab { margin: 0 0 var(--e3); font-size: 14px; color: var(--color-suave); }
 .u .lg-cab p { margin: 0; }
-.u .lg-gestor { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--e2); font-size: 14px; }
-.u .lg-jornadas { display: flex; gap: var(--e2); overflow-x: auto; padding: var(--e1) 0 var(--e2); scrollbar-width: none; }
-.u .lg-jornadas::-webkit-scrollbar { display: none; }
-.u .lg-jornadas button { flex: none; min-width: 48px; min-height: 44px; padding: 0 var(--e2); border-radius: var(--radio); cursor: pointer;
-  border: 1.5px solid var(--color-borde-campo); background: var(--color-superficie); color: var(--color-texto);
-  font: 700 14px/1 var(--fuente-texto); font-variant-numeric: tabular-nums; }
-.u .lg-jornadas button.lg-hecha { color: var(--color-suave); border-color: var(--color-linea); }
-.u .lg-jornadas button[aria-pressed=true] { background: var(--color-principal); border-color: var(--color-principal); color: var(--color-sobre-principal); }
-.u .lg-dia { font: 700 13px/1.3 var(--fuente-texto); text-transform: uppercase; letter-spacing: .02em; color: var(--color-principal-oscuro);
-  margin: var(--e4) 0 var(--e2); }
+.u .lg-jcab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e3); margin: var(--e4) 0 0; }
+.u .lg-jcab .n-grupo { margin: 0; }
+.u .lg-dia { font: 700 13px/1.3 var(--fuente-texto); text-transform: uppercase; letter-spacing: .02em; color: var(--color-principal-oscuro); margin: var(--e4) 0 var(--e2); }
 .u .lg-dia.lg-hoy { color: var(--color-texto); }
 .u .lg-aviso { margin: 0 0 var(--e2); padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-bloque); font-size: 14px; font-weight: 600; }
+/* El color de la camiseta de un equipo: un cuadrito con borde, para que se vea también un blanco. */
+.u .lg-color { flex: none; width: 12px; height: 12px; border-radius: var(--radio-peq); background: var(--c); border: 1px solid var(--color-borde-campo); }
+.u .lg-color-no { background: transparent; border-style: dashed; }
+.u .lg-eqt { display: inline-flex; align-items: center; gap: var(--e2); min-width: 0; }
+.u .lg-eqt > span { display: flex; flex-direction: column; min-width: 0; }
+.u .lg-eqt small { font-size: 12px; color: var(--color-suave); font-weight: 400; }
 .u .lg-lista { border-top: 1px solid var(--color-linea); margin: 0 0 var(--e3); }
 .u .lg-p { display: grid; grid-template-columns: 64px 1fr; gap: var(--e3); width: 100%; padding: var(--e3) var(--e2) var(--e3) var(--e3); text-align: left;
   border: 0; border-bottom: 1px solid var(--color-linea); border-left: 4px solid transparent; background: none; color: inherit; font: inherit; cursor: pointer; }
@@ -421,38 +433,78 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .lg-hora { display: flex; flex-direction: column; gap: 2px; }
 .u .lg-hora b { font-size: 16px; }
 .u .lg-hora small { font-size: 12px; color: var(--color-suave); overflow-wrap: anywhere; }
-.u .lg-eqs { display: flex; flex-direction: column; gap: 2px; min-width: 0; max-width: 480px; }
-.u .lg-eq { display: flex; justify-content: space-between; gap: var(--e3); font-size: 15px; }
-.u .lg-nom { min-width: 0; overflow-wrap: anywhere; }
+.u .lg-eqs { display: flex; flex-direction: column; gap: var(--e1); min-width: 0; max-width: 480px; }
+.u .lg-eq { display: flex; align-items: center; gap: var(--e2); font-size: 15px; }
+.u .lg-nom { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .u .lg-gol { flex: none; min-width: 24px; text-align: right; font-weight: 700; }
 .u .lg-gana { font-weight: 700; }
-.u .lg-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--e3); margin-top: var(--e1); font-size: 13px; color: var(--color-suave); }
+.u .lg-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--e3); margin-top: 2px; font-size: 13px; color: var(--color-suave); }
 .u .lg-meta .n-estado { color: var(--color-texto); }
 .u .lg-clas td.num:last-child { font-size: 15px; }
 @media (max-width: 639px) { .u .lg-clas th, .u .lg-clas td { padding-left: var(--e1); padding-right: var(--e1); } .u .lg-clas td:first-child, .u .lg-clas th:first-child { padding-left: var(--e2); } }
 .u .lg-clas td:first-child, .u .lg-clas th:first-child { width: 1%; }
+.u .lg-ranking { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); counter-reset: lg; }
+.u .lg-ranking li { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); padding: var(--e2) 0; border-bottom: 1px solid var(--color-linea); counter-increment: lg; }
+.u .lg-ranking li::before { content: counter(lg); flex: none; width: 1.6em; color: var(--color-suave); font-variant-numeric: tabular-nums; font-size: 13px; }
+.u .lg-ranking .lg-eqt { flex: 1 1 auto; }
+.u .lg-n { flex: none; font: var(--peso-titulos) 20px/1 var(--fuente-titulos); color: var(--color-principal-oscuro); }
 .u .lg-semana { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e2); }
 .u .lg-semana .n-grupo { margin: 0; min-width: 9em; text-align: center; font-variant-numeric: tabular-nums; }
 .u .lg-semana .u-btn-icono { font-size: 22px; }
 .u .lg-pend { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--e2); margin: 0 0 var(--e3); font-weight: 600; }
-.u .lg-marcador-v { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--e3); margin: 0;
-  font: 700 15px/1.3 var(--fuente-texto); text-align: center; }
-.u .lg-marcador-v b { font: var(--peso-titulos) 28px/1 var(--fuente-titulos); color: var(--color-principal-oscuro); }
+/* Ficha: el marcador. Cada equipo con una franja de su color arriba; en medio el resultado (o la hora) y el estado. */
+.u .lg-marcador { display: grid; grid-template-columns: 1fr auto 1fr; gap: var(--e3); align-items: start; }
+.u .lg-mlado { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-top: var(--e2); }
+.u .lg-mlado:last-child { text-align: right; align-items: flex-end; }
+.u .lg-mcolor { display: block; width: 100%; height: 8px; border-radius: var(--radio-peq); background: var(--c); border: 1px solid var(--color-borde-campo); margin-bottom: var(--e2); }
+.u .lg-mcolor.lg-color-no { background: transparent; border-style: dashed; }
+.u .lg-mlado > b { font: var(--peso-titulos) 17px/1.2 var(--fuente-titulos); overflow-wrap: anywhere; }
+.u .lg-mlado > small { font-size: 12px; color: var(--color-suave); }
+.u .lg-mcentro { display: flex; flex-direction: column; align-items: center; gap: var(--e2); padding-top: var(--e4); }
+.u .lg-mcentro > b { font: var(--peso-titulos) 34px/1 var(--fuente-titulos); color: var(--color-principal-oscuro); white-space: nowrap; }
+.u .lg-mcentro > b span { margin: 0 .15em; color: var(--color-suave); }
+.u .lg-mcentro > b.lg-mhora { font-size: 24px; }
+.u .lg-mgoles { list-style: none; margin: var(--e2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--e1); font-size: 14px; width: 100%; }
+.u .lg-mgoles li { display: flex; align-items: baseline; gap: var(--e2); min-width: 0; }
+.u .lg-mlado:last-child .lg-mgoles li { flex-direction: row-reverse; }
+.u .lg-dorsal { flex: none; min-width: 1.9em; padding: 0 var(--e1); border-radius: var(--radio-peq); background: var(--color-bloque); text-align: center; font-weight: 700; font-size: 12px; line-height: 1.6; }
+.u .lg-veces { flex: none; font-weight: 700; }
+@media (max-width: 639px) { .u .lg-mcentro > b { font-size: 28px; } .u .lg-mlado > b { font-size: 15px; } .u .lg-marcador { gap: var(--e2); } }
 .u .lg-datos { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: var(--e2) var(--e4); }
 .u .lg-datos dt { font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; }
 .u .lg-datos dd { margin: 0; overflow-wrap: anywhere; }
-.u .lg-sub { font-size: 16px; color: var(--color-principal-oscuro); }
-.u .lg-goles { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
-.u .lg-goles li { display: flex; justify-content: space-between; gap: var(--e3); padding: var(--e2) 0; border-bottom: 1px solid var(--color-linea); font-size: 14px; }
-.u .lg-goles li span { color: var(--color-suave); }
+.u .lg-sub { font-size: 16px; color: var(--color-principal-oscuro); margin: 0 0 var(--e2); }
+/* Acta */
 .u .lg-acta { display: grid; grid-template-columns: 1fr; gap: var(--e4); }
 @media (min-width: 640px) { .u .lg-acta { grid-template-columns: 1fr 1fr; } }
-.u .lg-lado { display: flex; flex-direction: column; gap: var(--e2); padding: var(--e3); border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); }
+.u .lg-lado { display: flex; flex-direction: column; gap: var(--e2); padding: var(--e3); border: 1px solid var(--color-linea); border-top: 6px solid var(--c, var(--color-linea));
+  border-radius: var(--radio); background: var(--color-superficie); }
 .u .lg-lado > b { font-size: 16px; overflow-wrap: anywhere; }
 .u .lg-paso { display: flex; align-items: center; gap: var(--e2); }
 .u .lg-paso input { width: 72px; text-align: center; font-size: 22px; font-variant-numeric: tabular-nums; }
 .u .lg-quien { display: flex; flex-direction: column; gap: var(--e2); }
 .u .lg-quien select { width: 100%; }
+/* Mover partidos: la regla, los huecos de la liga para elegir, qué cambia y a quién hay que avisar. */
+.u .lg-regla { margin: 0; padding: var(--e2) var(--e3); border-left: 3px solid var(--color-principal); background: var(--color-superficie); font-size: 14px; }
+.u .lg-huecos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--e2); }
+.u .lg-h { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 44px; padding: var(--e2) var(--e3); text-align: left; cursor: pointer;
+  border: 1.5px solid var(--color-borde-campo); border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto); font: 400 14px/1.3 var(--fuente-texto); }
+.u .lg-h b { font-size: 16px; }
+.u .lg-h small { font-size: 12px; color: var(--color-suave); }
+.u .lg-h[aria-checked=true] { border-color: var(--color-principal); box-shadow: inset 0 0 0 2px var(--color-principal); }
+.u .lg-h:disabled { cursor: default; border-style: dashed; border-color: var(--color-linea); color: var(--color-suave); }
+.u .lg-h-cambio:not([aria-checked=true]) small { color: var(--color-texto); font-weight: 600; }
+.u .lg-conf { display: flex; flex-direction: column; gap: var(--e3); }
+.u .lg-conf:empty { display: none; }
+.u .lg-cambios ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
+.u .lg-cambios li { display: flex; flex-direction: column; gap: 2px; padding: var(--e2) 0; border-bottom: 1px solid var(--color-linea); font-size: 14px; }
+.u .lg-avisar-ya { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: var(--e3); border-radius: var(--radio); background: var(--color-bloque); font-size: 14px; }
+.u .lg-avisar-ya b { font-size: 15px; }
+.u .lg-avisar-mal b { color: var(--color-error); }
+.u .lg-capitanas { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
+.u .lg-capitanas li { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--e1) var(--e3); padding: var(--e3) 0; border-bottom: 1px solid var(--color-linea); }
+.u .lg-capitanas .u-check { min-height: 44px; }
+.u .lg-msg { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--color-suave); }
 .u .n-ventana [hidden] { display: none; }
 /* El título de la ventana recibe el foco al abrirla (para el lector de pantalla), sin recuadro. */
 .u .n-ventana h2[tabindex="-1"]:focus { outline: none; }
