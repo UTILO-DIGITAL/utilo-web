@@ -718,6 +718,7 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
   .u .gs5 .gs-filtrar #gs-temp { flex: 0 0 140px; min-width: 0; }
   .u .gs5 .gs-filtrar input[type=search] { order: 1; flex: 2 1 260px; min-width: 260px; max-width: none; }
   .u .gs5 .gs-filtrar > .gs-chips { order: 2; flex: 1 1 100%; margin-top: var(--e1); }
+}
 
 .u .n-ventana .u-campo > input[type=search] + select { margin-top: var(--e2); }
 /* El recurso propio de la marca (su letra «pintada», si la tiene), una vez: la temporada del resumen. */
@@ -802,8 +803,9 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
 .u .u-campos.cm-una { grid-template-columns: 1fr; }
 .u .cm-coste { margin: var(--e1) 0 0; }
 .u .cm-sub { font-size: 1rem; margin: var(--e4) 0 var(--e2); }
-.u .cm-md-comps li { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); flex-wrap: wrap; }
-.u .cm-md-comps .u-check { flex: 1 1 12em; }
+.u .cm-md-comps li { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); }
+.u .cm-md-comps .u-check { flex: 1 1 0; min-width: 0; }
+.u .cm-md-comps li.cm-md-temp { display: block; padding: var(--e3) 0 var(--e1); font-weight: 700; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--color-suave); }
 .u .cm-md-n { display: inline-flex; align-items: center; gap: var(--e2); color: var(--color-suave); }
 .u .cm-md-n input { width: 4.5em; min-height: 44px; padding: 0 var(--e2); border: 1.5px solid var(--color-borde-campo); border-radius: var(--radio); font: inherit; color: var(--color-texto); background: var(--color-superficie); }
 .u .cm-provs, .u .cm-mods { margin-top: var(--e6); }
