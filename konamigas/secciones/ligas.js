@@ -405,7 +405,7 @@
         if (!temp) { cont.innerHTML = '<p class="u-vacio">Todavía no hay temporadas. Añade la primera en la tabla TEMPORADAS del Excel COMPETICION.</p>'; return; }
         if (S.tab !== 'CALENDARIO' && !actual) { cont.innerHTML = '<p class="u-vacio">Esta temporada todavía no tiene ligas. Se crean en las tablas COMPETICIONES y LIGAS del Excel COMPETICION.</p>'; return; }
         cont.innerHTML = ({ JORNADAS: htmlJornadas, CLASIFICACION: htmlClasificacion, CALENDARIO: htmlCalendario })[S.tab]();
-        [].forEach.call(el.querySelectorAll('.lg-fila-chips [aria-pressed=true], .lg-jornadas [aria-pressed=true]'), function (sel) {
+        [].forEach.call(el.querySelectorAll('.lg-fila-chips [aria-pressed=true]'), function (sel) {
           var p = sel.parentNode;
           if (p.scrollWidth > p.clientWidth) p.scrollLeft = Math.max(0, sel.offsetLeft - p.offsetLeft - p.clientWidth / 2 + sel.offsetWidth / 2);
         });
@@ -481,15 +481,21 @@
           (programa ? '<button type="button" class="u-btn" data-accion="recuperar">Recuperar en huecos libres</button>' : '') + '</div>';
         if (!js.length) return h + '<p class="u-vacio">Esta liga todavía no tiene partidos.</p>';
         if (S.jornada === null || js.indexOf(S.jornada) < 0) S.jornada = jornadaInicial(ps, hoy());
-        h += '<div class="lg-jornadas" role="group" aria-label="Jornada">' + js.map(function (j) {
-          var pj = ps.filter(function (p) { return num(p.JORNADA) === j; }), hecha = pj.length && pj.every(function (p) { return p.ESTADO !== 'Programado'; });
-          return '<button type="button" data-jornada="' + j + '" aria-pressed="' + (j === S.jornada) + '"' + (hecha ? ' class="lg-hecha"' : '') + ' aria-label="Jornada ' + j + '">J' + j + '</button>';
-        }).join('') + '</div>';
+        // Una liga tiene hasta 18 jornadas: en vez de un botón por jornada, la anterior, la siguiente y un desplegable con todas
+        // (su día y si ya está jugada).
+        var pos = js.indexOf(S.jornada);
+        h += '<div class="lg-jnav"><button type="button" class="u-btn u-btn-icono" data-jornada="' + (js[pos - 1] || '') + '"' + (pos > 0 ? '' : ' disabled') + ' aria-label="Jornada anterior">‹</button>' +
+          '<label class="u-campo"><span class="u-oculto">Jornada</span><select id="lg-jsel">' + js.map(function (j) {
+            var pj = ps.filter(function (p) { return num(p.JORNADA) === j && !p.ID_PARTIDO_ORIGEN; }), f = pj.map(function (p) { return p.FECHA; }).sort()[0];
+            var hecha = pj.length && pj.every(function (p) { return p.ESTADO !== 'Programado'; });
+            return '<option value="' + j + '"' + (j === S.jornada ? ' selected' : '') + '>Jornada ' + j + (f ? ' · ' + fechaDia(f) : '') + (hecha ? ' · jugada' : '') + '</option>';
+          }).join('') + '</select></label>' +
+          '<button type="button" class="u-btn u-btn-icono" data-jornada="' + (js[pos + 1] || '') + '"' + (pos < js.length - 1 ? '' : ' disabled') + ' aria-label="Jornada siguiente">›</button></div>';
         var pj = ps.filter(function (p) { return num(p.JORNADA) === S.jornada; }).sort(function (a, b) { return orden(cuando(a), cuando(b)) || orden(campo(a.ID_CAMPO), campo(b.ID_CAMPO)); });
         var fechas = []; pj.forEach(function (p) { if (fechas.indexOf(p.FECHA) < 0) fechas.push(p.FECHA); });
         var mov = programa && jornadaMovible(ps, S.jornada, hoy()).ok;
-        h += '<div class="lg-jcab"><h2 class="n-grupo">Jornada ' + S.jornada + '</h2>' +
-          (mov ? '<button type="button" class="u-btn" data-accion="jornadas">Intercambiar fecha con otra jornada</button>' : '') + '</div>';
+        // La jornada ya sale en el selector: aquí solo lo que se puede hacer con ella.
+        if (mov) h += '<div class="lg-jcab"><button type="button" class="u-btn" data-accion="jornadas">Intercambiar fecha con otra jornada</button></div>';
         fechas.forEach(function (f) {
           h += (fechas.length > 1 || f ? '<h3 class="lg-dia">' + texto(f ? fechaDia(f) + ' · ' + fecha(f) : 'Sin fecha') + '</h3>' : '') + htmlDia(f) +
             '<div class="lg-lista">' + pj.filter(function (p) { return p.FECHA === f; }).map(function (p) { return htmlPartido(p); }).join('') + '</div>';
@@ -877,21 +883,21 @@
       }
 
       /**
-       * Recuperar aplazados en huecos libres de su liga: se eligen los partidos (uno, varios o la jornada entera) y el día;
-       * cada uno va al siguiente hueco libre de ese día, por hora. Se ven primero los días en que la liga no juega, que
+       * Recuperar aplazados en huecos libres de su liga: se eligen los partidos (uno, varios o la jornada entera), el día y,
+       * para cada uno, la hora y el campo entre los huecos libres de ese día (propuesto: el siguiente libre, por hora). Se ven primero los días en que la liga no juega, que
        * son los que se dejan para recuperar. Antes de guardar, el aviso de las capitanas; al guardar, la lista para avisarlas.
        * elegidos: los IDs de aplazados marcados al abrir (null: todos los pendientes).
        */
       function formRecuperar(idLiga, elegidos) {
         var pend = aplazadosPendientes(d.par, idLiga);
         if (!pend.length) return;
-        var marcados = {}, dia = '', capitanas = null;
+        var marcados = {}, dia = '', capitanas = null, horas = {}; // horas: aplazado → hueco elegido
         // Desde el aviso, la primera jornada pendiente; desde la ficha, ese partido.
         pend.forEach(function (p) { marcados[p.ID] = elegidos ? elegidos.indexOf(p.ID) >= 0 : num(p.JORNADA) === num(pend[0].JORNADA); });
         var jornadasP = jornadas(pend), hasta = temp && temp.FECHA_FIN ? temp.FECHA_FIN : sumarDias(hoy(), 180);
         var html = '<h2 id="lg-vt">Recuperar aplazados</h2>' +
           '<p class="u-nota">' + texto(ligaCompleta(idLiga)) + '</p>' +
-          '<p class="lg-regla">Solo en los campos reservados para la liga esta temporada. Cada partido va al siguiente hueco libre del día que elijas; el aplazado se queda como estaba y la recuperación es un partido nuevo.</p>' +
+          '<p class="lg-regla">Solo en los campos reservados para la liga esta temporada. Eliges el día y, para cada partido, la hora y el campo entre los huecos libres. El aplazado se queda como estaba y la recuperación es un partido nuevo.</p>' +
           '<h3 class="lg-sub">1 · Qué partidos</h3><div class="lg-rec-ps">' + jornadasP.map(function (j) {
             var de = pend.filter(function (p) { return num(p.JORNADA) === j; });
             return '<fieldset class="lg-rec-j"><legend><label class="u-check"><input type="checkbox" data-jornada-rec="' + j + '"> Jornada ' + j + (de.length > 1 ? ' entera' : '') + '</label></legend>' +
@@ -918,13 +924,13 @@
               caja.innerHTML = '<p class="lg-pav lg-pav-ficha lg-av-si">' + texto(rep.map(equipo).join(' y ') + (rep.length === 1 ? ' jugaría' : ' jugarían') + ' dos veces el mismo día. Recupera esos partidos en días distintos: marca menos y repite después con los demás.') + '</p>';
               dia = ''; confirmar(); return;
             }
-            var ds = diasRecuperar(d.par, d.hue, d.cal, idLiga, sel, hoy() > (temp && temp.FECHA_INICIO || '') ? hoy() : temp.FECHA_INICIO, hasta, 12);
+            var ds = diasRecuperar(d.par, d.hue, d.cal, idLiga, sel, hoy() > (temp && temp.FECHA_INICIO || '') ? hoy() : temp.FECHA_INICIO, hasta, 9);
             ds.sort(function (a, b) { return (a.ok ? 0 : 1) - (b.ok ? 0 : 1) || (a.sinPartidos ? 0 : 1) - (b.sinPartidos ? 0 : 1) || orden(a.fecha, b.fecha); });
             if (ds.filter(function (x) { return x.ok; }).every(function (x) { return x.fecha !== dia; })) dia = '';
             caja.innerHTML = ds.length ? '<div class="lg-huecos" role="radiogroup" aria-label="Día">' + ds.map(function (x) {
               return '<button type="button" role="radio" aria-checked="' + (x.fecha === dia) + '" data-dia="' + x.fecha + '"' + (x.ok ? '' : ' disabled') + ' class="lg-h' + (x.ok && x.sinPartidos ? ' lg-h-libre' : '') + '">' +
-                '<b>' + texto(fechaDia(x.fecha)) + '</b><span>' + texto(x.ok ? (x.sinPartidos ? 'La liga no juega · ' : '') + x.libres + (x.libres === 1 ? ' hueco libre' : ' huecos libres') : 'No se puede') + '</span>' +
-                '<small>' + texto(x.ok ? (x.sinPartidos ? 'Día para recuperar' : 'Hay otros partidos') : x.equipo ? equipo(x.equipo) + ' ya juega ese día' : x.motivo) + '</small></button>';
+                '<b>' + texto(fechaDia(x.fecha)) + '</b><span>' + texto(x.ok ? x.libres + (x.libres === 1 ? ' hueco libre' : ' huecos libres') : 'No se puede') + '</span>' +
+                '<small>' + texto(x.ok ? (x.sinPartidos ? 'La liga no juega: día para recuperar' : 'La liga ya juega ese día') : x.equipo ? equipo(x.equipo) + ' ya juega ese día' : x.motivo) + '</small></button>';
             }).join('') + '</div>' : '<p class="u-vacio">La liga no tiene huecos en HUECOS: no se puede recuperar aquí.</p>';
             confirmar();
           }
@@ -933,8 +939,18 @@
             if (!dia || !sel.length) { conf.innerHTML = ''; g.disabled = true; g.textContent = 'Recuperar'; return; }
             var plan = planRecuperar(d.par, d.hue, dia, sel);
             if (plan.error) { conf.innerHTML = ''; g.disabled = true; return; }
-            var cambios = plan.asignaciones.map(function (a) { return { p: a.p, hueco: a.hueco, recupera: true, antes: foto(a.p), nuevo: { FECHA: dia, HORA: a.hueco.HORA, ID_CAMPO: a.hueco.ID_CAMPO } }; });
-            conf.innerHTML = htmlCambios(cambios);
+            // La hora y el campo de cada partido: la propuesta (el siguiente hueco libre), que se puede cambiar por otro libre.
+            var libres = huecosLibres(d.par, d.hue, idLiga, dia), hi = indice(libres);
+            plan.asignaciones.forEach(function (a) { if (!horas[a.p.ID] || !hi[horas[a.p.ID]]) horas[a.p.ID] = a.hueco.ID; });
+            var usados = {}, repetido = false;
+            sel.forEach(function (p) { if (usados[horas[p.ID]]) repetido = true; usados[horas[p.ID]] = 1; });
+            var cambios = sel.map(function (p) { var h = hi[horas[p.ID]]; return { p: p, hueco: h, recupera: true, antes: foto(p), nuevo: { FECHA: dia, HORA: h.HORA, ID_CAMPO: h.ID_CAMPO } }; });
+            conf.innerHTML = '<h3 class="lg-sub">3 · A qué hora</h3><div class="lg-rec-horas">' + sel.map(function (p) {
+              return '<label class="u-campo"><span class="u-etiqueta">' + texto(titulo(p) + ' · J' + p.JORNADA) + '</span><select data-hora="' + texto(p.ID) + '">' +
+                opciones(libres.map(function (h) { return [h.ID, h.HORA + ' · ' + campoLargo(h.ID_CAMPO)]; }), horas[p.ID]) + '</select></label>';
+            }).join('') + '</div>' +
+              (repetido ? '<p class="lg-pav lg-pav-ficha lg-av-no">Dos partidos no pueden ir al mismo hueco: cambia la hora de uno.</p>' : htmlCambios(cambios));
+            if (repetido) { g.disabled = true; return; }
             g.disabled = false; g.textContent = 'Recuperar ' + (sel.length === 1 ? 'el partido' : 'los ' + sel.length + ' partidos') + ' el ' + fechaDia(dia).toLowerCase();
             capitanas = ctx.llamar('ligasCapitanas', [equiposDe(sel)]);
             capitanas.catch(function () {});
@@ -950,6 +966,7 @@
           }
           vent.onchange = function (e) {
             var c = e.target;
+            if (c.hasAttribute('data-hora')) { horas[c.getAttribute('data-hora')] = c.value; confirmar(); return; }
             if (c.hasAttribute('data-rec')) marcados[c.getAttribute('data-rec')] = c.checked;
             else if (c.hasAttribute('data-jornada-rec')) pend.forEach(function (p) { if (String(num(p.JORNADA)) === c.getAttribute('data-jornada-rec')) { marcados[p.ID] = c.checked; var x = vent.querySelector('[data-rec="' + p.ID + '"]'); if (x) x.checked = c.checked; } });
             else return;
@@ -958,7 +975,7 @@
           vent.onclick = function (e) {
             var b = e.target.closest('[data-dia]');
             if (!b || b.disabled) return;
-            dia = b.getAttribute('data-dia');
+            dia = b.getAttribute('data-dia'); horas = {};
             [].forEach.call(vent.querySelectorAll('[data-dia]'), function (x) { x.setAttribute('aria-checked', x === b ? 'true' : 'false'); });
             confirmar();
           };
@@ -1087,6 +1104,7 @@
       el.addEventListener('change', function (e) {
         var t = e.target;
         if (t === selTemp) { S.temp = t.value; S.comp = ''; S.liga = ''; S.jornada = null; guardado(CLAVE + 'temp', t.value); pintar(); }
+        else if (t.id === 'lg-jsel') { S.jornada = Number(t.value); pintar(); }
         else if (t === chkMios) { S.mios = t.checked; guardado(CLAVE + 'mios', t.checked ? 'si' : 'no'); pintar(); }
       });
 

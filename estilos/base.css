@@ -412,6 +412,15 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .lg-jornadas button { min-width: 48px; padding: 0 var(--e2); font-variant-numeric: tabular-nums; }
 .u .lg-jornadas button.lg-hecha:not([aria-pressed=true]) { color: var(--color-suave); border-color: var(--color-linea); }
 .u .lg-cont { padding-top: var(--e4); }
+/* Jornadas: la anterior, la siguiente y un desplegable con todas (una liga tiene hasta 18). */
+.u .lg-jnav { display: flex; align-items: center; gap: var(--e2); margin: 0 0 var(--e2); }
+.u .lg-jnav .u-campo { flex: 0 1 320px; min-width: 0; }
+.u .lg-jnav select { width: 100%; font-weight: 700; }
+.u .lg-jnav .u-btn-icono { font-size: 22px; flex: none; }
+/* Recuperar: la hora y el campo de cada partido. */
+.u .lg-rec-horas { display: grid; grid-template-columns: 1fr; gap: var(--e3); }
+@media (min-width: 640px) { .u .lg-rec-horas { grid-template-columns: 1fr 1fr; } }
+.u .lg-rec-horas select { width: 100%; }
 .u .lg-cab { margin: 0 0 var(--e3); font-size: 14px; color: var(--color-suave); }
 .u .lg-cab p { margin: 0; }
 .u .lg-jcab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e3); margin: var(--e4) 0 0; }
