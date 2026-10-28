@@ -481,6 +481,11 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .cm-ped-l { list-style: none; margin: var(--e2) 0; padding: 0; display: grid; gap: var(--e1); }
 .u .cm-ped-l li { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--e1); }
 .u .cm-ped-l .cm-color { align-self: center; margin-right: 0; }
+.u .cm-contacto { margin: 0; overflow-wrap: anywhere; user-select: text; }
+.u .cm-contacto .u-etiqueta { margin-right: var(--e1); }
+.u .cm-extracto { margin: 0; padding: var(--e3); max-height: 50vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+  font: inherit; font-size: .95em; line-height: 1.5; user-select: text;
+  background: var(--color-fondo); border: 1px solid var(--color-linea); border-radius: var(--radio); }
 .u .cm-rec { border-top: 1px solid var(--color-linea); padding-top: var(--e3); }
 .u .cm-rec-ok .n-grupo { color: var(--color-bien); }
 .u .cm-rec-l { list-style: none; margin: var(--e2) 0 0; padding: 0; }

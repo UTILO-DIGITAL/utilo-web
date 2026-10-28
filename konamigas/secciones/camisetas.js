@@ -8,8 +8,9 @@
  *   en «Para hacer»: las preparadas o entregadas, para recuperarlas (T0248); las demás, para quitarlas.
  * - Stock: por modelo, color, dorsal y talla, calculado aquí con las tablas (las mismas cuentas que el motor,
  *   CAMISETAS5_CUENTAS.js). «Sacar del local» apunta una regalada, donada, perdida… (T0247).
- * - Pedidos: lo que falta de un modelo, dar las libres del local, preparar el pedido con el resto, confirmado y ha llegado.
- * - Recuento: lo que debería haber suelto en el local; se cambia lo que no cuadra y se aplica. Lo contado se guarda en
+ * - Pedidos: lo que falta de un modelo, dar las libres del local, preparar el pedido con el resto (proveedor de
+ *   CONTRAPARTES, con su contacto), el extracto para enviárselo, confirmado y ha llegado.
+ * - Recuento: lo que debería haber suelto en el local (en la caja, sin bolsa); se cambia lo que no cuadra y se aplica. Lo contado se guarda en
  *   este dispositivo hasta aplicarlo.
  * Los nombres de jugadoras, equipos y competiciones los da el motor (camisetas5Nombres), solo de las inscripciones con
  * camiseta; se guardan en el dispositivo y se ponen al día por detrás.
@@ -133,7 +134,7 @@
 
   /* ======================= pantalla ======================= */
 
-  var TABLAS = ['CAMISETAS', 'MODELOS', 'COLORES', 'PEDIDOS', 'PEDIDOS_LINEAS', 'AJUSTES_STOCK'];
+  var TABLAS = ['CAMISETAS', 'MODELOS', 'COLORES', 'PEDIDOS', 'PEDIDOS_LINEAS', 'AJUSTES_STOCK', 'CONTRAPARTES'];
   var VISTAS = [['entregas', 'Entregas'], ['stock', 'Stock'], ['pedidos', 'Pedidos'], ['recuento', 'Recuento']];
   // [estado, en plural para los filtros, color de base.css]
   var ESTADOS = [['Por pedir', 'Por pedir', 'bl'], ['Pedida', 'Pedidas', 'x'], ['Por preparar', 'Por preparar', 'pr'], ['Preparada', 'Preparadas', 'ec'],
@@ -289,7 +290,7 @@
         return '<optgroup label="' + texto(t.nombre) + '"><option value="T:' + texto(t.id) + '"' + (S.comp === 'T:' + t.id ? ' selected' : '') + '>Toda la temporada ' + texto(t.nombre) + '</option>' +
           t.comps.map(function (k) { return '<option value="C:' + texto(k.id) + '"' + (S.comp === 'C:' + k.id ? ' selected' : '') + '>' + texto(k.nombre) + '</option>'; }).join('') + '</optgroup>';
       }).join('') + '</select></label>' +
-        '<label class="u-campo"><span class="u-etiqueta">Buscar</span><input type="search" id="cm-q" placeholder="Equipo, jugadora o dorsal" value="' + texto(S.q) + '" autocomplete="off"></label></div>' +
+        '<label class="u-campo"><span class="u-etiqueta">Buscar</span><input type="search" id="cm-q" placeholder="Equipo, jugadora, dorsal, color o talla" value="' + texto(S.q) + '" autocomplete="off"></label></div>' +
         '<div id="cm-chips" class="cm-chips" role="group" aria-label="Qué camisetas"></div><div id="cm-lista"></div>';
       c.querySelector('#cm-comp').onchange = function () { S.comp = this.value; S.todo = {}; guardarPref(); pintar(false); };
       c.querySelector('#cm-q').oninput = function () { S.q = this.value; pintar(false); };
@@ -315,7 +316,7 @@
     }).join('');
 
     var qn = norm(S.q).trim();
-    var busca = function (x) { return !qn || norm([x.q.equipo, x.q.jugadora, x.c.DORSAL, x.q.liga].join(' ')).indexOf(qn) >= 0; };
+    var busca = function (x) { return !qn || norm([x.q.equipo, x.q.jugadora, x.c.DORSAL, x.q.liga, nombreColor(x.c.ID_COLOR), x.c.TALLA].join(' ')).indexOf(qn) >= 0; };
     var grupos = {}, orden = [];
     base.forEach(function (x) { var k = x.q.ie || '—'; if (!grupos[k]) { grupos[k] = []; orden.push(k); } grupos[k].push(x); });
     var eqs = orden.filter(function (k) { return grupos[k].some(function (x) { return es(S.filtro)(x) && busca(x); }); });
@@ -500,7 +501,7 @@
         ['Entregada', c.FECHA_ENTREGA ? fecha(c.FECHA_ENTREGA) : ''], ['Inscripción', q.baja ? '<span class="u-mal">De baja</span>' : '']]) +
       (s === 'recuperar' ? '<p class="u-nota">La inscripción está de baja y su camiseta está ' + (e === 'Entregada' ? 'entregada: hay que pedírsela al equipo.' : 'en un pack: hay que sacarla.') +
         ' Al recuperarla vuelve al local como libre.</p><label class="u-check"><input type="checkbox" id="cm-rota"> Vuelve rota (cuenta como defectuosa)</label>' :
-        s === 'quitar' ? '<p class="u-nota">La inscripción está de baja: a esta jugadora ya no se le dará camiseta. Al quitarla deja de contar como pendiente y, si estaba guardada en el local, vuelve a quedar libre.</p>' :
+        s === 'quitar' ? '<p class="u-nota">La inscripción está de baja: a esta jugadora ya no se le dará camiseta. Al quitarla deja de contar como pendiente y, si estaba apartada en el local, vuelve a quedar libre.</p>' :
         '<p class="u-nota">No llegó y Defectuosa la vuelven a dejar por pedir y, si estaba en el local, apuntan su −1 en el stock. Sin camiseta: a esta jugadora no se le hará.</p>') +
       '<div class="n-botones cm-marcas">' + botones.map(function (b) {
         return '<button type="button" class="u-btn' + (b[2] ? ' u-btn-accion' : '') + '" data-cm-m="' + texto(b[0]) + '">' + texto(b[1]) + '</button>';
@@ -524,13 +525,15 @@
     var neg = st.filter(function (f) { return f.local < 0; }).length;
     var total = fm.reduce(function (s, f) { return s + val(f); }, 0);
     var h = '<div class="u-filtros cm-filtros">' + selModelo() + '<div class="cm-sw" role="group" aria-label="Qué camisetas">' +
-      [['libres', 'Libres'], ['local', 'En el local']].map(function (x) { return '<button type="button" class="cm-chip" data-cm-ver="' + x[0] + '" aria-pressed="' + (k === x[0]) + '">' + x[1] + '</button>'; }).join('') +
+      [['libres', 'Libres'], ['local', 'Sueltas']].map(function (x) { return '<button type="button" class="cm-chip" data-cm-ver="' + x[0] + '" aria-pressed="' + (k === x[0]) + '">' + x[1] + '</button>'; }).join('') +
       '</div></div>' +
       '<div class="n-botones cm-acciones"><button type="button" class="u-btn u-btn-accion" id="cm-sacar">Sacar del local</button><button type="button" class="u-btn" id="cm-arec">Hacer recuento</button></div>' +
-      '<p class="u-nota">' + (k === 'libres' ? 'Libres: las del local que no están guardadas para ninguna jugadora (Por preparar).' : 'En el local: todas las sueltas, también las guardadas para una jugadora.') +
-      ' Se calcula con los pedidos que han llegado, las preparadas y entregadas, y los ajustes.</p>' +
-      (neg ? '<p class="u-mal">' + plural(neg, 'combinación sale', 'combinaciones salen') + ' en negativo: se han dado más camisetas de las que constan. Un recuento del local lo corrige.</p>' : '');
-    if (!fm.length) h += '<p class="u-vacio">' + (k === 'libres' ? 'No hay camisetas libres de ' : 'No hay camisetas en el local de ') + texto(nombreModelo(S.modelo)) + '. Cuando llegue un pedido, sus camisetas salen aquí.</p>';
+      '<p class="u-nota">' + (k === 'libres' ? '<b>Libres</b>: las sueltas que no son de nadie; se pueden dar a cualquier jugadora.' :
+        '<b>Sueltas</b>: las que hay en la caja del local, sin bolsa. Incluye las <b>apartadas</b> para una jugadora (Por preparar), que aún hay que meter en su bolsa. Las Preparadas ya están en su bolsa y no cuentan aquí.') +
+      ' Sueltas = las de los pedidos que han llegado, menos las preparadas y entregadas, más o menos los ajustes (recuentos y sacadas).</p>' +
+      (neg ? '<p class="u-mal">' + plural(neg, 'combinación no cuadra', 'combinaciones no cuadran') + ' (en negativo): consta que han salido más camisetas de las que han llegado. ' +
+        'Pasa con una camiseta que ya estaba antes de la web, un pedido sin marcar «Ha llegado» o una marcada por error. El recuento lo corrige con lo que haya de verdad.</p>' : '');
+    if (!fm.length) h += '<p class="u-vacio">' + (k === 'libres' ? 'No hay camisetas libres de ' : 'No hay camisetas sueltas de ') + texto(nombreModelo(S.modelo)) + '. Cuando llegue un pedido, sus camisetas salen aquí.</p>';
     else {
       h += '<h2 class="n-grupo">' + texto(nombreModelo(S.modelo)) + ' <span class="u-cifra">' + total + '</span></h2>';
       var cols = [], camis = [];
@@ -634,7 +637,8 @@
     c.querySelector('.cm-peds').onclick = function (e) {
       var b = e.target.closest('[data-cm-p]'); if (!b) return;
       var id = b.getAttribute('data-cm-p'), acc = b.getAttribute('data-cm-acc');
-      if (acc === 'confirmar') S.T.actualizar('PEDIDOS', id, { CONFIRMADO: true }).catch(function () {});
+      if (acc === 'extracto') ventanaExtracto(id);
+      else if (acc === 'confirmar') S.T.actualizar('PEDIDOS', id, { CONFIRMADO: true }).catch(function () {});
       else if (acc === 'llegado') {
         var f = hoy();
         S.T.actualizar('PEDIDOS', id, { FECHA_RECIBIDO: f }, { fn: 'camisetas5Recibir', args: [id, f] }).then(function (r) {
@@ -668,11 +672,13 @@
         var x = ESTADOS.filter(function (y) { return y[0] === e; })[0];
         return jug[e] + ' ' + (jug[e] === 1 || !x ? e : x[1]).toLowerCase();
       }).join(' · ') + '</p>' : '') +
+      (p.ID_PROVEEDOR ? '<p class="u-nota">Proveedor: ' + texto(nombreProveedor(p.ID_PROVEEDOR)) + '</p>' : '') +
       (p.NOTAS ? '<p class="u-nota">' + texto(p.NOTAS) + '</p>' : '') +
       (/^https?:\/\//.test(String(p.ARCHIVO_URL || '')) ? '<p><a href="' + texto(p.ARCHIVO_URL) + '" target="_blank" rel="noopener">Ver el documento del pedido</a></p>' : '') +
-      (nuevo ? '<p class="u-nota">Creando el pedido, sus líneas y las camisetas en el Excel…</p>' :
-        paso === 'sinConfirmar' ? '<div class="n-botones"><button type="button" class="u-btn" data-cm-p="' + texto(p.ID) + '" data-cm-acc="confirmar">Marcar confirmado</button></div>' :
-        paso === 'confirmado' ? '<div class="n-botones"><button type="button" class="u-btn" data-cm-p="' + texto(p.ID) + '" data-cm-acc="llegado">Ha llegado</button></div>' : '') + '</li>';
+      (nuevo ? '<p class="u-nota">Creando el pedido, sus líneas y las camisetas en el Excel…</p>' : '<div class="n-botones">' +
+        (paso === 'sinConfirmar' ? '<button type="button" class="u-btn" data-cm-p="' + texto(p.ID) + '" data-cm-acc="confirmar">Marcar confirmado</button>' :
+          paso === 'confirmado' ? '<button type="button" class="u-btn" data-cm-p="' + texto(p.ID) + '" data-cm-acc="llegado">Ha llegado</button>' : '') +
+        '<button type="button" class="u-btn u-btn-texto" data-cm-p="' + texto(p.ID) + '" data-cm-acc="extracto">Extracto para el proveedor</button></div>') + '</li>';
   }
 
   function darLibres(b, m) {
@@ -683,27 +689,92 @@
     }).catch(function (e) { S.ctx.aviso('No se han podido dar: ' + String(e.message).replace(/^\w+:\s*/, '')); pintar(false); });
   }
 
+  /** Proveedores (CONTRAPARTES de ECONOMIA con TIPO Proveedor), por nombre. */
+  function proveedores() {
+    return S.T.filas('CONTRAPARTES').filter(function (x) { return x.TIPO === 'Proveedor'; })
+      .sort(function (a, b) { return norm(a.NOMBRE) < norm(b.NOMBRE) ? -1 : 1; });
+  }
+  function nombreProveedor(id) { var x = S.T.fila('CONTRAPARTES', id); return x ? x.NOMBRE || id : id; }
+  function contactoProveedor(id) {
+    var x = S.T.fila('CONTRAPARTES', id);
+    return x && x.CONTACTO ? '<p class="cm-contacto"><span class="u-etiqueta">Contacto</span> ' + texto(x.CONTACTO) + '</p>' :
+      '<p class="u-nota">Este proveedor no tiene contacto apuntado: se pone en Economía (CONTRAPARTES · CONTACTO).</p>';
+  }
+  function codigoColor(id) { return color(id).CODIGO || ''; }
+
   function ventanaPedir(m, plan) {
     var Dd = D(), porId = {}; Dd.CAMISETAS.forEach(function (x) { porId[x.ID] = x; });
     var lin = cam5Lineas_(plan.pedir.map(function (id) { return porId[id]; }));
-    var temps = (S.N && S.N.temp) || [];
+    var temps = (S.N && S.N.temp) || [], provs = proveedores();
+    var habitual = String((S.T.fila('MODELOS', m) || {}).ID_PROVEEDOR || '');
+    if (!provs.some(function (x) { return String(x.ID) === habitual; })) habitual = '';
     var v = ventana('<h2>Preparar pedido</h2><p class="u-nota">' + texto(nombreModelo(m)) + ': ' + plural(plan.pedir.length, 'camiseta', 'camisetas') +
-      (plan.local.length ? '. Antes se dan las ' + plan.local.length + ' que tienen una libre en el local.' : '.') + ' El pedido queda sin confirmar hasta que lo confirme el proveedor.</p>' +
-      '<div class="u-tabla-caja"><table class="u-tabla"><thead><tr><th>Color</th><th>Dorsal</th><th>Talla</th><th class="num">Cuántas</th></tr></thead><tbody>' +
-      lin.map(function (l) { return '<tr><td>' + punto(l.ID_COLOR) + texto(nombreColor(l.ID_COLOR)) + '</td><td>' + texto(l.DORSAL || '—') + '</td><td>' + texto(l.TALLA) + '</td><td class="num">' + l.CANTIDAD + '</td></tr>'; }).join('') +
+      (plan.local.length === 1 ? '. Antes se da la que tiene una libre en el local.' : plan.local.length ? '. Antes se dan las ' + plan.local.length + ' que tienen una libre en el local.' : '.') + ' El pedido queda sin confirmar hasta que lo confirme el proveedor.</p>' +
+      (provs.length ? '<div class="u-campos">' + campo('Proveedor', '<select id="pp-prov">' + (habitual ? '' : '<option value="">Elige el proveedor</option>') +
+        opciones(provs.map(function (x) { return [x.ID, x.NOMBRE + (String(x.ID) === habitual ? ' (el habitual)' : '')]; }), habitual) + '</select>') + '</div><div id="pp-contacto"></div>' :
+        '<p class="u-mal">No hay ningún proveedor apuntado. Se añade en Economía (CONTRAPARTES, tipo Proveedor) y después se puede pedir.</p>') +
+      '<div class="u-tabla-caja"><table class="u-tabla"><thead><tr><th>Color (código)</th><th>Dorsal</th><th>Talla</th><th class="num">Cuántas</th></tr></thead><tbody>' +
+      lin.map(function (l) { return '<tr><td>' + punto(l.ID_COLOR) + texto(nombreColor(l.ID_COLOR)) + (codigoColor(l.ID_COLOR) ? ' <span class="u-nota">' + texto(codigoColor(l.ID_COLOR)) + '</span>' : '') + '</td><td>' + texto(l.DORSAL || '—') + '</td><td>' + texto(l.TALLA) + '</td><td class="num">' + l.CANTIDAD + '</td></tr>'; }).join('') +
       '</tbody></table></div><div class="u-campos">' +
       campo('Temporada', '<select id="pp-temp">' + opciones(temps.map(function (t) { return [t[0], t[1]]; }), (temps[0] || [])[0]) + '</select>') +
       campo('Llega hacia el (opcional)', '<input type="date" id="pp-est">') +
       campo('Notas (opcional)', '<input type="text" id="pp-notas" maxlength="200">') + '</div>' +
-      '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="pp-ok">Crear pedido</button><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cancelar</button></div>');
+      '<p class="u-error" hidden></p>' +
+      '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="pp-ok"' + (provs.length ? '' : ' disabled') + '>Crear pedido</button><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cancelar</button></div>');
+    var sp = v.querySelector('#pp-prov'), pc = v.querySelector('#pp-contacto');
+    var verContacto = function () { if (pc) pc.innerHTML = sp && sp.value ? contactoProveedor(sp.value) : ''; };
+    if (sp) sp.onchange = verContacto;
+    verContacto();
     v.querySelector('#pp-ok').onclick = function () {
-      var d = { ID_TEMPORADA: v.querySelector('#pp-temp').value, FECHA_ESTIMADA: v.querySelector('#pp-est').value, NOTAS: v.querySelector('#pp-notas').value.trim() };
+      var prov = sp ? sp.value : '';
+      if (!prov) { var e = v.querySelector('.u-error'); e.textContent = 'Elige a qué proveedor va el pedido.'; e.hidden = false; sp.focus(); return; }
+      var d = { ID_TEMPORADA: v.querySelector('#pp-temp').value, ID_PROVEEDOR: prov, FECHA_ESTIMADA: v.querySelector('#pp-est').value, NOTAS: v.querySelector('#pp-notas').value.trim() };
       cerrarVentana();
-      S.T.crear('PEDIDOS', { ID_MODELO: m, ID_TEMPORADA: d.ID_TEMPORADA, FECHA_PEDIDO: hoy(), FECHA_ESTIMADA: d.FECHA_ESTIMADA, CONFIRMADO: false, NOTAS: d.NOTAS },
+      S.T.crear('PEDIDOS', { ID_MODELO: m, ID_TEMPORADA: d.ID_TEMPORADA, ID_PROVEEDOR: prov, FECHA_PEDIDO: hoy(), FECHA_ESTIMADA: d.FECHA_ESTIMADA, CONFIRMADO: false, NOTAS: d.NOTAS },
         { fn: 'camisetas5Pedir', args: [m, d] }).then(function (r) {
-        S.ctx.aviso('Pedido ' + r.id + ' preparado' + (r.dadas ? '; ' + plural(r.dadas, 'camiseta sale', 'camisetas salen') + ' del local' : '') + '.');
+        S.ctx.aviso('Pedido ' + r.id + ' preparado' + (r.dadas ? '; ' + plural(r.dadas, 'camiseta sale', 'camisetas salen') + ' del local' : '') + '. El extracto para el proveedor, en su tarjeta.');
       }, function () { S.T.refrescar(['CAMISETAS']).catch(function () {}); });
     };
+  }
+
+  /** El pedido en texto, para enviarlo al proveedor por WhatsApp o correo: por color (con su código), dorsal y talla. */
+  function textoExtracto(p) {
+    var l = S.T.filas('PEDIDOS_LINEAS').filter(function (x) { return String(x.ID_PEDIDO) === String(p.ID); }).sort(cam5Orden_);
+    var porColor = {}, orden = [], total = 0;
+    l.forEach(function (x) {
+      if (!porColor[x.ID_COLOR]) { porColor[x.ID_COLOR] = []; orden.push(x.ID_COLOR); }
+      porColor[x.ID_COLOR].push(x); total += Number(x.CANTIDAD) || 0;
+    });
+    orden.sort(function (a, b) { return nombreColor(a) < nombreColor(b) ? -1 : 1; });
+    var t = ['Pedido ' + p.ID + ' · Konamigas', 'Modelo: ' + nombreModelo(p.ID_MODELO), p.ID_PROVEEDOR ? 'Proveedor: ' + nombreProveedor(p.ID_PROVEEDOR) : '',
+      p.FECHA_PEDIDO ? 'Fecha del pedido: ' + fecha(p.FECHA_PEDIDO) : '', p.FECHA_ESTIMADA ? 'Lo necesitamos hacia el: ' + fecha(p.FECHA_ESTIMADA) : ''].filter(String);
+    orden.forEach(function (col) {
+      var n = porColor[col].reduce(function (s, x) { return s + (Number(x.CANTIDAD) || 0); }, 0), cod = codigoColor(col);
+      t.push('', nombreColor(col) + (cod ? ' (código ' + cod + ')' : '') + ': ' + n);
+      porColor[col].forEach(function (x) { t.push('- ' + (x.DORSAL ? 'Dorsal ' + x.DORSAL : 'Sin dorsal') + ' · talla ' + x.TALLA + ': ' + x.CANTIDAD); });
+    });
+    t.push('', 'Total: ' + plural(total, 'camiseta', 'camisetas'));
+    if (p.NOTAS) t.push('Notas: ' + p.NOTAS);
+    return t.join('\n');
+  }
+
+  function ventanaExtracto(id) {
+    var p = S.T.fila('PEDIDOS', id); if (!p) return;
+    var txt = textoExtracto(p), comparte = typeof navigator.share === 'function';
+    var v = ventana('<h2>Extracto del pedido ' + texto(p.ID) + '</h2>' +
+      (p.ID_PROVEEDOR ? '<p><b>' + texto(nombreProveedor(p.ID_PROVEEDOR)) + '</b></p>' + contactoProveedor(p.ID_PROVEEDOR) : '<p class="u-nota">Este pedido no tiene proveedor apuntado.</p>') +
+      '<pre class="cm-extracto" tabindex="0">' + texto(txt) + '</pre>' +
+      '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="ex-copiar">Copiar</button>' +
+      (comparte ? '<button type="button" class="u-btn" id="ex-compartir">Compartir</button>' : '') +
+      '<button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cerrar</button></div>');
+    var pre = v.querySelector('.cm-extracto'), bc = v.querySelector('#ex-copiar');
+    var seleccionar = function () { var r = document.createRange(); r.selectNodeContents(pre); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); };
+    bc.onclick = function () {
+      var hecho = function () { bc.textContent = 'Copiado'; S.ctx.aviso('Extracto copiado: pégalo en el WhatsApp o el correo del proveedor.'); };
+      var mano = function () { seleccionar(); S.ctx.aviso('No se ha podido copiar solo: está seleccionado, cópialo tú.'); };
+      try { navigator.clipboard.writeText(txt).then(hecho, mano); } catch (e) { mano(); }
+    };
+    if (comparte) v.querySelector('#ex-compartir').onclick = function () { navigator.share({ title: 'Pedido ' + p.ID, text: txt }).catch(function () {}); };
   }
 
   /* ======================= Recuento ======================= */
@@ -720,7 +791,8 @@
     var contado = function (f) { return f.k in R.cont ? R.cont[f.k] : Math.max(f.debe, 0); };
     var revisados = cols.filter(function (x) { return R.rev[x]; }).length;
     var h = '<div class="u-filtros cm-filtros">' + selModelo() + '</div>' +
-      '<p class="u-nota">Cuenta las camisetas sueltas del local de ' + texto(nombreModelo(m)) + ' (también las guardadas para una jugadora). Cambia solo lo que no cuadra y marca cada color como contado. Lo que cuentes se guarda en este móvil hasta aplicarlo.</p>';
+      '<p class="u-nota">Cuenta las camisetas sueltas de ' + texto(nombreModelo(m)) + ': las de la caja, también las apartadas para una jugadora; las de las bolsas (Preparadas), no. Cambia solo lo que no coincida y marca cada color como contado. Lo que cuentes se guarda en este móvil hasta aplicarlo.</p>' +
+      (filas.some(function (f) { return f.debe < 0; }) ? '<p class="u-nota">Donde pone «no cuadra», las cuentas salen en negativo: consta que han salido más de las que llegaron. Pon lo que cuentes y, al aplicar, se corrige.</p>' : '');
     if (!cols.length) h += '<p class="u-vacio">No consta ninguna camiseta en el local de este modelo. Si encuentras alguna, añádela abajo.</p>';
     h += cols.map(function (col) {
       var l = filas.filter(function (f) { return f.ID_COLOR === col; }).sort(cam5Orden_);
@@ -728,7 +800,7 @@
         '<label class="u-check"><input type="checkbox" data-cm-rev="' + texto(col) + '"' + (R.rev[col] ? ' checked' : '') + '> Contado</label></div>' +
         '<ul class="cm-rec-l">' + l.map(function (f) {
           var n = contado(f), d = n - f.debe;
-          return '<li class="' + (d ? 'cm-dif' : '') + '"><span class="cm-rec-c"><b>' + texto(cami(f)) + '</b><span class="u-nota">debería ' + Math.max(f.debe, 0) + (f.debe < 0 ? ' (consta ' + f.debe + ')' : '') + '</span></span>' +
+          return '<li class="' + (d ? 'cm-dif' : '') + '"><span class="cm-rec-c"><b>' + texto(cami(f)) + '</b><span class="u-nota">' + (f.debe < 0 ? 'no cuadra: las cuentas dan −' + (-f.debe) : 'debería haber ' + f.debe) + '</span></span>' +
             '<span class="cm-paso"><button type="button" class="u-btn u-btn-icono" data-cm-menos="' + texto(f.k) + '" aria-label="Una menos de ' + texto(cami(f)) + '">−</button>' +
             '<b class="u-cifra">' + n + '</b><button type="button" class="u-btn u-btn-icono" data-cm-mas="' + texto(f.k) + '" aria-label="Una más de ' + texto(cami(f)) + '">+</button></span>' +
             (d < 0 ? '<label class="u-campo cm-falta"><span class="u-etiqueta">Por qué faltan ' + (-d) + '</span><select data-cm-tipo="' + texto(f.k) + '">' + opciones(FALTA.map(function (t) { return [t, t === 'Recuento' ? 'No lo sé' : t]; }), R.tipo[f.k] || 'Recuento') + '</select></label>' : '') +
