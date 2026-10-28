@@ -70,10 +70,29 @@
     return h + '</section>';
   }
 
-  function htmlBloque(b) {
+  /** La vista elegida de cada bloque con vistas (por su id), mientras la página está abierta. */
+  var ELEGIDA = {};
+  /**
+   * Un bloque con vistas (T0255): { id, titulo, vista (la de por defecto), vistas: [{ id, grupo, titulo, …lo de un bloque }] }.
+   * Arriba sale «Ver» con un desplegable (agrupado por grupo) y debajo, la vista elegida como un bloque más.
+   */
+  function htmlBloque(b, i) {
+    if (b.error || !b.vistas || !b.vistas.length) return htmlUno(b, '', i);
+    var k = b.id || b.titulo, sel = ELEGIDA[k] || b.vista;
+    var v = b.vistas.filter(function (x) { return x.id === sel; })[0] || b.vistas[0], grupo = null, ops = '';
+    b.vistas.forEach(function (x) {
+      if ((x.grupo || '') !== grupo) { ops += (grupo !== null && grupo !== '' ? '</optgroup>' : '') + (x.grupo ? '<optgroup label="' + texto(x.grupo) + '">' : ''); grupo = x.grupo || ''; }
+      ops += '<option value="' + texto(x.id) + '"' + (x === v ? ' selected' : '') + '>' + texto(x.titulo) + '</option>';
+    });
+    if (grupo) ops += '</optgroup>';
+    var ver = '<label class="pf-ver"><span>Ver</span><select data-pfvista="' + i + '">' + ops + '</select></label>';
+    return htmlUno(Object.assign({}, b, v, { titulo: b.titulo, vistas: null }), ver, i);
+  }
+
+  function htmlUno(b, ver, i) {
     if (b.error) return htmlError(b);
     var cols = b.columnas || [], filas = b.filas || [];
-    var h = '<section class="pf-bloque"><h2 class="n-grupo">' + texto(b.titulo) + (b.cuantas != null ? ' <span class="u-cifra">' + b.cuantas + '</span>' : '') + '</h2>';
+    var h = '<section class="pf-bloque" data-pfb="' + i + '"><div class="pf-cab"><h2 class="n-grupo">' + texto(b.titulo) + (b.cuantas != null ? ' <span class="u-cifra">' + b.cuantas + '</span>' : '') + '</h2>' + (ver || '') + '</div>';
     if (b.cifras && b.cifras.length) h += htmlCifras(b.cifras);
     if (b.nota) h += '<p class="u-nota">' + texto(b.nota) + '</p>';
     if (!filas.length) return h + (b.nota ? '' : '<p class="u-vacio">' + texto(b.vacio || 'No hay nada tuyo aquí por ahora.') + '</p>') + htmlAccion(b.accion) + '</section>';
@@ -117,11 +136,24 @@
 
   window.UN.registrar('PERFIL', {
     abrir: function (el, ctx) {
+      var visto = null; // lo que se está enseñando
+      function bloques(d) { return (d.bloques || []).map(htmlBloque).join(''); }
+      // Cambiar la vista de un bloque solo vuelve a pintar ese bloque.
+      el.addEventListener('change', function (e) {
+        var s = e.target.closest('[data-pfvista]');
+        if (!s || !visto) return;
+        var i = Number(s.getAttribute('data-pfvista')), b = (visto.bloques || [])[i], sec = s.closest('.pf-bloque');
+        if (!b || !sec) return;
+        ELEGIDA[b.id || b.titulo] = s.value;
+        sec.outerHTML = htmlBloque(b, i);
+        var n = el.querySelector('[data-pfvista="' + i + '"]'); if (n) n.focus();
+      });
       function pintar(d) {
+        visto = d;
         el.innerHTML = '<div class="pf">' + htmlQuien(ctx) +
           // Sin tareas abiertas, el bloque de tareas va después de lo demás: arriba, lo que hay que hacer.
-          (d ? (d.tareas && !d.tareas.error && !d.tareas.abiertas ? (d.bloques || []).map(htmlBloque).join('') + htmlTareas(d.tareas, d.hoy)
-            : htmlTareas(d.tareas, d.hoy) + (d.bloques || []).map(htmlBloque).join('')) : cargando()) +
+          (d ? (d.tareas && !d.tareas.error && !d.tareas.abiertas ? bloques(d) + htmlTareas(d.tareas, d.hoy)
+            : htmlTareas(d.tareas, d.hoy) + bloques(d)) : cargando()) +
           htmlCuenta(ctx) +
           '<p class="u-nota pf-hora" id="pf-hora">' + (d ? 'Al día a las ' + hora(d.leido) + '.' : '') + '</p></div>';
       }

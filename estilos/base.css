@@ -311,14 +311,18 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .pf-carga { display: flex; flex-direction: column; align-items: center; gap: var(--e3); padding: var(--e6) 0; }
 .u .pf .u-perfil dl { margin-top: 0; }
 .u .pf-hora { margin: 0; }
-.u .pf-cifras { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e2); margin: 0 0 var(--e3); }
+.u .pf-cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--e2); margin: 0 0 var(--e3); }
 .u .pf-cifras > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-tarjeta, var(--color-bloque)); }
 .u .pf-cifras b { font: var(--peso-titulos) 22px/1.1 var(--fuente-titulos); color: var(--color-principal-oscuro); overflow-wrap: anywhere; }
 .u .pf-cifras span { font-size: 12px; color: var(--color-suave); }
 .u .pf-cifras .pf-destacar { box-shadow: inset 0 0 0 2px var(--color-accion); }
 .u .pf-cifras .pf-destacar b { color: var(--color-texto); }
-@media (max-width: 639px) { .u .pf-cifras { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 639px) { .u .pf-cifras { grid-template-columns: 1fr 1fr; } .u .pf-cifras > div:last-child:nth-child(odd) { grid-column: 1 / -1; } }
 .u .pf-accion { margin-top: var(--e3); }
+.u .pf-cab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e3); margin: 0 0 var(--e2); }
+.u .pf-cab .n-grupo { margin: 0; }
+.u .pf-ver { display: flex; align-items: center; gap: var(--e2); font-size: 13px; color: var(--color-suave); min-width: 0; }
+.u .pf-ver select { min-width: 0; max-width: 100%; }
 
 /* ---------- Piezas de las secciones del núcleo (T0257) ----------
  * Pestañas de una sección, filtros encima de una lista, formulario en dos columnas en la ventana, una cifra mala
