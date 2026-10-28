@@ -62,7 +62,7 @@
       F.busca = '';
       var PL = leerLocal(CLAVE + '_pl', null);  // columnas plegadas; la primera vez, en el móvil, todas menos En curso
       if (!PL) { PL = {}; if (window.matchMedia && matchMedia('(max-width:640px)').matches) ESTADOS.forEach(function (e, i) { if (i !== ESTADOS.indexOf('En curso')) PL[e] = 1; }); }
-      var abiertaId = '', editando = false;
+      var abiertaId = '', editando = false, leido = false; // leido: ya hay tareas guardadas o del motor (antes, «cargando», no «no hay»)
 
       el.classList.add('kb');
       el.innerHTML =
@@ -211,6 +211,7 @@
       }
       function pintarTablero() {
         var todas = tareas();
+        if (!todas.length && !leido) { tab.innerHTML = '<div class="kz-centro kb-vacio" role="status"><div class="u-carga"></div><p>Cargando las tareas…</p></div>'; return; }
         if (!todas.length) { tab.innerHTML = '<p class="u-vacio kb-vacio">' + texto(TX.sinTareas || 'Todavía no hay tareas.') + '</p>'; return; }
         var lista = todas.filter(pasa);
         tab.innerHTML = ESTADOS.map(function (est) {
@@ -273,8 +274,10 @@
         var visto = t.ESTADO, cambios = { ESTADO: nuevo };
         if (tieneCol('FECHA_CIERRE')) cambios.FECHA_CIERRE = nuevo === CERRADA ? hoyISO() : '';
         if (C.HISTORIAL !== 'No' && tieneCol('HISTORIAL')) cambios.HISTORIAL = conLinea(t.HISTORIAL, lineaHist('cambiado el estado a ' + nuevo + ' (antes ' + visto + ') desde el kanban web.'));
-        ctx.tablas.actualizar(T, id, cambios, { fn: 'kanbanEstado', args: [id, nuevo, visto] }).then(function () {
-          if (ctx.abierta() && nuevo === ELIM) ctx.aviso(id + ' eliminada. Se puede recuperar desde su ficha.');
+        ctx.tablas.actualizar(T, id, cambios, { fn: 'kanbanEstado', args: [id, nuevo, visto] }).then(function (r) {
+          if (!ctx.abierta()) return;
+          if (r && r.aviso) ctx.aviso(r.aviso);
+          else if (nuevo === ELIM) ctx.aviso(id + ' eliminada. Se puede recuperar desde su ficha.');
         }, function () {});
       }
 
@@ -550,8 +553,8 @@
         editando = false;
         if (!que.length) { pintarFicha(); return; }
         if (C.HISTORIAL !== 'No' && tieneCol('HISTORIAL')) local.HISTORIAL = conLinea(t.HISTORIAL, lineaHist('editada desde el kanban web: ' + que.join(', ') + '.'));
-        ctx.tablas.actualizar(T, id, local, { fn: 'kanbanEditar', args: [id, srv, antes] }).then(function () {
-          if (ctx.abierta()) ctx.aviso(id + ' guardada.');
+        ctx.tablas.actualizar(T, id, local, { fn: 'kanbanEditar', args: [id, srv, antes] }).then(function (r) {
+          if (ctx.abierta()) ctx.aviso(r && r.aviso ? r.aviso : id + ' guardada.');
         }, function () {});
         pintarFicha();
       }
@@ -591,7 +594,7 @@
         if (tieneCol('HISTORIAL')) local.HISTORIAL = lineaHist('creada desde el kanban web en ' + NUEVA + '.');
         cerrarAlta();
         ctx.tablas.crear(T, local, { fn: 'kanbanCrear', args: [o] }).then(function (r) {
-          if (ctx.abierta()) ctx.aviso('Creada ' + r.id + ': ' + (local.TITULO || ''));
+          if (ctx.abierta()) ctx.aviso(r.aviso ? 'Creada ' + r.id + '. ' + r.aviso : 'Creada ' + r.id + ': ' + (local.TITULO || ''));
         }, function () {});
       };
 
@@ -616,11 +619,13 @@
       });
       abrirFiltros(!!F._ab);
       ctx.tablas.leer([T, TE]).then(function () {
+        leido = true;
         if (!ctx.abierta()) return;
         todo();
         var pedida = new URLSearchParams(location.search).get('t');
         if (pedida && tarea(pedida)) abrirFicha(pedida, true);
       }, function (e) {
+        leido = true;
         tab.innerHTML = '<p class="u-error kb-vacio">No se han podido leer las tareas.</p><p class="u-nota kb-vacio">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Pulsa ↻ o vuelve a abrir la sección.</p>';
       });
       opciones().catch(function () {});
