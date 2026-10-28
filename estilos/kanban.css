@@ -547,3 +547,18 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
   background: var(--color-superficie); color: var(--color-principal-oscuro); box-shadow: var(--sombra-flota); }
 .f-tirar svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .f-tirar.listo { color: var(--color-accion); }
+
+/* ===================== Kanban del núcleo 5.0 (T0254, nucleo/secciones/kanban.js) =====================
+ * El tablero y la ficha de arriba, dentro del marco del núcleo: el tablero ocupa todo el ancho del panel y la ficha se abre
+ * en la ventana de T0172, sin marco: se pinta dentro y baja con su propio desplazamiento. */
+.u .n-main.kb { max-width: none; padding: 0; }
+.u .n-main.kb .kb-vacio { padding: var(--e4); }
+.u .fv-caja.kb-ficha { display: block; overflow-y: auto; overscroll-behavior: contain; }
+.u .kb-ficha .barra { padding: var(--e3) var(--e4); }
+.u .kb-ficha .cab h1 { font-size: 24px; }
+.u .kb-ficha .est .fpill { font-size: 14px; }
+.u .kb-ficha .claude-fila .claude-texto { flex: 1 1 240px; }
+.u .kb-ficha .edit .pie { padding: 0; }
+.u #alta-form .edit { padding: 0; gap: var(--e3); }
+.u #alta-error:not(:empty) { display: block; }
+@media (min-width: 900px) { .u .n-main.kb .filtros, .u .n-main.kb .tablero { padding-left: var(--e5); padding-right: var(--e5); } }
