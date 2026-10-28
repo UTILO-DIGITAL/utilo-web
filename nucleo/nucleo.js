@@ -223,6 +223,7 @@
   /**
    * Lo que recibe cada sección en abrir(el, ctx):
    * - id, titulo, persona, perfil, admin y config (su personalización de config.json · nucleo, con los valores por defecto).
+   * - correo y secciones (T0259): la cuenta con la que ha entrado y las secciones de su menú ({ id, titulo }), en orden.
    * - tablas: las tablas al momento (UT de kanban4/tablas.js): leer, filas, fila, actualizar, crear, borrar.
    * - alCambiar(f): f(tabla, info) cada vez que cambia una tabla, solo mientras la sección está abierta.
    * - llamar(fn, args): una función de su «api» del motor (recibe ctx en el motor). Devuelve una promesa.
@@ -232,6 +233,7 @@
   function ctxDe(s) {
     return {
       id: s.id, titulo: s.titulo, persona: cred.persona, perfil: cred.perfil, admin: cred.admin, config: s.config || {},
+      correo: cred.correo || '', secciones: menu().map(function (x) { return { id: x.id, titulo: x.titulo }; }), // T0259
       tablas: tablas(),
       alCambiar: function (f) { (oyentes[s.id] = oyentes[s.id] || []).push(f); },
       llamar: llamar,

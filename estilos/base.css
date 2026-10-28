@@ -277,6 +277,41 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .n-tabla-2 td { overflow-wrap: anywhere; }
 @media (min-width: 640px) { .u .n-tabla-2 th:first-child { width: 30%; } }
 
+/* ---------- Piezas del núcleo para listas (T0259) ----------
+ * .n-estado: el estado de una tarea como texto con un cuadradito de su color (colores funcionales de arriba).
+ * .n-lista: una tabla que en el móvil (menos de 640 px) se lee como lista: cada fila, un bloque; la primera columna en
+ *   negrita y las demás seguidas, cada una con su título delante (data-t). */
+.u .n-estado { display: inline-flex; align-items: center; gap: var(--e1); white-space: nowrap; font-weight: 600; }
+.u .n-estado::before { content: ''; flex: none; width: 10px; height: 10px; border-radius: var(--radio-peq); background: var(--estado, var(--estado-x)); }
+.u .n-e-ni { --estado: var(--estado-ni); } .u .n-e-ec { --estado: var(--estado-ec); } .u .n-e-bl { --estado: var(--estado-bl); }
+.u .n-e-pr { --estado: var(--estado-pr); } .u .n-e-co { --estado: var(--estado-co); } .u .n-e-x { --estado: var(--estado-x); }
+.u .n-lista tfoot td { font-weight: 700; border-top: 1px solid var(--color-borde-campo); border-bottom: 0; }
+@media (max-width: 639px) {
+  .u .n-lista, .u .n-lista tbody, .u .n-lista tfoot, .u .n-lista tr { display: block; }
+  .u .n-lista thead { display: none; }
+  .u .n-lista tr { padding: var(--e2) var(--e3); border-bottom: 1px solid var(--color-linea); }
+  .u .n-lista tbody tr:last-child { border-bottom: 0; }
+  .u .n-lista td { display: inline; padding: 0; border: 0; }
+  .u .n-lista td:first-child { display: block; margin-bottom: var(--e1); }
+  .u .n-lista td + td:not(:empty)::after { content: '  ·  '; white-space: pre; color: var(--color-suave); }
+  .u .n-lista td:last-child::after { content: none !important; }
+  .u .n-lista td.num { text-align: left; }
+  .u .n-lista tfoot tr { border-top: 1px solid var(--color-borde-campo); }
+  .u .n-lista tfoot td { border: 0; }
+  .u .n-lista tfoot td.num::before { content: none; }
+}
+
+/* ---------- Perfil del núcleo (T0259, nucleo/secciones/perfil.js) ---------- */
+.u .pf { display: flex; flex-direction: column; gap: var(--e5); }
+.u .pf .u-perfil-quien { padding-bottom: var(--e3); }
+.u .pf-bloque .n-grupo { margin: 0 0 var(--e2); }
+.u .pf-resumen { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e4); margin-bottom: var(--e3); font-size: 14px; }
+.u .pf-vencida { color: var(--color-error); font-weight: 700; }
+.u .pf-fecha { white-space: nowrap; }
+.u .pf-carga { display: flex; flex-direction: column; align-items: center; gap: var(--e3); padding: var(--e6) 0; }
+.u .pf .u-perfil dl { margin-top: 0; }
+.u .pf-hora { margin: 0; }
+
 /* ---------- Piezas de las secciones del núcleo (T0257) ----------
  * Pestañas de una sección, filtros encima de una lista, formulario en dos columnas en la ventana, una cifra mala
  * (en negativo, pasada de presupuesto) y la fila de total de una tabla. Solo variables. */
