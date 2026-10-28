@@ -276,3 +276,43 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .n-tabla-2 th:first-child { width: 42%; }
 .u .n-tabla-2 td { overflow-wrap: anywhere; }
 @media (min-width: 640px) { .u .n-tabla-2 th:first-child { width: 30%; } }
+
+/* ---------- Pedir a Utilo (T0262, nucleo/secciones/pedir.js) ----------
+ * Formulario y, al lado en el ordenador (debajo en el móvil), lo que ha pedido el negocio. Lista con líneas, no tarjetas.
+ * El estado de cada petición lleva el color del estado del kanban equivalente (funcional). */
+.u .pd { display: grid; gap: var(--e6); }
+@media (min-width: 900px) { .u .pd { grid-template-columns: minmax(320px, 400px) 1fr; align-items: start; } }
+.u .pd-h { font-size: 20px; color: var(--color-principal-oscuro); margin-bottom: var(--e2); }
+.u .pd-form { display: flex; flex-direction: column; gap: var(--e3); }
+.u .pd-form .n-ayuda { margin: 0; }
+.u .pd-tipos { border: 0; margin: 0; padding: 0; display: grid; gap: var(--e2); }
+.u .pd-tipos legend { padding: 0; margin-bottom: var(--e2); }
+.u .pd-tipo { display: flex; align-items: center; gap: var(--e3); min-height: 44px; padding: var(--e2) var(--e3); cursor: pointer;
+  border: 1.5px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); }
+.u .pd-tipo:has(input:checked) { border-color: var(--color-principal-oscuro); }
+.u .pd-tipo span { display: flex; flex-direction: column; }
+.u .pd-tipo small { color: var(--color-suave); font-size: 13px; }
+.u .pd-form textarea { width: 100%; min-height: 120px; }
+.u .pd-fila { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); }
+.u .pd-urg { display: flex; align-items: center; gap: var(--e2); min-height: 44px; font-weight: 700; cursor: pointer; }
+.u .pd-cont { font-variant-numeric: tabular-nums; }
+.u .pd-captura { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e3); }
+.u .pd-elegir { cursor: pointer; }
+.u .pd-mini { width: 96px; height: 72px; object-fit: cover; border: 1px solid var(--color-linea); border-radius: var(--radio); }
+.u .pd-priv, .u .pd-msg { margin: 0; }
+.u .pd-enviar { width: 100%; }
+.u .pd-lcab { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e2) var(--e3); margin-bottom: var(--e2); }
+.u .pd-lcab .pd-h { margin: 0; flex: 1 1 auto; }
+.u .pd-ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
+.u .pd-s { padding: var(--e3) 0; border-bottom: 1px solid var(--color-linea); }
+.u .pd-enviando { color: var(--color-suave); }
+.u .pd-top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e1) var(--e2); font-size: 14px; }
+.u .pd-e { display: inline-block; padding: 0 var(--e2); border-radius: var(--radio-peq); font: 700 12px/1.6 var(--fuente-texto); color: var(--color-superficie); }
+.u .pd-e-ni { background: var(--estado-ni); } .u .pd-e-ec { background: var(--estado-ec); } .u .pd-e-co { background: var(--estado-co); }
+.u .pd-e-pr { background: var(--estado-pr); } .u .pd-e-x { background: var(--estado-x); }
+.u .pd-f { margin-left: auto; color: var(--color-suave); font-variant-numeric: tabular-nums; }
+.u .pd-txt { margin: var(--e2) 0 var(--e1); white-space: pre-wrap; overflow-wrap: anywhere; }
+.u .pd-m { overflow-wrap: anywhere; }
+.u .pd-r { margin-top: var(--e2); padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-bloque); font-size: 14px;
+  white-space: pre-wrap; overflow-wrap: anywhere; }
+.u .pd-r b { display: block; font-size: 12px; color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .02em; }
