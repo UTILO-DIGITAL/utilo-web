@@ -181,7 +181,11 @@
         if (S === yo && !S.N) { S.errorN = e.message; pintar(false); }
       });
     },
-    cerrar: function () { cerrarVentana(); S = null; }
+    cerrar: function () {
+      // T0258: la lista de cada árbitro para su Perfil, con lo último (el árbitro no lee los Excel de Camisetas).
+      if (S) S.ctx.llamar('camisetas5ArbitroGuardar', []).catch(function () {});
+      cerrarVentana(); S = null;
+    }
   });
   if (ANCHO.addEventListener) ANCHO.addEventListener('change', function () { if (S && S.vista === 'stock') pintar(false); });
 
@@ -202,6 +206,17 @@
     var h = String(color(id).COLOR_HEX || '');
     // El color de la camiseta es un dato del Excel (COLORES.COLOR_HEX), no un color de la marca.
     return /^#[0-9a-f]{6}$/i.test(h) ? '<i class="cm-color" style="background:' + h + '" aria-hidden="true"></i>' : '';
+  }
+  /**
+   * La camiseta dibujada: rellena de su color (COLORES.COLOR_HEX, un dato del Excel) y con el dorsal encima, en blanco o
+   * en oscuro según lo claro que sea el color. Es lo que se reconoce de un vistazo en el campo.
+   */
+  function camiseta(c, peq) {
+    var h = String(color(c.ID_COLOR).COLOR_HEX || ''), ok = /^#[0-9a-f]{6}$/i.test(h), claro = true;
+    if (ok) { var r = parseInt(h.substr(1, 2), 16), g = parseInt(h.substr(3, 2), 16), b = parseInt(h.substr(5, 2), 16); claro = (r * 299 + g * 587 + b * 114) / 1000 > 150; }
+    return '<span class="cm-cami' + (peq ? ' cm-cami-p' : '') + (claro ? ' cm-cami-clara' : '') + '" aria-hidden="true"' + (ok ? ' style="--cm-c:' + h + '"' : '') + '>' +
+      '<svg viewBox="0 0 24 24"><path d="M6.5 3 1.5 6.2l2.1 4.2 2.9-1.1V21.5h11V9.3l2.9 1.1 2.1-4.2L17.5 3c-.7 1.7-2.8 2.8-5.5 2.8S7.2 4.7 6.5 3z"/></svg>' +
+      '<b' + (String(c.DORSAL || '').length > 1 ? ' class="cm-cami-2"' : '') + '>' + texto(c.DORSAL || '–') + '</b></span>';
   }
   function nombreModelo(id) { var m = S.T.fila('MODELOS', id); return m ? m.NOMBRE || id : id; }
   function talla(c) { return [c.DORSAL ? 'Dorsal ' + c.DORSAL : 'Sin dorsal', c.TALLA].filter(String).join(' · '); }
@@ -337,10 +352,12 @@
       var aDar = todas.filter(function (x) { return !x.q.baja && x.s !== 'Sin camiseta'; }), ent = aDar.filter(function (x) { return x.s === 'Entregada'; }).length;
       var prep = todas.filter(function (x) { return x.s === 'Preparada'; });
       var x0 = todas[0].q;
-      return '<section class="cm-eq"><div class="cm-eq-cab"><h2 class="n-grupo">' + punto(x0.colorEq) + texto(x0.equipo || 'Sin equipo') + '</h2>' +
+      return '<section class="cm-eq"><div class="cm-eq-cab"><h2 class="n-grupo">' + punto(x0.colorEq) + texto(x0.equipo || 'Sin equipo') +
+        (x0.colorEq ? ' <span class="cm-eq-color">' + texto(nombreColor(x0.colorEq)) + '</span>' : '') + '</h2>' +
         '<span class="u-cifra' + (aDar.length && ent === aDar.length ? ' cm-ok' : '') + '">' + ent + ' de ' + aDar.length + '</span></div>' +
         '<div class="cm-barra" aria-hidden="true"><i style="width:' + (aDar.length ? Math.round(100 * ent / aDar.length) : 100) + '%"></i></div>' +
         '<p class="u-nota cm-eq-sub">' + texto([S.comp.charAt(0) === 'T' ? x0.compNombre : '', x0.liga].filter(String).join(' · ')) + '</p>' +
+        htmlProximo(k, ent < aDar.length) +
         '<ul class="cm-jugs">' + ver.map(htmlJugadora).join('') + '</ul>' +
         '<div class="n-botones cm-eq-pie">' +
         (prep.length > 1 ? '<button type="button" class="u-btn" data-cm-todas="' + texto(k) + '">Entregar las ' + prep.length + ' preparadas</button>' : '') +
@@ -350,13 +367,29 @@
     c.querySelector('#cm-lista').innerHTML = h;
   }
 
+  var DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  /** «jue 30/10» de 'aaaa-mm-dd'. */
+  function diaCorto(v) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v || '')); if (!m) return String(v || '');
+    return DIAS[new Date(+m[1], +m[2] - 1, +m[3]).getDay()] + ' ' + m[3] + '/' + m[2];
+  }
+  /** El próximo partido del equipo (camisetas5Nombres · prox), si le quedan camisetas por entregar: cuándo y quién arbitra. */
+  function htmlProximo(ie, faltan) {
+    var p = faltan && S.N && S.N.prox && S.N.prox[ie];
+    if (!p) return '';
+    return '<p class="cm-prox">Próximo partido: <b>' + texto(diaCorto(p[0]) + (p[1] ? ' · ' + p[1] : '')) + '</b>' + (p[2] ? ' · ' + texto(p[2]) : '') +
+      (p[3] ? ' · arbitra <b>' + texto(p[3]) + '</b>' : '') + '</p>';
+  }
+
   function htmlJugadora(x) {
     var c = x.c, s = x.s, sig = siguiente(s);
     var est = s === 'recuperar' ? '<span class="n-estado n-e-bl">Por recuperar</span>' : s === 'quitar' ? '<span class="n-estado n-e-bl">Baja: quitar la camiseta</span>' : chipEstado(c.ESTADO);
-    return '<li class="cm-jug' + (c._pendiente ? ' cm-guardando' : '') + '"><button type="button" class="cm-jug-n" data-cm-cam="' + texto(c.ID) + '">' +
-      '<b>' + texto(x.q.jugadora || c.ID_INSCRIPCION_JUGADORA) + '</b>' +
-      '<span class="u-nota">' + punto(c.ID_COLOR) + texto([talla(c), nombreColor(c.ID_COLOR)].join(' · ')) + '</span>' +
-      '<span class="cm-jug-e">' + est + (c._pendiente ? ' <span class="u-nota">Guardando…</span>' : c.ESTADO === 'Entregada' && c.FECHA_ENTREGA ? ' <span class="u-nota">' + fecha(c.FECHA_ENTREGA) + '</span>' : '') + '</span></button>' +
+    // Lo primero, la camiseta (color, dorsal y talla); la jugadora, debajo.
+    return '<li class="cm-jug' + (c._pendiente ? ' cm-guardando' : '') + '"><button type="button" class="cm-jug-n" data-cm-cam="' + texto(c.ID) + '"' +
+      ' aria-label="' + texto([c.DORSAL ? 'Dorsal ' + c.DORSAL : 'Sin dorsal', c.TALLA, nombreColor(c.ID_COLOR), x.q.jugadora].filter(String).join(', ')) + '">' +
+      camiseta(c) + '<span class="cm-jug-t"><span class="cm-jug-c">' + texto((c.DORSAL || '–') + (c.TALLA || '?')) + '</span>' +
+      '<span class="cm-jug-p">' + texto(x.q.jugadora || c.ID_INSCRIPCION_JUGADORA) + '</span>' +
+      '<span class="cm-jug-e">' + est + (c._pendiente ? ' <span class="u-nota">Guardando…</span>' : c.ESTADO === 'Entregada' && c.FECHA_ENTREGA ? ' <span class="u-nota">' + fecha(c.FECHA_ENTREGA) + '</span>' : '') + '</span></span></button>' +
       (sig ? '<button type="button" class="u-btn cm-sig' + (sig[2] ? ' cm-sig-' + sig[2] : '') + '" data-cm-sig="' + texto(c.ID) + '"' +
         (sig[2] ? ' aria-label="' + texto(sig[1] + ' la camiseta de ' + (x.q.jugadora || c.ID)) + '"' : '') + '>' + texto(sig[1]) + '</button>' : '') + '</li>';
   }
@@ -427,7 +460,8 @@
     var eq = quien(l[0]).equipo;
     var v = ventana('<h2>Entregar a ' + texto(eq) + '</h2><p class="u-nota">Marca como entregadas las camisetas preparadas de este equipo. Quita las que no estés entregando ahora.</p>' +
       '<ul class="cm-lista-ok">' + l.map(function (c) {
-        return '<li><label class="u-check"><input type="checkbox" checked data-cm-id="' + texto(c.ID) + '"> <span><b>' + texto(quien(c).jugadora || c.ID) + '</b> <span class="u-nota">' + texto(talla(c)) + '</span></span></label></li>';
+        return '<li><label class="u-check cm-ok-c"><input type="checkbox" checked data-cm-id="' + texto(c.ID) + '"> ' + camiseta(c, true) +
+          '<span><b>' + texto((c.DORSAL || '–') + (c.TALLA || '?')) + '</b> <span class="u-nota">' + texto(quien(c).jugadora || c.ID) + '</span></span></label></li>';
       }).join('') + '</ul>' +
       '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="ce-ok"></button><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cancelar</button></div>');
     var ok = v.querySelector('#ce-ok');
