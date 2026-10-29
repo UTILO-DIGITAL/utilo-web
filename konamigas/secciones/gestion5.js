@@ -103,8 +103,15 @@
    * precio = la TARIFA «Inscripción equipo» de su competición (REF_ID) vigente el día que se inscribió; menos sus
    * DESCUENTOS (sin IVA, se les pone el de la tarifa); cobrado = los MOVIMIENTOS con REF_TIPO «Inscripción» y REF_ID esa
    * inscripción (un ingreso suma, un gasto, una devolución, resta). Una competición INCLUIDA no se cobra.
+   * Un equipo de Baja no debe nada: lo cobrado es su señal, que se queda como ingreso (decisión de Javi, T0256), con
+   * baja: true y senal (lo cobrado, o 0 si se le devolvió).
    */
   function pago(d, ie) {
+    var p = pago0(d, ie);
+    if (p && ie.ESTADO === 'Baja') { p.baja = true; p.falta = 0; p.senal = Math.max(0, p.cobrado || 0); }
+    return p;
+  }
+  function pago0(d, ie) {
     var c = indice(d.com)[ie.ID_COMPETICION];
     if (!c) return null;
     if (c.INCLUIDA === true || ie.ORIGEN === 'Clasificación') return { incluida: true, precio: 0, descuento: 0, cobrado: 0, falta: 0 };
@@ -186,8 +193,9 @@
   /** Avisos de una inscripción de jugadora: [{ id, k, t }], sin los dados por buenos. */
   function avisosJugadora(d, ij, ctxT) {
     var out = [];
-    if (ij.ESTADO !== 'Activa') return out;
     var ie = ctxT.ie[ij.ID_INSCRIPCION_EQUIPO];
+    // Las de un equipo de Baja cuentan como de baja (el motor las da de baja con él; las migradas pueden seguir Activas).
+    if (ij.ESTADO !== 'Activa' || (ie && ie.ESTADO === 'Baja')) return out;
     var d0 = txt(ij.DORSAL);
     if (!d0) out.push({ id: 'dorsal-sin', k: 'dorsal', t: 'Sin dorsal' });
     else if ((ctxT.dorsal[ij.ID_INSCRIPCION_EQUIPO + '|' + d0] || 0) > 1) out.push({ id: 'dorsal-rep', k: 'dorsal', t: 'Dorsal ' + d0 + ' repetido' });
@@ -395,7 +403,7 @@
       function falta(i) { var p = pagoDe(i); return p && !p.incluida && !p.sinTarifa && p.falta > 0 ? p.falta : 0; }
       function avE(i) { var k = String(i.ID); if (!memo.avE[k]) memo.avE[k] = avisosEquipo(d, i, cx); return memo.avE[k]; }
       function avJ(j) { var k = String(j.ID); if (!memo.avJ[k]) memo.avJ[k] = avisosJugadora(d, j, cx); return memo.avJ[k]; }
-      function activas(idIe) { return (porIe[idIe] || []).filter(function (j) { return j.ESTADO === 'Activa'; }); }
+      function activas(idIe) { var i = ix.ie[idIe]; if (i && i.ESTADO === 'Baja') return []; return (porIe[idIe] || []).filter(function (j) { return j.ESTADO === 'Activa'; }); }
       /** Cuenta como inscrito (como en la publicada): ni Baja, ni sin confirmar, ni copa. */
       function inscrito(i) { return cuenta(i) && i.ESTADO !== 'Solicitada'; }
       function staff(id) { return ix.stf[String(id || '')] || null; }
@@ -831,6 +839,15 @@
         return o;
       }
 
+      /**
+       * Guarda cambios de la inscripción de un equipo. Si cambia el ESTADO va por gestion5Equipo: al darlo de baja, el motor da
+       * de baja a sus jugadoras (y al reactivarlo vuelven las que se fueron con él), y las devuelve en otras.
+       */
+      function escribirIe(ie, c) {
+        if (!('ESTADO' in c) || c.ESTADO === ie.ESTADO) return T.actualizar('INSCRIPCIONES_EQUIPOS', ie.ID, c);
+        var antes = {}; Object.keys(c).forEach(function (k) { antes[k] = ie[k] === undefined ? '' : ie[k]; });
+        return T.actualizar('INSCRIPCIONES_EQUIPOS', ie.ID, c, { fn: 'gestion5Equipo', args: [ie.ID, c, { antes: antes }] });
+      }
       /** Lo que hace cada botón de solución de una tarjeta. Devuelve el texto del aviso, o un error. */
       function resolver(btn) {
         var card = btn.closest('.gs-tarjeta'), sol = btn.getAttribute('data-sol'), reg = card.getAttribute('data-reg');
@@ -838,7 +855,7 @@
         if (btn.hasAttribute('data-pide') && !btn.hasAttribute('data-seguro')) { btn.setAttribute('data-seguro', ''); btn.textContent = '¿Seguro? Pulsa otra vez'; return; }
         var campo = function (k) { var e = card.querySelector('[data-campo="' + k + '"]'); return e ? String(e.value).trim() : ''; };
         var ie = reg && ix.ie[reg], ij = reg && !ie ? T.fila(IJ, reg) : null, hecho = '', cam = {}, ps = [];
-        var ponIe = function (c) { cam = c; ps.push(T.actualizar('INSCRIPCIONES_EQUIPOS', ie.ID, c)); };
+        var ponIe = function (c) { cam = c; ps.push(escribirIe(ie, c)); };
         var dorsalMal = function (v, idIe, menos) {
           if (!/^\d{1,3}$/.test(v)) return 'El dorsal es un número.';
           var o = (porIe[idIe] || []).filter(function (x) { return x.ESTADO === 'Activa' && menos.indexOf(String(x.ID)) < 0 && txt(x.DORSAL) === v; })[0];
@@ -847,7 +864,7 @@
         var rev = card.hasAttribute('data-rev') ? T.fila('REVISIONES', card.getAttribute('data-rev')) : null;
         var cerrarRev = function (dec) { ps.push(T.actualizar('REVISIONES', rev.ID, { RESUELTO: true, MOTIVO: txt(rev.MOTIVO) + (dec ? ' · Decisión: ' + dec : '') })); };
         if (sol === 'confirmar') { ponIe({ ESTADO: 'Confirmada' }); hecho = 'Inscripción confirmada.'; }
-        else if (sol === 'baja-eq') { ponIe({ ESTADO: 'Baja' }); hecho = 'Equipo dado de baja.'; }
+        else if (sol === 'baja-eq') { ponIe({ ESTADO: 'Baja' }); hecho = 'Equipo dado de baja, con sus jugadoras.'; }
         else if (sol === 'liga') { var l = campo('liga'); if (!l) return err('Elige la liga.'); ponIe({ ID_LIGA: l }); hecho = 'Liga asignada: ' + nom('lig', l) + '.'; }
         else if (sol === 'mensaje') { ponIe({ MENSAJE_INICIAL_ENVIADO: true }); hecho = 'Apuntado: mensaje inicial enviado.'; }
         else if (sol === 'grupo') { ponIe({ GRUPO_CREADO: true }); hecho = 'Apuntado: grupo creado.'; }
@@ -915,6 +932,20 @@
           : T.crear('REVISIONES', { TIPO: 'Aviso: ' + id, ID_REGISTRO: reg, MOTIVO: t + (por ? ' · ' + por : ''), RESUELTO: true, FECHA: hoy() });
         p.then(function () { if (ctx.abierta()) ctx.aviso('Aviso dado por bueno: ya no avisa.'); }, function () {});
       }
+      /** La categoría de Economía de las señales (config SENALES): el motor pasa a ella los cobros al dar de baja un equipo. */
+      var SENAL = PAGOS ? txt(cfg.SENALES) : '';
+      /** Señales de los equipos de baja de la temporada: lo que pagaron y se queda como ingreso. No es una alerta. */
+      function htmlSenales(vis) {
+        var xs = vis.filter(function (i) { if (i.ESTADO !== 'Baja' || i.ORIGEN === 'Clasificación') return false; var p = pagoDe(i); return p && p.senal > 0; });
+        if (!xs.length) return '';
+        var tot = xs.reduce(function (n, i) { return n + pagoDe(i).senal; }, 0);
+        return '<details class="gs-alt gs-senales"' + (altAb.senales ? ' open' : '') + ' data-alt="senales"><summary><span>Señales de equipos de baja · ' + plural(xs.length, 'equipo', 'equipos') + '</span><em class="gs-pos">' + eurC(tot) + '</em></summary>' +
+          '<p class="gs-nota">Se dieron de baja después de pagar: no deben nada y lo pagado se queda como ingreso' + (SENAL ? ', en Economía en la categoría «' + texto(SENAL) + '»' : '') + '.</p>' +
+          '<div class="gs-lista">' + xs.map(function (i) {
+            return '<button type="button" class="gs-item" data-ie="' + texto(i.ID) + '"><div class="gs-min"><div class="gs-t">' + punto(i.ID_COLOR) + texto(nomIe(i.ID)) + '</div>' +
+              '<div class="gs-s">' + texto([nomComp(i.ID_COMPETICION), nom('lig', i.ID_LIGA)].filter(Boolean).join(' · ')) + '</div></div><div class="gs-d">' + eurC(pagoDe(i).senal) + '</div></button>';
+          }).join('') + '</div></details>';
+      }
       function htmlResumen() {
         var vis = ies.filter(enFiltro), eqs = vis.filter(inscrito), leidas = jugLeidas();
         var nJug = 0;
@@ -948,7 +979,8 @@
           (leidas ? htmlAlerta('Jugadoras con alerta', cartas(jAl.map(function (j) { return { i: j, avs: avJ(j) }; })), ['JUGADORAS', 'avisos'])
             : '<details class="gs-alt"><summary><span>Jugadoras con alerta</span><em>…</em></summary><p class="gs-nota">Cargando las jugadoras…</p></details>') +
           htmlAlerta('Fotos sin vincular', fotos.length ? [tarjetaFotos(fotos.length)] : []) +
-          (pest.indexOf('REVISIONES') >= 0 ? htmlAlerta('Revisiones sin resolver', revs.map(tarjetaRev), ['REVISIONES', '']) : '') + '</div></div>';
+          (pest.indexOf('REVISIONES') >= 0 ? htmlAlerta('Revisiones sin resolver', revs.map(tarjetaRev), ['REVISIONES', '']) : '') +
+          (PAGOS ? htmlSenales(vis) : '') + '</div></div>';
 
         // Días con ligas (por el día de juego de LIGAS), en orden de la semana; al final, los equipos sin liga.
         var grupos = {};
@@ -1291,7 +1323,7 @@
         if (ie.ESTADO === 'Baja') t.push(tag('Baja · no cuenta', 'gs-tag-r'));
         if (ie.ORIGEN === 'Clasificación') t.push(tag('Copa', 'gs-tag-g'));
         var lig = ix.lig[String(ie.ID_LIGA || '')], ges = lig ? staff(lig.ID_GESTOR) : null, apodo = ges ? txt(ges.APODO || ges.NOMBRE) : '';
-        var nAct = pl.filter(function (j) { return j.ESTADO === 'Activa'; }).length, cargandoPl = !jugLeidas() && esTem;
+        var nAct = activas(ie.ID).length, cargandoPl = !jugLeidas() && esTem;
         var html = '<p class="gs-nota gs-sub">' + texto([nomComp(ie.ID_COMPETICION), nom('lig', ie.ID_LIGA), ie.ID].filter(Boolean).join(' · ')) + '</p>' +
           (t.length ? '<div class="gs-tags gs-sub2">' + t.join('') + '</div>' : '') +
           '<div class="gs-btns">' + (cap ? aWa(cap.TELEFONO, 'Escribir a la capitana') : '') +
@@ -1311,7 +1343,14 @@
           campo({ id: 'e-GRUPO_CREADO', t: 'si', et: 'Grupo de WhatsApp creado (Gr C/TS)', v: ie.GRUPO_CREADO }) +
           campo({ id: 'e-EN_XPORTY', t: 'si', et: 'Dado de alta en Xporty', v: ie.EN_XPORTY }) + '</div>' +
           campo({ id: 'e-NOTAS', t: 'area', et: 'Notas internas', v: ie.NOTAS });
-        if (p) {
+        if (p && p.baja && !p.incluida) {
+          html += '<div class="gs-sec">Pagos</div><div class="gs-dl">' +
+            fila('Cobrado', eurC(p.cobrado) + (p.cobros ? ' (' + plural(p.cobros, 'movimiento', 'movimientos') + ')' : '')) +
+            fila('Señal', p.senal > 0 ? '<b>' + eurC(p.senal) + ' · se queda</b>' : p.cobros ? '<span class="gs-opc">Devuelta</span>' : '<span class="gs-opc">No pagó nada</span>') + '</div>' +
+            '<p class="gs-nota">Equipo de baja: no debe nada y lo que pagó se queda como ingreso (no se devuelve)' +
+            (SENAL && p.senal > 0 ? ', en Economía en la categoría «' + texto(SENAL) + '»' : '') +
+            '. Si se le devuelve, se apunta en Economía como gasto con la referencia «Inscripción» · ' + texto(ie.ID) + '.</p>';
+        } else if (p) {
           html += '<div class="gs-sec">Pagos</div>' + (p.incluida ? '<p class="gs-nota">Incluida en otra inscripción: no se cobra.</p>' : '<div class="gs-dl">' +
             fila('Precio', p.sinTarifa ? '<span class="gs-amb">Sin tarifa en TARIFAS para esta competición</span>' : eurC(p.precio)) +
             (p.descuento ? fila('Descuento', eurC(p.descuento)) : '') +
@@ -1323,7 +1362,7 @@
           campo({ id: 'e-ID_CAPITANA', t: 'select', et: 'Capitana', v: ie.ID_CAPITANA, opts: capis, vacio: capis.length ? '— Sin capitana —' : 'Todavía no tiene jugadoras' }) +
           (cargandoPl ? '<p class="gs-nota">Cargando las jugadoras…</p>' : '') +
           (pl.length ? '<div class="gs-lista gs-plantilla">' + pl.map(function (j) {
-            var q = ix.jug[j.ID_JUGADORA] || {}, baja = j.ESTADO === 'Baja';
+            var q = ix.jug[j.ID_JUGADORA] || {}, baja = j.ESTADO === 'Baja' || ie.ESTADO === 'Baja';
             return '<button type="button" class="gs-item' + (baja ? ' gs-err' : '') + '" data-ij="' + texto(j.ID) + '"><div class="gs-min"><div class="gs-t">' + texto(nombreJug(q) || j.ID_JUGADORA) + '</div>' +
               '<div class="gs-tags">' + (String(j.ID_JUGADORA) === String(ie.ID_CAPITANA) ? tag('Capitana', 'gs-tag-v') : '') + (baja ? tag('Baja', 'gs-tag-err') : '') + guardando(j) + '</div></div>' +
               '<div class="gs-d">' + (txt(j.DORSAL) ? texto(txt(j.DORSAL)) : '<span class="gs-opc">Sin dorsal</span>') + '</div></button>';
@@ -1359,7 +1398,7 @@
               return mal;
             },
             escribir: function (cs) {
-              return [Object.keys(cs[0]).length ? T.actualizar('INSCRIPCIONES_EQUIPOS', ie.ID, cs[0]) : null,
+              return [Object.keys(cs[0]).length ? escribirIe(ie, cs[0]) : null,
                 Object.keys(cs[1]).length ? T.actualizar('EQUIPOS', e.ID, cs[1]) : null];
             }
           });
