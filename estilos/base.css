@@ -1159,6 +1159,10 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
 .u .cm-ped-pasos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin: var(--e2) 0 var(--e1); }
 .u .cm-ped-pasos i { height: 4px; border-radius: var(--radio-peq); background: var(--color-linea); }
 .u .cm-ped-pasos .cm-hecho { background: var(--color-bien); }
+.u .cm-ped-reg { margin: 0 0 var(--e1); font-size: 13px; }
+.u .cm-ped-reg summary { cursor: pointer; }
+.u .cm-ped-reg ol { margin: var(--e1) 0 var(--e2); padding: 0 0 0 var(--e3); border-left: 2px solid var(--color-linea); list-style: none; }
+.u .cm-ped-reg li { margin: 0 0 var(--e1); }
 .u .cm-cobro-l { display: block; font-weight: 400; margin-top: 2px; }
 .u .cm-ct-todos { display: grid; grid-template-columns: 1fr auto; gap: var(--e3); align-items: end; margin: var(--e3) 0; }
 /* En el móvil, los filtros en una fila que se desliza y los campos uno debajo de otro: la lista empieza arriba. */

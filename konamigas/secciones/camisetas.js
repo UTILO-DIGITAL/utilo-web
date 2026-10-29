@@ -976,6 +976,7 @@
       (nuevo ? '' : '<div class="cm-ped-pasos" role="img" aria-label="Paso ' + (i + 1) + ' de ' + PASOS_PED.length + ': ' + PASOS[paso][0] + '">' + PASOS_PED.map(function (x, k) {
         return '<i class="' + (k <= i ? 'cm-hecho' : '') + '" title="' + x[1] + '"></i>';
       }).join('') + '</div>') +
+      (nuevo ? '' : htmlRegistro(p)) +
       '<p class="u-nota">' + texto([p.ID_PROVEEDOR ? nombreProveedor(p.ID_PROVEEDOR) : '', p.FECHA_PEDIDO ? 'pedido el ' + fecha(p.FECHA_PEDIDO) : '', nuevo ? '' : falta].filter(String).join(' · ')) + '</p>' +
       '<p class="cm-ped-l1"><b>' + plural(unidades, 'camiseta', 'camisetas') + '</b>' +
         (imp ? ' · ' + eur(imp.unidad) + '/u · <b>' + eur(imp.total) + '</b> <span class="u-nota" title="' + (imp.factura ? 'Según su factura' : 'Según el catálogo del proveedor') + '">sin IVA</span>' : nuevo ? '' : ' · <span class="u-nota">sin precio</span>') + (nuevo ? '' : htmlDocsPedido(p)) + '</p>' +
@@ -998,6 +999,46 @@
         '<div class="n-botones">' + (paso === 'sinConfirmar' ? '<button type="button" class="u-btn" data-cm-p="' + id + '" data-cm-acc="confirmar">Marcar confirmado</button>' :
           paso === 'confirmado' ? '<button type="button" class="u-btn" data-cm-p="' + id + '" data-cm-acc="llegado">Ha llegado</button>' : '') +
         '<button type="button" class="u-btn' + (paso === 'recibido' ? '' : ' u-btn-texto') + '" data-cm-p="' + id + '" data-cm-acc="pdf">PDF para el proveedor</button></div>') + '</li>';
+  }
+
+  /*
+   * Registro del pedido: lo que ha pasado con él, sacado de su LOG («dd/MM/yyyy HH:mm · persona · [qué · ]COLUMNA: antes
+   * → después; …», que escribe el motor en cada cambio) y dicho en palabras. Si el LOG no tiene el alta o la llegada (un
+   * pedido migrado), salen de FECHA_PEDIDO y FECHA_RECIBIDO.
+   */
+  var REG_COL = {
+    CONFIRMADO: function (a, d) { return /^(sí|true|1)$/i.test(d) ? 'Confirmado por el proveedor' : 'Vuelve a «Sin confirmar»'; },
+    FECHA_RECIBIDO: function (a, d) { return d === '—' ? 'Quitada la llegada' : 'Ha llegado al local'; },
+    FECHA_ESTIMADA: function (a, d) { return d === '—' ? 'Sin fecha prevista' : 'Llegada prevista: ' + fecha(d); },
+    ID_FACTURA: function (a, d) { return d === '—' ? 'Quitada la factura' : a === '—' ? 'Factura enlazada' : 'Cambiada la factura'; },
+    ID_PROVEEDOR: function (a, d) { return 'Cambiado el proveedor: ' + nombreProveedor(d); },
+    NOTAS: function () { return 'Cambiadas las notas'; },
+    ARCHIVO_URL: function () { return 'Cambiado el documento del pedido'; }
+  };
+  function registroPedido(p) {
+    var l = [], alta = false, llego = false;
+    String(p.LOG || '').split('\n').forEach(function (t) {
+      var m = /^(\d{2}\/\d{2}\/\d{4})(?: (\d{2}:\d{2}))? · (.+?) · (.*)$/.exec(t.trim()); if (!m) return;
+      var partes = m[4].split(' · '), hechos = partes.pop(), que = partes.join(' · '), cosas = [];
+      if (/^Alta/.test(m[4])) { alta = true; cosas.push('Pedido creado' + (m[4].replace(/^Alta( · )?/, '') ? ' · ' + m[4].replace(/^Alta( · )?/, '') : '')); }
+      else hechos.split('; ').forEach(function (h) {
+        var c = /^([A-Z_]+): (.*) → (.*)$/.exec(h);
+        if (!c) { cosas.push(h); return; }
+        if (c[1] === 'FECHA_RECIBIDO' && c[3] !== '—') llego = true;
+        cosas.push(REG_COL[c[1]] ? REG_COL[c[1]](c[2], c[3]) : que || h);
+      });
+      cosas.forEach(function (x) { l.push({ dia: m[1], hora: m[2] || '', quien: m[3], que: x }); });
+    });
+    var d = function (v) { return fecha(v).replace(/^(\d{2}\/\d{2}\/\d{4}).*/, '$1'); };
+    if (!alta && p.FECHA_PEDIDO) l.unshift({ dia: d(p.FECHA_PEDIDO), hora: '', quien: '', que: 'Pedido creado' });
+    if (!llego && p.FECHA_RECIBIDO) l.push({ dia: d(p.FECHA_RECIBIDO), hora: '', quien: '', que: 'Ha llegado al local' });
+    return l;
+  }
+  function htmlRegistro(p) {
+    var l = registroPedido(p); if (!l.length) return '';
+    var u = l[l.length - 1], linea = function (x) { return '<b>' + texto(x.que) + '</b> <span class="u-nota">' + texto([x.dia + (x.hora ? ' ' + x.hora : ''), x.quien].filter(String).join(' · ')) + '</span>'; };
+    return '<details class="cm-ped-reg"><summary>Registro <span class="u-nota">· ' + texto(u.que) + ', ' + texto(u.dia) + '</span></summary><ol>' +
+      l.map(function (x) { return '<li>' + linea(x) + '</li>'; }).join('') + '</ol></details>';
   }
 
   /**
