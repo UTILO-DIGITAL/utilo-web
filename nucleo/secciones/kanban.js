@@ -334,8 +334,21 @@
         var m = /\n\s*(DECISIONES|ABIERTO)\s*:/.exec(d), i = m ? m.index : d.length;
         return { solicitud: d.slice(0, i).replace(/^\s*SOLICITUD\s*:\s*/, '').trim(), resto: d.slice(i) };
       }
+      /**
+       * T0267: título de una tarea de «Espera a» de la tarea abierta que no está en la copia. Si es de otro perfil, el motor
+       * no la manda y en DEPENDE_DE viene como «T0001 · Tarea de otro perfil» (TEXTOS.otroPerfil).
+       */
+      function tituloDep(id) {
+        var t = abiertaId ? tarea(abiertaId) : null, s = t ? String(t.DEPENDE_DE || '') : '', i = s.indexOf(id + ' · ');
+        if (i < 0) return '';
+        var r = s.slice(i + id.length + 3), j = -1;
+        ids(r).forEach(function (o) { var k = r.indexOf(', ' + o); if (k >= 0 && (j < 0 || k < j)) j = k; });
+        return (j < 0 ? r : r.slice(0, j)).trim();
+      }
+      function otroPerfil(id) { return !tarea(id) && tituloDep(id) === (TX.otroPerfil || 'Tarea de otro perfil'); }
       function rel(id) {
         var x = tarea(id);
+        if (otroPerfil(id)) return '<span class="frel"><span class="frid">' + texto(id) + '</span><span class="frtit">' + texto(tituloDep(id)) + '</span></span>';
         var st = x ? x.ESTADO : 'No existe';
         return '<a class="frel" href="?s=' + texto(ctx.id.toLowerCase()) + '&amp;t=' + encodeURIComponent(id) + '" data-rel="' + texto(id) + '">' +
           '<span class="fpill ' + cls(st) + '">' + texto(st) + '</span><span class="frid">' + texto(id) + '</span><span class="frtit">' + texto(x ? x.TITULO : '') + '</span></a>';
@@ -472,8 +485,8 @@
           (ayuda ? '<div class="ayuda">' + (n === 'TITULO' ? ayuda : texto(ayuda)) + '</div>' : '') + '</div>';
       }
       function chipDep(x) {
-        var t = tarea(x);
-        return '<span class="chip" data-dep="' + texto(x) + '"><span>' + texto(x + (t ? ' · ' + t.TITULO : '')) + '</span><button type="button" class="quitar" aria-label="Quitar ' + texto(x) + '" data-quitar-dep="' + texto(x) + '">×</button></span>';
+        var t = tarea(x), tt = t ? t.TITULO : otroPerfil(x) ? tituloDep(x) : ''; // T0267
+        return '<span class="chip" data-dep="' + texto(x) + '"><span>' + texto(x + (tt ? ' · ' + tt : '')) + '</span><button type="button" class="quitar" aria-label="Quitar ' + texto(x) + '" data-quitar-dep="' + texto(x) + '">×</button></span>';
       }
       /** Engancha contador, «espera a» y quitar en un formulario. */
       function vivo(f) {
