@@ -353,6 +353,7 @@
         '<span class="u-cifra' + (aDar.length && ent === aDar.length ? ' cm-ok' : '') + '">' + ent + ' de ' + aDar.length + '</span></div>' +
         '<div class="cm-barra" aria-hidden="true"><i style="width:' + (aDar.length ? Math.round(100 * ent / aDar.length) : 100) + '%"></i></div>' +
         '<p class="u-nota cm-eq-sub">' + texto([S.comp.charAt(0) === 'T' ? x0.compNombre : '', x0.liga].filter(String).join(' · ')) + '</p>' +
+        htmlProximo(k, ent < aDar.length) +
         '<ul class="cm-jugs">' + ver.map(htmlJugadora).join('') + '</ul>' +
         '<div class="n-botones cm-eq-pie">' +
         (prep.length > 1 ? '<button type="button" class="u-btn" data-cm-todas="' + texto(k) + '">Entregar las ' + prep.length + ' preparadas</button>' : '') +
@@ -360,6 +361,20 @@
           (S.todo[k] ? 'Ver solo el filtro' : 'Ver todo el equipo (' + todas.length + ')') + '</button>' : '') + '</div></section>';
     }).join('') + '</div>';
     c.querySelector('#cm-lista').innerHTML = h;
+  }
+
+  var DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  /** «jue 30/10» de 'aaaa-mm-dd'. */
+  function diaCorto(v) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v || '')); if (!m) return String(v || '');
+    return DIAS[new Date(+m[1], +m[2] - 1, +m[3]).getDay()] + ' ' + m[3] + '/' + m[2];
+  }
+  /** El próximo partido del equipo (camisetas5Nombres · prox), si le quedan camisetas por entregar: cuándo y quién arbitra. */
+  function htmlProximo(ie, faltan) {
+    var p = faltan && S.N && S.N.prox && S.N.prox[ie];
+    if (!p) return '';
+    return '<p class="cm-prox">Próximo partido: <b>' + texto(diaCorto(p[0]) + (p[1] ? ' · ' + p[1] : '')) + '</b>' + (p[2] ? ' · ' + texto(p[2]) : '') +
+      (p[3] ? ' · arbitra <b>' + texto(p[3]) + '</b>' : '') + '</p>';
   }
 
   function htmlJugadora(x) {
