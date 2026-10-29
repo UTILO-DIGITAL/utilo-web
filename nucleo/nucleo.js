@@ -364,6 +364,7 @@
   /**
    * Lo que recibe cada sección en abrir(el, ctx):
    * - id, titulo, persona, perfil, admin y config (su personalización de config.json · nucleo, con los valores por defecto).
+   * - autor (T0273): el nombre para lo que se apunta (como ctx.autor del motor).
    * - correo y secciones (T0259): la cuenta con la que ha entrado y las secciones que ve ({ id, titulo }), en orden; las de
    *   dentro de Perfil, con enPerfil e icono (T0269).
    * - tablas: las tablas al momento (UT de kanban4/tablas.js): leer, filas, fila, actualizar, crear, borrar.
@@ -378,6 +379,8 @@
       // T0259: las secciones que ves, en orden; T0269: con enPerfil (y su icono) las que van dentro de Perfil.
       // T0273: como, quien administra si está viendo como esta persona ({ correo, persona }); verComo, la ventana para elegir (solo quien administra).
       como: cred.como || null, verComo: cred.admin && !cred.como ? verComo : null,
+      // T0273: el nombre con el que se apunta lo que hace (HISTORIAL…), como en el motor: «Javi Canela como Ana».
+      autor: cred.como ? cred.como.persona + ' como ' + cred.persona : cred.persona,
       correo: cred.correo || '', secciones: todas().map(function (x) { return x.enPerfil ? { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true } : { id: x.id, titulo: x.titulo }; }),
       tablas: tablas(),
       alCambiar: function (f) { (oyentes[s.id] = oyentes[s.id] || []).push(f); },
