@@ -16,6 +16,11 @@
  *   este dispositivo hasta aplicarlo.
  * Los nombres de jugadoras, equipos y competiciones los da el motor (camisetas5Nombres), solo de las inscripciones con
  * camiseta; se guardan en el dispositivo y se ponen al día por detrás.
+ * T0268: el pack de camisetas incluidas de cada competición (PACKS): en Entregas, cada camiseta dice si es personalizada y
+ * cada equipo, los dorsales del pack que le quedan libres y los repetidos, con un mensaje para mandarle; en Pedidos,
+ * definir el pack, pedirlo antes de la temporada, lo cobrado por las personalizadas (tarifa «Camiseta» de TARIFAS) y el
+ * catálogo de cada proveedor (CATALOGO): el pedido solo ofrece los proveedores que hacen el modelo en esos colores y el
+ * extracto lleva su código.
  */
 (function () {
   'use strict';
@@ -129,14 +134,128 @@
     cam5Stock_(D, modelo).forEach(function (f) { if (f.local) L[cam5Clave_(f)] = f.local; });
     return L;
   }
+
+  /* ---------- T0268 · pack de camisetas incluidas, catálogo de cada proveedor y tarifa de las personalizadas ---------- */
+
+  /** «4M»: dorsal y talla juntos, como se dicen en el campo y en el pack. */
+  function cam5Corto_(f) { return cam5Txt_(f.DORSAL) + cam5Txt_(f.TALLA); }
+  /** El pack de una competición (filas de PACKS): [{ DORSAL, TALLA }] por dorsal. */
+  function cam5Pack_(packs, comp) {
+    comp = cam5Txt_(comp);
+    return (packs || []).filter(function (p) { return p && cam5Txt_(p.ID) && cam5Txt_(p.ID_COMPETICION) === comp && cam5Txt_(p.DORSAL); })
+      .map(function (p) { return { DORSAL: cam5Txt_(p.DORSAL), TALLA: cam5Txt_(p.TALLA) }; }).sort(cam5Orden_);
+  }
+  /**
+   * El pack escrito a mano («1S, 2S, 3S, 4M» o «1 - S, 2 - S…», como en el Excel antiguo): { pack: [{ DORSAL, TALLA }], mal: [trozos] }.
+   * Un dorsal repetido cuenta como mal: en un equipo cada dorsal es de una sola jugadora.
+   */
+  function cam5LeerPack_(t) {
+    var pack = [], mal = [], ya = {};
+    String(t || '').split(/[,;\n]+/).forEach(function (x) {
+      x = x.trim(); if (!x) return;
+      var m = /^(\d{1,3})\s*[-·\s]?\s*(XXL|XL|XS|S|M|L)$/i.exec(x);
+      if (!m || ya[m[1]]) { mal.push(x); return; }
+      ya[m[1]] = 1; pack.push({ DORSAL: m[1], TALLA: m[2].toUpperCase() });
+    });
+    return { pack: pack.sort(cam5Orden_), mal: mal };
+  }
+  /**
+   * Lo incluido de un equipo según el pack de su competición. camisetas: las del equipo; pack: cam5Pack_; porJugadora:
+   * camisetas incluidas por jugadora (MODELOS_COMPETICION · CAMISETAS_INCLUIDAS, 1 si no se dice); bajas: { ID_INSCRIPCION: true }.
+   * No cuentan las «Sin camiseta» ni las de las bajas. De la más antigua a la más reciente (por ID), cada camiseta con un dorsal
+   * y una talla del pack que nadie del equipo ha cogido antes va incluida, si su jugadora no ha gastado ya las suyas; las demás
+   * son personalizadas.
+   * { incluida: { ID: true|false }, libres: [{ DORSAL, TALLA }] (del pack, con el dorsal sin usar en el equipo),
+   *   repetidos: [{ DORSAL, ids: [ID] }] (dorsales que llevan dos o más jugadoras), personalizadas: n, incluidas: n }
+   */
+  function cam5Incluidas_(camisetas, pack, porJugadora, bajas) {
+    bajas = bajas || {};
+    var maxJ = porJugadora === undefined || porJugadora === null || porJugadora === '' ? 1 : cam5Num_(porJugadora);
+    var hueco = {}, usado = {}, porJug = {}, dorsales = {}, r = { incluida: {}, libres: [], repetidos: [], personalizadas: 0, incluidas: 0 };
+    (pack || []).forEach(function (p) { hueco[cam5Txt_(p.DORSAL)] = cam5Txt_(p.TALLA); });
+    (camisetas || []).filter(function (c) {
+      return c && cam5Txt_(c.ID) && cam5Txt_(c.ESTADO) !== 'Sin camiseta' && !bajas[cam5Txt_(c.ID_INSCRIPCION_JUGADORA)];
+    }).sort(function (a, b) { return cam5Txt_(a.ID) < cam5Txt_(b.ID) ? -1 : 1; }).forEach(function (c) {
+      var d = cam5Txt_(c.DORSAL), j = cam5Txt_(c.ID_INSCRIPCION_JUGADORA);
+      if (d) {
+        (dorsales[d] = dorsales[d] || { j: {}, ids: [] }).ids.push(cam5Txt_(c.ID));
+        dorsales[d].j[j] = 1;
+      }
+      var si = !!d && hueco[d] === cam5Txt_(c.TALLA) && !usado[d] && (porJug[j] || 0) < maxJ;
+      if (si) { usado[d] = 1; porJug[j] = (porJug[j] || 0) + 1; r.incluidas++; } else r.personalizadas++;
+      r.incluida[cam5Txt_(c.ID)] = si;
+    });
+    r.libres = (pack || []).filter(function (p) { return !dorsales[cam5Txt_(p.DORSAL)]; });
+    r.repetidos = Object.keys(dorsales).filter(function (d) { return Object.keys(dorsales[d].j).length > 1; })
+      .map(function (d) { return { DORSAL: d, ids: dorsales[d].ids }; }).sort(cam5Orden_);
+    return r;
+  }
+
+  /** Sí de un booleano del Excel (true, 'TRUE', 'Sí'…). */
+  function cam5Si_(v) { return v === true || /^(true|s[ií]|1)$/i.test(cam5Txt_(v)); }
+  /** Importe del Excel → euros, sin redondear (acepta 10, '10,50', '1.234,56 €' o '1234.56'); null si está vacío. */
+  function cam5Eur_(v) {
+    if (typeof v === 'number') return isFinite(v) ? v : null;
+    var s = cam5Txt_(v).replace(/\s|€/g, '');
+    if (!s) return null;
+    var n = Number(s.indexOf(',') >= 0 ? s.replace(/\./g, '').replace(',', '.') : s);
+    return isFinite(n) ? n : null;
+  }
+  /** Importe del Excel → céntimos; null si está vacío. */
+  function cam5Cts_(v) { var n = cam5Eur_(v); return n === null ? null : Math.round(n * 100); }
+  /**
+   * Lo que hace un proveedor de un modelo (filas de CATALOGO), solo lo que sigue haciendo (ACTIVO no es «no»):
+   * { ID_COLOR: { CODIGO, precio (céntimos sin IVA, o null), ID } }.
+   */
+  function cam5Catalogo_(catalogo, prov, modelo) {
+    var m = {};
+    (catalogo || []).forEach(function (f) {
+      if (!f || !cam5Txt_(f.ID) || cam5Txt_(f.ID_PROVEEDOR) !== cam5Txt_(prov) || cam5Txt_(f.ID_MODELO) !== cam5Txt_(modelo)) return;
+      if (f.ACTIVO === false || /^(false|no|0)$/i.test(cam5Txt_(f.ACTIVO))) return;
+      m[cam5Txt_(f.ID_COLOR)] = { CODIGO: cam5Txt_(f.CODIGO), precio: cam5Cts_(f.PRECIO), ID: cam5Txt_(f.ID) };
+    });
+    return m;
+  }
+  /**
+   * Los proveedores que hacen un modelo y, de los colores que se quieren pedir, cuáles no hacen:
+   * [{ ID_PROVEEDOR, faltan: [ID_COLOR], colores: n }], primero los que lo tienen todo y después los que tienen más colores.
+   */
+  function cam5Proveedores_(catalogo, modelo, colores) {
+    var provs = [];
+    (catalogo || []).forEach(function (f) {
+      var p = cam5Txt_(f && f.ID_PROVEEDOR);
+      if (p && cam5Txt_(f.ID) && cam5Txt_(f.ID_MODELO) === cam5Txt_(modelo) && provs.indexOf(p) < 0) provs.push(p);
+    });
+    return provs.map(function (p) {
+      var cat = cam5Catalogo_(catalogo, p, modelo);
+      return { ID_PROVEEDOR: p, colores: Object.keys(cat).length, faltan: (colores || []).filter(function (c, i, a) { return a.indexOf(c) === i && !cat[cam5Txt_(c)]; }) };
+    }).filter(function (x) { return x.colores; }).sort(function (a, b) { return a.faltan.length - b.faltan.length || b.colores - a.colores; });
+  }
+  /**
+   * La tarifa «Camiseta» (lo que se cobra por una personalizada con la inscripción) de una competición: la de TARIFAS con
+   * CONCEPTO Camiseta de su temporada, de esa competición o sin REF_ID, vigente ese día ('aaaa-mm-dd'; FECHA_DESDE y
+   * FECHA_HASTA). { precio: céntimos sin IVA, iva: %, total: céntimos con IVA (del precio exacto: 8,2645 € + 21 % = 10 €) } o null.
+   */
+  function cam5Tarifa_(tarifas, comp, temp, dia) {
+    var f = function (v) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(cam5Txt_(v)) || /^(\d{2})\/(\d{2})\/(\d{4})/.exec(cam5Txt_(v)); return !m ? '' : m[1].length === 4 ? m[1] + '-' + m[2] + '-' + m[3] : m[3] + '-' + m[2] + '-' + m[1]; };
+    var l = (tarifas || []).filter(function (t) {
+      if (!t || cam5Txt_(t.CONCEPTO) !== 'Camiseta' || cam5Txt_(t.ID_TEMPORADA) !== cam5Txt_(temp)) return false;
+      if (cam5Txt_(t.REF_ID) && cam5Txt_(t.REF_ID) !== cam5Txt_(comp)) return false;
+      return (!f(t.FECHA_DESDE) || !dia || f(t.FECHA_DESDE) <= dia) && (!f(t.FECHA_HASTA) || !dia || f(t.FECHA_HASTA) >= dia);
+    }).sort(function (a, b) { return (cam5Txt_(b.REF_ID) ? 1 : 0) - (cam5Txt_(a.REF_ID) ? 1 : 0) || (f(b.FECHA_DESDE) < f(a.FECHA_DESDE) ? -1 : 1); });
+    if (!l.length || cam5Eur_(l[0].PRECIO) === null) return null;
+    var iva = parseFloat(cam5Txt_(l[0].TIPO_IVA).replace(',', '.')) || 0;
+    return { precio: cam5Cts_(l[0].PRECIO), iva: iva, total: Math.round(cam5Eur_(l[0].PRECIO) * (100 + iva)) };
+  }
   // --- fin de las cuentas ---
 
-  var CALC = { stock: cam5Stock_, plan: cam5Plan_, lineas: cam5Lineas_, paso: cam5Paso_, local: cam5Local_, clave: cam5Clave_, orden: cam5Orden_ };
+  var CALC = { stock: cam5Stock_, plan: cam5Plan_, lineas: cam5Lineas_, paso: cam5Paso_, local: cam5Local_, clave: cam5Clave_, orden: cam5Orden_,
+    pack: cam5Pack_, leerPack: cam5LeerPack_, incluidas: cam5Incluidas_, catalogo: cam5Catalogo_, proveedores: cam5Proveedores_, tarifa: cam5Tarifa_ };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
 
-  var TABLAS = ['CAMISETAS', 'MODELOS', 'COLORES', 'PEDIDOS', 'PEDIDOS_LINEAS', 'AJUSTES_STOCK', 'CONTRAPARTES', 'FACTURAS', 'MODELOS_COMPETICION'];
+  var TABLAS = ['CAMISETAS', 'MODELOS', 'COLORES', 'PEDIDOS', 'PEDIDOS_LINEAS', 'AJUSTES_STOCK', 'CONTRAPARTES', 'FACTURAS', 'MODELOS_COMPETICION', 'PACKS', 'CATALOGO', 'TARIFAS'];
   var VISTAS = [['entregas', 'Entregas'], ['stock', 'Stock'], ['pedidos', 'Pedidos'], ['recuento', 'Recuento']];
   // [estado, en plural para los filtros, color de base.css]
   var ESTADOS = [['Por pedir', 'Por pedir', 'bl'], ['Pedida', 'Pedidas', 'x'], ['Por preparar', 'Por preparar', 'pr'], ['Preparada', 'Preparadas', 'ec'],
@@ -361,6 +480,7 @@
     }
     h += '<div class="cm-eqs">' + eqs.map(function (k) {
       var todas = grupos[k].slice().sort(function (a, b) { return cam5Orden_(a.c, b.c) || (a.q.jugadora < b.q.jugadora ? -1 : 1); });
+      var pk = packEquipo(todas);
       var ver = S.todo[k] || S.filtro === 'todas' ? todas : todas.filter(function (x) { return es(S.filtro)(x) && busca(x); });
       var aDar = todas.filter(function (x) { return !x.q.baja && x.s !== 'Sin camiseta'; }), ent = aDar.filter(function (x) { return x.s === 'Entregada'; }).length;
       var prep = todas.filter(function (x) { return x.s === 'Preparada'; });
@@ -370,9 +490,10 @@
         '<span class="u-cifra' + (aDar.length && ent === aDar.length ? ' cm-ok' : '') + '">' + ent + ' de ' + aDar.length + '</span></div>' +
         '<div class="cm-barra" aria-hidden="true"><i style="width:' + (aDar.length ? Math.round(100 * ent / aDar.length) : 100) + '%"></i></div>' +
         '<p class="u-nota cm-eq-sub">' + texto([S.comp.charAt(0) === 'T' ? x0.compNombre : '', x0.liga].filter(String).join(' · ')) + '</p>' +
-        htmlProximo(k, ent < aDar.length) +
-        '<ul class="cm-jugs">' + ver.map(htmlJugadora).join('') + '</ul>' +
+        htmlProximo(k, ent < aDar.length) + htmlPackEquipo(pk) +
+        '<ul class="cm-jugs">' + ver.map(function (x) { return htmlJugadora(x, pk); }).join('') + '</ul>' +
         '<div class="n-botones cm-eq-pie">' +
+        (pk ? '<button type="button" class="u-btn u-btn-texto" data-cm-msg="' + texto(k) + '">Mensaje al equipo</button>' : '') +
         (prep.length > 1 ? '<button type="button" class="u-btn" data-cm-todas="' + texto(k) + '">Entregar las ' + prep.length + ' preparadas</button>' : '') +
         (S.filtro !== 'todas' && (todas.length > ver.length || S.todo[k]) ? '<button type="button" class="u-btn u-btn-texto" data-cm-todo="' + texto(k) + '">' +
           (S.todo[k] ? 'Ver solo el filtro' : 'Ver todo el equipo (' + todas.length + ')') + '</button>' : '') + '</div></section>';
@@ -400,15 +521,17 @@
       (p[3] ? ' · arbitra <b>' + texto(p[3]) + '</b>' : '') + '</p>';
   }
 
-  function htmlJugadora(x) {
+  function htmlJugadora(x, pk) {
     var c = x.c, s = x.s, sig = siguiente(s);
+    // T0268: con pack, la que no entra en él es personalizada (se cobra con la inscripción).
+    var pers = pk && c.ID in pk.incluida && !pk.incluida[c.ID];
     var est = s === 'recuperar' ? '<span class="n-estado n-e-bl">Por recuperar</span>' : s === 'quitar' ? '<span class="n-estado n-e-bl">Baja: quitar la camiseta</span>' : chipEstado(c.ESTADO);
     // Lo primero, la camiseta (color, dorsal y talla); la jugadora, debajo.
     return '<li class="cm-jug' + (c._pendiente ? ' cm-guardando' : '') + '"><button type="button" class="cm-jug-n" data-cm-cam="' + texto(c.ID) + '"' +
       ' aria-label="' + texto([c.DORSAL ? 'Dorsal ' + c.DORSAL : 'Sin dorsal', c.TALLA, nombreColor(c.ID_COLOR), x.q.jugadora].filter(String).join(', ')) + '">' +
       camiseta(c) + '<span class="cm-jug-t"><span class="cm-jug-c">' + texto((c.DORSAL || '–') + (c.TALLA || '?')) + '</span>' +
       '<span class="cm-jug-p">' + texto(x.q.jugadora || c.ID_INSCRIPCION_JUGADORA) + '</span>' +
-      '<span class="cm-jug-e">' + est + (c._pendiente ? ' <span class="u-nota">Guardando…</span>' : c.ESTADO === 'Entregada' && c.FECHA_ENTREGA ? ' <span class="u-nota">' + fecha(c.FECHA_ENTREGA) + '</span>' : '') + '</span></span></button>' +
+      '<span class="cm-jug-e">' + est + (pers ? ' <span class="cm-pers">Personalizada</span>' : '') + (c._pendiente ? ' <span class="u-nota">Guardando…</span>' : c.ESTADO === 'Entregada' && c.FECHA_ENTREGA ? ' <span class="u-nota">' + fecha(c.FECHA_ENTREGA) + '</span>' : '') + '</span></span></button>' +
       (sig ? '<button type="button" class="u-btn cm-sig' + (sig[2] ? ' cm-sig-' + sig[2] : '') + '" data-cm-sig="' + texto(c.ID) + '"' +
         (sig[2] ? ' aria-label="' + texto(sig[1] + ' la camiseta de ' + (x.q.jugadora || c.ID)) + '"' : '') + '>' + texto(sig[1]) + '</button>' : '') + '</li>';
   }
@@ -437,7 +560,62 @@
       S.todo[id] = !S.todo[id]; pintar(false);
     } else if ((id = b.getAttribute('data-cm-todas'))) {
       ventanaEntregarEquipo(id);
+    } else if ((id = b.getAttribute('data-cm-msg'))) {
+      ventanaMensaje(id);
     }
+  }
+
+  /* ---------- T0268 · pack de camisetas incluidas de un equipo ---------- */
+
+  function packDe(comp) { return cam5Pack_(S.T.filas('PACKS'), comp); }
+  function porJugadora(comp) { var x = S.T.filas('MODELOS_COMPETICION').filter(function (m) { return String(m.ID_COMPETICION) === String(comp); })[0]; return x ? x.CAMISETAS_INCLUIDAS : 1; }
+  /** Lo incluido de un equipo ([{ c, q }] de Entregas) según el pack de su competición; null si no tiene pack. */
+  function packEquipo(todas) {
+    var comp = todas[0] && todas[0].q.comp, pack = comp ? packDe(comp) : [];
+    if (!pack.length) return null;
+    var b = {}; todas.forEach(function (x) { if (x.q.baja) b[x.c.ID_INSCRIPCION_JUGADORA] = true; });
+    var r = cam5Incluidas_(todas.map(function (x) { return x.c; }), pack, porJugadora(comp), b);
+    r.pack = pack; r.comp = comp;
+    return r;
+  }
+  function cortos(l) { return l.map(cam5Corto_).join(' '); }
+  function htmlPackEquipo(pk) {
+    if (!pk) return '';
+    var N = S.N || { insc: {} }, nom = function (id) { var c = S.T.fila('CAMISETAS', id); return c ? (N.insc[c.ID_INSCRIPCION_JUGADORA] || [''])[0] || id : id; };
+    return '<p class="cm-pack-l">' + plural(pk.incluidas, 'incluida', 'incluidas') + ' de ' + pk.pack.length + (pk.personalizadas ? ' · <b>' + plural(pk.personalizadas, 'personalizada', 'personalizadas') + '</b>' : '') +
+      (pk.libres.length ? ' · libres del pack: <span class="cm-pack-c">' + texto(cortos(pk.libres)) + '</span>' : ' · pack completo') + '</p>' +
+      pk.repetidos.map(function (r) { return '<p class="u-mal cm-pack-l">El ' + texto(r.DORSAL) + ' lo llevan ' + texto(r.ids.map(nom).join(' y ')) + ': solo una entra en el pack.</p>'; }).join('');
+  }
+  /** Euros con IVA de una tarifa ({ precio, iva }): lo que paga el equipo por cada personalizada. */
+  function conIva(t) { return t ? t.total : 0; }
+  /**
+   * El mensaje para el equipo: las camisetas que tiene gratis con la inscripción (el pack), las que lleva cada jugadora,
+   * las personalizadas (con lo que cuestan), los dorsales del pack que le quedan libres y los repetidos.
+   */
+  function textoMensaje(ie) {
+    var todas = S.T.filas('CAMISETAS').map(function (c) { return { c: c, q: quien(c) }; }).filter(function (x) { return x.q.ie === ie; })
+      .sort(function (a, b) { return cam5Orden_(a.c, b.c); });
+    var pk = packEquipo(todas); if (!pk) return '';
+    var q0 = todas[0].q, vivas = todas.filter(function (x) { return x.c.ID in pk.incluida; });
+    var tar = cam5Tarifa_(S.T.filas('TARIFAS'), pk.comp, q0.temp, hoy());
+    var inc = vivas.filter(function (x) { return pk.incluida[x.c.ID]; }), per = vivas.filter(function (x) { return !pk.incluida[x.c.ID]; });
+    var una = function (x) { return cam5Corto_(x.c) + ' ' + (x.q.jugadora || '').split(' ')[0]; };
+    var t = ['Camisetas de ' + (q0.equipo || 'vuestro equipo') + (q0.compNombre ? ' · ' + q0.compNombre : ''), '',
+      'Con la inscripción tenéis ' + plural(pk.pack.length, 'camiseta incluida', 'camisetas incluidas') + ' (gratis), con estos dorsales y tallas: ' + cortos(pk.pack) + '.'];
+    if (inc.length) t.push('', 'Incluidas (' + inc.length + '): ' + inc.map(una).join(', ') + '.');
+    if (per.length) t.push('', 'Personalizadas (' + per.length + '): ' + per.map(una).join(', ') + '.' +
+      (tar ? ' Cada una cuesta ' + eur(conIva(tar)) + ' y va con la inscripción.' : ' Se pagan aparte con la inscripción.'));
+    t.push('', pk.libres.length ? 'Dorsales del pack que os quedan libres: ' + cortos(pk.libres) + '. Si alguna elige uno de estos con su talla, le sale gratis.' : 'Ya habéis usado todo el pack.');
+    pk.repetidos.forEach(function (r) {
+      t.push('', 'Ojo: el ' + r.DORSAL + ' lo lleváis ' + r.ids.map(function (id) { var x = vivas.filter(function (y) { return y.c.ID === id; })[0]; return x ? (x.q.jugadora || '').split(' ')[0] : id; }).join(' y ') +
+        '. En el pack solo entra una; la otra es personalizada o tiene que cambiar de dorsal.');
+    });
+    return t.join('\n');
+  }
+  function ventanaMensaje(ie) {
+    var txt = textoMensaje(ie); if (!txt) return;
+    var x = S.T.filas('CAMISETAS').filter(function (c) { return quien(c).ie === ie; })[0];
+    ventanaTexto('Mensaje para ' + (x ? quien(x).equipo : 'el equipo'), '<p class="u-nota">Para las capitanas: lo que tienen gratis y los dorsales que les quedan. Cópialo y pégalo en su WhatsApp.</p>', txt, 'Camisetas del equipo');
   }
 
   /** Preparada, Entregada, Por preparar o Sin camiseta: directo a la tabla, al momento. Con aviso, se puede deshacer. */
@@ -723,7 +901,7 @@
     h += '<h2 class="n-grupo">Pedidos de ' + texto(nombreModelo(m)) + ' <span class="u-cifra">' + peds.length + '</span></h2>';
     if (!peds.length) h += '<p class="u-vacio">Este modelo no tiene pedidos' + (plan && plan.pedir.length ? '. Con «Preparar pedido» se hace el primero con lo que falta.' : ' todavía.') + '</p>';
     h += '<ul class="cm-peds">' + peds.map(function (p) { return htmlPedido(p, lineas[p.ID] || [], jug[p.ID] || {}); }).join('') + '</ul>';
-    h += htmlModelos() + htmlProveedores();
+    h += htmlPacks(m) + htmlModelos() + htmlProveedores();
     c.innerHTML = h;
     engancharModelo(c);
     var bl = c.querySelector('#cm-libres'), bp = c.querySelector('#cm-pedir');
@@ -733,12 +911,23 @@
       var b = e.target.closest('[data-cm-mod]'); if (b) ventanaModelo(b.getAttribute('data-cm-mod'));
     };
     c.querySelector('.cm-provs').onclick = function (e) {
-      var b = e.target.closest('[data-cm-prov]'); if (b) ventanaProveedor(b.getAttribute('data-cm-prov'));
+      var b = e.target.closest('[data-cm-prov]'), k = e.target.closest('[data-cm-cat]');
+      if (b) ventanaProveedor(b.getAttribute('data-cm-prov'));
+      else if (k) ventanaCatalogo(k.getAttribute('data-cm-cat'));
+    };
+    c.querySelector('.cm-packs').onclick = function (e) {
+      var b = e.target.closest('[data-cm-pk]'); if (!b) return;
+      var k = b.getAttribute('data-cm-pk'), acc = b.getAttribute('data-cm-acc');
+      if (acc === 'editar') ventanaPack(k);
+      else if (acc === 'pedir') ventanaPedirPack(k);
+      else if (acc === 'cobro') ventanaCobro(k);
+      else if (acc === 'excel') guardarIncluidas(b, k);
     };
     c.querySelector('.cm-peds').onclick = function (e) {
       var b = e.target.closest('[data-cm-p]'); if (!b) return;
       var id = b.getAttribute('data-cm-p'), acc = b.getAttribute('data-cm-acc');
       if (acc === 'extracto') ventanaExtracto(id);
+      else if (acc === 'pdf') pdfPedido(id);
       else if (acc === 'factura') ventanaFactura(id);
       else if (acc === 'confirmar') S.T.actualizar('PEDIDOS', id, { CONFIRMADO: true }).catch(function () {});
       else if (acc === 'llegado') {
@@ -783,7 +972,8 @@
       (nuevo ? '<p class="u-nota">Creando el pedido, sus líneas y las camisetas en el Excel…</p>' : '<div class="n-botones">' +
         (paso === 'sinConfirmar' ? '<button type="button" class="u-btn" data-cm-p="' + texto(p.ID) + '" data-cm-acc="confirmar">Marcar confirmado</button>' :
           paso === 'confirmado' ? '<button type="button" class="u-btn" data-cm-p="' + texto(p.ID) + '" data-cm-acc="llegado">Ha llegado</button>' : '') +
-        '<button type="button" class="u-btn u-btn-texto" data-cm-p="' + texto(p.ID) + '" data-cm-acc="extracto">Extracto para el proveedor</button>' +
+        '<button type="button" class="u-btn" data-cm-p="' + texto(p.ID) + '" data-cm-acc="pdf">PDF para el proveedor</button>' +
+        '<button type="button" class="u-btn u-btn-texto" data-cm-p="' + texto(p.ID) + '" data-cm-acc="extracto">Extracto en texto</button>' +
         '<button type="button" class="u-btn u-btn-texto" data-cm-p="' + texto(p.ID) + '" data-cm-acc="factura">' + (p.ID_FACTURA ? 'Cambiar factura' : 'Enlazar factura') + '</button></div>') + '</li>';
   }
 
@@ -840,38 +1030,27 @@
     return x && x.CONTACTO ? '<div class="cm-contacto-b">' + htmlContacto(x.CONTACTO) + '</div>' :
       '<p class="u-nota">Este proveedor no tiene contacto apuntado: se pone en «Proveedores», abajo en la pestaña Pedidos.</p>';
   }
-  function codigoColor(id) { return color(id).CODIGO || ''; }
+  /** El código del color: el del proveedor en su catálogo (T0268) o, si no lo tiene, el de COLORES. */
+  function codigoColor(id, prov, modelo) {
+    var c = prov && modelo ? cam5Catalogo_(S.T.filas('CATALOGO'), prov, modelo)[id] : null;
+    return (c && c.CODIGO) || color(id).CODIGO || '';
+  }
 
   function ventanaPedir(m, plan) {
     var Dd = D(), porId = {}; Dd.CAMISETAS.forEach(function (x) { porId[x.ID] = x; });
     var lin = cam5Lineas_(plan.pedir.map(function (id) { return porId[id]; }));
-    var temps = (S.N && S.N.temp) || [], provs = proveedores();
-    var habitual = String((S.T.fila('MODELOS', m) || {}).ID_PROVEEDOR || '');
-    if (!provs.some(function (x) { return String(x.ID) === habitual; })) habitual = '';
+    var temps = (S.N && S.N.temp) || [];
     var v = ventana('<h2>Preparar pedido</h2><p class="u-nota">' + texto(nombreModelo(m)) + ': ' + plural(plan.pedir.length, 'camiseta', 'camisetas') +
       (plan.local.length === 1 ? '. Antes se da la que tiene una libre en el local.' : plan.local.length ? '. Antes se dan las ' + plan.local.length + ' que tienen una libre en el local.' : '.') + ' El pedido queda sin confirmar hasta que lo confirme el proveedor.</p>' +
-      (provs.length ? '<div class="u-campos">' + campo('Proveedor', '<select id="pp-prov">' + (habitual ? '' : '<option value="">Elige el proveedor</option>') +
-        opciones(provs.map(function (x) {
-          var u = ultimoPrecio(x.ID, m) || ultimoPrecio(x.ID);
-          return [x.ID, x.NOMBRE + (String(x.ID) === habitual ? ' · habitual' : '') + (u ? ' · ' + eur(u.unidad) : '')];
-        }), habitual) + '</select>') + '</div><div id="pp-contacto"></div>' :
-        '<p class="u-mal">No hay ningún proveedor apuntado. Añádelo en «Proveedores», abajo en la pestaña Pedidos, y después prepara el pedido.</p>') +
-      '<div class="u-tabla-caja"><table class="u-tabla"><thead><tr><th>Color (código)</th><th>Dorsal</th><th>Talla</th><th class="num">Cuántas</th></tr></thead><tbody>' +
-      lin.map(function (l) { return '<tr><td>' + punto(l.ID_COLOR) + texto(nombreColor(l.ID_COLOR)) + (codigoColor(l.ID_COLOR) ? ' <span class="u-nota">' + texto(codigoColor(l.ID_COLOR)) + '</span>' : '') + '</td><td>' + texto(l.DORSAL || '—') + '</td><td>' + texto(l.TALLA) + '</td><td class="num">' + l.CANTIDAD + '</td></tr>'; }).join('') +
-      '</tbody></table></div><div class="u-campos">' +
+      selProveedor(m, lin, 'pp') + '<div id="pp-lineas"></div><div class="u-campos">' +
       campo('Temporada', '<select id="pp-temp">' + opciones(temps.map(function (t) { return [t[0], t[1]]; }), (temps[0] || [])[0]) + '</select>') +
       campo('Llega hacia el (opcional)', '<input type="date" id="pp-est">') +
       campo('Notas (opcional)', '<input type="text" id="pp-notas" maxlength="200">') + '</div>' +
       '<p class="u-error" hidden></p>' +
-      '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="pp-ok"' + (provs.length ? '' : ' disabled') + '>Crear pedido</button><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cancelar</button></div>');
-    var sp = v.querySelector('#pp-prov'), pc = v.querySelector('#pp-contacto');
-    var verContacto = function () {
-      if (!pc) return;
-      var u = sp && sp.value ? ultimoPrecio(sp.value, m) || ultimoPrecio(sp.value) : null;
-      pc.innerHTML = sp && sp.value ? contactoProveedor(sp.value) + '<p class="u-nota">' + (u ? 'Último precio: <b>' + eur(u.unidad) + '/camiseta</b> sin IVA (' + texto(nombreModelo(u.p.ID_MODELO)) + ', ' + texto(u.p.ID) + ').' : 'Sin precio todavía: ningún pedido suyo tiene factura.') + '</p>' : '';
-    };
-    if (sp) sp.onchange = verContacto;
-    verContacto();
+      '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="pp-ok">Crear pedido</button><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cancelar</button></div>');
+    var sp = v.querySelector('#pp-prov');
+    engancharProveedor(v, m, lin, 'pp');
+    v.querySelector('#pp-ok').disabled = !sp;
     v.querySelector('#pp-ok').onclick = function () {
       var prov = sp ? sp.value : '';
       if (!prov) { var e = v.querySelector('.u-error'); e.textContent = 'Elige a qué proveedor va el pedido.'; e.hidden = false; sp.focus(); return; }
@@ -881,6 +1060,256 @@
         { fn: 'camisetas5Pedir', args: [m, d] }).then(function (r) {
         S.ctx.aviso('Pedido ' + r.id + ' preparado' + (r.dadas ? '; ' + plural(r.dadas, 'camiseta sale', 'camisetas salen') + ' del local' : '') + '. El extracto para el proveedor, en su tarjeta.');
       }, function () { S.T.refrescar(['CAMISETAS']).catch(function () {}); });
+    };
+  }
+
+  /* ---------- T0268 · proveedor del pedido según su catálogo ---------- */
+
+  /**
+   * El desplegable de proveedor de un pedido de un modelo con esas líneas: solo los que hacen el modelo (CATALOGO); los que
+   * no hacen alguno de sus colores salen sin poder elegirse, con lo que les falta. Primero el habitual, si puede.
+   */
+  function selProveedor(m, lin, pre) {
+    var cols = lin.map(function (l) { return String(l.ID_COLOR); });
+    var cand = cam5Proveedores_(S.T.filas('CATALOGO'), m, cols).filter(function (x) { return S.T.fila('CONTRAPARTES', x.ID_PROVEEDOR); });
+    var habitual = String((S.T.fila('MODELOS', m) || {}).ID_PROVEEDOR || ''), valen = cand.filter(function (x) { return !x.faltan.length; });
+    if (!valen.some(function (x) { return x.ID_PROVEEDOR === habitual; })) habitual = valen.length ? valen[0].ID_PROVEEDOR : '';
+    if (!cand.length) return '<p class="u-mal">Ningún proveedor tiene ' + texto(nombreModelo(m)) + ' en su catálogo. Añádelo en «Proveedores › Catálogo», abajo en esta pestaña, y después prepara el pedido.</p>';
+    if (!valen.length) {
+      return '<p class="u-mal">Ningún proveedor hace ' + texto(nombreModelo(m)) + ' en todos estos colores: ' + texto(cand.map(function (x) {
+        return nombreProveedor(x.ID_PROVEEDOR) + ' no hace ' + x.faltan.map(nombreColor).join(', ');
+      }).join('; ')) + '. Completa su catálogo en «Proveedores › Catálogo».</p>';
+    }
+    return '<div class="u-campos">' + campo('Proveedor', '<select id="' + pre + '-prov">' + cand.map(function (x) {
+      var u = ultimoPrecio(x.ID_PROVEEDOR, m), nom = nombreProveedor(x.ID_PROVEEDOR);
+      return '<option value="' + texto(x.ID_PROVEEDOR) + '"' + (x.ID_PROVEEDOR === habitual ? ' selected' : '') + (x.faltan.length ? ' disabled' : '') + '>' +
+        texto(nom + (x.ID_PROVEEDOR === String((S.T.fila('MODELOS', m) || {}).ID_PROVEEDOR || '') ? ' · habitual' : '') +
+          (x.faltan.length ? ' · no hace ' + x.faltan.map(nombreColor).join(', ') : u ? ' · último ' + eur(u.unidad) : '')) + '</option>';
+    }).join('') + '</select>') + '</div><div id="' + pre + '-contacto"></div>';
+  }
+  /** Al elegir proveedor: su contacto, su último precio y las líneas con su código y su precio de catálogo. */
+  function engancharProveedor(v, m, lin, pre) {
+    var sp = v.querySelector('#' + pre + '-prov'), pc = v.querySelector('#' + pre + '-contacto'), pl = v.querySelector('#' + pre + '-lineas');
+    var ver = function () {
+      var prov = sp ? sp.value : '', cat = prov ? cam5Catalogo_(S.T.filas('CATALOGO'), prov, m) : {};
+      if (pc) {
+        var u = prov ? ultimoPrecio(prov, m) : null;
+        pc.innerHTML = prov ? contactoProveedor(prov) + '<p class="u-nota">' + (u ? 'Último precio pagado: <b>' + eur(u.unidad) + '/camiseta</b> sin IVA (' + texto(u.p.ID) + ').' : 'Ningún pedido suyo de este modelo tiene factura todavía.') + '</p>' : '';
+      }
+      if (!pl) return;
+      // Con data-resumen (el pack: muchas líneas iguales), solo el total; si no, la tabla con el código de ese proveedor.
+      var total = 0, sinPrecio = 0, n = 0, filas = lin.map(function (l) {
+        var c = cat[l.ID_COLOR], cod = (c && c.CODIGO) || color(l.ID_COLOR).CODIGO || '';
+        n += l.CANTIDAD;
+        if (c && c.precio !== null) total += c.precio * l.CANTIDAD; else sinPrecio += l.CANTIDAD;
+        return '<tr><td>' + punto(l.ID_COLOR) + texto(nombreColor(l.ID_COLOR)) + (cod ? ' <span class="u-nota">' + texto(cod) + '</span>' : '') + '</td><td>' + texto(l.DORSAL || '—') + '</td><td>' + texto(l.TALLA) + '</td><td class="num">' + l.CANTIDAD + '</td></tr>';
+      });
+      pl.innerHTML = (pl.hasAttribute('data-resumen') ? '' : '<div class="u-tabla-caja"><table class="u-tabla"><thead><tr><th>Color (código)</th><th>Dorsal</th><th>Talla</th><th class="num">Cuántas</th></tr></thead><tbody>' +
+        filas.join('') + '</tbody></table></div>') +
+        (prov ? '<p class="u-nota">' + plural(n, 'camiseta', 'camisetas') + (total ? ' · según su tarifa, <b>' + eur(total) + '</b> sin IVA' : '') +
+          (sinPrecio ? ' · ' + plural(sinPrecio, 'sin precio en su catálogo', 'sin precio en su catálogo') : '') + '</p>' : '');
+    };
+    if (sp) sp.onchange = ver;
+    ver();
+  }
+  /** Lo que hace un proveedor, por modelo: «VAPIANO-SALERM 25-26: 15 colores · 4,50 €». */
+  function htmlHace(prov) {
+    var mods = {};
+    S.T.filas('CATALOGO').forEach(function (f) { if (String(f.ID_PROVEEDOR) === String(prov)) mods[f.ID_MODELO] = 1; });
+    var l = Object.keys(mods).map(function (m) {
+      var cat = cam5Catalogo_(S.T.filas('CATALOGO'), prov, m), cs = Object.keys(cat), pr = cs.map(function (k) { return cat[k].precio; }).filter(function (x) { return x !== null; });
+      if (!cs.length) return '';
+      var min = pr.length ? Math.min.apply(null, pr) : null, max = pr.length ? Math.max.apply(null, pr) : null;
+      return nombreModelo(m) + ': ' + plural(cs.length, 'color', 'colores') + (min === null ? '' : ' · ' + eur(min) + (max !== min ? ' a ' + eur(max) : ''));
+    }).filter(String);
+    return '<span class="u-nota">' + (l.length ? 'Hace ' + texto(l.join(' · ')) : 'Sin catálogo: no se le puede hacer ningún pedido') + '</span>';
+  }
+
+  /** El catálogo de un proveedor: de un modelo, qué colores hace, con su código y su precio. */
+  function ventanaCatalogo(prov) {
+    var mods = S.T.filas('MODELOS').slice().sort(function (a, b) { return norm(a.NOMBRE) < norm(b.NOMBRE) ? -1 : 1; });
+    if (!mods.length) { S.ctx.aviso('Primero da de alta algún modelo en «Modelos».'); return; }
+    var hace = mods.filter(function (m) { return S.T.filas('CATALOGO').some(function (f) { return String(f.ID_PROVEEDOR) === String(prov) && String(f.ID_MODELO) === String(m.ID); }); });
+    var m0 = String((hace[0] || mods.filter(function (m) { return m.ID === S.modelo; })[0] || mods[0]).ID);
+    var v = ventana('<h2>Catálogo de ' + texto(nombreProveedor(prov)) + '</h2>' +
+      '<p class="u-nota">Marca los colores en que hace el modelo, con su código de color (el que va en el extracto) y su precio por camiseta sin IVA, según su tarifa. El modelo es el mismo para todos los proveedores.</p>' +
+      '<div class="u-campos cm-una">' + campo('Modelo', '<select id="ct-mod">' + opciones(mods.map(function (m) { return [m.ID, m.NOMBRE + (hace.indexOf(m) >= 0 ? '' : ' · no lo hace')]; }), m0) + '</select>') + '</div>' +
+      '<div class="cm-ct-todos">' + campo('Mismo precio para todos', '<input type="text" id="ct-todos" inputmode="decimal" placeholder="4,50">') + '<button type="button" class="u-btn" id="ct-pon">Poner</button></div>' +
+      '<div id="ct-cols"></div><p class="u-error" hidden></p>' +
+      '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="ct-ok">Guardar</button><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cancelar</button></div>');
+    var sm = v.querySelector('#ct-mod'), cols = v.querySelector('#ct-cols');
+    var filas = function () { return S.T.filas('CATALOGO').filter(function (f) { return String(f.ID_PROVEEDOR) === String(prov) && String(f.ID_MODELO) === sm.value; }); };
+    var pintarCols = function () {
+      var ya = {}; filas().forEach(function (f) { ya[f.ID_COLOR] = f; });
+      cols.innerHTML = '<ul class="cm-lista-ok cm-ct">' + S.T.filas('COLORES').map(function (c) {
+        var f = ya[c.ID], si = f && !(f.ACTIVO === false || /^(false|no)$/i.test(String(f.ACTIVO))), pr = f ? cam5Cts_(f.PRECIO) : null;
+        return '<li><label class="u-check"><input type="checkbox" data-ct-si="' + texto(c.ID) + '"' + (si ? ' checked' : '') + '> ' + punto(c.ID) + texto(c.NOMBRE) + '</label>' +
+          '<input type="text" class="cm-ct-cod" data-ct-cod="' + texto(c.ID) + '" maxlength="30" placeholder="' + texto(c.CODIGO || 'Código') + '" value="' + texto(f ? f.CODIGO : '') + '" aria-label="Código de ' + texto(c.NOMBRE) + '">' +
+          '<input type="text" class="cm-ct-pre" data-ct-pre="' + texto(c.ID) + '" inputmode="decimal" placeholder="€" value="' + texto(pr === null ? '' : (pr / 100).toFixed(2).replace('.', ',')) + '" aria-label="Precio de ' + texto(c.NOMBRE) + '"></li>';
+      }).join('') + '</ul>';
+    };
+    sm.onchange = pintarCols; pintarCols();
+    v.querySelector('#ct-pon').onclick = function () {
+      var t = v.querySelector('#ct-todos').value.trim();
+      [].forEach.call(v.querySelectorAll('[data-ct-pre]'), function (x) { if (v.querySelector('[data-ct-si="' + x.getAttribute('data-ct-pre') + '"]').checked) x.value = t; });
+    };
+    v.querySelector('#ct-ok').onclick = function () {
+      var err = v.querySelector('.u-error'), ya = {}, p = [], mal = '';
+      filas().forEach(function (f) { ya[f.ID_COLOR] = f; });
+      S.T.filas('COLORES').forEach(function (c) {
+        var si = v.querySelector('[data-ct-si="' + c.ID + '"]').checked, cod = v.querySelector('[data-ct-cod="' + c.ID + '"]').value.trim();
+        var tp = v.querySelector('[data-ct-pre="' + c.ID + '"]').value.trim(), pr = tp ? cam5Cts_(tp) : null, f = ya[c.ID];
+        if (tp && (pr === null || pr < 0)) mal = 'El precio de ' + c.NOMBRE + ' no es un importe (p. ej. 4,50).';
+        var d = { CODIGO: cod, PRECIO: pr === null ? '' : pr / 100, ACTIVO: si };
+        if (f) {
+          var cambios = {};
+          if (String(f.CODIGO || '') !== cod) cambios.CODIGO = cod;
+          if (cam5Cts_(f.PRECIO) !== pr) cambios.PRECIO = d.PRECIO;
+          if (cam5Si_(f.ACTIVO === '' || f.ACTIVO === undefined ? true : f.ACTIVO) !== si) cambios.ACTIVO = si;
+          if (Object.keys(cambios).length) p.push(['a', f.ID, cambios]);
+        } else if (si) p.push(['c', null, { ID_PROVEEDOR: prov, ID_MODELO: sm.value, ID_COLOR: c.ID, CODIGO: cod, PRECIO: d.PRECIO, ACTIVO: true }]);
+      });
+      if (mal) { err.textContent = mal; err.hidden = false; return; }
+      cerrarVentana();
+      if (!p.length) return;
+      Promise.all(p.map(function (x) { return x[0] === 'a' ? S.T.actualizar('CATALOGO', x[1], x[2]) : S.T.crear('CATALOGO', x[2]); }))
+        .then(function () { S.ctx.aviso('Catálogo de ' + nombreProveedor(prov) + ' guardado.'); }, function () {});
+    };
+  }
+
+  /* ---------- T0268 · packs de camisetas incluidas y lo cobrado por las personalizadas ---------- */
+
+  /** Las competiciones de un modelo (MODELOS_COMPETICION), de la temporada más reciente a la más antigua. */
+  function compsPack(m) {
+    var orden = ((S.N && S.N.temp) || []).map(function (t) { return t[0]; });
+    var tDe = function (k) { var x = S.N && S.N.comp && S.N.comp[k]; return x ? orden.indexOf(x[1]) : 999; };
+    return compsDeModelo(m).map(function (x) { return String(x.ID_COMPETICION); }).sort(function (a, b) { return (tDe(a) < 0 ? 999 : tDe(a)) - (tDe(b) < 0 ? 999 : tDe(b)) || (nombreComp(a) < nombreComp(b) ? -1 : 1); });
+  }
+  /**
+   * Lo de una competición para el pack: por equipo, sus camisetas, lo incluido según el pack y las personalizadas según el
+   * Excel (INCLUIDA, que es lo cobrado). { pack, equipos: [{ ie, nombre, color, baja, pk, cobradas }], tar, personalizadas,
+   * cobradas, distintas (las que el Excel no tiene como dice el pack) }.
+   */
+  function datosPack(comp) {
+    var N = S.N || { eq: {}, comp: {} }, pack = packDe(comp), porEq = {}, temp = (N.comp[comp] || ['', ''])[1];
+    Object.keys(N.eq).forEach(function (ie) { if (N.eq[ie][1] === comp) porEq[ie] = []; });
+    S.T.filas('CAMISETAS').forEach(function (c) { var q = quien(c); if (q.comp === comp && q.ie) (porEq[q.ie] = porEq[q.ie] || []).push({ c: c, q: q }); });
+    var r = { pack: pack, equipos: [], tar: cam5Tarifa_(S.T.filas('TARIFAS'), comp, temp, hoy()), personalizadas: 0, cobradas: 0, distintas: 0 };
+    Object.keys(porEq).forEach(function (ie) {
+      var l = porEq[ie], e = N.eq[ie] || ['', '', '', '', ''];
+      var pk = pack.length && l.length ? packEquipo(l) : null;
+      var cobradas = l.filter(function (x) { return x.c.ESTADO !== 'Sin camiseta' && x.c.INCLUIDA !== '' && x.c.INCLUIDA !== undefined && !cam5Si_(x.c.INCLUIDA); }).length;
+      if (pk) {
+        r.personalizadas += pk.personalizadas;
+        l.forEach(function (x) { if (x.c.ID in pk.incluida && pk.incluida[x.c.ID] !== cam5Si_(x.c.INCLUIDA)) r.distintas++; });
+      }
+      r.cobradas += cobradas;
+      r.equipos.push({ ie: ie, nombre: e[0] || ie, color: e[3], baja: e[4] === 'Baja', pk: pk, cobradas: cobradas, n: l.length });
+    });
+    r.equipos.sort(function (a, b) { return norm(a.nombre) < norm(b.nombre) ? -1 : 1; });
+    return r;
+  }
+  function htmlPacks(m) {
+    var cs = compsPack(m);
+    var h = '<section class="u-bloque cm-packs"><h2 class="n-grupo">Packs de camisetas incluidas <span class="u-cifra">' + cs.length + '</span></h2>' +
+      '<p class="u-nota">Lo que entra gratis con la inscripción de cada equipo: unas combinaciones fijas de dorsal y talla (1S, 2S, 3S, 4M…). Una camiseta con un dorsal y una talla del pack que nadie del equipo ha cogido es incluida; las demás, personalizadas, y se cobran con la inscripción (tarifa «Camiseta» de Economía).</p>';
+    if (!cs.length) return h + '<p class="u-vacio">' + texto(nombreModelo(m)) + ' no va en ninguna competición: dáselas en «Modelos».</p></section>';
+    if (!S.N) return h + '<p class="u-nota">Cargando las competiciones…</p></section>';
+    return h + '<ul class="cm-peds">' + cs.map(function (k) {
+      var d = datosPack(k), b = function (acc, t, cl) { return '<button type="button" class="u-btn' + (cl ? ' ' + cl : '') + '" data-cm-pk="' + texto(k) + '" data-cm-acc="' + acc + '">' + t + '</button>'; };
+      var vivos = d.equipos.filter(function (e) { return !e.baja; }).length;
+      return '<li class="cm-ped"><div class="cm-ped-cab"><b>' + texto(nombreComp(k)) + '</b><span class="u-nota">' + plural(vivos, 'equipo', 'equipos') + '</span></div>' +
+        (d.pack.length ? '<p class="cm-pack-c">' + texto(cortos(d.pack)) + '</p><p class="u-nota">' + plural(d.pack.length, 'camiseta incluida', 'camisetas incluidas') + ' por equipo</p>' :
+          '<p class="u-nota">Sin pack: todas sus camisetas cuentan como personalizadas hasta que se defina.</p>') +
+        '<p class="cm-coste">' + (d.cobradas ? '<b>' + plural(d.cobradas, 'personalizada', 'personalizadas') + '</b>' + (d.tar ? ' · <b>' + eur(conIva(d.tar) * d.cobradas) + '</b> cobrados con las inscripciones (' + eur(conIva(d.tar)) + ' cada una)' : ' · <span class="u-mal">sin tarifa «Camiseta» en Economía para esta temporada</span>') : 'Ninguna personalizada') + '</p>' +
+        (d.distintas ? '<p class="u-mal">Según el pack ' + (d.personalizadas === 1 ? 'hay 1 personalizada' : 'hay ' + d.personalizadas + ' personalizadas') + ', pero ' +
+          plural(d.distintas, 'camiseta no está marcada', 'camisetas no están marcadas') + ' así en el Excel. «Marcar en el Excel» las pone como dice el pack.</p>' : '') +
+        '<div class="n-botones">' + b('editar', d.pack.length ? 'Cambiar pack' : 'Definir pack', d.pack.length ? '' : 'u-btn-accion') +
+        (d.pack.length ? b('pedir', 'Pedir el pack') : '') + (d.equipos.length ? b('cobro', 'Por equipo', 'u-btn-texto') : '') +
+        (d.distintas ? b('excel', 'Marcar ' + d.distintas + ' en el Excel', 'u-btn-texto') : '') + '</div></li>';
+    }).join('') + '</ul></section>';
+  }
+  function ventanaPack(comp) {
+    var pack = packDe(comp), otras = Object.keys((S.N && S.N.comp) || {}).filter(function (k) { return k !== comp && packDe(k).length; });
+    var v = ventana('<h2>Pack de ' + texto(nombreComp(comp)) + '</h2>' +
+      '<p class="u-nota">Las combinaciones de dorsal y talla que entran con la inscripción, separadas por comas: 1S, 2S, 3S, 4M… Cada dorsal, una sola vez.</p>' +
+      (otras.length ? '<div class="u-campos cm-una">' + campo('Copiar el de otra competición', '<select id="pk-de"><option value="">—</option>' + opciones(otras.map(function (k) { return [k, nombreComp(k)]; }), '') + '</select>') + '</div>' : '') +
+      '<div class="u-campos cm-una">' + campo('Pack', '<textarea id="pk-t" rows="3" autocomplete="off">' + texto(cortos(pack).split(' ').filter(String).join(', ')) + '</textarea>') + '</div>' +
+      '<p class="cm-pack-c" id="pk-ver"></p><p class="u-error" hidden></p>' +
+      '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="pk-ok">Guardar</button><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cancelar</button></div>');
+    var t = v.querySelector('#pk-t'), ver = v.querySelector('#pk-ver'), err = v.querySelector('.u-error'), de = v.querySelector('#pk-de');
+    var leer = function () { var l = cam5LeerPack_(t.value); ver.textContent = l.pack.length ? plural(l.pack.length, 'camiseta', 'camisetas') + ': ' + cortos(l.pack) : ''; err.hidden = !l.mal.length; err.textContent = l.mal.length ? 'No entiendo: ' + l.mal.join(', ') + ' (cada una es un dorsal y una talla, sin repetir dorsal).' : ''; return l; };
+    t.oninput = leer; leer();
+    if (de) de.onchange = function () { if (de.value) { t.value = cortos(packDe(de.value)).split(' ').join(', '); leer(); } };
+    v.querySelector('#pk-ok').onclick = function () {
+      var l = leer(); if (l.mal.length) return;
+      var ok = this; ok.disabled = true; ok.textContent = 'Guardando…';
+      S.ctx.llamar('camisetas5Pack', [comp, l.pack]).then(function (r) {
+        cerrarVentana();
+        S.ctx.aviso('Pack de ' + nombreComp(comp) + ': ' + plural(r.pack, 'camiseta incluida', 'camisetas incluidas') + '.');
+        return S.T.refrescar(['PACKS'], true);
+      }).catch(function (e) { ok.disabled = false; ok.textContent = 'Volver a probar'; err.textContent = 'No se ha guardado: ' + String(e.message).replace(/^\w+:\s*/, ''); err.hidden = false; });
+    };
+  }
+  function guardarIncluidas(b, comp) {
+    b.disabled = true; b.textContent = 'Marcando…';
+    S.ctx.llamar('camisetas5Incluidas', [comp]).then(function (r) {
+      S.ctx.aviso(r.cambiadas ? plural(r.cambiadas, 'camiseta marcada', 'camisetas marcadas') + ' en el Excel según el pack.' : 'El Excel ya estaba como dice el pack.');
+      return S.T.refrescar(['CAMISETAS'], true);
+    }).catch(function (e) { S.ctx.aviso('No se ha podido: ' + String(e.message).replace(/^\w+:\s*/, '')); pintar(false); });
+  }
+  /** Lo cobrado por las personalizadas de una competición, equipo a equipo, y lo que dice el pack de cada uno. */
+  function ventanaCobro(comp) {
+    var d = datosPack(comp), u = conIva(d.tar), tot = 0;
+    ventana('<h2>' + texto(nombreComp(comp)) + ' · por equipo</h2>' +
+      '<p class="u-nota">Personalizadas: las que el Excel tiene como no incluidas (se cobran con la inscripción' + (d.tar ? ', ' + eur(u) + ' cada una con IVA' : '; falta la tarifa «Camiseta» de esta temporada en Economía') + '). Libres: los dorsales del pack que le quedan a cada equipo.</p>' +
+      '<div class="u-tabla-caja"><table class="u-tabla cm-cobro"><thead><tr><th>Equipo</th><th class="num">Personalizadas</th><th class="num">Cobrado</th></tr></thead><tbody>' +
+      d.equipos.map(function (e) {
+        tot += e.cobradas;
+        return '<tr><td class="u-tabla-t">' + punto(e.color) + texto(e.nombre) + (e.baja ? ' <span class="u-nota">(baja)</span>' : '') +
+          (e.pk ? '<span class="u-nota cm-cobro-l">' + plural(e.n, 'camiseta', 'camisetas') + ' · libres: ' + (texto(cortos(e.pk.libres)) || 'ninguna') + '</span>' : '') +
+          (e.pk && e.pk.repetidos.length ? '<span class="u-mal cm-cobro-l">Repite el ' + texto(e.pk.repetidos.map(function (r) { return r.DORSAL; }).join(', ')) + '</span>' : '') + '</td>' +
+          '<td class="num">' + (e.cobradas || '') + (e.pk && e.pk.personalizadas !== e.cobradas ? ' <span class="u-nota">(pack: ' + e.pk.personalizadas + ')</span>' : '') + '</td>' +
+          '<td class="num">' + (e.cobradas && d.tar ? eur(u * e.cobradas) : '') + '</td></tr>';
+      }).join('') + '<tr><td><b>Total</b></td><td class="num"><b>' + tot + '</b></td><td class="num"><b>' + (d.tar ? eur(u * tot) : '') + '</b></td></tr></tbody></table></div>' +
+      '<div class="n-botones"><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cerrar</button></div>');
+  }
+  /** Pedir el pack antes de la temporada: cuántos equipos de cada color (de entrada, los inscritos) y a qué proveedor. */
+  function ventanaPedirPack(comp) {
+    var d = datosPack(comp), mc = S.T.filas('MODELOS_COMPETICION').filter(function (x) { return String(x.ID_COMPETICION) === comp; })[0], m = mc ? String(mc.ID_MODELO) : '';
+    var porCol = {}; d.equipos.forEach(function (e) { if (!e.baja && e.color) porCol[e.color] = (porCol[e.color] || 0) + 1; });
+    var temps = (S.N && S.N.temp) || [], tComp = ((S.N && S.N.comp[comp]) || ['', ''])[1];
+    var v = ventana('<h2>Pedir el pack de ' + texto(nombreComp(comp)) + '</h2>' +
+      '<p class="u-nota">El pack entero (' + texto(cortos(d.pack)) + ') por cada equipo, en su color, antes de que las jugadoras elijan. Al llegar quedan libres en el local y se dan a las jugadoras como cualquier libre. De entrada, los equipos inscritos de cada color.</p>' +
+      '<ul class="cm-lista-ok cm-pp-cols">' + S.T.filas('COLORES').map(function (c) {
+        return '<li><span>' + punto(c.ID) + texto(c.NOMBRE) + '</span><label class="cm-md-n"><input type="number" min="0" step="1" inputmode="numeric" data-pp-col="' + texto(c.ID) + '" value="' + (porCol[c.ID] || 0) + '" aria-label="Equipos de ' + texto(c.NOMBRE) + '"> equipos</label></li>';
+      }).join('') + '</ul><p class="u-nota" id="pk-tot"></p><div id="pk-prov"></div><div class="u-campos">' +
+      campo('Temporada', '<select id="pk-temp">' + opciones(temps.map(function (t) { return [t[0], t[1]]; }), tComp || (temps[0] || [])[0]) + '</select>') +
+      campo('Llega hacia el (opcional)', '<input type="date" id="pk-est">') + campo('Notas (opcional)', '<input type="text" id="pk-notas" maxlength="200">') + '</div><p class="u-error" hidden></p>' +
+      '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="pk-ok">Crear pedido</button><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cancelar</button></div>');
+    var cols = function () { var o = {}; [].forEach.call(v.querySelectorAll('[data-pp-col]'), function (x) { var n = Number(x.value); if (n > 0) o[x.getAttribute('data-pp-col')] = n; }); return o; };
+    var prov = v.querySelector('#pk-prov'), ok = v.querySelector('#pk-ok');
+    var ver = function () {
+      var o = cols(), eqs = Object.keys(o).reduce(function (s, k) { return s + o[k]; }, 0);
+      v.querySelector('#pk-tot').textContent = eqs ? plural(eqs, 'equipo', 'equipos') + ' · ' + plural(eqs * d.pack.length, 'camiseta', 'camisetas') : 'Pon cuántos equipos de cada color.';
+      var antes = (v.querySelector('#pk-prov-prov') || {}).value;
+      prov.innerHTML = eqs ? selProveedor(m, Object.keys(o).map(function (k) { return { ID_COLOR: k }; }), 'pk-prov') : '';
+      var sp = v.querySelector('#pk-prov-prov');
+      if (sp && antes && [].some.call(sp.options, function (x) { return x.value === antes && !x.disabled; })) sp.value = antes;
+      var lin = []; Object.keys(o).forEach(function (k) { d.pack.forEach(function (x) { lin.push({ ID_COLOR: k, DORSAL: x.DORSAL, TALLA: x.TALLA, CANTIDAD: o[k] }); }); });
+      if (sp) { prov.insertAdjacentHTML('beforeend', '<div id="pk-prov-lineas" data-resumen></div>'); engancharProveedor(v, m, lin, 'pk-prov'); }
+      ok.disabled = !sp || !eqs;
+    };
+    v.querySelector('.cm-pp-cols').oninput = ver; ver();
+    ok.onclick = function () {
+      var sp = v.querySelector('#pk-prov-prov'), err = v.querySelector('.u-error');
+      var dd = { ID_PROVEEDOR: sp ? sp.value : '', ID_TEMPORADA: v.querySelector('#pk-temp').value, FECHA_ESTIMADA: v.querySelector('#pk-est').value, NOTAS: v.querySelector('#pk-notas').value.trim(), colores: cols() };
+      ok.disabled = true; ok.textContent = 'Creando el pedido…';
+      S.ctx.llamar('camisetas5PedirPack', [comp, dd]).then(function (r) {
+        cerrarVentana();
+        S.ctx.aviso('Pedido ' + r.id + ' del pack preparado. El extracto para el proveedor, en su tarjeta.');
+        return S.T.refrescar(['PEDIDOS', 'PEDIDOS_LINEAS'], true);
+      }).catch(function (e) { ok.disabled = false; ok.textContent = 'Volver a probar'; err.textContent = 'No se ha creado: ' + String(e.message).replace(/^\w+:\s*/, ''); err.hidden = false; });
     };
   }
 
@@ -984,7 +1413,7 @@
       campo('Prenda', '<input type="text" id="md-pre" maxlength="60" list="md-prendas" value="' + texto(m ? m.PRENDA : 'Camiseta') + '"><datalist id="md-prendas"><option value="Camiseta"><option value="Peto"><option value="Sudadera"></datalist>') +
       campo('Proveedor habitual', '<select id="md-prov"><option value="">Sin proveedor habitual</option>' + opciones(provs.map(function (x) { return [x.ID, x.NOMBRE]; }), m ? m.ID_PROVEEDOR : '') + '</select>') +
       campo('Notas (opcional)', '<input type="text" id="md-not" maxlength="200" value="' + texto(m ? m.NOTAS : '') + '">') + '</div>' +
-      '<h3 class="cm-sub">Competiciones que lo llevan</h3><p class="u-nota">Cada competición es de una temporada: marca solo las del año en que se usa este modelo. Al lado, cuántas camisetas tiene cada jugadora con la inscripción (normalmente 1). El pack de tallas y dorsales que se ofrece (1S, 2S, 3S, 4M…) todavía no se define aquí.</p>' +
+      '<h3 class="cm-sub">Competiciones que lo llevan</h3><p class="u-nota">Cada competición es de una temporada: marca solo las del año en que se usa este modelo. Al lado, cuántas camisetas tiene cada jugadora con la inscripción (normalmente 1). El pack de dorsales y tallas que entra con la inscripción (1S, 2S, 3S, 4M…) se define en «Packs», en esta misma pestaña.</p>' +
       (S.N ? (comps.length ? '<ul class="cm-lista-ok cm-md-comps">' + comps.map(function (k, i) {
         var x = ya[k], t = S.N.comp[k][1];
         return (i === 0 || S.N.comp[comps[i - 1]][1] !== t ? '<li class="cm-md-temp">Temporada ' + texto(nombreTemp(t)) + '</li>' : '') + '<li><label class="u-check"><input type="checkbox" data-md-comp="' + texto(k) + '"' + (x ? ' checked' : '') + '> ' + texto(S.N.comp[k][0]) + '</label>' +
@@ -1032,15 +1461,16 @@
     var l = proveedores();
     return '<section class="u-bloque cm-provs"><div class="cm-eq-cab"><h2 class="n-grupo">Proveedores <span class="u-cifra">' + l.length + '</span></h2>' +
       '<button type="button" class="u-btn" data-cm-prov="">Añadir proveedor</button></div>' +
-      '<p class="u-nota">A quién se le hacen los pedidos. Se guardan con los demás proveedores de Konamigas (Excel ECONOMIA), así que también los ve Economía.</p>' +
+      '<p class="u-nota">A quién se le hacen los pedidos. Se guardan con los demás proveedores de Konamigas (Excel ECONOMIA), así que también los ve Economía. En «Catálogo», qué modelos hace cada uno y en qué colores, con su código y su precio: un pedido solo puede ir a quien hace el modelo en todos sus colores.</p>' +
       (l.length ? '<ul class="cm-prov-l">' + l.map(function (x) {
         var usos = S.T.filas('MODELOS').filter(function (m) { return String(m.ID_PROVEEDOR) === String(x.ID); }).map(function (m) { return m.NOMBRE || m.ID; });
         return '<li><div class="cm-rec-c"><b>' + texto(x.NOMBRE) + '</b>' +
           htmlContacto(x.CONTACTO) +
-          (usos.length ? '<span class="u-nota">Habitual de ' + texto(usos.join(', ')) + '</span>' : '') +
+          (usos.length ? '<span class="u-nota">Habitual de ' + texto(usos.join(', ')) + '</span>' : '') + htmlHace(x.ID) +
           (function () { var u = ultimoPrecio(x.ID); return u ? '<span class="u-nota">Último precio: ' + eur(u.unidad) + '/camiseta sin IVA (' + texto(nombreModelo(u.p.ID_MODELO)) + ', ' + texto(u.p.ID) + ')</span>' : ''; })() +
           (x.NOTAS ? '<span class="u-nota">' + texto(x.NOTAS) + '</span>' : '') + '</div>' +
-          '<button type="button" class="u-btn u-btn-texto" data-cm-prov="' + texto(x.ID) + '">Cambiar</button></li>';
+          '<span class="cm-prov-b"><button type="button" class="u-btn u-btn-texto" data-cm-cat="' + texto(x.ID) + '">Catálogo</button>' +
+          '<button type="button" class="u-btn u-btn-texto" data-cm-prov="' + texto(x.ID) + '">Cambiar</button></span></li>';
       }).join('') + '</ul>' : '<p class="u-vacio">Todavía no hay ningún proveedor.</p>') + '</section>';
   }
 
@@ -1084,7 +1514,7 @@
     var t = ['Pedido ' + p.ID + ' · Konamigas', 'Modelo: ' + nombreModelo(p.ID_MODELO), p.ID_PROVEEDOR ? 'Proveedor: ' + nombreProveedor(p.ID_PROVEEDOR) : '',
       p.FECHA_PEDIDO ? 'Fecha del pedido: ' + fecha(p.FECHA_PEDIDO) : '', p.FECHA_ESTIMADA ? 'Lo necesitamos hacia el: ' + fecha(p.FECHA_ESTIMADA) : ''].filter(String);
     orden.forEach(function (col) {
-      var n = porColor[col].reduce(function (s, x) { return s + (Number(x.CANTIDAD) || 0); }, 0), cod = codigoColor(col);
+      var n = porColor[col].reduce(function (s, x) { return s + (Number(x.CANTIDAD) || 0); }, 0), cod = codigoColor(col, p.ID_PROVEEDOR, p.ID_MODELO);
       t.push('', nombreColor(col) + (cod ? ' (código ' + cod + ')' : '') + ': ' + n);
       porColor[col].forEach(function (x) { t.push('- ' + (x.DORSAL ? 'Dorsal ' + x.DORSAL : 'Sin dorsal') + ' · talla ' + x.TALLA + ': ' + x.CANTIDAD); });
     });
@@ -1095,9 +1525,14 @@
 
   function ventanaExtracto(id) {
     var p = S.T.fila('PEDIDOS', id); if (!p) return;
-    var txt = textoExtracto(p), comparte = typeof navigator.share === 'function';
-    var v = ventana('<h2>Extracto del pedido ' + texto(p.ID) + '</h2>' +
-      (p.ID_PROVEEDOR ? '<p><b>' + texto(nombreProveedor(p.ID_PROVEEDOR)) + '</b></p>' + contactoProveedor(p.ID_PROVEEDOR) : '<p class="u-nota">Este pedido no tiene proveedor apuntado.</p>') +
+    ventanaTexto('Extracto del pedido ' + p.ID,
+      p.ID_PROVEEDOR ? '<p><b>' + texto(nombreProveedor(p.ID_PROVEEDOR)) + '</b></p>' + contactoProveedor(p.ID_PROVEEDOR) : '<p class="u-nota">Este pedido no tiene proveedor apuntado.</p>',
+      textoExtracto(p), 'Pedido ' + p.ID);
+  }
+  /** Un texto para copiar o compartir (el extracto de un pedido, el mensaje a un equipo). */
+  function ventanaTexto(titulo, cabecera, txt, titShare) {
+    var comparte = typeof navigator.share === 'function';
+    var v = ventana('<h2>' + texto(titulo) + '</h2>' + cabecera +
       '<pre class="cm-extracto" tabindex="0">' + texto(txt) + '</pre>' +
       '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="ex-copiar">Copiar</button>' +
       (comparte ? '<button type="button" class="u-btn" id="ex-compartir">Compartir</button>' : '') +
@@ -1105,11 +1540,109 @@
     var pre = v.querySelector('.cm-extracto'), bc = v.querySelector('#ex-copiar');
     var seleccionar = function () { var r = document.createRange(); r.selectNodeContents(pre); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); };
     bc.onclick = function () {
-      var hecho = function () { bc.textContent = 'Copiado'; S.ctx.aviso('Extracto copiado: pégalo en el WhatsApp o el correo del proveedor.'); };
+      var hecho = function () { bc.textContent = 'Copiado'; S.ctx.aviso('Copiado: pégalo en el WhatsApp o el correo.'); };
       var mano = function () { seleccionar(); S.ctx.aviso('No se ha podido copiar solo: está seleccionado, cópialo tú.'); };
       try { navigator.clipboard.writeText(txt).then(hecho, mano); } catch (e) { mano(); }
     };
-    if (comparte) v.querySelector('#ex-compartir').onclick = function () { navigator.share({ title: 'Pedido ' + p.ID, text: txt }).catch(function () {}); };
+    if (comparte) v.querySelector('#ex-compartir').onclick = function () { navigator.share({ title: titShare, text: txt }).catch(function () {}); };
+  }
+
+  /* ---------- T0268 · el pedido en PDF, con la plantilla de Konamigas ---------- */
+
+  /** Nombre del color del estampado (COLORES · ESTAMPADO, un #rrggbb): «Blanco (#FFFFFF)». */
+  function estampado(v) {
+    var h = String(v || '').trim().toUpperCase();
+    if (!h) return '';
+    var n = { '#FFFFFF': 'Blanco', '#000000': 'Negro' }[h];
+    return n ? n + ' (' + h + ')' : h;
+  }
+  /**
+   * El pedido como documento para el proveedor (como el PDF de Javi, 16/10/2026): cabecera de Konamigas con las unidades,
+   * los datos del pedido y del proveedor, el resumen por color y talla (con el código de color de ese proveedor, el color
+   * de la camiseta y del estampado, y su precio de catálogo) y el detalle de cada color con dorsal, talla y cantidad.
+   * Sin nombres de jugadoras: al proveedor solo le hace falta lo que estampa. Los colores y las letras salen de marca.css.
+   */
+  function htmlPdf(p) {
+    var css = getComputedStyle(document.documentElement), v = function (k, d) { return (css.getPropertyValue(k) || '').trim() || d; };
+    var azul = v('--color-principal', 'navy'), rosa = v('--color-accion', 'deeppink'), suave = v('--color-tarjeta-cab', '#eee'), linea = v('--color-linea', '#ccc');
+    var mod = S.T.fila('MODELOS', p.ID_MODELO) || {}, prov = S.T.fila('CONTRAPARTES', p.ID_PROVEEDOR) || {}, con = leerContacto(prov.CONTACTO);
+    var cat = cam5Catalogo_(S.T.filas('CATALOGO'), p.ID_PROVEEDOR, p.ID_MODELO);
+    var l = S.T.filas('PEDIDOS_LINEAS').filter(function (x) { return String(x.ID_PEDIDO) === String(p.ID); }).sort(cam5Orden_);
+    var porColor = {}, cols = [], tallas = [], total = 0, importe = 0, sinPrecio = 0;
+    l.forEach(function (x) {
+      var n = Number(x.CANTIDAD) || 0, c = String(x.ID_COLOR);
+      if (!porColor[c]) { porColor[c] = { n: 0, t: {}, l: [] }; cols.push(c); }
+      porColor[c].n += n; porColor[c].t[x.TALLA] = (porColor[c].t[x.TALLA] || 0) + n; porColor[c].l.push(x);
+      if (tallas.indexOf(x.TALLA) < 0) tallas.push(x.TALLA);
+      total += n;
+      var pu = cam5Cts_(x.PRECIO_UNIDAD) !== null ? cam5Cts_(x.PRECIO_UNIDAD) : cat[c] ? cat[c].precio : null;
+      if (pu === null) sinPrecio += n; else importe += pu * n;
+    });
+    tallas.sort(function (a, b) { return CAM5_TALLAS.indexOf(a) - CAM5_TALLAS.indexOf(b); });
+    cols.sort(function (a, b) { var x = codigoColor(a, p.ID_PROVEEDOR, p.ID_MODELO), y = codigoColor(b, p.ID_PROVEEDOR, p.ID_MODELO); return x < y ? -1 : x > y ? 1 : 0; });
+    var nomCol = function (c) { var cod = codigoColor(c, p.ID_PROVEEDOR, p.ID_MODELO); return (cod ? cod + ' - ' : '') + String(nombreColor(c)).toUpperCase(); };
+    var hex = function (c) { var h = String(color(c).COLOR_HEX || ''); return /^#[0-9a-f]{6}$/i.test(h) ? h.toUpperCase() : ''; };
+    var mues = function (h) { return h ? '<i class="m" style="background:' + h + '"></i>' : ''; };
+    var precio = function (c) { var pu = cat[c] ? cat[c].precio : null; return pu === null ? '' : eur(pu); };
+    var temp = nombreTemp(p.ID_TEMPORADA), paso = PASOS[cam5Paso_(p)][0];
+    var fila = function (k, val) { return val ? '<tr><th>' + k + '</th><td>' + val + '</td></tr>' : ''; };
+    var ahora = new Date(), cuando = fecha(hoy()) + ' ' + dos(ahora.getHours()) + ':' + dos(ahora.getMinutes());
+    return '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Konamigas · Pedido ' + texto(p.ID) + ' · ' + texto(prov.NOMBRE || '') + '</title>' +
+      '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&family=Poppins:wght@400;600&display=swap">' +
+      '<style>@page{size:A4;margin:14mm 12mm}*{box-sizing:border-box}body{margin:0;font:10pt/1.35 Poppins,Arial,sans-serif;color:' + azul + ';-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+      'h1,h2,h3{font-family:Montserrat,Arial,sans-serif;font-weight:800;margin:0}' +
+      '.cab{display:flex;justify-content:space-between;align-items:baseline;border-bottom:3px solid ' + rosa + ';padding-bottom:6px;margin-bottom:12px}' +
+      '.cab h1{font-size:17pt;color:' + rosa + '}.cab b{font:800 19pt Montserrat,Arial,sans-serif;color:' + rosa + '}' +
+      'table{width:100%;border-collapse:collapse;margin:0 0 12px}th,td{border:1px solid ' + linea + ';padding:4px 7px;text-align:left;vertical-align:middle}' +
+      '.datos th{width:28%;font-weight:600;background:' + suave + '}h2{font-size:11pt;margin:14px 0 6px;letter-spacing:.02em}' +
+      '.res thead th,.det thead th{font:700 8.5pt Montserrat,Arial,sans-serif;text-transform:uppercase;border-bottom:2px solid ' + azul + '}' +
+      '.num{text-align:center}.der{text-align:right}.tot td{font-weight:700;border-top:2px solid ' + azul + '}.res td:first-child{font-weight:700;border-left:6px solid var(--c)}' +
+      '.m{display:inline-block;width:2.4em;height:1.05em;border:1px solid ' + azul + ';vertical-align:-2px;margin-right:5px}' +
+      '.color{break-inside:avoid;margin-bottom:10px;border:1px solid ' + linea + ';border-left:6px solid var(--c)}.color h3{font-size:10.5pt;padding:5px 8px;border-bottom:1px solid ' + linea + '}' +
+      '.color p{margin:0;padding:4px 8px;font-size:9pt;border-bottom:1px solid ' + linea + '}.color table{margin:0}.color table th,.color table td{border-left:0;border-right:0;text-align:center}' +
+      '.pie{margin-top:14px;font-size:8pt;opacity:.8}.nota{font-size:8.5pt;opacity:.85}</style></head><body>' +
+      '<div class="cab"><h1>KONAMIGAS · PEDIDO DE CAMISETAS</h1><b>' + total + ' uds</b></div>' +
+      '<table class="datos">' + fila('Pedido', texto(p.ID + (prov.NOMBRE ? ' · ' + prov.NOMBRE : '') + (p.FECHA_PEDIDO ? ' · ' + fecha(p.FECHA_PEDIDO) : ''))) +
+      fila('Proveedor', texto(prov.NOMBRE || p.ID_PROVEEDOR || '')) +
+      fila('Contacto', texto([con.persona, con.tel, con.correo].filter(Boolean).join(' · '))) +
+      fila('Fecha del pedido', texto(fecha(p.FECHA_PEDIDO))) + fila('Lo necesitamos hacia el', texto(fecha(p.FECHA_ESTIMADA))) +
+      fila('Temporada', texto(temp)) + fila('Modelo', texto([mod.NOMBRE, mod.PRENDA].filter(Boolean).join(' · '))) +
+      fila('Total camisetas', texto(total + ' (' + plural(cols.length, 'color', 'colores') + ')')) +
+      fila('Importe según tarifa', importe ? texto(eur(importe) + ' sin IVA' + (sinPrecio ? ' (sin precio: ' + sinPrecio + ' camisetas)' : '')) : '') +
+      fila('Estado', texto(paso)) + fila('Notas', texto(p.NOTAS || '')) + '</table>' +
+      '<h2>RESUMEN POR COLOR Y TALLA</h2><table class="res"><thead><tr><th>Color camiseta</th><th>Hex</th><th>Color estampado</th>' +
+      tallas.map(function (t) { return '<th class="num">' + texto(t) + '</th>'; }).join('') + '<th class="num">Total</th>' + (importe ? '<th class="der">Precio</th>' : '') + '</tr></thead><tbody>' +
+      cols.map(function (c) {
+        var x = porColor[c], e = color(c).ESTAMPADO;
+        return '<tr style="--c:' + (hex(c) || linea) + '"><td>' + texto(nomCol(c)) + '</td><td>' + texto(hex(c)) + '</td><td>' + (e ? mues(String(e)) + texto(estampado(e)) : '') + '</td>' +
+          tallas.map(function (t) { return '<td class="num">' + (x.t[t] || '') + '</td>'; }).join('') + '<td class="num"><b>' + x.n + '</b></td>' + (importe ? '<td class="der">' + precio(c) + '</td>' : '') + '</tr>';
+      }).join('') + '<tr class="tot"><td colspan="3">TOTAL</td>' + tallas.map(function (t) {
+        return '<td class="num">' + cols.reduce(function (s, c) { return s + (porColor[c].t[t] || 0); }, 0) + '</td>';
+      }).join('') + '<td class="num">' + total + '</td>' + (importe ? '<td class="der">' + eur(importe) + '</td>' : '') + '</tr></tbody></table>' +
+      '<h2>DETALLE POR COLOR (DORSAL Y TALLA)</h2>' + cols.map(function (c) {
+        var x = porColor[c], e = color(c).ESTAMPADO;
+        return '<section class="color" style="--c:' + (hex(c) || linea) + '"><h3>' + texto(nomCol(c)) + ' · ' + plural(x.n, 'camiseta', 'camisetas') + '</h3>' +
+          '<p><b>Color camiseta:</b> ' + mues(hex(c)) + texto(hex(c)) + (e ? ' · <b>Color estampado (dorsal):</b> ' + mues(String(e)) + texto(estampado(e)) : '') + (mod.PRENDA ? ' · <b>Modelo:</b> ' + texto(mod.PRENDA) : '') + '</p>' +
+          '<table><thead><tr><th>Dorsal</th><th>Talla</th><th>Cantidad</th></tr></thead><tbody>' + x.l.map(function (y) {
+            return '<tr><td><b>' + texto(y.DORSAL || '—') + '</b></td><td>' + texto(y.TALLA) + '</td><td>' + texto(y.CANTIDAD) + '</td></tr>';
+          }).join('') + '</tbody></table></section>';
+      }).join('') +
+      '<p class="pie">Generado el ' + texto(cuando) + ' desde la web de Konamigas · ' + texto(p.ID) + ' · ' + plural(total, 'camiseta', 'camisetas') + '</p>' +
+      '<script>window.onload=function(){(document.fonts&&document.fonts.ready||Promise.resolve()).then(function(){setTimeout(function(){window.print();},300);});};<\/script></body></html>';
+  }
+  /** Abre el PDF del pedido para guardarlo o compartirlo («Guardar como PDF» del navegador). */
+  function pdfPedido(id) {
+    var p = S.T.fila('PEDIDOS', id); if (!p) return;
+    var h = htmlPdf(p), w = null;
+    try { w = window.open('', '_blank'); } catch (e) { w = null; }
+    if (w && w.document) { w.document.open(); w.document.write(h); w.document.close(); return; }
+    // Si el navegador no deja abrir otra pestaña, se imprime desde un marco escondido.
+    var f = document.createElement('iframe');
+    f.setAttribute('aria-hidden', 'true'); f.style.cssText = 'position:fixed;width:0;height:0;border:0;right:0;bottom:0';
+    document.body.appendChild(f);
+    f.contentWindow.document.open(); f.contentWindow.document.write(h); f.contentWindow.document.close();
+    setTimeout(function () { f.remove(); }, 60000);
+    S.ctx.aviso('Elige «Guardar como PDF» para mandarlo al proveedor.');
   }
 
   /* ======================= Recuento ======================= */
