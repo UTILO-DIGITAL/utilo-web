@@ -124,6 +124,8 @@
    * Una columna de tipo «marca» sale como una etiqueta (Pagado, Por cobrar…).
    * Si las filas llevan _grupo (T0269: Próximos, Jugados), cada grupo sale con su cabecera y cuántas tiene.
    * Si una fila lleva _detalle ([{ titulo, valor }], T0269), se puede tocar y debajo se despliega su detalle.
+   * Si lleva _ir ({ seccion, texto, …parámetros }, T0277), lleva a esa sección con esos parámetros (?s=ligas&partido=…): sin
+   * _detalle, la fila entera es el enlace; con él, el enlace va al final del detalle.
    */
   function htmlTabla(cols, filas, sumar, total) {
     var sumas = [].concat(sumar || []), tot = function (c) { return total != null && typeof total === 'object' ? total[c.nombre] : total; };
@@ -137,21 +139,31 @@
           grupo = f._grupo;
           cab = '<tr class="pf-grupo"><th colspan="' + cols.length + '" scope="colgroup">' + texto(grupo) + ' <span class="u-cifra">' + enGrupo[grupo] + '</span></th></tr>';
         }
-        var abre = f._detalle && f._detalle.length;
-        return cab + (abre ? '<tr class="pf-fila-abre" tabindex="0" aria-expanded="false">' : '<tr>') + cols.map(function (c, i) {
+        var abre = f._detalle && f._detalle.length, ir = hrefIr(f._ir), va = ir && !abre;
+        return cab + (abre ? '<tr class="pf-fila-abre" tabindex="0" aria-expanded="false">' : va ? '<tr class="pf-fila-ir">' : '<tr>') + cols.map(function (c, i) {
           var v = valor(f[c.nombre], c.tipo);
+          // T0277: la primera columna lleva el enlace (se llega con el teclado); tocar la fila entera hace lo mismo.
+          if (va && i === 0) return '<td class="u-tabla-t" data-t="' + texto(c.titulo) + '"><a href="' + texto(ir.href) + '" data-sx="' + texto(ir.seccion) + '" title="' + texto(ir.texto) + '">' + (texto(v) || '—') + '</a></td>';
           if (c.tipo === 'marca' && v) v = '<span class="pf-marca" data-m="' + texto(String(v).split(' ')[0].toLowerCase()) + '">' + texto(v) + '</span>';
           else v = v ? (num(c.tipo) && c.titulo ? '<span class="pf-et">' + texto(c.titulo) + ' </span>' : '') + texto(v) : ''; // en el móvil, «Arbitraje 18,00 €»
           var cl = [num(c.tipo) ? 'num' : i === 0 ? 'u-tabla-t' : '', v ? '' : 'pf-vacia'].filter(Boolean).join(' '); // vacía: en el móvil no sale
           return '<td' + (cl ? ' class="' + cl + '"' : '') + ' data-t="' + texto(c.titulo) + '">' + (v || (c.tipo === 'marca' ? '' : '<span class="u-tabla-s">—</span>')) + '</td>';
         }).join('') + '</tr>' + (abre ? '<tr class="pf-fila-detalle" hidden><td colspan="' + cols.length + '"><dl class="pf-dl">' + f._detalle.map(function (d) {
           return '<dt>' + texto(d.titulo) + '</dt><dd>' + texto(valor(d.valor, d.tipo)) + '</dd>';
-        }).join('') + '</dl></td></tr>' : '');
+        }).join('') + '</dl>' + (ir ? '<p class="pf-ir"><a href="' + texto(ir.href) + '" data-sx="' + texto(ir.seccion) + '">' + texto(ir.texto) + ' ›</a></p>' : '') + '</td></tr>' : '');
       }).join('') + '</tbody>' +
       (hayTotal ? '<tfoot><tr>' + cols.map(function (c, i) {
         return sumas.indexOf(c.nombre) >= 0 ? '<td class="num" data-t="' + texto(c.titulo) + '">' + texto(valor(tot(c), c.tipo)) + '</td>' : '<td>' + (i === 0 ? 'Total' : '') + '</td>';
       }).join('') + '</tr></tfoot>' : '') +
       '</table>';
+  }
+
+  /** El enlace de una fila a otra sección (_ir, T0277): { href: '?s=ligas&partido=PAR…', seccion, texto }, o null. */
+  function hrefIr(x) {
+    if (!x || !x.seccion) return null;
+    var q = '?s=' + encodeURIComponent(String(x.seccion).toLowerCase());
+    Object.keys(x).forEach(function (k) { if (k !== 'seccion' && k !== 'texto' && x[k] !== '' && x[k] != null) q += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(x[k]); });
+    return { href: q, seccion: String(x.seccion).toUpperCase(), texto: String(x.texto || 'Abrir') };
   }
 
   /** Lo que se despliega, abierto o no (por bloque), mientras la página está abierta. */
@@ -224,7 +236,12 @@
         tr.setAttribute('aria-expanded', ab ? 'true' : 'false');
         if (d && d.classList.contains('pf-fila-detalle')) d.hidden = !ab;
       }
-      el.addEventListener('click', function (e) { var tr = e.target.closest('tr.pf-fila-abre'); if (tr && el.contains(tr)) abrirFila(tr); });
+      el.addEventListener('click', function (e) {
+        var tr = e.target.closest('tr.pf-fila-abre'); if (tr && el.contains(tr)) { abrirFila(tr); return; }
+        // T0277: una fila que lleva a otra sección: tocarla en cualquier sitio es tocar su enlace.
+        tr = e.target.closest('tr.pf-fila-ir');
+        if (tr && el.contains(tr) && !e.target.closest('a')) { var a = tr.querySelector('a[data-sx]'); if (a) a.click(); }
+      });
       el.addEventListener('keydown', function (e) {
         var tr = e.target.closest && e.target.closest('tr.pf-fila-abre');
         if (tr && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); abrirFila(tr); }
