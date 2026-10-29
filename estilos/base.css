@@ -1152,21 +1152,11 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
 .u .cm-temp .cm-dl { margin-top: var(--e2); }
 .u .cm-temp .cm-dl select { min-height: 40px; max-width: 100%; }
 .u .cm-ped-l1 { margin: var(--e1) 0; font-size: 14px; }
-.u .cm-ped-j { margin: var(--e2) 0 0; font-size: 14px; }
-.u .cm-ped-cifras { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--e2); margin: var(--e2) 0 0; }
-.u .cm-ped-cifras div { padding: var(--e2); border-radius: var(--radio-peq); background: var(--color-bloque); }
-.u .cm-ped-cifras dt { font-size: 12px; color: var(--color-suave); }
-.u .cm-ped-cifras dd { margin: 0; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.u .cm-ped-iva { margin: var(--e1) 0 0; font-size: 12px; }
-.u .cm-pasos { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); margin: var(--e3) 0 var(--e2); padding: 0; }
-.u .cm-pasos li { position: relative; display: flex; flex-direction: column; align-items: center; gap: var(--e1); font-size: 12px; color: var(--color-suave); text-align: center; }
-.u .cm-pasos li::before { content: ""; position: absolute; top: 7px; left: -50%; width: 100%; height: 3px; background: var(--color-linea); }
-.u .cm-pasos li:first-child::before { display: none; }
-.u .cm-pasos i { position: relative; width: 16px; height: 16px; border-radius: var(--radio-peq); border: 2px solid var(--color-borde-campo); background: var(--color-superficie); }
-.u .cm-pasos .cm-hecho, .u .cm-pasos .cm-ahora { color: var(--color-texto); font-weight: 700; }
-.u .cm-pasos .cm-hecho i { background: var(--color-bien); border-color: var(--color-bien); }
-.u .cm-pasos .cm-hecho::before, .u .cm-pasos .cm-ahora::before { background: var(--color-bien); }
-.u .cm-pasos .cm-ahora i { border-color: var(--color-principal-oscuro); background: var(--color-bloque); }
+.u .cm-ped-j { display: flex; align-items: center; gap: var(--e3); margin: var(--e1) 0 0; font-size: 14px; }
+.u .cm-ped-j .cm-barra { flex: 1; margin: 0; }
+.u .cm-ped-pasos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin: var(--e2) 0 var(--e1); }
+.u .cm-ped-pasos i { height: 4px; border-radius: var(--radio-peq); background: var(--color-linea); }
+.u .cm-ped-pasos .cm-hecho { background: var(--color-bien); }
 .u .cm-cobro-l { display: block; font-weight: 400; margin-top: 2px; }
 .u .cm-ct-todos { display: grid; grid-template-columns: 1fr auto; gap: var(--e3); align-items: end; margin: var(--e3) 0; }
 /* En el móvil, los filtros en una fila que se desliza y los campos uno debajo de otro: la lista empieza arriba. */

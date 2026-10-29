@@ -968,24 +968,20 @@
     var nuevo = !!p._nueva, id = texto(p.ID), i = PASOS_PED.map(function (x) { return x[0]; }).indexOf(paso);
     var conJug = Object.keys(jug).filter(function (e) { return e !== 'Sin camiseta'; }).reduce(function (n, e) { return n + jug[e]; }, 0), ent = jug['Entregada'] || 0;
     var imp = nuevo ? null : importePedido(p, lineas, unidades);
-    var falta = paso === 'sinConfirmar' ? 'Falta mandarlo al proveedor y marcarlo confirmado.' :
-      paso === 'confirmado' ? 'Esperando a que llegue' + (p.FECHA_ESTIMADA ? ' (hacia el ' + fecha(p.FECHA_ESTIMADA) + ')' : '') + '.' : 'Llegó el ' + fecha(p.FECHA_RECIBIDO) + '.';
+    var falta = paso === 'sinConfirmar' ? 'falta mandarlo y marcarlo confirmado' :
+      paso === 'confirmado' ? (p.FECHA_ESTIMADA ? 'llega hacia el ' + fecha(p.FECHA_ESTIMADA) : 'esperando a que llegue') : 'llegó el ' + fecha(p.FECHA_RECIBIDO);
     var raro = paso !== 'recibido' && !nuevo && (jug['Por preparar'] || jug['Preparada'] || jug['Entregada']);
     return '<li class="cm-ped' + (p._pendiente ? ' cm-guardando' : '') + '"><div class="cm-ped-cab"><b>' + texto(nuevo ? 'Pedido nuevo' : p.ID) + '</b>' +
       '<span class="n-estado n-e-' + PASOS[paso][1] + '">' + PASOS[paso][0] + '</span></div>' +
-      '<p class="u-nota">' + texto([p.ID_PROVEEDOR ? nombreProveedor(p.ID_PROVEEDOR) : '', p.FECHA_PEDIDO ? 'pedido el ' + fecha(p.FECHA_PEDIDO) : ''].filter(String).join(' · ')) + '</p>' +
-      '<dl class="cm-ped-cifras"><div><dt>Camisetas</dt><dd>' + unidades + '</dd></div>' +
-        '<div><dt>Precio unidad</dt><dd>' + (imp ? eur(imp.unidad) : '—') + '</dd></div>' +
-        '<div><dt>Total</dt><dd>' + (imp ? eur(imp.total) : '—') + '</dd></div></dl>' +
-      (imp ? '<p class="u-nota cm-ped-iva">Sin IVA · ' + (imp.factura ? 'según su factura' : 'según el catálogo del proveedor') + '</p>' :
-        nuevo ? '' : '<p class="u-nota cm-ped-iva">Sin precio: enlaza su factura o pon el precio en el catálogo del proveedor.</p>') +
+      (nuevo ? '' : '<div class="cm-ped-pasos" role="img" aria-label="Paso ' + (i + 1) + ' de ' + PASOS_PED.length + ': ' + PASOS[paso][0] + '">' + PASOS_PED.map(function (x, k) {
+        return '<i class="' + (k <= i ? 'cm-hecho' : '') + '" title="' + x[1] + '"></i>';
+      }).join('') + '</div>') +
+      '<p class="u-nota">' + texto([p.ID_PROVEEDOR ? nombreProveedor(p.ID_PROVEEDOR) : '', p.FECHA_PEDIDO ? 'pedido el ' + fecha(p.FECHA_PEDIDO) : '', nuevo ? '' : falta].filter(String).join(' · ')) + '</p>' +
+      '<p class="cm-ped-l1"><b>' + plural(unidades, 'camiseta', 'camisetas') + '</b>' +
+        (imp ? ' · ' + eur(imp.unidad) + '/u · <b>' + eur(imp.total) + '</b> <span class="u-nota" title="' + (imp.factura ? 'Según su factura' : 'Según el catálogo del proveedor') + '">sin IVA</span>' : nuevo ? '' : ' · <span class="u-nota">sin precio</span>') + '</p>' +
       (nuevo ? '<p class="u-nota">Creando el pedido, sus líneas y las camisetas en el Excel…</p>' :
-        '<ol class="cm-pasos" aria-label="Paso ' + (i + 1) + ' de ' + PASOS_PED.length + '">' + PASOS_PED.map(function (x, k) {
-          return '<li class="' + (k < i || paso === 'recibido' ? 'cm-hecho' : k === i ? 'cm-ahora' : '') + '"><i></i><small>' + x[1] + '</small></li>';
-        }).join('') + '</ol>' +
-        '<p class="cm-ped-l1">' + texto(falta) + '</p>' +
-        (conJug ? '<p class="cm-ped-j">Jugadoras: <b>' + ent + ' de ' + conJug + '</b> ya la tienen</p><div class="cm-barra" aria-hidden="true"><i style="width:' + Math.round(100 * ent / conJug) + '%"></i></div>' :
-          unidades ? '<p class="cm-ped-j u-nota">Para el local (sin jugadoras).</p>' : '') +
+        (conJug ? '<div class="cm-ped-j"><span>Jugadoras <b>' + ent + ' de ' + conJug + '</b></span><span class="cm-barra" aria-hidden="true"><i style="width:' + Math.round(100 * ent / conJug) + '%"></i></span></div>' :
+          unidades ? '<p class="u-nota">Para el local (sin jugadoras).</p>' : '') +
         (raro ? '<p class="u-mal">Ya hay camisetas suyas en el local y no consta como llegado: márcalo con «Ha llegado».</p>' : '') +
         '<details class="cm-ped-det"><summary>Detalle</summary>' +
         (orden.length ? '<ul class="cm-ped-l">' + orden.map(function (col) {
