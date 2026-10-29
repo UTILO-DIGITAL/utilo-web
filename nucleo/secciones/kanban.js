@@ -60,6 +60,14 @@
       var F = leerLocal(CLAVE + '_f', {});      // filtros de este dispositivo
       if (typeof F.dias !== 'number') F.dias = Number(C.DIAS_CERRADAS) || 30;
       F.busca = '';
+      // T0269: desde Perfil («Ver todas en Tareas ›», ?s=kanban&asignado=…), el tablero se abre con las tareas de esa persona.
+      try {
+        var u = new URL(location.href), asig = u.searchParams.get('asignado');
+        if (asig !== null) {
+          F.ASIGNADO = asig.trim(); guardarLocal(CLAVE + '_f', F);
+          u.searchParams.delete('asignado'); history.replaceState(history.state, '', u.pathname + u.search);
+        }
+      } catch (e) {}
       var PL = leerLocal(CLAVE + '_pl', null);  // columnas plegadas; la primera vez, en el móvil, todas menos En curso
       if (!PL) { PL = {}; if (window.matchMedia && matchMedia('(max-width:640px)').matches) ESTADOS.forEach(function (e, i) { if (i !== ESTADOS.indexOf('En curso')) PL[e] = 1; }); }
       var abiertaId = '', editando = false, leido = false; // leido: ya hay tareas guardadas o del motor (antes, «cargando», no «no hay»)
@@ -165,6 +173,8 @@
           var n = FILTROS[i], v = F[n];
           if (!v) continue;
           if (n === 'ASIGNADO' && v === '-') { if (String(t.ASIGNADO || '').trim()) return false; }
+          // Una tarea de varias personas («Ana, Bruno») sale en el filtro de cada una, como en Perfil (T0269).
+          else if (n === 'ASIGNADO') { if (String(t.ASIGNADO || '').split(/[,\/]/).map(function (x) { return x.trim().toLowerCase(); }).indexOf(v.toLowerCase()) < 0) return false; }
           else if (String(t[n] || '') !== v) return false;
         }
         if (t.ESTADO === CERRADA) { var d = dias(t.FECHA_CIERRE); return d === null || -d <= F.dias; }
