@@ -688,11 +688,14 @@
           }).join('') + '</div><button type="button" class="u-btn u-btn-icono" data-dias="1" aria-label="Días siguientes">›</button></div>' +
           '<p class="lg-leyenda" aria-hidden="true"><span><i class="lg-s-jugado"></i>Jugado</span><span><i class="lg-s-anulado"></i>Anulado</span><span><i class="lg-s-aplazado"></i>Aplazado</span><span><i class="lg-s-pendiente"></i>Por jugar</span></p>';
         // El día abierto: qué jornada es, lo que se puede hacer con ella y sus partidos.
-        var titu = todas ? fechaDia(dia.fecha) : (dia.jr ? 'Jornada de recuperación' : 'Jornada ' + dia.jornadas.join(' y ')) + ' · ' + fechaDia(dia.fecha);
+        // Arriba la jornada y debajo su día (con «Todas», solo el día).
+        var titu = todas ? fechaDia(dia.fecha) : dia.jr ? 'Jornada de recuperación' : 'Jornada ' + dia.jornadas.join(' y ');
+        var sub = (todas ? '' : fechaDia(dia.fecha)) + (dia.fecha === hoy() ? (todas ? 'Hoy' : ' · hoy') : '');
         S.jornada = !todas && dia.jornadas.length === 1 ? dia.jornadas[0] : null;
         var mov = programa && S.jornada !== null && jornadaMovible(partidosLiga(actual.liga.ID), S.jornada, hoy()).ok;
-        h += '<div class="lg-jcab"><h2 class="n-grupo' + (dia.jr ? ' lg-jr-t' : '') + '">' + texto(titu) + (dia.fecha === hoy() ? ' · hoy' : '') + '</h2>' +
-          (mov ? '<button type="button" class="lg-jcambiar" data-accion="jornadas" title="Intercambiar la fecha con otra jornada"><span aria-hidden="true">⇄</span> Cambiar de fecha</button>' : '') + '</div>';
+        h += '<div class="lg-jcab"><h2 class="n-grupo' + (dia.jr ? ' lg-jr-t' : '') + '">' + texto(titu) + '</h2>' +
+          (sub || mov ? '<p class="lg-jfecha">' + (sub ? '<span>' + texto(sub) + '</span>' : '') +
+            (mov ? '<button type="button" class="lg-jcambiar" data-accion="jornadas" title="Intercambiar la fecha con otra jornada"><span aria-hidden="true">⇄</span> Cambiar de fecha</button>' : '') + '</p>' : '') + '</div>';
         // Un día marcado como festivo o descanso en CALENDARIO no debería tener partidos: se avisa para corregirlo.
         var ch = choqueCalendario(d.cal, dia.fecha, dia.ps);
         h += ch ? '<p class="lg-pav lg-pav-ficha lg-av-no" role="alert">Ojo: este día está marcado como ' + texto(ch.motivo) + ' en el calendario y tiene ' + ch.n + (ch.n === 1 ? ' partido' : ' partidos') +
