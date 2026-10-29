@@ -582,9 +582,9 @@
   function htmlPackEquipo(pk) {
     if (!pk) return '';
     var N = S.N || { insc: {} }, nom = function (id) { var c = S.T.fila('CAMISETAS', id); return c ? (N.insc[c.ID_INSCRIPCION_JUGADORA] || [''])[0] || id : id; };
-    return '<p class="cm-pack-l">' + plural(pk.incluidas, 'incluida', 'incluidas') + ' de ' + pk.pack.length + (pk.personalizadas ? ' · <b>' + plural(pk.personalizadas, 'personalizada', 'personalizadas') + '</b>' : '') +
-      (pk.libres.length ? ' · libres del pack: <span class="cm-pack-c">' + texto(cortos(pk.libres)) + '</span>' : ' · pack completo') + '</p>' +
-      pk.repetidos.map(function (r) { return '<p class="u-mal cm-pack-l">El ' + texto(r.DORSAL) + ' lo llevan ' + texto(r.ids.map(nom).join(' y ')) + ': solo una entra en el pack.</p>'; }).join('');
+    return '<p class="cm-pack-l">' + pk.incluidas + ' gratis de ' + pk.pack.length + (pk.personalizadas ? ' · <b>' + plural(pk.personalizadas, 'personalizada', 'personalizadas') + '</b>' : '') +
+      (pk.libres.length ? ' · le quedan gratis: <span class="cm-pack-c">' + texto(cortos(pk.libres)) + '</span>' : ' · ya no le quedan gratis') + '</p>' +
+      pk.repetidos.map(function (r) { return '<p class="u-mal cm-pack-l">El ' + texto(r.DORSAL) + ' lo llevan ' + texto(r.ids.map(nom).join(' y ')) + ': solo una puede ser gratis.</p>'; }).join('');
   }
   /** Euros con IVA de una tarifa ({ precio, iva }): lo que paga el equipo por cada personalizada. */
   function conIva(t) { return t ? t.total : 0; }
@@ -601,14 +601,14 @@
     var inc = vivas.filter(function (x) { return pk.incluida[x.c.ID]; }), per = vivas.filter(function (x) { return !pk.incluida[x.c.ID]; });
     var una = function (x) { return cam5Corto_(x.c) + ' ' + (x.q.jugadora || '').split(' ')[0]; };
     var t = ['Camisetas de ' + (q0.equipo || 'vuestro equipo') + (q0.compNombre ? ' · ' + q0.compNombre : ''), '',
-      'Con la inscripción tenéis ' + plural(pk.pack.length, 'camiseta incluida', 'camisetas incluidas') + ' (gratis), con estos dorsales y tallas: ' + cortos(pk.pack) + '.'];
-    if (inc.length) t.push('', 'Incluidas (' + inc.length + '): ' + inc.map(una).join(', ') + '.');
+      'Con la inscripción tenéis ' + plural(pk.pack.length, 'camiseta gratis', 'camisetas gratis') + ', con estos dorsales y tallas: ' + cortos(pk.pack) + '.'];
+    if (inc.length) t.push('', 'Gratis (' + inc.length + '): ' + inc.map(una).join(', ') + '.');
     if (per.length) t.push('', 'Personalizadas (' + per.length + '): ' + per.map(una).join(', ') + '.' +
       (tar ? ' Cada una cuesta ' + eur(conIva(tar)) + ' y va con la inscripción.' : ' Se pagan aparte con la inscripción.'));
-    t.push('', pk.libres.length ? 'Dorsales del pack que os quedan libres: ' + cortos(pk.libres) + '. Si alguna elige uno de estos con su talla, le sale gratis.' : 'Ya habéis usado todo el pack.');
+    t.push('', pk.libres.length ? 'Dorsales del pack que os quedan libres: ' + cortos(pk.libres) + '. Si alguna elige uno de estos con su talla, le sale gratis.' : 'Ya habéis usado todas las gratis.');
     pk.repetidos.forEach(function (r) {
       t.push('', 'Ojo: el ' + r.DORSAL + ' lo lleváis ' + r.ids.map(function (id) { var x = vivas.filter(function (y) { return y.c.ID === id; })[0]; return x ? (x.q.jugadora || '').split(' ')[0] : id; }).join(' y ') +
-        '. En el pack solo entra una; la otra es personalizada o tiene que cambiar de dorsal.');
+        '. Solo una puede ser gratis; la otra es personalizada o tiene que cambiar de dorsal.');
     });
     return t.join('\n');
   }
@@ -1186,59 +1186,65 @@
     return compsDeModelo(m).map(function (x) { return String(x.ID_COMPETICION); }).sort(function (a, b) { return (tDe(a) < 0 ? 999 : tDe(a)) - (tDe(b) < 0 ? 999 : tDe(b)) || (nombreComp(a) < nombreComp(b) ? -1 : 1); });
   }
   /**
-   * Lo de una competición para el pack: por equipo, sus camisetas, lo incluido según el pack y las personalizadas según el
-   * Excel (INCLUIDA, que es lo cobrado). { pack, equipos: [{ ie, nombre, color, baja, pk, cobradas }], tar, personalizadas,
-   * cobradas, distintas (las que el Excel no tiene como dice el pack) }.
+   * Lo de una competición: equipo a equipo, sus camisetas y cuáles son gratis o personalizadas. La cuenta es una sola, la
+   * del pack (cam5Incluidas_); el Excel (CAMISETAS · INCLUIDA) solo sale como aviso si no está apuntado igual.
+   * { pack, equipos: [{ ie, nombre, color, baja, pk, n, gratis, pers }], tar, camisetas, gratis, pers, distintas }.
+   * Sin pack, todas las camisetas cuentan como personalizadas.
    */
   function datosPack(comp) {
     var N = S.N || { eq: {}, comp: {} }, pack = packDe(comp), porEq = {}, temp = (N.comp[comp] || ['', ''])[1];
     Object.keys(N.eq).forEach(function (ie) { if (N.eq[ie][1] === comp) porEq[ie] = []; });
     S.T.filas('CAMISETAS').forEach(function (c) { var q = quien(c); if (q.comp === comp && q.ie) (porEq[q.ie] = porEq[q.ie] || []).push({ c: c, q: q }); });
-    var r = { pack: pack, equipos: [], tar: cam5Tarifa_(S.T.filas('TARIFAS'), comp, temp, hoy()), personalizadas: 0, cobradas: 0, distintas: 0 };
+    var r = { pack: pack, equipos: [], tar: cam5Tarifa_(S.T.filas('TARIFAS'), comp, temp, hoy()), camisetas: 0, gratis: 0, pers: 0, distintas: 0 };
     Object.keys(porEq).forEach(function (ie) {
       var l = porEq[ie], e = N.eq[ie] || ['', '', '', '', ''];
+      var vivas = l.filter(function (x) { return x.c.ESTADO !== 'Sin camiseta' && !x.q.baja; });
       var pk = pack.length && l.length ? packEquipo(l) : null;
-      var cobradas = l.filter(function (x) { return x.c.ESTADO !== 'Sin camiseta' && x.c.INCLUIDA !== '' && x.c.INCLUIDA !== undefined && !cam5Si_(x.c.INCLUIDA); }).length;
-      if (pk) {
-        r.personalizadas += pk.personalizadas;
-        l.forEach(function (x) { if (x.c.ID in pk.incluida && pk.incluida[x.c.ID] !== cam5Si_(x.c.INCLUIDA)) r.distintas++; });
-      }
-      r.cobradas += cobradas;
-      r.equipos.push({ ie: ie, nombre: e[0] || ie, color: e[3], baja: e[4] === 'Baja', pk: pk, cobradas: cobradas, n: l.length });
+      var gratis = pk ? pk.incluidas : 0, pers = pk ? pk.personalizadas : vivas.length;
+      if (pk) l.forEach(function (x) { if (x.c.ID in pk.incluida && pk.incluida[x.c.ID] !== cam5Si_(x.c.INCLUIDA)) r.distintas++; });
+      r.camisetas += vivas.length; r.gratis += gratis; r.pers += pers;
+      r.equipos.push({ ie: ie, nombre: e[0] || ie, color: e[3], baja: e[4] === 'Baja', pk: pk, n: vivas.length, gratis: gratis, pers: pers });
     });
     r.equipos.sort(function (a, b) { return norm(a.nombre) < norm(b.nombre) ? -1 : 1; });
     return r;
   }
+  /** Lo que se cobra por n personalizadas: «100,00 € a cobrar (10,00 € cada una)» o el aviso de que falta la tarifa. */
+  function htmlCobrar(d, n) {
+    if (!n) return '';
+    return d.tar ? ' → <b>' + eur(conIva(d.tar) * n) + '</b> con las inscripciones (' + eur(conIva(d.tar)) + ' cada una)' :
+      ' · <span class="u-mal">falta la tarifa «Camiseta» de esta temporada en Economía</span>';
+  }
   function htmlPacks(m) {
     var cs = compsPack(m);
-    var h = '<section class="u-bloque cm-packs"><h2 class="n-grupo">Packs de camisetas incluidas <span class="u-cifra">' + cs.length + '</span></h2>' +
-      '<p class="u-nota">Lo que entra gratis con la inscripción de cada equipo: unas combinaciones fijas de dorsal y talla (1S, 2S, 3S, 4M…). Una camiseta con un dorsal y una talla del pack que nadie del equipo ha cogido es incluida; las demás, personalizadas, y se cobran con la inscripción (tarifa «Camiseta» de Economía).</p>';
+    var h = '<section class="u-bloque cm-packs"><h2 class="n-grupo">Camisetas gratis de cada competición</h2>' +
+      '<p class="u-nota">Cada competición regala con la inscripción unas camisetas fijas: una lista de dorsales con su talla (el «pack»). ' +
+      'Si una jugadora elige un dorsal y una talla de la lista y nadie de su equipo lo tiene ya, le sale <b>gratis</b>. Si elige otro dorsal u otra talla, es <b>personalizada</b> y paga la tarifa «Camiseta» con la inscripción.</p>';
     if (!cs.length) return h + '<p class="u-vacio">' + texto(nombreModelo(m)) + ' no va en ninguna competición: dáselas en «Modelos».</p></section>';
     if (!S.N) return h + '<p class="u-nota">Cargando las competiciones…</p></section>';
     return h + '<ul class="cm-peds">' + cs.map(function (k) {
       var d = datosPack(k), b = function (acc, t, cl) { return '<button type="button" class="u-btn' + (cl ? ' ' + cl : '') + '" data-cm-pk="' + texto(k) + '" data-cm-acc="' + acc + '">' + t + '</button>'; };
       var vivos = d.equipos.filter(function (e) { return !e.baja; }).length;
       return '<li class="cm-ped"><div class="cm-ped-cab"><b>' + texto(nombreComp(k)) + '</b><span class="u-nota">' + plural(vivos, 'equipo', 'equipos') + '</span></div>' +
-        (d.pack.length ? '<p class="cm-pack-c">' + texto(cortos(d.pack)) + '</p><p class="u-nota">' + plural(d.pack.length, 'camiseta incluida', 'camisetas incluidas') + ' por equipo</p>' :
-          '<p class="u-nota">Sin pack: todas sus camisetas cuentan como personalizadas hasta que se defina.</p>') +
-        '<p class="cm-coste">' + (d.cobradas ? '<b>' + plural(d.cobradas, 'personalizada', 'personalizadas') + '</b>' + (d.tar ? ' · <b>' + eur(conIva(d.tar) * d.cobradas) + '</b> cobrados con las inscripciones (' + eur(conIva(d.tar)) + ' cada una)' : ' · <span class="u-mal">sin tarifa «Camiseta» en Economía para esta temporada</span>') : 'Ninguna personalizada') + '</p>' +
-        (d.distintas ? '<p class="u-mal">Según el pack ' + (d.personalizadas === 1 ? 'hay 1 personalizada' : 'hay ' + d.personalizadas + ' personalizadas') + ', pero ' +
-          plural(d.distintas, 'camiseta no está marcada', 'camisetas no están marcadas') + ' así en el Excel. «Marcar en el Excel» las pone como dice el pack.</p>' : '') +
-        '<div class="n-botones">' + b('editar', d.pack.length ? 'Cambiar pack' : 'Definir pack', d.pack.length ? '' : 'u-btn-accion') +
-        (d.pack.length ? b('pedir', 'Pedir el pack') : '') + (d.equipos.length ? b('cobro', 'Por equipo', 'u-btn-texto') : '') +
-        (d.distintas ? b('excel', 'Marcar ' + d.distintas + ' en el Excel', 'u-btn-texto') : '') + '</div></li>';
+        (d.pack.length ? '<p class="cm-pack-t">Gratis por equipo (' + d.pack.length + '):</p><p class="cm-pack-c">' + texto(cortos(d.pack)) + '</p>' :
+          '<p class="u-mal">Todavía no tiene la lista de camisetas gratis: mientras, todas cuentan como personalizadas.</p>') +
+        (d.camisetas ? '<p class="cm-coste">' + plural(d.camisetas, 'camiseta', 'camisetas') + ': ' + (d.pack.length ? '<b>' + d.gratis + ' gratis</b> · ' : '') +
+          '<b>' + plural(d.pers, 'personalizada', 'personalizadas') + '</b>' + htmlCobrar(d, d.pers) + '</p>' : '<p class="u-nota">Todavía no tiene camisetas.</p>') +
+        (d.distintas ? '<p class="u-nota">En el Excel, ' + plural(d.distintas, 'camiseta está apuntada', 'camisetas están apuntadas') + ' de otra manera (gratis o personalizada). ' +
+          b('excel', 'Apuntarlo en el Excel', 'u-btn-texto cm-en-linea') + '</p>' : '') +
+        '<div class="n-botones">' + b('editar', d.pack.length ? 'Cambiar la lista de gratis' : 'Poner la lista de gratis', d.pack.length ? '' : 'u-btn-accion') +
+        (d.pack.length ? b('pedir', 'Pedirlas antes de la temporada') : '') + (d.equipos.length ? b('cobro', 'Equipo a equipo', 'u-btn-texto') : '') + '</div></li>';
     }).join('') + '</ul></section>';
   }
   function ventanaPack(comp) {
     var pack = packDe(comp), otras = Object.keys((S.N && S.N.comp) || {}).filter(function (k) { return k !== comp && packDe(k).length; });
-    var v = ventana('<h2>Pack de ' + texto(nombreComp(comp)) + '</h2>' +
-      '<p class="u-nota">Las combinaciones de dorsal y talla que entran con la inscripción, separadas por comas: 1S, 2S, 3S, 4M… Cada dorsal, una sola vez.</p>' +
-      (otras.length ? '<div class="u-campos cm-una">' + campo('Copiar el de otra competición', '<select id="pk-de"><option value="">—</option>' + opciones(otras.map(function (k) { return [k, nombreComp(k)]; }), '') + '</select>') + '</div>' : '') +
-      '<div class="u-campos cm-una">' + campo('Pack', '<textarea id="pk-t" rows="3" autocomplete="off">' + texto(cortos(pack).split(' ').filter(String).join(', ')) + '</textarea>') + '</div>' +
+    var v = ventana('<h2>Camisetas gratis · ' + texto(nombreComp(comp)) + '</h2>' +
+      '<p class="u-nota">Los dorsales que regala la inscripción, cada uno con su talla, separados por comas: 1S, 2S, 3S, 4M… Cada dorsal, una sola vez. Vale para todos los equipos de la competición.</p>' +
+      (otras.length ? '<div class="u-campos cm-una">' + campo('Copiar la de otra competición', '<select id="pk-de"><option value="">—</option>' + opciones(otras.map(function (k) { return [k, nombreComp(k)]; }), '') + '</select>') + '</div>' : '') +
+      '<div class="u-campos cm-una">' + campo('Dorsal y talla', '<textarea id="pk-t" rows="3" autocomplete="off">' + texto(cortos(pack).split(' ').filter(String).join(', ')) + '</textarea>') + '</div>' +
       '<p class="cm-pack-c" id="pk-ver"></p><p class="u-error" hidden></p>' +
       '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="pk-ok">Guardar</button><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cancelar</button></div>');
     var t = v.querySelector('#pk-t'), ver = v.querySelector('#pk-ver'), err = v.querySelector('.u-error'), de = v.querySelector('#pk-de');
-    var leer = function () { var l = cam5LeerPack_(t.value); ver.textContent = l.pack.length ? plural(l.pack.length, 'camiseta', 'camisetas') + ': ' + cortos(l.pack) : ''; err.hidden = !l.mal.length; err.textContent = l.mal.length ? 'No entiendo: ' + l.mal.join(', ') + ' (cada una es un dorsal y una talla, sin repetir dorsal).' : ''; return l; };
+    var leer = function () { var l = cam5LeerPack_(t.value); ver.textContent = l.pack.length ? plural(l.pack.length, 'camiseta gratis', 'camisetas gratis') + ' por equipo: ' + cortos(l.pack) : ''; err.hidden = !l.mal.length; err.textContent = l.mal.length ? 'No entiendo: ' + l.mal.join(', ') + ' (cada una es un dorsal y una talla, sin repetir dorsal).' : ''; return l; };
     t.oninput = leer; leer();
     if (de) de.onchange = function () { if (de.value) { t.value = cortos(packDe(de.value)).split(' ').join(', '); leer(); } };
     v.querySelector('#pk-ok').onclick = function () {
@@ -1246,32 +1252,31 @@
       var ok = this; ok.disabled = true; ok.textContent = 'Guardando…';
       S.ctx.llamar('camisetas5Pack', [comp, l.pack]).then(function (r) {
         cerrarVentana();
-        S.ctx.aviso('Pack de ' + nombreComp(comp) + ': ' + plural(r.pack, 'camiseta incluida', 'camisetas incluidas') + '.');
+        S.ctx.aviso(nombreComp(comp) + ': ' + plural(r.pack, 'camiseta gratis', 'camisetas gratis') + ' por equipo.');
         return S.T.refrescar(['PACKS'], true);
       }).catch(function (e) { ok.disabled = false; ok.textContent = 'Volver a probar'; err.textContent = 'No se ha guardado: ' + String(e.message).replace(/^\w+:\s*/, ''); err.hidden = false; });
     };
   }
   function guardarIncluidas(b, comp) {
-    b.disabled = true; b.textContent = 'Marcando…';
+    b.disabled = true; b.textContent = 'Apuntando…';
     S.ctx.llamar('camisetas5Incluidas', [comp]).then(function (r) {
-      S.ctx.aviso(r.cambiadas ? plural(r.cambiadas, 'camiseta marcada', 'camisetas marcadas') + ' en el Excel según el pack.' : 'El Excel ya estaba como dice el pack.');
+      S.ctx.aviso(r.cambiadas ? plural(r.cambiadas, 'camiseta apuntada', 'camisetas apuntadas') + ' en el Excel como gratis o personalizada.' : 'El Excel ya estaba al día.');
       return S.T.refrescar(['CAMISETAS'], true);
     }).catch(function (e) { S.ctx.aviso('No se ha podido: ' + String(e.message).replace(/^\w+:\s*/, '')); pintar(false); });
   }
-  /** Lo cobrado por las personalizadas de una competición, equipo a equipo, y lo que dice el pack de cada uno. */
+  /** Equipo a equipo: gratis, personalizadas, lo que se cobra y los dorsales gratis que le quedan. */
   function ventanaCobro(comp) {
-    var d = datosPack(comp), u = conIva(d.tar), tot = 0;
-    ventana('<h2>' + texto(nombreComp(comp)) + ' · por equipo</h2>' +
-      '<p class="u-nota">Personalizadas: las que el Excel tiene como no incluidas (se cobran con la inscripción' + (d.tar ? ', ' + eur(u) + ' cada una con IVA' : '; falta la tarifa «Camiseta» de esta temporada en Economía') + '). Libres: los dorsales del pack que le quedan a cada equipo.</p>' +
-      '<div class="u-tabla-caja"><table class="u-tabla cm-cobro"><thead><tr><th>Equipo</th><th class="num">Personalizadas</th><th class="num">Cobrado</th></tr></thead><tbody>' +
+    var d = datosPack(comp), u = conIva(d.tar), tg = 0, tp = 0;
+    ventana('<h2>' + texto(nombreComp(comp)) + ' · equipo a equipo</h2>' +
+      '<p class="u-nota">' + (d.tar ? 'Cada personalizada paga ' + eur(u) + ' con la inscripción.' : 'Falta la tarifa «Camiseta» de esta temporada en Economía.') + ' Debajo de cada equipo, los dorsales gratis que todavía puede elegir.</p>' +
+      '<div class="u-tabla-caja"><table class="u-tabla cm-cobro"><thead><tr><th>Equipo</th><th class="num">Gratis</th><th class="num">Personalizadas</th><th class="num">A cobrar</th></tr></thead><tbody>' +
       d.equipos.map(function (e) {
-        tot += e.cobradas;
+        tg += e.gratis; tp += e.pers;
         return '<tr><td class="u-tabla-t">' + punto(e.color) + texto(e.nombre) + (e.baja ? ' <span class="u-nota">(baja)</span>' : '') +
-          (e.pk ? '<span class="u-nota cm-cobro-l">' + plural(e.n, 'camiseta', 'camisetas') + ' · libres: ' + (texto(cortos(e.pk.libres)) || 'ninguna') + '</span>' : '') +
-          (e.pk && e.pk.repetidos.length ? '<span class="u-mal cm-cobro-l">Repite el ' + texto(e.pk.repetidos.map(function (r) { return r.DORSAL; }).join(', ')) + '</span>' : '') + '</td>' +
-          '<td class="num">' + (e.cobradas || '') + (e.pk && e.pk.personalizadas !== e.cobradas ? ' <span class="u-nota">(pack: ' + e.pk.personalizadas + ')</span>' : '') + '</td>' +
-          '<td class="num">' + (e.cobradas && d.tar ? eur(u * e.cobradas) : '') + '</td></tr>';
-      }).join('') + '<tr><td><b>Total</b></td><td class="num"><b>' + tot + '</b></td><td class="num"><b>' + (d.tar ? eur(u * tot) : '') + '</b></td></tr></tbody></table></div>' +
+          (e.pk ? '<span class="u-nota cm-cobro-l">Le quedan gratis: ' + (texto(cortos(e.pk.libres)) || 'ninguna') + '</span>' : '') +
+          (e.pk && e.pk.repetidos.length ? '<span class="u-mal cm-cobro-l">Dorsal repetido: ' + texto(e.pk.repetidos.map(function (r) { return r.DORSAL; }).join(', ')) + '</span>' : '') + '</td>' +
+          '<td class="num">' + (d.pack.length ? e.gratis : '—') + '</td><td class="num">' + e.pers + '</td><td class="num">' + (e.pers && d.tar ? eur(u * e.pers) : '') + '</td></tr>';
+      }).join('') + '<tr><td><b>Total</b></td><td class="num"><b>' + (d.pack.length ? tg : '—') + '</b></td><td class="num"><b>' + tp + '</b></td><td class="num"><b>' + (d.tar ? eur(u * tp) : '') + '</b></td></tr></tbody></table></div>' +
       '<div class="n-botones"><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cerrar</button></div>');
   }
   /** Pedir el pack antes de la temporada: cuántos equipos de cada color (de entrada, los inscritos) y a qué proveedor. */
@@ -1279,8 +1284,8 @@
     var d = datosPack(comp), mc = S.T.filas('MODELOS_COMPETICION').filter(function (x) { return String(x.ID_COMPETICION) === comp; })[0], m = mc ? String(mc.ID_MODELO) : '';
     var porCol = {}; d.equipos.forEach(function (e) { if (!e.baja && e.color) porCol[e.color] = (porCol[e.color] || 0) + 1; });
     var temps = (S.N && S.N.temp) || [], tComp = ((S.N && S.N.comp[comp]) || ['', ''])[1];
-    var v = ventana('<h2>Pedir el pack de ' + texto(nombreComp(comp)) + '</h2>' +
-      '<p class="u-nota">El pack entero (' + texto(cortos(d.pack)) + ') por cada equipo, en su color, antes de que las jugadoras elijan. Al llegar quedan libres en el local y se dan a las jugadoras como cualquier libre. De entrada, los equipos inscritos de cada color.</p>' +
+    var v = ventana('<h2>Pedir las gratis · ' + texto(nombreComp(comp)) + '</h2>' +
+      '<p class="u-nota">Las camisetas gratis (' + texto(cortos(d.pack)) + ') de cada equipo, en su color, antes de que las jugadoras elijan. Al llegar quedan libres en el local y se dan a las jugadoras como cualquier libre. De entrada, los equipos inscritos de cada color.</p>' +
       '<ul class="cm-lista-ok cm-pp-cols">' + S.T.filas('COLORES').map(function (c) {
         return '<li><span>' + punto(c.ID) + texto(c.NOMBRE) + '</span><label class="cm-md-n"><input type="number" min="0" step="1" inputmode="numeric" data-pp-col="' + texto(c.ID) + '" value="' + (porCol[c.ID] || 0) + '" aria-label="Equipos de ' + texto(c.NOMBRE) + '"> equipos</label></li>';
       }).join('') + '</ul><p class="u-nota" id="pk-tot"></p><div id="pk-prov"></div><div class="u-campos">' +
@@ -1307,7 +1312,7 @@
       ok.disabled = true; ok.textContent = 'Creando el pedido…';
       S.ctx.llamar('camisetas5PedirPack', [comp, dd]).then(function (r) {
         cerrarVentana();
-        S.ctx.aviso('Pedido ' + r.id + ' del pack preparado. El extracto para el proveedor, en su tarjeta.');
+        S.ctx.aviso('Pedido ' + r.id + ' de las camisetas gratis preparado. El extracto para el proveedor, en su tarjeta.');
         return S.T.refrescar(['PEDIDOS', 'PEDIDOS_LINEAS'], true);
       }).catch(function (e) { ok.disabled = false; ok.textContent = 'Volver a probar'; err.textContent = 'No se ha creado: ' + String(e.message).replace(/^\w+:\s*/, ''); err.hidden = false; });
     };
