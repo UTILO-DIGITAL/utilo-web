@@ -1031,6 +1031,10 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
 .u .cm-jug-t { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
 .u .cm-jug-c { font: 800 22px/1.1 var(--fuente-titulos); letter-spacing: .01em; }
 .u .cm-jug-p { font-size: 14px; color: var(--color-suave); overflow-wrap: anywhere; }
+.u .cm-hist { list-style: none; margin: 0 0 var(--e3); padding: 0 0 0 var(--e3); border-left: 2px solid var(--color-linea); display: grid; gap: var(--e2); }
+.u .cm-hist li { display: grid; gap: 2px; font-size: 14px; }
+.u .cm-hist-f { font-weight: 700; font-size: 13px; color: var(--color-suave); }
+.u .cm-hist li.cm-hist-ent .cm-hist-f { color: var(--color-texto); }
 .u .cm-prox { margin: 0 0 var(--e2); font-size: 14px; }
 .u .cm-eq-color { font: 400 15px/1.2 var(--fuente-texto); color: var(--color-suave); margin-left: var(--e1); }
 /* La camiseta dibujada: el color es el dato COLORES.COLOR_HEX; el dorsal, encima, dentro del cuerpo. */
@@ -1134,7 +1138,7 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
      los filtros más bajos y cada camiseta en menos alto (la jugadora y su estado en la misma línea). */
   .u .n-main:has(> .cm-pest) { max-width: none; }
   .u .cm-eqs { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: var(--e3); align-items: start; }
-  .u .cm-filtros { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--e3); max-width: 1100px; }
+  .u .cm-filtros { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); gap: var(--e3); max-width: 1200px; }
   .u .cm-chips { gap: var(--e1) var(--e2); }
   .u .cm-chip { min-height: 36px; padding: 0 var(--e3); font-size: 14px; }
   .u .cm-eq { padding: var(--e3) var(--e3) var(--e2); }
