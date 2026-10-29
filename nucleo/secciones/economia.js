@@ -46,6 +46,15 @@
   function pct(t) { var n = parseFloat(String(t == null ? '' : t).replace(',', '.')); return isFinite(n) ? n : 0; }
   /** Base, cuota de IVA y total de una fila (BASE, TIPO_IVA), en céntimos. La cuota se redondea al céntimo. */
   function importe(f) { var b = cts(f.BASE), i = Math.round(b * pct(f.TIPO_IVA) / 100); return { base: b, iva: i, total: b + i }; }
+  /**
+   * T0272 · La base (céntimos) de un total con IVA: la que, con su cuota redondeada al céntimo, da justo ese total
+   * (si el redondeo no lo permite, la más cercana). Para apuntar un importe tal cual lo dicen, con el IVA incluido.
+   */
+  function baseDeTotal(total, tipo) {
+    var p = pct(tipo), b = Math.round(total * 100 / (100 + p)), c = [b, b - 1, b + 1];
+    for (var k = 0; k < c.length; k++) if (c[k] + Math.round(c[k] * p / 100) === total) return c[k];
+    return b;
+  }
   function suma(a, b) { return { base: a.base + b.base, iva: a.iva + b.iva, total: a.total + b.total }; }
   function cero() { return { base: 0, iva: 0, total: 0 }; }
   function miles(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
@@ -280,7 +289,8 @@
    * redondeado al euro.
    * - Con una medida para su grupo (med = { Equipos: { grupos, periodo: { id: n }, desglose: { id: n } } }) y la medida del
    *   periodo anterior y de este: lo real del anterior por cada una (equipo, partido…), por las de ahora. Si la medida
-   *   pasa por el desglose, también cuánto le toca a cada parte de este periodo (y rec es su suma).
+   *   pasa por el desglose, también cuánto le toca a cada parte de este periodo (y rec es su suma), con sus medidas en
+   *   unidades: { ID_DESGLOSE: n }, y lo que sale por cada una en porUna.
    * - Si no: lo real del periodo anterior.
    */
   function recomendar(d, p, lista, med) {
@@ -292,19 +302,19 @@
     function euro(c) { return Math.round(c / 100) * 100; }
     return d.cat.filter(function (c) { return !esReparto(d, c) && (c.TIPO === 'Ingreso' || c.TIPO === 'Gasto'); }).map(function (c) {
       var r = { cat: c, tipo: c.TIPO, grupo: String(c.GRUPO || ''), ant: ant.map(function (x, i) { return { p: x, real: reales[i][c.ID] || 0 }; }),
-        rec: null, razon: '', medida: '', partes: null };
+        rec: null, razon: '', medida: '', partes: null, unidades: null, porUna: 0 };
       if (!p1) { r.razon = 'No hay ' + String(d.cfg.NOMBRE_PERIODO || 'periodo').toLowerCase() + ' anterior con que comparar.'; return r; }
       var real1 = r.ant[0].real, n = deGrupo[r.grupo], M = n ? med[n] : null;
       var n1 = M && M.periodo ? M.periodo[p1.id] || 0 : 0, n0 = M && M.periodo ? M.periodo[p.id] || 0 : 0, uni = String(n || '').toLowerCase();
       if (M && n1 && n0) {
         var tasa = real1 / n1;
-        r.medida = n;
+        r.medida = n; r.porUna = tasa;
         r.rec = euro(tasa * n0);
         r.razon = eur0(real1) + ' con ' + n1 + ' ' + uni + ' la ' + p1.nombre + ' → ' + n0 + ' ' + uni + ' ahora';
         var ks = Object.keys(M.desglose || {}).filter(function (k) { var x = ixDes[k]; return x && P && String(x[P] || '') === p.id; });
         if (ks.length && real1) {
-          r.partes = {}; var tot = 0;
-          ks.forEach(function (k) { r.partes[k] = euro(tasa * M.desglose[k]); tot += r.partes[k]; });
+          r.partes = {}; r.unidades = {}; var tot = 0;
+          ks.forEach(function (k) { r.partes[k] = euro(tasa * M.desglose[k]); r.unidades[k] = M.desglose[k]; tot += r.partes[k]; });
           r.rec = tot;
         }
       } else {
@@ -336,7 +346,7 @@
     return mal;
   }
 
-  var CALC = { cts: cts, pct: pct, importe: importe, eur: eur, eur0: eur0, fecha: fecha, periodos: periodos, periodoActual: periodoActual,
+  var CALC = { cts: cts, pct: pct, importe: importe, baseDeTotal: baseDeTotal, eur: eur, eur0: eur0, fecha: fecha, periodos: periodos, periodoActual: periodoActual,
     anteriores: anteriores, movDe: movDe, facDe: facDe, preDe: preDe, resumen: resumen, saldos: saldos, cuenta: cuenta, pendientes: pendientes,
     sinFactura: sinFactura, presupuesto: presupuesto, grupos: grupos, estadoLinea: estadoLinea, avisos: avisos, cruzados: cruzados,
     desglose: desglose, recomendar: recomendar, esReparto: esReparto, problemasMov: problemasMov };
@@ -701,6 +711,33 @@
       function ivas() { return ['21%', '10%', '4%', '0%']; }
       function cambios(f, v) { var c = {}; Object.keys(v).forEach(function (k) { if (String(f[k] == null ? '' : f[k]) !== String(v[k])) c[k] = v[k]; }); return c; }
       function confirmar(b, t, f) { if (b.getAttribute('data-ok')) { f(); return; } b.setAttribute('data-ok', '1'); b.textContent = t; }
+      /**
+       * T0272: el importe de un movimiento o una factura se puede escribir con el IVA incluido, como lo dicen muchas veces:
+       * se guarda la base que le toca (baseDeTotal). La casilla se recuerda en este navegador.
+       */
+      function conIva() { return guardado(CLAVE + 'coniva') === '1'; }
+      function verImporte(v) {
+        if (v.BASE === '' || v.BASE == null) return '';
+        var x = conIva() ? importe(v).total : cts(v.BASE);
+        return (x / 100).toFixed(2).replace('.', ',').replace(/,00$/, '');
+      }
+      function casillaIva(pre) {
+        return '<label class="u-check u-ancho"><input type="checkbox" id="' + pre + '-coniva"' + (conIva() ? ' checked' : '') + '> El importe lleva el IVA incluido</label>';
+      }
+      /** La base escrita (en céntimos), o la que sale del total si la casilla del IVA incluido está marcada. */
+      function baseEn(pre) {
+        var x = cts(val(pre + '-BASE')), c = vent.querySelector('#' + pre + '-coniva');
+        return c && c.checked ? baseDeTotal(x, val(pre + '-TIPO_IVA')) : x;
+      }
+      /** Etiqueta del importe y la línea de debajo con lo que se va a guardar. */
+      function pintaImporte(pre, etBase) {
+        var ci = vent.querySelector('#' + pre + '-coniva').checked, b = baseEn(pre), t = importe({ BASE: b / 100, TIPO_IVA: val(pre + '-TIPO_IVA') });
+        vent.querySelector('#' + pre + '-imp-et').textContent = ci ? 'Importe con IVA' : etBase;
+        vent.querySelector('#' + pre + '-total').textContent = ci ? 'Sin IVA ' + eur(t.base) + ' · IVA ' + eur(t.iva) + ' · total ' + eur(t.total) : 'IVA ' + eur(t.iva) + ' · total con IVA ' + eur(t.total);
+      }
+      function oirImporte(pre, refrescar) {
+        vent.querySelector('#' + pre + '-coniva').addEventListener('change', function (e) { guardado(CLAVE + 'coniva', e.target.checked ? '1' : ''); refrescar(); });
+      }
       function dato(et, v) { return v === '' || v == null ? '' : '<div class="eco-df"><span>' + texto(et) + '</span><span>' + v + '</span></div>'; }
 
       /** Ficha de un movimiento (como en la 4.1): lo que es, de un vistazo, y qué se puede hacer con él. */
@@ -763,13 +800,13 @@
         if (!m && DS && !v[DS] && S.des && S.des !== '-' && d.colsMov.indexOf(DS) >= 0) v[DS] = S.des;
         var tienePer = P && d.colsMov.indexOf(P) >= 0, tieneDes = DS && d.colsMov.indexOf(DS) >= 0;
         var cuentas = d.cue.map(function (c) { return [c.ID, c.NOMBRE]; }), st = { tipo: v.TIPO || 'Gasto' };
-        var base = v.BASE === '' || v.BASE == null ? '' : String(v.BASE).replace('.', ',');
         var html = '<h2 id="eco-vt">' + (m ? 'Editar movimiento' : 'Añadir movimiento') + '</h2>' +
           '<div class="eco-sw" role="group" aria-label="Qué es">' +
           '<button type="button" data-tipo="Ingreso">↓ Entra dinero</button><button type="button" data-tipo="Gasto">↑ Sale dinero</button><button type="button" data-tipo="Interno">⇄ Entre cuentas</button></div>' +
           '<div class="u-campos">' +
-          campo('Importe sin IVA', '<input type="text" inputmode="decimal" class="eco-imp" id="m-BASE" value="' + texto(base) + '" placeholder="0,00" data-foco>') +
+          campo('<span id="m-imp-et">Importe sin IVA</span>', '<input type="text" inputmode="decimal" class="eco-imp" id="m-BASE" value="' + texto(verImporte(v)) + '" placeholder="0,00" data-foco>') +
           campo('IVA', '<select id="m-TIPO_IVA">' + opciones(ivas().map(function (x) { return [x, x]; }), v.TIPO_IVA) + '</select>') +
+          casillaIva('m') +
           '<p class="u-nota u-ancho" id="m-total"></p>' +
           campo('Concepto', '<input type="text" id="m-CONCEPTO" value="' + texto(v.CONCEPTO) + '" maxlength="200" placeholder="Qué es, como lo diríais entre vosotros">', 'u-ancho') +
           campo('Fecha', '<input type="date" id="m-FECHA" value="' + texto(v.FECHA) + '">') +
@@ -805,16 +842,16 @@
             var fs = d.fac.filter(function (f) { return String(f.ID) === String(fa) || (f.ESTADO !== 'Anulada' && (!ctr || String(f.ID_CONTRAPARTE) === ctr) && (tipo === 'Ingreso' ? f.TIPO === 'Emitida' : f.TIPO !== 'Emitida')); })
               .sort(function (a, b) { return String(a.FECHA) < String(b.FECHA) ? 1 : -1; }).slice(0, 60);
             sf.innerHTML = opciones(fs.map(function (f) { return [f.ID, numFac(f) + ' · ' + fecha(f.FECHA) + ' · ' + eur(importe(f).total)]; }), fa, 'Sin factura');
-            var t = importe({ BASE: val('m-BASE'), TIPO_IVA: val('m-TIPO_IVA') });
-            vent.querySelector('#m-total').textContent = 'IVA ' + eur(t.iva) + ' · total con IVA ' + eur(t.total);
+            pintaImporte('m', 'Importe sin IVA');
           }
           refrescar();
           vent.querySelector('.eco-sw').onclick = function (e) { var b = e.target.closest('[data-tipo]'); if (b) { st.tipo = b.getAttribute('data-tipo'); refrescar(); } };
           ['m-TIPO_IVA', 'm-ID_CONTRAPARTE', 'm-PER'].forEach(function (id) { var e = vent.querySelector('#' + id); if (e) e.addEventListener('change', refrescar); });
           vent.querySelector('#m-BASE').addEventListener('input', refrescar);
+          oirImporte('m', refrescar);
           vent.querySelector('#m-guardar').onclick = function () {
             var tipo = st.tipo, interno = tipo === 'Interno';
-            var nv = { FECHA: val('m-FECHA'), TIPO: tipo, CONCEPTO: val('m-CONCEPTO'), BASE: cts(val('m-BASE')) / 100, TIPO_IVA: val('m-TIPO_IVA'),
+            var nv = { FECHA: val('m-FECHA'), TIPO: tipo, CONCEPTO: val('m-CONCEPTO'), BASE: baseEn('m') / 100, TIPO_IVA: val('m-TIPO_IVA'),
               ID_CATEGORIA: interno ? '' : val('m-ID_CATEGORIA'), ID_CUENTA: val('m-ID_CUENTA'), ID_CUENTA_DESTINO: interno ? val('m-ID_CUENTA_DESTINO') : '',
               ID_CONTRAPARTE: interno ? '' : val('m-ID_CONTRAPARTE'), ID_FACTURA: interno ? '' : val('m-ID_FACTURA'), NOTAS: val('m-NOTAS') };
             if (tienePer) nv[P] = val('m-PER');
@@ -854,8 +891,9 @@
           campo('Número', '<input type="text" id="f-NUMERO" value="' + texto(v.NUMERO) + '" maxlength="40">', 'eco-numero') +
           campo('Fecha', '<input type="date" id="f-FECHA" value="' + texto(v.FECHA) + '">') +
           campo('<span id="f-ctr-et">' + (v.TIPO === 'Emitida' ? 'Cliente (a quién se la hacemos)' : 'Proveedor (quién nos la hace)') + '</span>', '<select id="f-ID_CONTRAPARTE">' + opciones(d.ctr.map(function (c) { return [c.ID, c.NOMBRE]; }).sort(function (a, b) { return String(a[1]).localeCompare(String(b[1]), 'es'); }), v.ID_CONTRAPARTE, 'Elige') + '</select>') +
-          campo('Base imponible', '<input type="text" inputmode="decimal" id="f-BASE" value="' + texto(v.BASE === '' || v.BASE == null ? '' : String(v.BASE).replace('.', ',')) + '" placeholder="0,00">') +
+          campo('<span id="f-imp-et">Base imponible</span>', '<input type="text" inputmode="decimal" id="f-BASE" value="' + texto(verImporte(v)) + '" placeholder="0,00">') +
           campo('IVA', '<select id="f-TIPO_IVA">' + opciones(ivas().map(function (x) { return [x, x]; }), v.TIPO_IVA) + '</select>') +
+          casillaIva('f') +
           '<p class="u-nota u-ancho" id="f-total"></p>' +
           campo('Estado', '<select id="f-ESTADO">' + opciones([['Pendiente', 'Pendiente'], ['Pagada', 'Pagada'], ['Anulada', 'Anulada']], v.ESTADO, 'Sin estado') + '</select>') +
           campo('Enlace en Drive', '<input type="url" id="f-ARCHIVO_URL" value="' + texto(v.ARCHIVO_URL) + '" placeholder="https://drive.google.com/…">', 'u-ancho') +
@@ -871,15 +909,15 @@
             vent.querySelector('#f-ctr-et').textContent = tipo === 'Emitida' ? 'Cliente (a quién se la hacemos)' : 'Proveedor (quién nos la hace)';
             var n = vent.querySelector('#f-NUMERO');
             n.disabled = em; if (em) n.value = ''; n.placeholder = em ? 'Se numera sola al guardar (' + String(cfg.SERIE_EMITIDAS || '') + '…)' : '';
-            var t = importe({ BASE: val('f-BASE'), TIPO_IVA: val('f-TIPO_IVA') });
-            vent.querySelector('#f-total').textContent = 'IVA ' + eur(t.iva) + ' · total ' + eur(t.total);
+            pintaImporte('f', 'Base imponible');
           }
           refrescar();
           ['f-TIPO', 'f-TIPO_IVA'].forEach(function (id) { var e = vent.querySelector('#' + id); if (e) e.addEventListener('change', refrescar); });
           vent.querySelector('#f-BASE').addEventListener('input', refrescar);
+          oirImporte('f', refrescar);
           vent.querySelector('#f-guardar').onclick = function () {
             var tipo = f ? f.TIPO : val('f-TIPO'), em = tipo === 'Emitida' && !f;
-            var nv = { FECHA: val('f-FECHA'), ID_CONTRAPARTE: val('f-ID_CONTRAPARTE'), BASE: cts(val('f-BASE')) / 100, TIPO_IVA: val('f-TIPO_IVA'),
+            var nv = { FECHA: val('f-FECHA'), ID_CONTRAPARTE: val('f-ID_CONTRAPARTE'), BASE: baseEn('f') / 100, TIPO_IVA: val('f-TIPO_IVA'),
               ESTADO: val('f-ESTADO'), ARCHIVO_URL: val('f-ARCHIVO_URL'), NOTAS: val('f-NOTAS') };
             if (!em) nv.NUMERO = val('f-NUMERO');
             var mal = [];
@@ -942,19 +980,32 @@
         var verGen = !ks.length || gen || !x.partes, antes = 0;
         filas.forEach(function (r) { antes += cts(r.IMPORTE); });
         var real = 0; presupuesto(d, per).forEach(function (r) { if (String(r.cat.ID) === String(idCat)) real = r.real; });
-        function entrada(et, r, k, rec) {
+        var uni = String(x.medida || '').toLowerCase();
+        function entrada(et, r, k, rec, nota) {
           return campo(texto(et), '<input type="text" inputmode="decimal" data-pre="' + texto(r ? r.ID : '') + '" data-des="' + texto(k) + '" data-rec="' + (rec == null ? '' : rec) +
-            '" data-antes="' + (r ? cts(r.IMPORTE) : 0) + '" value="' + texto(r ? eur(cts(r.IMPORTE)).replace(' €', '') : '') + '" placeholder="0">');
+            '" data-antes="' + (r ? cts(r.IMPORTE) : 0) + '" value="' + texto(r ? eur(cts(r.IMPORTE)).replace(' €', '') : '') + '" placeholder="0">' +
+            (nota ? '<span class="u-nota">' + nota + '</span>' : ''));
+        }
+        // Lo recomendado de cada parte (p. ej. cada competición), con sus equipos o partidos, debajo de su casilla.
+        function notaParte(k) {
+          if (!x.partes || x.partes[k] == null) return '';
+          var n = x.unidades && x.unidades[k];
+          return 'Recomendado ' + eur0(x.partes[k]) + (n ? ' · ' + n + ' ' + texto(uni) : '');
         }
         var h = '<h2 id="eco-vt">' + texto(c.NOMBRE) + '</h2>' +
           '<p class="u-nota">' + texto([c.GRUPO, c.TIPO === 'Ingreso' ? 'ingreso' : 'gasto', 'sin IVA'].filter(Boolean).join(' · ')) + (presPorPeriodo(d) ? ' · ' + texto(nomPeriodo()) : '') + '</p>' +
           '<div class="eco-dl">' + x.ant.map(function (a) { return dato('Real la ' + a.p.nombre, eur0(a.real)); }).join('') +
           dato('Real ahora', eur0(real)) + dato('Previsto ahora', antes ? eur0(antes) : 'Sin previsto') + '</div>' +
-          (x.rec != null ? '<div class="u-bloque eco-rec"><b>Recomendado: ' + eur0(x.rec) + '</b><p class="u-nota">' + texto(x.razon) + '</p>' +
+          (x.rec != null ? '<div class="u-bloque eco-rec"><b>Recomendado: ' + eur0(x.rec) + '</b><p class="u-nota">' + texto(x.razon) +
+            (x.partes ? '. Sale a ' + eur(Math.round(x.porUna)) + ' por ' + texto(uni.replace(/s$/, '')) + ', repartido así:' : '') + '</p>' +
+            (x.partes ? '<div class="eco-dl eco-rec-partes">' + Object.keys(x.partes).sort(function (a, b) { return nombre('des', a).localeCompare(nombre('des', b), 'es'); })
+              .map(function (k) { return dato(nombre('des', k) + (x.unidades && x.unidades[k] ? ' · ' + x.unidades[k] + ' ' + uni : ''), eur0(x.partes[k])); }).join('') +
+              (verGen ? dato('General', eur0(0)) : '') + '</div>' : '') +
             '<button type="button" class="u-btn" id="p-usar">Usar lo recomendado</button></div>' : (x.razon ? '<p class="u-nota">' + texto(x.razon) + '</p>' : '')) +
           (S.medidas && S.medidas._error ? '<p class="u-error">No se han podido contar ' + texto(Object.keys(M).join(' ni ').toLowerCase()) + ' (' + texto(S.medidas._error) + '): lo recomendado es lo real de la anterior.</p>' : '') +
-          '<div class="u-campos" id="p-lista">' + ks.map(function (k) { return entrada(nombre('des', k), partes[k], k, x.partes ? x.partes[k] : null); }).join('') +
-          (verGen ? entrada(ks.length ? 'General' : 'Previsto', gen, '', x.partes ? null : x.rec) : '') + '</div>' +
+          '<div class="u-campos" id="p-lista">' + ks.map(function (k) { return entrada(nombre('des', k), partes[k], k, x.partes ? x.partes[k] : null, notaParte(k)); }).join('') +
+          // Con lo recomendado por partes, la general se queda a 0 al usarlo: lo recomendado ya está repartido.
+          (verGen ? entrada(ks.length ? 'General' : 'Previsto', gen, '', x.partes ? 0 : x.rec, x.partes ? 'Lo que no es de ninguna ' + texto(nomDes.toLowerCase()) + '. Recomendado 0 €' : '') : '') + '</div>' +
           '<p class="u-nota" id="p-tot"></p><p class="u-error" role="alert" hidden></p><div class="n-botones">' +
           '<button type="button" class="u-btn u-btn-accion" id="p-guardar">Guardar lo previsto</button><button type="button" class="u-btn" data-cerrar>Cancelar</button>' +
           (pest.indexOf('MOVIMIENTOS') >= 0 ? '<button type="button" class="u-btn u-btn-texto" id="p-movs">Ver sus movimientos</button>' : '') + '</div>';

@@ -455,6 +455,7 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 /* Presupuesto de una categoría: la recomendación en su bloque, con su botón; importes alineados a la derecha */
 .u .eco-rec { display: flex; flex-direction: column; align-items: flex-start; gap: var(--e2); }
 .u .eco-rec .u-nota { margin: 0; }
+.u .eco-rec .eco-dl { align-self: stretch; margin: 0; }
 .u #p-lista input { text-align: right; font-variant-numeric: tabular-nums; }
 /* Abrir una factura en Drive (enlace que se abre en otra pestaña) */
 .u .eco-drive { font-weight: 700; white-space: nowrap; }
