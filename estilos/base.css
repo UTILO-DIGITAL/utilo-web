@@ -333,11 +333,24 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .pf-marca { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--color-bloque); color: var(--color-texto); white-space: nowrap; }
 .u .pf-marca[data-m="pagado"] { background: var(--color-bien); color: var(--color-superficie, #fff); }
 .u .pf-marca[data-m="por"] { box-shadow: inset 0 0 0 2px var(--color-accion); background: transparent; }
+/* T0269: cabecera de cada grupo de filas de un bloque (Próximos, Jugados), el enlace a todas tus tareas y los botones de
+ * las secciones que van dentro de Perfil (Pedir a Utilo). */
+.u .n-lista tbody tr.pf-grupo th { position: static; padding: var(--e2) var(--e3); border-radius: 0; font-size: 13px; text-align: left;
+  color: var(--color-principal-oscuro); background: var(--color-bloque); border-bottom: 1px solid var(--color-linea); }
+.u .n-lista tbody tr.pf-grupo th .u-cifra { font-weight: 400; color: var(--color-suave); }
+.u .pf-ver-todas { margin: var(--e3) 0 0; }
+.u .pf-ver-todas a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; color: var(--color-principal-oscuro); }
+.u .pf-dentro .u-btn { display: inline-flex; align-items: center; gap: var(--e2); }
+.u .pf-dentro .u-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 @media (max-width: 639px) {
   /* En el móvil, las celdas vacías no salen y el «·» va delante de cada dato (no detrás), para que no quede uno suelto al final. */
   .u .pf-bloque .n-lista td.pf-vacia { display: none; }
   .u .pf-bloque .n-lista tbody td::after { content: none; }
   .u .pf-bloque .n-lista tbody td:nth-child(n+3):not(.pf-vacia)::before { content: '  ·  '; white-space: pre; color: var(--color-suave); }
+  .u .pf-bloque .n-lista tfoot td:empty { display: none; }
+  .u .pf-bloque .n-lista tfoot td::after { content: none; }
+  .u .pf-bloque .n-lista tbody tr.pf-grupo { padding: 0; }
+  .u .pf-bloque .n-lista tbody tr.pf-grupo th { display: block; }
 }
 
 /* ---------- Piezas de las secciones del núcleo (T0257) ----------
