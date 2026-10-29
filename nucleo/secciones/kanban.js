@@ -275,7 +275,8 @@
 
       /* ---------- escribir (al momento; el motor, por detrás) ---------- */
 
-      function lineaHist(que) { return ahora() + ' (' + (ctx.persona || '') + '): ' + que; }
+      // T0273: con el nombre de quien lo hace de verdad («Javi Canela como Ana»), igual que lo escribe el motor.
+      function lineaHist(que) { return ahora() + ' (' + (ctx.autor || ctx.persona || '') + '): ' + que; }
       function conLinea(h, l) { h = String(h || '').replace(/\s+$/, ''); return h ? h + '\n' + l : l; }
 
       function cambiarEstado(id, nuevo) {
