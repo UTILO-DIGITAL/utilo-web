@@ -481,11 +481,13 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .eco-sw button[aria-pressed=true][data-tipo=Gasto] { color: var(--color-error); }
 .u .u-campo input.eco-imp { font-size: 22px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
 .u .eco-opc { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--color-suave); }
-/* Preparar el presupuesto: una categoría debajo de otra, con sus importes */
-.u .eco-prep { padding: var(--e3) 0; border-top: 1px solid var(--color-linea); }
-.u .eco-prep > .u-nota { margin: var(--e1) 0 var(--e2); }
-.u .eco-prep .eco-num .u-btn-texto { min-height: 32px; padding: 0 var(--e1); }
-.u .eco-prep input { text-align: right; font-variant-numeric: tabular-nums; }
+/* Presupuesto de una categoría: la recomendación en su bloque, con su botón; importes alineados a la derecha */
+.u .eco-rec { display: flex; flex-direction: column; align-items: flex-start; gap: var(--e2); }
+.u .eco-rec .u-nota { margin: 0; }
+.u .eco-rec .eco-dl { align-self: stretch; margin: 0; }
+.u #p-lista input { text-align: right; font-variant-numeric: tabular-nums; }
+/* Abrir una factura en Drive (enlace que se abre en otra pestaña) */
+.u .eco-drive { font-weight: 700; white-space: nowrap; }
 /* Añadir movimiento: lo único que flota en la sección, abajo a la derecha, encima de la barra de secciones del móvil */
 .u .eco-fab { position: fixed; right: var(--e4); bottom: calc(var(--e4) + env(safe-area-inset-bottom, 0px)); z-index: 44; min-height: 52px; padding: 0 var(--e5);
   border: 0; border-radius: var(--radio); background: var(--color-accion); color: var(--color-sobre-accion); font: 800 17px/1 var(--fuente-texto); box-shadow: var(--sombra-flota); cursor: pointer; }
