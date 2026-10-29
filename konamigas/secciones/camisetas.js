@@ -307,10 +307,12 @@
         return '<optgroup label="' + texto(t.nombre) + '"><option value="T:' + texto(t.id) + '"' + (S.comp === 'T:' + t.id ? ' selected' : '') + '>Toda la temporada ' + texto(t.nombre) + '</option>' +
           t.comps.map(function (k) { return '<option value="C:' + texto(k.id) + '"' + (S.comp === 'C:' + k.id ? ' selected' : '') + '>' + texto(k.nombre) + '</option>'; }).join('') + '</optgroup>';
       }).join('') + '</select></label>' +
+        '<label class="u-campo"><span class="u-etiqueta">Juegan</span><select id="cm-dia">' + opciones(DIAS_JUEGAN.map(function (d) { return [d[0], d[1]()]; }), S.dia || '') + '</select></label>' +
         '<label class="u-campo"><span class="u-etiqueta">Buscar</span><input type="search" id="cm-q" placeholder="Equipo, jugadora, dorsal, color o talla" value="' + texto(S.q) + '" autocomplete="off"></label></div>' +
         '<div id="cm-chips" class="cm-chips" role="group" aria-label="Qué camisetas"></div><div id="cm-lista"></div>';
       c.querySelector('#cm-comp').onchange = function () { S.comp = this.value; S.todo = {}; guardarPref(); pintar(false); };
       c.querySelector('#cm-q').oninput = function () { S.q = this.value; pintar(false); };
+      c.querySelector('#cm-dia').onchange = function () { S.dia = this.value; S.todo = {}; pintar(false); };
       c.querySelector('#cm-chips').onclick = function (e) { var b = e.target.closest('[data-cm-f]'); if (b) { S.filtro = b.getAttribute('data-cm-f'); S.todo = {}; pintar(false); } };
       c.querySelector('#cm-lista').onclick = clicLista;
     }
@@ -321,6 +323,9 @@
       if (S.comp === 'T:' + q.temp || S.comp === 'C:' + q.comp) base.push({ c: cm, q: q, s: situacion(cm, q) });
     });
     base = base.filter(function (x) { return !(x.q.baja && x.s === 'Sin camiseta'); });
+    // «Juegan»: solo los equipos cuyo próximo partido cae ese día (camisetas5Nombres · prox).
+    var rango = diaRango(S.dia), juega = function (ie) { var p = S.N.prox && S.N.prox[ie]; return p && p[0] >= rango[0] && p[0] <= rango[1]; };
+    if (S.dia) base = base.filter(function (x) { return juega(x.q.ie); });
     var es = function (k) { return function (x) {
       return k === 'todas' ? true : k === 'hacer' ? x.s === 'recuperar' || x.s === 'quitar' : k === 'pendientes' ? !x.q.baja && !hecha(x.s) : x.s === k;
     }; };
@@ -338,9 +343,17 @@
     var grupos = {}, orden = [];
     base.forEach(function (x) { var k = x.q.ie || '—'; if (!grupos[k]) { grupos[k] = []; orden.push(k); } grupos[k].push(x); });
     var eqs = orden.filter(function (k) { return grupos[k].some(function (x) { return es(S.filtro)(x) && busca(x); }); });
-    eqs.sort(function (a, b) { return norm(grupos[a][0].q.equipo) < norm(grupos[b][0].q.equipo) ? -1 : 1; });
+    var cuando = function (k) { var p = S.N.prox && S.N.prox[k]; return p ? p[0] + ' ' + (p[1] || '') : '9'; };
+    eqs.sort(function (a, b) {
+      // Con «Juegan», por la hora del partido: lo primero, lo que toca antes.
+      if (S.dia && cuando(a) !== cuando(b)) return cuando(a) < cuando(b) ? -1 : 1;
+      return norm(grupos[a][0].q.equipo) < norm(grupos[b][0].q.equipo) ? -1 : 1;
+    });
     var faltan = cuenta('pendientes'), hacer = cuenta('hacer');
-    var h = '<p class="cm-resumen">' + (faltan ? 'Quedan <b class="cm-pintada">' + faltan + '</b> por entregar' : 'Todo entregado') +
+    var h = S.dia ? '<p class="cm-resumen">' + texto(DIAS_JUEGAN.filter(function (d) { return d[0] === S.dia; })[0][1]()) + ': juegan <b>' + plural(orden.length, 'equipo', 'equipos') + '</b>' +
+        ' · <b class="cm-pintada">' + cuenta('Preparada') + '</b> para entregar · <b>' + cuenta('Por preparar') + '</b> para preparar' +
+        (cuenta('Por pedir') + cuenta('Pedida') ? ' · ' + (cuenta('Por pedir') + cuenta('Pedida')) + ' sin camiseta todavía' : '') + '</p>' :
+      '<p class="cm-resumen">' + (faltan ? 'Quedan <b class="cm-pintada">' + faltan + '</b> por entregar' : 'Todo entregado') +
       (hacer ? ' · <span class="u-mal">' + plural(hacer, 'camiseta de una baja', 'camisetas de bajas') + '</span>' : '') + '</p>';
     if (!eqs.length) {
       h += '<p class="u-vacio">' + (base.length ? (qn ? 'Ninguna camiseta de esta competición encaja con «' + texto(S.q) + '».' : 'No hay camisetas con este filtro. Prueba con «Todas».') :
@@ -368,6 +381,12 @@
   }
 
   var DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  /** 'aaaa-mm-dd' de hoy más n días. */
+  function enDias(n) { var d = new Date(); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()); }
+  /** Opciones de «Juegan»: [valor, texto]. */
+  var DIAS_JUEGAN = [['', function () { return 'Cualquier día'; }], ['hoy', function () { return 'Hoy (' + diaCorto(enDias(0)) + ')'; }],
+    ['manana', function () { return 'Mañana (' + diaCorto(enDias(1)) + ')'; }], ['semana', function () { return 'Próximos 7 días'; }]];
+  function diaRango(d) { return d === 'hoy' ? [enDias(0), enDias(0)] : d === 'manana' ? [enDias(1), enDias(1)] : d === 'semana' ? [enDias(0), enDias(6)] : ['', '9']; }
   /** «jue 30/10» de 'aaaa-mm-dd'. */
   function diaCorto(v) {
     var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v || '')); if (!m) return String(v || '');
@@ -515,6 +534,43 @@
   function dl(pares) { return '<dl class="cm-dl">' + pares.filter(function (p) { return p[1]; }).map(function (p) { return '<dt>' + p[0] + '</dt><dd>' + p[1] + '</dd>'; }).join('') + '</dl>'; }
 
   /** Una camiseta: sus datos y lo que se puede hacer con ella. */
+  /**
+   * El historial de una camiseta, del más antiguo al último, para contestar «¿cuándo me la disteis?»: cuándo se pidió y
+   * llegó su pedido (PEDIDOS) y cada cambio de su fila con fecha, hora y quién (CAMISETAS · LOG, «dd/mm/aaaa hh:mm ·
+   * persona · qué»). La fecha de entrega sale aunque no esté en el LOG (las de antes de la web nueva).
+   * [{ f: 'aaaa-mm-dd hh:mm', dia: 'dd/mm/aaaa', hora, que, quien, estado }]
+   */
+  function historial(c) {
+    var ev = [], ped = c.ID_PEDIDO ? S.T.fila('PEDIDOS', c.ID_PEDIDO) : null, entregaEnLog = false;
+    var iso = function (d) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '')); return m ? m[1] + '-' + m[2] + '-' + m[3] : ''; };
+    var mas = function (f, hora, que, quien, estado) { if (f) ev.push({ f: f + ' ' + (hora || '00:00'), dia: fecha(f), hora: hora || '', que: que, quien: quien || '', estado: estado || '' }); };
+    if (ped) {
+      mas(iso(ped.FECHA_PEDIDO), '', 'al proveedor' + (ped.ID_PROVEEDOR ? ' ' + nombreProveedor(ped.ID_PROVEEDOR) : '') + ' en el pedido ' + ped.ID, '', 'Pedida');
+      mas(iso(ped.FECHA_RECIBIDO), '', 'llegó el pedido ' + ped.ID + ' al local', '', 'Por preparar');
+    }
+    String(c.LOG || '').split('\n').forEach(function (l) {
+      var m = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{1,2}:\d{2})\s+·\s+([^·]+?)\s+·\s+(.*)$/.exec(l.trim());
+      if (!m) return;
+      var f = m[3] + '-' + m[2] + '-' + m[1], quien = m[5], que = m[6], est = /ESTADO:\s*([^→;]*?)\s*→\s*([^;]+)/.exec(que);
+      if (/^Migración/i.test(quien)) { mas(f, m[4], 'Pasada de los Excel antiguos a la web nueva', '', ''); return; }
+      if (est) {
+        var a = est[2].trim();
+        if (a === 'Entregada') entregaEnLog = true;
+        mas(f, m[4], (est[1].trim() && est[1].trim() !== '—' ? 'antes ' + est[1].trim() : '') +
+          (/árbitro/i.test(que) ? ' · ' + que.split(' · ')[0] : ''), quien, a);
+      } else if (!/^FECHA_ENTREGA/.test(que)) mas(f, m[4], que.replace(/\s*·\s*$/, ''), quien, '');
+    });
+    if (c.FECHA_ENTREGA && !entregaEnLog) mas(iso(c.FECHA_ENTREGA) || '', '', '', '', 'Entregada');
+    return ev.sort(function (a, b) { return a.f < b.f ? -1 : a.f > b.f ? 1 : 0; });
+  }
+  function htmlHistorial(c) {
+    var h = historial(c);
+    return '<h3 class="cm-sub">Historial</h3>' + (h.length ? '<ol class="cm-hist">' + h.map(function (e) {
+      return '<li' + (e.estado === 'Entregada' ? ' class="cm-hist-ent"' : '') + '><span class="cm-hist-f">' + texto(e.dia) + (e.hora ? ' · ' + texto(e.hora) : '') + '</span>' +
+        '<span>' + (e.estado ? chipEstado(e.estado) + ' ' : '') + texto(e.que) + (e.quien ? ' <span class="u-nota">· ' + texto(e.quien) + '</span>' : '') + '</span></li>';
+    }).join('') + '</ol>' : '<p class="u-nota">Sin cambios apuntados todavía.</p>');
+  }
+
   function ventanaCamiseta(c) {
     var q = quien(c), s = situacion(c, q), e = c.ESTADO;
     var botones = [];
@@ -535,7 +591,8 @@
       dl([['Equipo', texto([q.equipo, q.compNombre].filter(String).join(' · '))], ['Camiseta', punto(c.ID_COLOR) + texto(nombreColor(c.ID_COLOR) + ' · ' + talla(c))],
         ['Modelo', texto(nombreModelo(c.ID_MODELO))], ['Estado', s === 'recuperar' ? '<span class="n-estado n-e-bl">Por recuperar</span> ' + texto('(' + e + ')') : chipEstado(e)],
         ['Pedido', ped ? texto(c.ID_PEDIDO + (ped.FECHA_RECIBIDO ? ' · llegó el ' + fecha(ped.FECHA_RECIBIDO) : ' · aún no ha llegado')) : ''],
-        ['Entregada', c.FECHA_ENTREGA ? fecha(c.FECHA_ENTREGA) : ''], ['Inscripción', q.baja ? '<span class="u-mal">De baja</span>' : '']]) +
+        ['Entregada', c.FECHA_ENTREGA ? '<b>' + texto(fecha(c.FECHA_ENTREGA)) + '</b>' : ''], ['Inscripción', q.baja ? '<span class="u-mal">De baja</span>' : '']]) +
+      htmlHistorial(c) +
       (s === 'recuperar' ? '<p class="u-nota">La inscripción está de baja y su camiseta está ' + (e === 'Entregada' ? 'entregada: hay que pedírsela al equipo.' : 'en un pack: hay que sacarla.') +
         ' Al recuperarla vuelve al local como libre.</p><label class="u-check"><input type="checkbox" id="cm-rota"> Vuelve rota (cuenta como defectuosa)</label>' :
         s === 'quitar' ? '<p class="u-nota">La inscripción está de baja: a esta jugadora ya no se le dará camiseta. Al quitarla deja de contar como pendiente y, si estaba asignada en el local, vuelve a quedar libre.</p>' :
