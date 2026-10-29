@@ -523,7 +523,10 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .lg-rec-horas select { width: 100%; }
 .u .lg-cab { margin: 0 0 var(--e3); font-size: 14px; color: var(--color-suave); }
 .u .lg-cab p { margin: 0; }
-.u .lg-jcab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e3); margin: var(--e4) 0 0; }
+.u .lg-jcab { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--e3); margin: var(--e4) 0 0; }
+/* Cambiar la fecha de la jornada: un enlace discreto junto al título, no un botón grande (Javi). */
+.u .lg-jcambiar { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--color-suave); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.u .lg-jcambiar:hover { color: var(--color-principal-oscuro); }
 .u .lg-jcab .n-grupo { margin: 0; }
 .u .lg-dia { font: 700 13px/1.3 var(--fuente-texto); text-transform: uppercase; letter-spacing: .02em; color: var(--color-principal-oscuro); margin: var(--e4) 0 var(--e2); }
 .u .lg-dia.lg-hoy { color: var(--color-texto); }

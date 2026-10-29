@@ -692,7 +692,7 @@
         S.jornada = !todas && dia.jornadas.length === 1 ? dia.jornadas[0] : null;
         var mov = programa && S.jornada !== null && jornadaMovible(partidosLiga(actual.liga.ID), S.jornada, hoy()).ok;
         h += '<div class="lg-jcab"><h2 class="n-grupo' + (dia.jr ? ' lg-jr-t' : '') + '">' + texto(titu) + (dia.fecha === hoy() ? ' · hoy' : '') + '</h2>' +
-          (mov ? '<button type="button" class="u-btn" data-accion="jornadas">Intercambiar fecha con otra jornada</button>' : '') + '</div>';
+          (mov ? '<button type="button" class="lg-jcambiar" data-accion="jornadas" title="Intercambiar la fecha con otra jornada"><span aria-hidden="true">⇄</span> Cambiar de fecha</button>' : '') + '</div>';
         // Un día marcado como festivo o descanso en CALENDARIO no debería tener partidos: se avisa para corregirlo.
         var ch = choqueCalendario(d.cal, dia.fecha, dia.ps);
         h += ch ? '<p class="lg-pav lg-pav-ficha lg-av-no" role="alert">Ojo: este día está marcado como ' + texto(ch.motivo) + ' en el calendario y tiene ' + ch.n + (ch.n === 1 ? ' partido' : ' partidos') +
