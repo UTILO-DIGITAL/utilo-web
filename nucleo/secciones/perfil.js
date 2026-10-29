@@ -1,9 +1,10 @@
 /*
  * Sección Perfil base del núcleo · UTILO_CORE 5.0 (T0259) · motor/modulos/perfil de utilo-apps
  *
- * Lo tuyo en el negocio: quién eres y con qué perfil, tus tareas abiertas (las vencidas primero), las listas que el
- * cliente activa en su configuración (tus partidos, tus pedidos…), lo que aportan otras secciones (lo que te falta por
- * cobrar…) y cerrar sesión. Cómo se configura: docs/SECCION_PERFIL.md de utilo-apps.
+ * Lo tuyo en el negocio: quién eres y con qué perfil, tus tareas más urgentes (las vencidas primero) con el enlace a
+ * todas en Tareas, las listas que el cliente activa en su configuración (tus partidos, tus pedidos…), lo que aportan otras
+ * secciones (lo que te falta por cobrar…), cerrar sesión y, al final, las secciones que van dentro de Perfil (Pedir a
+ * Utilo, T0269). Cómo se configura: docs/SECCION_PERFIL.md de utilo-apps.
  *
  * - Todo sale de una llamada al motor (perfilDatos), que lee con la capa de tablas y solo devuelve tus filas: las tablas
  *   enteras no llegan al navegador.
@@ -50,14 +51,23 @@
       '<p class="u-error">No se ha podido leer.</p><p class="u-nota">' + texto(b.error) + ' Vuelve a abrir Perfil para probar otra vez; si sigue, avisa a quien administra.</p></section>';
   }
 
-  function htmlTareas(t, hoy) {
+  /** «Ver todas en Tareas ›» (T0269): abre la sección de TAREAS_VER con tus tareas, si la ves. */
+  function htmlVerTareas(ctx) {
+    var id = String((ctx.config || {}).TAREAS_VER || '').toUpperCase();
+    var s = id && (ctx.secciones || []).filter(function (x) { return x.id === id; })[0];
+    if (!s) return '';
+    return '<p class="pf-ver-todas"><a href="?s=' + encodeURIComponent(id.toLowerCase()) + '&amp;asignado=' + encodeURIComponent(ctx.persona || '') + '" data-sx="' + texto(id) + '">' +
+      'Ver todas en ' + texto(s.titulo) + ' ›</a></p>';
+  }
+
+  function htmlTareas(t, hoy, ctx) {
     if (!t) return '';
     if (t.error) return htmlError(t);
     var resumen = t.abiertas ? [t.vencidas ? '<span class="pf-vencida">' + plural(t.vencidas, 'vencida', 'vencidas') + '</span>' : '']
       .concat(t.porEstado.map(function (e) { return '<span class="n-estado n-e-' + (ESTADOS[e.estado.toLowerCase()] || 'x') + '">' + texto(e.estado) + ' <span class="u-cifra">' + e.n + '</span></span>'; }))
       .filter(Boolean).join('') : '';
     var h = '<section class="pf-bloque"><h2 class="n-grupo">' + texto(t.titulo) + ' <span class="u-cifra">' + t.abiertas + '</span></h2>';
-    if (!t.abiertas) return h + '<p class="u-vacio">No tienes tareas abiertas. Las que te asignen aparecen aquí.</p></section>';
+    if (!t.abiertas) return h + '<p class="u-vacio">No tienes tareas abiertas. Las que te asignen aparecen aquí.</p>' + htmlVerTareas(ctx) + '</section>';
     h += '<div class="pf-resumen">' + resumen + '</div>' +
       '<table class="u-tabla n-lista"><thead><tr><th>Tarea</th><th>Estado</th><th>Fecha límite</th></tr></thead><tbody>' +
       t.filas.map(function (f) {
@@ -67,7 +77,7 @@
           '<td class="pf-fecha' + (vencida ? ' pf-vencida' : '') + '">' + (f.DEADLINE ? texto(fecha(f.DEADLINE)) + (vencida ? ' · vencida' : '') : '<span class="u-tabla-s">Sin fecha</span>') + '</td></tr>';
       }).join('') + '</tbody></table>';
     if (t.abiertas > t.filas.length) h += '<p class="u-nota">Y ' + plural(t.abiertas - t.filas.length, 'tarea más', 'tareas más') + '.</p>';
-    return h + '</section>';
+    return h + htmlVerTareas(ctx) + '</section>';
   }
 
   /** La vista elegida de cada bloque con vistas (por su id), mientras la página está abierta. */
@@ -96,28 +106,50 @@
     if (b.cifras && b.cifras.length) h += htmlCifras(b.cifras);
     if (b.nota) h += '<p class="u-nota">' + texto(b.nota) + '</p>';
     if (!filas.length) h += b.nota ? '' : '<p class="u-vacio">' + texto(b.vacio || 'No hay nada tuyo aquí por ahora.') + '</p>';
-    else {
+    else if (b.plegar) {
+      // T0269: la tabla, plegada debajo de las cifras y el botón; se despliega al tocar «plegar» (p. ej. «Ver los partidos»).
+      var k = 'tabla:' + (b.id || b.titulo);
+      return h + htmlAccion(b.accion) + '<details class="pf-detalle" data-pfdet="' + texto(k) + '"' + (ABIERTO[k] ? ' open' : '') + '><summary>' + texto(b.plegar) +
+        ' <span class="u-cifra">' + filas.length + '</span></summary>' + htmlTabla(cols, filas, b.sumar, b.total) + '</details>' +
+        htmlDetalle(b.detalle, b._vista, b.id || b.titulo) + '</section>';
+    } else {
       h += htmlTabla(cols, filas, b.sumar, b.total);
       if (b.cuantas > filas.length) h += '<p class="u-nota">Y ' + plural(b.cuantas - filas.length, 'más', 'más') + '.</p>';
     }
     return h + htmlAccion(b.accion) + htmlDetalle(b.detalle, b._vista, b.id || b.titulo) + '</section>';
   }
 
-  /** Una tabla de un bloque; con sumar, el total debajo. Una columna de tipo «marca» sale como una etiqueta (Pagado, Por cobrar…). */
+  /**
+   * Una tabla de un bloque; con sumar (una columna o varias, T0269), el total debajo (total: un número o { COLUMNA: número }).
+   * Una columna de tipo «marca» sale como una etiqueta (Pagado, Por cobrar…).
+   * Si las filas llevan _grupo (T0269: Próximos, Jugados), cada grupo sale con su cabecera y cuántas tiene.
+   * Si una fila lleva _detalle ([{ titulo, valor }], T0269), se puede tocar y debajo se despliega su detalle.
+   */
   function htmlTabla(cols, filas, sumar, total) {
-    var suma = sumar ? cols.filter(function (c) { return c.nombre === sumar; })[0] : null;
+    var sumas = [].concat(sumar || []), tot = function (c) { return total != null && typeof total === 'object' ? total[c.nombre] : total; };
+    var hayTotal = sumas.length && total != null && cols.some(function (c) { return sumas.indexOf(c.nombre) >= 0; });
+    var grupo = null, enGrupo = {};
+    filas.forEach(function (f) { if (f._grupo) enGrupo[f._grupo] = (enGrupo[f._grupo] || 0) + 1; });
     return '<table class="u-tabla n-lista"><thead><tr>' + cols.map(function (c) { return '<th' + (num(c.tipo) ? ' class="num"' : '') + '>' + texto(c.titulo) + '</th>'; }).join('') + '</tr></thead><tbody>' +
       filas.map(function (f) {
-        return '<tr>' + cols.map(function (c, i) {
+        var cab = '';
+        if (f._grupo && f._grupo !== grupo) {
+          grupo = f._grupo;
+          cab = '<tr class="pf-grupo"><th colspan="' + cols.length + '" scope="colgroup">' + texto(grupo) + ' <span class="u-cifra">' + enGrupo[grupo] + '</span></th></tr>';
+        }
+        var abre = f._detalle && f._detalle.length;
+        return cab + (abre ? '<tr class="pf-fila-abre" tabindex="0" aria-expanded="false">' : '<tr>') + cols.map(function (c, i) {
           var v = valor(f[c.nombre], c.tipo);
           if (c.tipo === 'marca' && v) v = '<span class="pf-marca" data-m="' + texto(String(v).split(' ')[0].toLowerCase()) + '">' + texto(v) + '</span>';
-          else v = v ? texto(v) : '';
+          else v = v ? (num(c.tipo) && c.titulo ? '<span class="pf-et">' + texto(c.titulo) + ' </span>' : '') + texto(v) : ''; // en el móvil, «Arbitraje 18,00 €»
           var cl = [num(c.tipo) ? 'num' : i === 0 ? 'u-tabla-t' : '', v ? '' : 'pf-vacia'].filter(Boolean).join(' '); // vacía: en el móvil no sale
-          return '<td' + (cl ? ' class="' + cl + '"' : '') + ' data-t="' + texto(c.titulo) + '">' + (v || '<span class="u-tabla-s">—</span>') + '</td>';
-        }).join('') + '</tr>';
+          return '<td' + (cl ? ' class="' + cl + '"' : '') + ' data-t="' + texto(c.titulo) + '">' + (v || (c.tipo === 'marca' ? '' : '<span class="u-tabla-s">—</span>')) + '</td>';
+        }).join('') + '</tr>' + (abre ? '<tr class="pf-fila-detalle" hidden><td colspan="' + cols.length + '"><dl class="pf-dl">' + f._detalle.map(function (d) {
+          return '<dt>' + texto(d.titulo) + '</dt><dd>' + texto(valor(d.valor, d.tipo)) + '</dd>';
+        }).join('') + '</dl></td></tr>' : '');
       }).join('') + '</tbody>' +
-      (suma && total != null ? '<tfoot><tr>' + cols.map(function (c, i) {
-        return c === suma ? '<td class="num" data-t="Total">' + texto(valor(total, suma.tipo)) + '</td>' : '<td>' + (i === 0 ? 'Total' : '') + '</td>';
+      (hayTotal ? '<tfoot><tr>' + cols.map(function (c, i) {
+        return sumas.indexOf(c.nombre) >= 0 ? '<td class="num" data-t="' + texto(c.titulo) + '">' + texto(valor(tot(c), c.tipo)) + '</td>' : '<td>' + (i === 0 ? 'Total' : '') + '</td>';
       }).join('') + '</tr></tfoot>' : '') +
       '</table>';
   }
@@ -150,13 +182,23 @@
   }
 
   function htmlCuenta(ctx) {
-    var ves = (ctx.secciones || []).filter(function (s) { return s.id !== 'PERFIL'; }).map(function (s) { return s.titulo; }).join(', ');
+    var ves = (ctx.secciones || []).filter(function (s) { return s.id !== 'PERFIL' && !s.enPerfil; }).map(function (s) { return s.titulo; }).join(', ');
     return '<section class="pf-bloque u-perfil"><h2 class="n-grupo">Tu cuenta</h2><dl>' +
       '<dt>Cuenta</dt><dd>' + texto(ctx.correo || '') + '</dd>' +
       '<dt>Secciones</dt><dd>' + texto(ves || 'Solo Perfil') + '</dd>' +
       '<dt>Dispositivo</dt><dd>Sesión guardada en este dispositivo</dd></dl>' +
       '<a class="u-btn" href="?salir">Cerrar sesión</a>' +
       '<p class="u-nota">Al cerrar la sesión tendrás que volver a entrar con tu cuenta de Google.</p></section>';
+  }
+
+  /** Las secciones que van dentro de Perfil («enPerfil», T0269: Pedir a Utilo), como botones al final. */
+  function htmlDentro(ctx) {
+    var ss = (ctx.secciones || []).filter(function (s) { return s.enPerfil; });
+    if (!ss.length) return '';
+    return '<section class="pf-bloque pf-dentro" aria-label="Más"><div class="n-botones">' + ss.map(function (s) {
+      return '<a class="u-btn" href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '">' +
+        (s.icono ? '<svg viewBox="0 0 24 24" aria-hidden="true">' + s.icono + '</svg>' : '') + '<span>' + texto(s.titulo) + '</span></a>';
+    }).join('') + '</div></section>';
   }
 
   window.UN.registrar('PERFIL', {
@@ -173,15 +215,26 @@
         sec.outerHTML = htmlBloque(b, i);
         var n = el.querySelector('[data-pfvista="' + i + '"]'); if (n) n.focus();
       });
+      // Una fila con detalle (T0269) lo despliega o lo pliega al tocarla, o con Intro o espacio.
+      function abrirFila(tr) {
+        var d = tr.nextElementSibling, ab = tr.getAttribute('aria-expanded') !== 'true';
+        tr.setAttribute('aria-expanded', ab ? 'true' : 'false');
+        if (d && d.classList.contains('pf-fila-detalle')) d.hidden = !ab;
+      }
+      el.addEventListener('click', function (e) { var tr = e.target.closest('tr.pf-fila-abre'); if (tr && el.contains(tr)) abrirFila(tr); });
+      el.addEventListener('keydown', function (e) {
+        var tr = e.target.closest && e.target.closest('tr.pf-fila-abre');
+        if (tr && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); abrirFila(tr); }
+      });
       // Si el detalle de un bloque está desplegado, sigue así al cambiar de vista o al ponerse al día.
       el.addEventListener('toggle', function (e) { var d = e.target; if (d.getAttribute && d.hasAttribute('data-pfdet')) ABIERTO[d.getAttribute('data-pfdet')] = d.open; }, true);
       function pintar(d) {
         visto = d;
         el.innerHTML = '<div class="pf">' + htmlQuien(ctx) +
           // Sin tareas abiertas, el bloque de tareas va después de lo demás: arriba, lo que hay que hacer.
-          (d ? (d.tareas && !d.tareas.error && !d.tareas.abiertas ? bloques(d) + htmlTareas(d.tareas, d.hoy)
-            : htmlTareas(d.tareas, d.hoy) + bloques(d)) : cargando()) +
-          htmlCuenta(ctx) +
+          (d ? (d.tareas && !d.tareas.error && !d.tareas.abiertas ? bloques(d) + htmlTareas(d.tareas, d.hoy, ctx)
+            : htmlTareas(d.tareas, d.hoy, ctx) + bloques(d)) : cargando()) +
+          htmlCuenta(ctx) + htmlDentro(ctx) +
           '<p class="u-nota pf-hora" id="pf-hora">' + (d ? 'Al día a las ' + hora(d.leido) + '.' : '') + '</p></div>';
       }
       var guardado = leer(ctx);
