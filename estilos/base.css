@@ -560,6 +560,8 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .lg-pv { grid-area: v; justify-content: flex-start; }
 .u .lg-nom { min-width: 0; overflow-wrap: anywhere; }
 .u .lg-gana { font-weight: 700; }
+/* Un partido al que le falta un equipo en PARTIDOS (fallo de los datos): el hueco, marcado. */
+.u .lg-falta .lg-nom { color: var(--estado-bl); font-style: italic; font-size: 14px; }
 .u .lg-pc { grid-area: c; display: flex; align-items: center; justify-content: center; min-width: 64px; min-height: 40px; padding: 0 var(--e2);
   border-radius: var(--radio); background: var(--color-tarjeta, var(--color-bloque)); }
 .u .lg-pc b { font: var(--peso-titulos) 22px/1 var(--fuente-titulos); color: var(--color-principal-oscuro); white-space: nowrap; }
