@@ -941,10 +941,10 @@
   }
 
   var PASOS = { sinConfirmar: ['Sin confirmar', 'pr'], confirmado: ['Esperando al proveedor', 'ec'], recibido: ['En el local', 'co'] };
-  var PASOS_PED = [['sinConfirmar', 'Preparado'], ['confirmado', 'Confirmado'], ['recibido', 'En el local']];
   /**
-   * Un pedido, como en la 4.1: sus pasos con una barra (preparado → confirmado → en el local), lo que falta para el
-   * siguiente, cómo van sus camisetas con las jugadoras (barra de entregadas) y, plegado, el desglose por color y talla.
+   * Un pedido, en pocas líneas (Javi: minimalista): número y estado, proveedor y fechas, lo que falta para el siguiente
+   * paso y cómo van sus camisetas con las jugadoras. Lo demás (colores y tallas, lo pagado, notas, extracto y factura),
+   * plegado en «Detalle». A la vista, solo el botón del paso siguiente y el PDF.
    */
   function htmlPedido(p, lineas, jug) {
     var paso = cam5Paso_(p), unidades = lineas.reduce(function (s, l) { return s + (Number(l.CANTIDAD) || 0); }, 0);
@@ -954,38 +954,33 @@
       porColor[l.ID_COLOR].n += Number(l.CANTIDAD) || 0;
       porColor[l.ID_COLOR].t[l.TALLA] = (porColor[l.ID_COLOR].t[l.TALLA] || 0) + (Number(l.CANTIDAD) || 0);
     });
-    var nuevo = !!p._nueva, i = PASOS_PED.map(function (x) { return x[0]; }).indexOf(paso);
+    var nuevo = !!p._nueva, id = texto(p.ID);
     var conJug = Object.keys(jug).filter(function (e) { return e !== 'Sin camiseta'; }).reduce(function (n, e) { return n + jug[e]; }, 0), ent = jug['Entregada'] || 0;
-    var falta = paso === 'sinConfirmar' ? 'mandarlo al proveedor (PDF o extracto) y marcarlo confirmado cuando lo acepte.' :
-      paso === 'confirmado' ? 'que llegue' + (p.FECHA_ESTIMADA ? ' (hacia el ' + fecha(p.FECHA_ESTIMADA) + ')' : '') + ' y marcar «Ha llegado».' : '';
+    var falta = paso === 'sinConfirmar' ? 'Falta mandarlo al proveedor y marcarlo confirmado.' :
+      paso === 'confirmado' ? 'Esperando a que llegue' + (p.FECHA_ESTIMADA ? ' (hacia el ' + fecha(p.FECHA_ESTIMADA) + ')' : '') + '.' : 'Llegó el ' + fecha(p.FECHA_RECIBIDO) + '.';
+    var raro = paso !== 'recibido' && !nuevo && (jug['Por preparar'] || jug['Preparada'] || jug['Entregada']);
     return '<li class="cm-ped' + (p._pendiente ? ' cm-guardando' : '') + '"><div class="cm-ped-cab"><b>' + texto(nuevo ? 'Pedido nuevo' : p.ID) + '</b>' +
       '<span class="n-estado n-e-' + PASOS[paso][1] + '">' + PASOS[paso][0] + '</span></div>' +
-      '<p class="u-nota">' + texto([p.ID_PROVEEDOR ? nombreProveedor(p.ID_PROVEEDOR) : '', nombreTemp(p.ID_TEMPORADA), unidades ? plural(unidades, 'camiseta', 'camisetas') : '',
-        p.FECHA_PEDIDO ? 'pedido el ' + fecha(p.FECHA_PEDIDO) : '', p.FECHA_RECIBIDO ? 'llegó el ' + fecha(p.FECHA_RECIBIDO) : ''].filter(String).join(' · ')) + '</p>' +
-      '<ol class="cm-pasos" aria-label="Paso ' + (i + 1) + ' de ' + PASOS_PED.length + '">' + PASOS_PED.map(function (x, k) {
-        return '<li class="' + (k < i || paso === 'recibido' ? 'cm-hecho' : k === i ? 'cm-ahora' : '') + '"><i></i><small>' + x[1] + '</small></li>';
-      }).join('') + '</ol>' +
-      (falta ? '<p class="cm-falta-p"><b>Falta:</b> ' + texto(falta) + '</p>' : '') +
-      (conJug ? '<p class="cm-ped-j">Jugadoras: <b>' + ent + ' de ' + conJug + '</b> entregadas' + (conJug > ent ? ' <span class="u-nota">· ' + Object.keys(jug).filter(function (e) { return e !== 'Entregada' && e !== 'Sin camiseta'; }).map(function (e) {
+      '<p class="u-nota">' + texto([p.ID_PROVEEDOR ? nombreProveedor(p.ID_PROVEEDOR) : '', unidades ? plural(unidades, 'camiseta', 'camisetas') : '', p.FECHA_PEDIDO ? 'pedido el ' + fecha(p.FECHA_PEDIDO) : ''].filter(String).join(' · ')) + '</p>' +
+      (nuevo ? '<p class="u-nota">Creando el pedido, sus líneas y las camisetas en el Excel…</p>' :
+        '<p class="cm-ped-l1">' + texto(falta) + (conJug ? ' Jugadoras: <b>' + ent + ' de ' + conJug + '</b> entregadas.' : unidades ? ' Para el local.' : '') + '</p>' +
+        (raro ? '<p class="u-mal">Ya hay camisetas suyas en el local y no consta como llegado: márcalo con «Ha llegado».</p>' : '') +
+        '<details class="cm-ped-det"><summary>Detalle</summary>' +
+        (orden.length ? '<ul class="cm-ped-l">' + orden.map(function (col) {
+          var x = porColor[col];
+          return '<li>' + punto(col) + '<b>' + texto(nombreColor(col)) + '</b> <span class="u-cifra">' + x.n + '</span> <span class="u-nota">' +
+            CAM5_TALLAS.concat(Object.keys(x.t).filter(function (t) { return CAM5_TALLAS.indexOf(t) < 0; })).filter(function (t) { return x.t[t]; }).map(function (t) { return t + ' ' + x.t[t]; }).join(' · ') + '</span></li>';
+        }).join('') + '</ul>' : '') +
+        (conJug > ent ? '<p class="u-nota">Por entregar: ' + Object.keys(jug).filter(function (e) { return e !== 'Entregada' && e !== 'Sin camiseta'; }).map(function (e) {
           var x = ESTADOS.filter(function (y) { return y[0] === e; })[0]; return jug[e] + ' ' + (jug[e] === 1 || !x ? e : x[1]).toLowerCase();
-        }).join(' · ') + '</span>' : '') + '</p><div class="cm-barra" aria-hidden="true"><i style="width:' + Math.round(100 * ent / conJug) + '%"></i></div>' :
-        unidades && !nuevo ? '<p class="u-nota">Sin jugadoras: camisetas para tener en el local.</p>' : '') +
-      htmlCoste(p) +
-      (paso !== 'recibido' && !nuevo && (jug['Por preparar'] || jug['Preparada'] || jug['Entregada']) ?
-        '<p class="u-mal">Tiene camisetas ya en el local (por preparar, preparadas o entregadas) y el pedido no consta como llegado: si ya llegó, márcalo con «Ha llegado»' + (paso === 'sinConfirmar' ? ' (antes, «Marcar confirmado»)' : '') + '. Mientras, las cuentas del stock no cuadran.</p>' : '') +
-      (p.NOTAS ? '<p class="u-nota">' + texto(p.NOTAS) + '</p>' : '') +
-      (orden.length ? '<details class="cm-ped-det"><summary>Por color y talla <span class="u-nota">' + plural(orden.length, 'color', 'colores') + '</span></summary><ul class="cm-ped-l">' + orden.map(function (col) {
-        var x = porColor[col];
-        return '<li>' + punto(col) + '<b>' + texto(nombreColor(col)) + '</b> <span class="u-cifra">' + x.n + '</span> <span class="u-nota">' +
-          CAM5_TALLAS.concat(Object.keys(x.t).filter(function (t) { return CAM5_TALLAS.indexOf(t) < 0; })).filter(function (t) { return x.t[t]; }).map(function (t) { return t + ' ' + x.t[t]; }).join(' · ') + '</span></li>';
-      }).join('') + '</ul></details>' : '') +
-      (/^https?:\/\//.test(String(p.ARCHIVO_URL || '')) ? '<p><a href="' + texto(p.ARCHIVO_URL) + '" target="_blank" rel="noopener">Ver el documento del pedido</a></p>' : '') +
-      (nuevo ? '<p class="u-nota">Creando el pedido, sus líneas y las camisetas en el Excel…</p>' : '<div class="n-botones">' +
-        (paso === 'sinConfirmar' ? '<button type="button" class="u-btn" data-cm-p="' + texto(p.ID) + '" data-cm-acc="confirmar">Marcar confirmado</button>' :
-          paso === 'confirmado' ? '<button type="button" class="u-btn" data-cm-p="' + texto(p.ID) + '" data-cm-acc="llegado">Ha llegado</button>' : '') +
-        '<button type="button" class="u-btn" data-cm-p="' + texto(p.ID) + '" data-cm-acc="pdf">PDF para el proveedor</button>' +
-        '<button type="button" class="u-btn u-btn-texto" data-cm-p="' + texto(p.ID) + '" data-cm-acc="extracto">Extracto en texto</button>' +
-        '<button type="button" class="u-btn u-btn-texto" data-cm-p="' + texto(p.ID) + '" data-cm-acc="factura">' + (p.ID_FACTURA ? 'Cambiar factura' : 'Enlazar factura') + '</button></div>') + '</li>';
+        }).join(' · ') + '</p>' : '') +
+        htmlCoste(p) + (p.NOTAS ? '<p class="u-nota">' + texto(p.NOTAS) + '</p>' : '') +
+        (/^https?:\/\//.test(String(p.ARCHIVO_URL || '')) ? '<p><a href="' + texto(p.ARCHIVO_URL) + '" target="_blank" rel="noopener">Ver el documento del pedido</a></p>' : '') +
+        '<div class="n-botones"><button type="button" class="u-btn u-btn-texto" data-cm-p="' + id + '" data-cm-acc="extracto">Extracto en texto</button>' +
+        '<button type="button" class="u-btn u-btn-texto" data-cm-p="' + id + '" data-cm-acc="factura">' + (p.ID_FACTURA ? 'Cambiar factura' : 'Enlazar factura') + '</button></div></details>' +
+        '<div class="n-botones">' + (paso === 'sinConfirmar' ? '<button type="button" class="u-btn" data-cm-p="' + id + '" data-cm-acc="confirmar">Marcar confirmado</button>' :
+          paso === 'confirmado' ? '<button type="button" class="u-btn" data-cm-p="' + id + '" data-cm-acc="llegado">Ha llegado</button>' : '') +
+        '<button type="button" class="u-btn' + (paso === 'recibido' ? '' : ' u-btn-texto') + '" data-cm-p="' + id + '" data-cm-acc="pdf">PDF para el proveedor</button></div>') + '</li>';
   }
 
   function darLibres(b, m) {
@@ -1228,14 +1223,6 @@
     return Object.keys(N.comp).filter(function (k) { return N.comp[k][1] === ant && norm(N.comp[k][0]).trim() === norm(yo[0]).trim(); })[0] || '';
   }
   function modeloDe(comp) { var x = S.T.filas('MODELOS_COMPETICION').filter(function (m) { return String(m.ID_COMPETICION) === String(comp); })[0]; return x || null; }
-  /** Las cuentas de una competición en tres cifras, con frase: camisetas, las que entran en la inscripción y las personalizadas. */
-  function htmlCifras(d) {
-    if (!d.camisetas) return '<p class="u-nota">Todavía no hay camisetas de jugadoras en esta competición.</p>';
-    var u = conIva(d.tar);
-    return '<div class="cm-cifras"><div><b>' + d.camisetas + '</b><span>camisetas de jugadoras</span></div>' +
-      (d.pack.length ? '<div><b>' + d.gratis + '</b><span>entran en la inscripción (no pagan)</span></div>' : '') +
-      '<div><b>' + d.pers + '</b><span>personalizadas: ' + (d.tar ? 'pagan ' + eur(u * d.pers) + ' con la inscripción (' + eur(u) + ' cada una)' : 'falta la tarifa «Camiseta» de esta temporada en Economía') + '</span></div></div>';
-  }
   function pTemporada(c) {
     if (!S.N) { c.innerHTML = '<div class="kz-centro cm-carga" role="status"><div class="u-carga"></div><span class="u-nota">Cargando las temporadas y sus competiciones…</span></div>'; return; }
     var temps = S.N.temp || [];
@@ -1244,29 +1231,28 @@
     var mods = S.T.filas('MODELOS').slice().sort(function (a, b) { return norm(a.NOMBRE) < norm(b.NOMBRE) ? -1 : 1; });
     var copiables = comps.filter(function (k) { var a = compAnterior(k); return !packDe(k).length && a && packDe(a).length; });
     var h = '<div class="u-filtros cm-filtros">' + campo('Temporada', '<select id="cm-temp">' + opciones(temps.map(function (t) { return [t[0], t[1]]; }), S.temp) + '</select>') + '</div>' +
-      '<section class="u-bloque cm-temp-intro"><h2 class="n-grupo">Preparar las camisetas de la temporada</h2><ol>' +
-      '<li><b>Modelo</b>: la camiseta que lleva cada competición (la combinación de sponsors de este año). Si falta, se da de alta en Pedidos › Modelos.</li>' +
-      '<li><b>Camisetas que incluye la inscripción</b>: la lista de dorsales con su talla que entran en el precio de cada equipo (1S, 2S, 3S, 4M…). Cualquier otra que pida una jugadora es <b>personalizada</b> y la paga con la inscripción (tarifa «Camiseta» de Economía).</li>' +
-      '<li><b>Pedido para el local</b>, si quieres tener camisetas antes de que las jugadoras elijan.</li></ol>' +
-      '<p class="u-nota">Las competiciones de la temporada son las que ya existen en el Excel COMPETICION; aquí solo se preparan sus camisetas.</p>' +
-      (copiables.length ? '<button type="button" class="u-btn" id="cm-copiar-todas">Copiar las listas de la temporada anterior (' + copiables.length + ')</button>' : '') + '</section>';
+      '<details class="cm-temp-intro"><summary>Cómo se prepara una temporada</summary><ol>' +
+      '<li><b>Modelo</b> de cada competición (la camiseta de este año; los modelos se dan de alta en Pedidos › Modelos).</li>' +
+      '<li><b>Camisetas que incluye la inscripción</b>: los dorsales con su talla que entran en el precio de cada equipo. Cualquier otra es <b>personalizada</b> y se paga con la inscripción.</li>' +
+      '<li><b>Pedido para el local</b>, si quieres camisetas antes de que las jugadoras elijan.</li></ol>' +
+      '<p class="u-nota">Las competiciones son las del Excel COMPETICION; aquí solo se preparan sus camisetas.</p></details>' +
+      (copiables.length ? '<p><button type="button" class="u-btn u-btn-texto cm-en-linea" id="cm-copiar-todas">Copiar las listas de la temporada anterior (' + copiables.length + ')</button></p>' : '');
     if (!comps.length) h += '<p class="u-vacio">Esta temporada todavía no tiene competiciones.</p>';
     h += '<ul class="cm-peds cm-temp">' + comps.map(function (k) {
       var d = datosPack(k), mc = modeloDe(k), ant = compAnterior(k), pa = ant ? packDe(ant) : [];
       var conCamisetas = S.T.filas('CAMISETAS').some(function (x) { return quien(x).comp === k; });
-      var b = function (acc, t, cl) { return '<button type="button" class="u-btn' + (cl ? ' ' + cl : '') + '" data-cm-tc="' + texto(k) + '" data-cm-acc="' + acc + '">' + t + '</button>'; };
-      var vivos = d.equipos.filter(function (e) { return !e.baja; }).length;
-      var paso = function (n, ok, t) { return '<div class="cm-temp-paso' + (ok ? ' cm-temp-ok' : '') + '"><span class="cm-temp-n" aria-hidden="true">' + (ok ? '✓' : n) + '</span><div>' + t + '</div></div>'; };
+      var b = function (acc, t) { return '<button type="button" class="u-btn u-btn-texto cm-en-linea" data-cm-tc="' + texto(k) + '" data-cm-acc="' + acc + '">' + t + '</button>'; };
+      var vivos = d.equipos.filter(function (e) { return !e.baja; }).length, u = conIva(d.tar);
       return '<li class="cm-ped"><div class="cm-ped-cab"><b>' + texto(S.N.comp[k][0]) + '</b><span class="u-nota">' + plural(vivos, 'equipo', 'equipos') + '</span></div>' +
-        paso(1, !!mc, '<span class="u-etiqueta">Modelo</span>' + (conCamisetas && mc ? '<p>' + texto(nombreModelo(mc.ID_MODELO)) + ' <span class="u-nota">(ya tiene camisetas: no se cambia)</span></p>' :
-          '<select data-cm-tmod="' + texto(k) + '" aria-label="Modelo de ' + texto(S.N.comp[k][0]) + '"><option value="">Elige el modelo</option>' + opciones(mods.map(function (m) { return [m.ID, m.NOMBRE]; }), mc ? mc.ID_MODELO : '') + '</select>')) +
-        paso(2, !!d.pack.length, '<span class="u-etiqueta">Camisetas que incluye la inscripción' + (d.pack.length ? ' (' + d.pack.length + ' por equipo)' : '') + '</span>' +
-          (d.pack.length ? '<p class="cm-pack-c">' + texto(cortos(d.pack)) + '</p>' : '<p class="u-nota">Sin lista todavía: mientras, todas cuentan como personalizadas.</p>') +
-          '<div class="n-botones">' + b('editar', d.pack.length ? 'Cambiar la lista' : 'Poner la lista', d.pack.length ? 'u-btn-texto' : '') +
-          (pa.length && cortos(pa) !== cortos(d.pack) ? b('copiar', 'Copiar la de ' + texto(nombreComp(ant)) + ' (' + texto(cortos(pa)) + ')', 'u-btn-texto') : '') + '</div>') +
-        paso(3, false, '<span class="u-etiqueta">Pedido para el local (opcional)</span><div class="n-botones">' + (mc ? b('pedir', 'Hacer pedido para el local') : '<span class="u-nota">Primero, el modelo.</span>') + '</div>') +
-        '<h3 class="cm-sub">Cómo va</h3>' + htmlCifras(d) +
-        (d.equipos.length ? '<div class="n-botones">' + b('cobro', 'Equipo a equipo', 'u-btn-texto') + '</div>' : '') + '</li>';
+        dl([
+          ['Modelo', conCamisetas && mc ? texto(nombreModelo(mc.ID_MODELO)) :
+            '<select data-cm-tmod="' + texto(k) + '" aria-label="Modelo de ' + texto(S.N.comp[k][0]) + '"><option value="">Elige el modelo</option>' + opciones(mods.map(function (m) { return [m.ID, m.NOMBRE]; }), mc ? mc.ID_MODELO : '') + '</select>'],
+          ['Incluye', (d.pack.length ? '<span class="cm-pack-c">' + texto(cortos(d.pack)) + '</span> ' + b('editar', 'Cambiar') : '<span class="u-mal">Sin lista</span> ' + b('editar', 'Poner la lista')) +
+            (pa.length && cortos(pa) !== cortos(d.pack) ? ' · ' + b('copiar', 'Copiar la del año pasado') : '')],
+          ['Personalizadas', d.camisetas ? '<b>' + d.pers + '</b> de ' + d.camisetas + ' camisetas' + (d.pers ? (d.tar ? ' · ' + eur(u * d.pers) : ' · <span class="u-mal">sin tarifa</span>') : '') +
+            ' · ' + b('cobro', 'Equipo a equipo') : '<span class="u-nota">Sin camisetas todavía</span>'],
+          ['Pedido local', mc ? b('pedir', 'Hacer pedido para el local') : '<span class="u-nota">Primero, el modelo</span>']
+        ]) + '</li>';
     }).join('') + '</ul>';
     c.innerHTML = h;
     c.querySelector('#cm-temp').onchange = function () { S.temp = this.value; pintar(true); };
