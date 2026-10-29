@@ -12,12 +12,13 @@
  *   Resumen   beneficio frente al presupuesto, ingresos y gastos, IVA; ingresos y gastos por grupo con su barra
  *             («Quedan», «Te has pasado») que se abre en sus categorías, y cada categoría, en sus movimientos;
  *             beneficio y reparto; resultado por desglose. Se puede mirar una sola parte del desglose.
- *   Movimientos  lista con filtros; cada uno abre su ficha (Editar, Borrar, Hacer la factura).
+ *   Movimientos  lista con filtros; cada uno abre su ficha (Editar, Borrar, Hacer la factura). «Añadir movimiento»
+ *             (el botón que flota) solo sale aquí.
  *   Caja      el dinero de cada cuenta (banco, cajas, socios) y, al tocarla, sus movimientos con el saldo.
  *   Pendiente facturas por cobrar y por pagar y gastos sin factura.
- *   Facturas  de T0257.
- *   Presupuesto  se mira; lo prepara quien dice PREPARA_PRESUPUESTO, para todo el periodo a la vez, con una
- *             recomendación sacada de lo real de los periodos anteriores (por MEDIDAS, si las hay) y confirmación.
+ *   Facturas  de T0257, con el cliente o el proveedor de cada una y su enlace para abrirla en Drive (ARCHIVO_URL).
+ *   Presupuesto  quien dice PREPARA_PRESUPUESTO toca una categoría y define lo previsto, con una recomendación sacada
+ *             de lo real del periodo anterior (por MEDIDAS, si las hay) y confirmación; los demás solo lo miran.
  *
  * Personalización (config.json · nucleo.secciones.economia.config, declarada en su modulo.json):
  *   PERIODO / NOMBRE_PERIODO   columna de MOVIMIENTOS que da el periodo (p. ej. ID_TEMPORADA) y cómo se llama; vacía, el año
@@ -421,6 +422,7 @@
           b.setAttribute('aria-selected', si ? 'true' : 'false');
           if (si && b.parentNode.scrollWidth > b.parentNode.clientWidth) b.parentNode.scrollLeft = Math.max(0, b.offsetLeft - b.parentNode.offsetLeft - 16); // en el móvil, que se vea
         });
+        el.querySelector('.eco-fab').hidden = S.tab !== 'MOVIMIENTOS'; // T0272: añadir un movimiento, solo desde Movimientos
         var np = pendientes(d).filter(function (x) { return x.falta > 0; }).length + sinFactura(d, per).length, nb = el.querySelector('#eco-npend');
         if (nb) { nb.textContent = np; nb.hidden = !np; }
         if (!d.cue.length && !d.mov.length) {
@@ -512,7 +514,7 @@
         var cz = cruzados(d, per, S.des);
         if (cz.length) h += '<p class="u-nota">' + cz.length + (cz.length === 1 ? ' movimiento tiene' : ' movimientos tienen') + ' una categoría del otro tipo: restan de su categoría, como una devolución. ' +
           (pest.indexOf('MOVIMIENTOS') >= 0 ? '<button type="button" class="u-btn u-btn-texto" data-accion="cruzados">Ver esos movimientos</button>' : '') + '</p>';
-        if (!r.n && !ps.some(function (x) { return x.previsto; })) h += '<p class="u-vacio">Todavía no hay movimientos en la ' + texto(nomPeriodo()) + '. Los que apuntes con «Añadir movimiento» salen aquí al momento.</p>';
+        if (!r.n && !ps.some(function (x) { return x.previsto; })) h += '<p class="u-vacio">Todavía no hay movimientos en la ' + texto(nomPeriodo()) + '. Los que apuntes en Movimientos salen aquí al momento.</p>';
         return h;
       }
 
@@ -637,24 +639,31 @@
           .sort(function (a, b) { return String(a.FECHA) < String(b.FECHA) ? 1 : -1; });
         var tot = 0; fs.forEach(function (x) { if (x.ESTADO !== 'Anulada') tot += importe(x).total; });
         var h = '<div class="eco-cab"><p class="u-nota">' + fs.length + (fs.length === 1 ? ' factura' : ' facturas') + ' · ' + eur(tot) + ' con IVA (sin las anuladas)</p>' +
-          '<button type="button" class="u-btn" data-accion="factura">Añadir factura</button></div>' +
+          '<button type="button" class="u-btn u-btn-accion" data-accion="factura">Añadir factura</button></div>' +
           '<div class="u-filtros"><label class="u-campo"><span class="u-etiqueta">Tipo</span><select data-ffac="tipo">' + opciones([['Emitida', 'Emitidas'], ['Recibida', 'Recibidas'], ['Ticket', 'Tickets']], f.tipo, 'Todas') + '</select></label>' +
           '<label class="u-campo"><span class="u-etiqueta">Estado</span><select data-ffac="estado">' + opciones([['Pendiente', 'Pendiente'], ['Pagada', 'Pagada'], ['Anulada', 'Anulada'], ['-', 'Sin estado']], f.estado, 'Todos') + '</select></label></div>';
         if (!fs.length) return h + '<p class="u-vacio">No hay facturas ' + (f.tipo || f.estado ? 'con este filtro' : 'en la ' + texto(nomPeriodo() || 'este periodo')) + '. Las que añadas salen aquí al momento.</p>';
-        return h + '<table class="u-tabla eco-tabla"><thead><tr><th>Factura</th><th class="num">Total</th></tr></thead><tbody>' + fs.map(function (x) {
+        var sinPdf = fs.filter(function (x) { return !x.ARCHIVO_URL; }).length;
+        return h + '<table class="u-tabla eco-tabla"><thead><tr><th>Factura</th><th>Archivo</th><th class="num">Total</th></tr></thead><tbody>' + fs.map(function (x) {
           return '<tr tabindex="0" data-fac="' + texto(x.ID) + '"><td class="u-tabla-t">' + texto(numFac(x)) + ' · ' + texto(nombre('ctr', x.ID_CONTRAPARTE)) + chip(x) +
-            '<div class="u-nota">' + [fecha(x.FECHA), x.TIPO, x.ESTADO].filter(Boolean).join(' · ') + '</div></td>' +
+            '<div class="u-nota">' + [fecha(x.FECHA), x.TIPO === 'Emitida' ? 'Emitida (a un cliente)' : x.TIPO === 'Ticket' ? 'Ticket' : 'Recibida (de un proveedor)', x.ESTADO].filter(Boolean).join(' · ') + '</div></td>' +
+            '<td>' + enlaceDrive(x) + '</td>' +
             '<td class="num"><span class="u-cifra' + (x.ESTADO === 'Anulada' ? ' eco-anulada' : '') + '">' + eur(importe(x).total) + '</span></td></tr>';
-        }).join('') + '</tbody></table>';
+        }).join('') + '</tbody></table>' +
+          (sinPdf ? '<p class="u-nota">' + sinPdf + (sinPdf === 1 ? ' factura no tiene' : ' facturas no tienen') + ' su archivo enlazado: ábrela y pega en «Enlace en Drive» el enlace del PDF (en Drive, Compartir › Copiar enlace).</p>' : '');
+      }
+      /** El enlace al PDF de una factura en Drive, para abrirlo en otra pestaña (sin abrir la ficha). */
+      function enlaceDrive(f) {
+        return f && f.ARCHIVO_URL ? '<a class="eco-drive" href="' + texto(f.ARCHIVO_URL) + '" target="_blank" rel="noopener" data-fuera>Abrir en Drive ↗</a>' : '<span class="u-nota">Sin archivo</span>';
       }
 
       /* ----- Presupuesto (se mira; se prepara aparte) ----- */
 
       function htmlPresupuesto() {
         var ps = presupuesto(d, per, S.des), av = avisos(d, ps);
-        var h = '<div class="eco-cab"><p class="u-nota">Lo previsto' + (presPorPeriodo(d) ? ' para la ' + texto(nomPeriodo()) : '') + ' frente a lo real, sin IVA. Toca una categoría para ver sus movimientos.</p>' +
-          (prepara ? '<button type="button" class="u-btn" data-accion="preparar">Preparar el presupuesto' + (presPorPeriodo(d) ? ' de la ' + texto(nomPeriodo()) : '') + '</button>' : '') + '</div>';
-        if (!prepara) h += '<p class="u-nota">Lo prepara ' + texto(cfg.PREPARA_PRESUPUESTO ? 'el perfil ' + cfg.PREPARA_PRESUPUESTO : 'quien administra') + '.</p>';
+        var h = '<p class="u-nota">Lo previsto' + (presPorPeriodo(d) ? ' para la ' + texto(nomPeriodo()) : '') + ' frente a lo real, sin IVA. ' +
+          (prepara ? 'Toca una categoría para definir lo previsto: te recomienda una cifra a partir de lo real de ' + (presPorPeriodo(d) ? 'la ' + texto(nomPer.toLowerCase()) + ' anterior' : 'antes') + '.' :
+            'Toca una categoría para ver sus movimientos. Lo prepara ' + texto(cfg.PREPARA_PRESUPUESTO ? 'el perfil ' + cfg.PREPARA_PRESUPUESTO : 'quien administra') + '.') + '</p>';
         if (av.length) {
           h += '<h2 class="n-grupo">Para afinar · ' + av.length + '</h2>' + av.slice(0, 8).map(function (a) {
             return '<div class="eco-aviso' + (a.orden > 1 ? ' eco-amb' : '') + '"><b>' + texto(a.cat.NOMBRE) + '</b><p>' + texto(a.t) + '</p></div>';
@@ -663,11 +672,11 @@
         ['Ingreso', 'Gasto'].forEach(function (tipo) {
           var xs = ps.filter(function (x) { return x.tipo === tipo && !esReparto(d, x.cat) && (S.ceros || x.previsto || x.real); }), tp = 0, tr = 0;
           h += '<h2 class="n-grupo">' + (tipo === 'Ingreso' ? 'Ingresos' : 'Gastos') + '</h2>';
-          if (!xs.length) { h += '<p class="u-vacio">No hay nada previsto ni apuntado' + (prepara ? '. Toca «Preparar el presupuesto» para preverlo.' : '.') + '</p>'; return; }
+          if (!xs.length) { h += '<p class="u-vacio">No hay nada previsto ni apuntado' + (prepara ? '. Toca «Ver todas las categorías» para prever alguna.' : '.') + '</p>'; return; }
           h += '<table class="u-tabla eco-tabla"><thead><tr><th>Categoría</th><th class="num">Previsto</th><th class="num u-solo-ancho">Real</th><th class="num">' + (tipo === 'Gasto' ? 'Queda' : 'Diferencia') + '</th></tr></thead><tbody>' +
             xs.map(function (x) {
               tp += x.previsto; tr += x.real;
-              return '<tr tabindex="0" data-vercat="' + texto(x.cat.ID) + '"><td class="u-tabla-t">' + texto(x.cat.NOMBRE) + (x.filas.some(function (r) { return r._pendiente || r._nueva; }) ? ' <span class="u-chip">Guardando</span>' : '') +
+              return '<tr tabindex="0" ' + (prepara ? 'data-precat' : 'data-vercat') + '="' + texto(x.cat.ID) + '"><td class="u-tabla-t">' + texto(x.cat.NOMBRE) + (x.filas.some(function (r) { return r._pendiente || r._nueva; }) ? ' <span class="u-chip">Guardando</span>' : '') +
                 '<div class="u-nota">' + texto(x.grupo) + '<span class="u-solo-movil">' + (x.grupo ? ' · ' : '') + 'real ' + eur0(x.real) + '</span></div></td><td class="num">' + eur0(x.previsto) + '</td><td class="num u-solo-ancho">' + eur0(x.real) + '</td>' +
                 '<td class="num">' + (x.previsto ? '<span class="u-cifra' + (x.dif < 0 ? ' u-mal' : '') + '">' + eur0(x.dif) + '</span>' : '<span class="u-nota">Sin previsto</span>') + '</td></tr>';
             }).join('') + '<tr class="eco-total"><td class="u-tabla-t">Total<div class="u-nota u-solo-movil">real ' + eur0(tr) + '</div></td><td class="num">' + eur0(tp) + '</td><td class="num u-solo-ancho">' + eur0(tr) + '</td><td class="num">' + (tp ? '<span class="u-cifra' + ((tipo === 'Gasto' ? tp - tr : tr - tp) < 0 ? ' u-mal' : '') + '">' + eur0(tipo === 'Gasto' ? tp - tr : tr - tp) + '</span>' : '<span class="u-nota">Sin previsto</span>') + '</td></tr></tbody></table>';
@@ -709,7 +718,7 @@
             dato(m.TIPO === 'Ingreso' ? 'Quién paga' : 'Quién cobra', texto(nombre('ctr', m.ID_CONTRAPARTE)))) +
           (P && m[P] ? dato(nomPer, texto(nombre('per', m[P]))) : '') + (DS && m[DS] ? dato(nomDes, texto(nombre('des', m[DS]))) : '') +
           dato('Sin IVA', eur(x.base)) + dato('IVA', texto(m.TIPO_IVA || '0%') + ' · ' + eur(x.iva)) + dato('Total', eur(x.total)) +
-          (interno ? '' : dato('Factura o ticket', f ? '<button type="button" class="u-btn u-btn-texto" data-verfac="' + texto(f.ID) + '">' + texto(numFac(f)) + ' ›</button>' : sinFac(m) ? '<span class="u-mal">Falta</span>' : 'No lleva')) +
+          (interno ? '' : dato('Factura o ticket', f ? '<button type="button" class="u-btn u-btn-texto" data-verfac="' + texto(f.ID) + '">' + texto(numFac(f)) + ' ›</button>' + (f.ARCHIVO_URL ? ' · ' + enlaceDrive(f) : '') : sinFac(m) ? '<span class="u-mal">Falta</span>' : 'No lleva')) +
           dato('Notas', texto(m.NOTAS)) + '</div>' +
           (m.LOG ? '<details class="eco-hist"><summary>Historial de cambios</summary><pre>' + texto(m.LOG) + '</pre></details>' : '') +
           '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="d-editar" data-foco>Editar movimiento</button>' +
@@ -838,26 +847,28 @@
         var movs = f ? d.mov.filter(function (m) { return String(m.ID_FACTURA) === String(f.ID); }) : [];
         var pagado = 0; movs.forEach(function (m) { pagado += importe(m).total; });
         var html = '<h2 id="eco-vt">' + (f ? 'Factura ' + texto(numFac(f)) : movId ? (v.TIPO === 'Emitida' ? 'Hacer la factura' : 'Añadir su factura') : 'Añadir factura') + '</h2>' +
+          (f ? '<p>' + enlaceDrive(f) + '</p>' : '') +
           (movId ? '<p class="u-nota">Con los datos del movimiento. ' + (v.TIPO === 'Emitida' ? 'La fecha es la de hoy, que es cuando se emite; el número lo pone el Excel al guardarla.' : 'Pon el número que trae la factura.') + ' Al guardarla queda enlazada al movimiento.</p>' : '') +
           '<div class="u-campos">' +
           (f ? '' : campo('Tipo', '<select id="f-TIPO">' + opciones([['Emitida', 'Emitida (la hacemos nosotros)'], ['Recibida', 'Recibida'], ['Ticket', 'Ticket']], v.TIPO) + '</select>')) +
           campo('Número', '<input type="text" id="f-NUMERO" value="' + texto(v.NUMERO) + '" maxlength="40">', 'eco-numero') +
           campo('Fecha', '<input type="date" id="f-FECHA" value="' + texto(v.FECHA) + '">') +
-          campo(v.TIPO === 'Emitida' ? 'Cliente' : 'Contraparte', '<select id="f-ID_CONTRAPARTE">' + opciones(d.ctr.map(function (c) { return [c.ID, c.NOMBRE]; }).sort(function (a, b) { return String(a[1]).localeCompare(String(b[1]), 'es'); }), v.ID_CONTRAPARTE, 'Elige') + '</select>') +
+          campo('<span id="f-ctr-et">' + (v.TIPO === 'Emitida' ? 'Cliente (a quién se la hacemos)' : 'Proveedor (quién nos la hace)') + '</span>', '<select id="f-ID_CONTRAPARTE">' + opciones(d.ctr.map(function (c) { return [c.ID, c.NOMBRE]; }).sort(function (a, b) { return String(a[1]).localeCompare(String(b[1]), 'es'); }), v.ID_CONTRAPARTE, 'Elige') + '</select>') +
           campo('Base imponible', '<input type="text" inputmode="decimal" id="f-BASE" value="' + texto(v.BASE === '' || v.BASE == null ? '' : String(v.BASE).replace('.', ',')) + '" placeholder="0,00">') +
           campo('IVA', '<select id="f-TIPO_IVA">' + opciones(ivas().map(function (x) { return [x, x]; }), v.TIPO_IVA) + '</select>') +
           '<p class="u-nota u-ancho" id="f-total"></p>' +
           campo('Estado', '<select id="f-ESTADO">' + opciones([['Pendiente', 'Pendiente'], ['Pagada', 'Pagada'], ['Anulada', 'Anulada']], v.ESTADO, 'Sin estado') + '</select>') +
-          campo('Enlace al PDF', '<input type="url" id="f-ARCHIVO_URL" value="' + texto(v.ARCHIVO_URL) + '" placeholder="https://…">', 'u-ancho') +
+          campo('Enlace en Drive', '<input type="url" id="f-ARCHIVO_URL" value="' + texto(v.ARCHIVO_URL) + '" placeholder="https://drive.google.com/…">', 'u-ancho') +
+          '<p class="u-nota u-ancho">El del PDF o la foto de la factura: en Drive, Compartir › Copiar enlace.</p>' +
           campo('Notas', '<textarea id="f-NOTAS" rows="2">' + texto(v.NOTAS) + '</textarea>', 'u-ancho') + '</div>' +
-          (f ? '<p class="u-nota">' + (movs.length ? movs.length + (movs.length === 1 ? ' movimiento' : ' movimientos') + ' con esta factura: ' + eur(pagado) + ' de ' + eur(importe(f).total) + '.' : 'Ningún movimiento lleva todavía esta factura.') +
-            (f.ARCHIVO_URL ? ' <a href="' + texto(f.ARCHIVO_URL) + '" target="_blank" rel="noopener">Abrir el PDF</a>' : '') + '</p>' : '') +
+          (f ? '<p class="u-nota">' + (movs.length ? movs.length + (movs.length === 1 ? ' movimiento' : ' movimientos') + ' con esta factura: ' + eur(pagado) + ' de ' + eur(importe(f).total) + '.' : 'Ningún movimiento lleva todavía esta factura.') + '</p>' : '') +
           '<p class="u-error" role="alert" hidden></p><div class="n-botones">' +
           '<button type="button" class="u-btn u-btn-accion" id="f-guardar">Guardar factura</button><button type="button" class="u-btn" data-cerrar>Cancelar</button>' +
           (f && f.ESTADO === 'Pendiente' ? '<button type="button" class="u-btn" id="f-apuntar">' + (f.TIPO === 'Emitida' ? 'Apuntar el cobro' : 'Apuntar el pago') + '</button>' : '') + '</div>';
         ventana(html, function () {
           function refrescar() {
             var tipo = f ? f.TIPO : val('f-TIPO'), em = tipo === 'Emitida' && !f;
+            vent.querySelector('#f-ctr-et').textContent = tipo === 'Emitida' ? 'Cliente (a quién se la hacemos)' : 'Proveedor (quién nos la hace)';
             var n = vent.querySelector('#f-NUMERO');
             n.disabled = em; if (em) n.value = ''; n.placeholder = em ? 'Se numera sola al guardar (' + String(cfg.SERIE_EMITIDAS || '') + '…)' : '';
             var t = importe({ BASE: val('f-BASE'), TIPO_IVA: val('f-TIPO_IVA') });
@@ -874,7 +885,7 @@
             var mal = [];
             if (!em && !nv.NUMERO) mal.push('Falta el número.');
             if (!nv.FECHA) mal.push('Falta la fecha.');
-            if (!nv.ID_CONTRAPARTE) mal.push('Falta ' + (tipo === 'Emitida' ? 'el cliente.' : 'la contraparte.'));
+            if (!nv.ID_CONTRAPARTE) mal.push('Falta ' + (tipo === 'Emitida' ? 'el cliente.' : 'el proveedor.'));
             if (!(cts(val('f-BASE')) > 0)) mal.push('La base tiene que ser mayor que 0.');
             if (!em && nv.NUMERO && d.fac.some(function (x) { return x !== f && x.TIPO === tipo && String(x.NUMERO).trim() === nv.NUMERO; })) mal.push('Ya hay una ' + tipo.toLowerCase() + ' con el número ' + nv.NUMERO + '.');
             if (mal.length) { verError(mal); return; }
@@ -899,113 +910,93 @@
         });
       }
 
-      /* ---------- preparar el presupuesto ---------- */
+      /* ---------- preparar el presupuesto, categoría a categoría ---------- */
 
       /**
-       * Ventana para preparar el presupuesto de todo el periodo a la vez: por categoría, lo real de los dos anteriores, lo
-       * previsto ahora y lo recomendado («Usar»). Guardar pide confirmar con los totales; cada cambio queda en su LOG.
+       * T0272: ventana para definir lo previsto de una categoría en el periodo: lo real de los dos anteriores, lo previsto
+       * ahora y lo recomendado (con su porqué y «Usar lo recomendado»), por desglose si el presupuesto va así. Guardar pide
+       * confirmar con lo que cambia (la categoría y el beneficio previsto); cada cambio queda en su LOG.
        */
-      function prepararPres() {
+      function formPresCat(idCat) {
         var M = cfg.MEDIDAS && typeof cfg.MEDIDAS === 'object' ? cfg.MEDIDAS : {};
         if (Object.keys(M).length && !S.medidas) {
-          ventana('<h2 id="eco-vt">Preparar el presupuesto</h2><div class="kz-centro" role="status"><div class="u-carga"></div><p class="u-nota">Contando ' + texto(Object.keys(M).join(' y ').toLowerCase()) + ' de cada ' + texto(nomPer.toLowerCase()) + '…</p></div>');
-          ctx.llamar('economiaMedidas', []).then(function (r) {
-            S.medidas = r || {};
-            if (velo.classList.contains('abierto')) prepararVer();
-          }, function (e) {
+          ventana('<h2 id="eco-vt">' + texto(nombre('cat', idCat)) + '</h2><div class="kz-centro" role="status"><div class="u-carga"></div><p class="u-nota">Contando ' + texto(Object.keys(M).join(' y ').toLowerCase()) + ' de cada ' + texto(nomPer.toLowerCase()) + ' para recomendarte una cifra…</p></div>' +
+            '<div class="n-botones"><button type="button" class="u-btn" data-cerrar>Cancelar</button></div>');
+          ctx.llamar('economiaMedidas', []).then(function (r) { S.medidas = r || {}; if (velo.classList.contains('abierto')) formPresCat(idCat); }, function (e) {
             S.medidas = { _error: String(e && e.message || e).replace(/^\w+:\s*/, '') };
-            if (velo.classList.contains('abierto')) prepararVer();
+            if (velo.classList.contains('abierto')) formPresCat(idCat);
           });
           return;
         }
-        prepararVer();
-      }
-      function prepararVer() {
         preparar();
-        var M = cfg.MEDIDAS && typeof cfg.MEDIDAS === 'object' ? cfg.MEDIDAS : {}, med = {};
+        var c = ix.cat[idCat]; if (!c) return;
+        var med = {};
         Object.keys(M).forEach(function (n) { var x = (S.medidas || {})[n] || {}; med[n] = { grupos: M[n].grupos || [], periodo: x.periodo || {}, desglose: x.desglose || {} }; });
-        var recs = recomendar(d, per, lista, med), conDes = presPorDes(d), filasPer = preDe(d, per), ant = anteriores(lista, per, 2);
-        var h = '<h2 id="eco-vt">Presupuesto de la ' + texto(nomPeriodo()) + '</h2>' +
-          '<p class="u-nota">Sin IVA. Lo recomendado sale de lo real de la ' + texto(ant[0] ? ant[0].nombre : 'temporada anterior') +
-          (Object.keys(M).length ? ', por ' + texto(Object.keys(M).join(' o ').toLowerCase()) + ' donde se puede' : '') + '. Cambia lo que haga falta y guarda una vez: se pide confirmar.</p>' +
-          (S.medidas && S.medidas._error ? '<p class="u-error">No se han podido contar las medidas (' + texto(S.medidas._error) + '): lo recomendado es lo real de la anterior.</p>' : '') +
-          '<div class="n-botones"><button type="button" class="u-btn" id="p-todas">Usar todo lo recomendado</button></div><div id="p-lista">';
-        ['Ingreso', 'Gasto'].forEach(function (tipo) {
-          h += '<h3 class="n-grupo">' + (tipo === 'Ingreso' ? 'Ingresos' : 'Gastos') + '</h3>';
-          recs.filter(function (x) { return x.tipo === tipo; }).forEach(function (x) {
-            var filas = filasPer.filter(function (r) { return String(r.ID_CATEGORIA) === String(x.cat.ID); });
-            var gen = filas.filter(function (r) { return !conDes || !r[DS]; })[0];
-            var partes = {};
-            filas.forEach(function (r) { if (conDes && r[DS]) partes[r[DS]] = r; });
-            if (conDes && x.partes) Object.keys(x.partes).forEach(function (k) { if (!partes[k]) partes[k] = null; });
-            var ks = Object.keys(partes).sort(function (a, b) { return nombre('des', a).localeCompare(nombre('des', b), 'es'); });
-            var verGen = !ks.length || gen || !x.partes;
-            var prev = 0; filas.forEach(function (r) { prev += cts(r.IMPORTE); });
-            h += '<div class="eco-prep" data-pcat="' + texto(x.cat.ID) + '"><div class="eco-gl"><b>' + texto(x.cat.NOMBRE) + '</b>' +
-              (x.rec != null ? '<span class="eco-num">Recomendado ' + eur0(x.rec) + ' <button type="button" class="u-btn u-btn-texto" data-usar="' + texto(x.cat.ID) + '">Usar</button></span>' : '') + '</div>' +
-              '<p class="u-nota">' + texto([x.grupo].concat(x.ant.map(function (a) { return 'real la ' + a.p.nombre + ': ' + eur0(a.real); })).filter(Boolean).join(' · ')) +
-              (x.razon ? '<br>' + texto(x.razon) : '') + (prev ? ' · ahora previsto ' + eur0(prev) : '') + '</p><div class="u-campos">' +
-              ks.map(function (k) {
-                var r = partes[k], rec = x.partes && x.partes[k] != null ? x.partes[k] : '';
-                return campo(texto(nombre('des', k)), '<input type="text" inputmode="decimal" data-pre="' + texto(r ? r.ID : '') + '" data-des="' + texto(k) + '" data-rec="' + rec + '" data-antes="' + (r ? cts(r.IMPORTE) : 0) + '" value="' + texto(r ? eur(cts(r.IMPORTE)).replace(' €', '') : '') + '" placeholder="0">');
-              }).join('') +
-              (verGen ? campo(ks.length ? 'General' : 'Previsto', '<input type="text" inputmode="decimal" data-pre="' + texto(gen ? gen.ID : '') + '" data-des="" data-rec="' + (x.partes ? '' : x.rec == null ? '' : x.rec) + '" data-antes="' + (gen ? cts(gen.IMPORTE) : 0) + '" value="' + texto(gen ? eur(cts(gen.IMPORTE)).replace(' €', '') : '') + '" placeholder="0">') : '') +
-              '</div></div>';
-          });
-        });
-        h += '</div><p class="u-nota" id="p-tot"></p><p class="u-error" role="alert" hidden></p><div class="n-botones">' +
-          '<button type="button" class="u-btn u-btn-accion" id="p-guardar">Revisar y guardar el presupuesto</button><button type="button" class="u-btn" data-cerrar>Cancelar</button></div>';
+        var x = recomendar(d, per, lista, med).filter(function (r) { return String(r.cat.ID) === String(idCat); })[0] ||
+          { cat: c, ant: [], rec: null, razon: '', partes: null };
+        var conDes = presPorDes(d), filas = preDe(d, per).filter(function (r) { return String(r.ID_CATEGORIA) === String(idCat); });
+        var gen = filas.filter(function (r) { return !conDes || !r[DS]; })[0], partes = {};
+        filas.forEach(function (r) { if (conDes && r[DS]) partes[r[DS]] = r; });
+        if (conDes && x.partes) Object.keys(x.partes).forEach(function (k) { if (!partes[k]) partes[k] = null; });
+        var ks = Object.keys(partes).sort(function (a, b) { return nombre('des', a).localeCompare(nombre('des', b), 'es'); });
+        var verGen = !ks.length || gen || !x.partes, antes = 0;
+        filas.forEach(function (r) { antes += cts(r.IMPORTE); });
+        var real = 0; presupuesto(d, per).forEach(function (r) { if (String(r.cat.ID) === String(idCat)) real = r.real; });
+        function entrada(et, r, k, rec) {
+          return campo(texto(et), '<input type="text" inputmode="decimal" data-pre="' + texto(r ? r.ID : '') + '" data-des="' + texto(k) + '" data-rec="' + (rec == null ? '' : rec) +
+            '" data-antes="' + (r ? cts(r.IMPORTE) : 0) + '" value="' + texto(r ? eur(cts(r.IMPORTE)).replace(' €', '') : '') + '" placeholder="0">');
+        }
+        var h = '<h2 id="eco-vt">' + texto(c.NOMBRE) + '</h2>' +
+          '<p class="u-nota">' + texto([c.GRUPO, c.TIPO === 'Ingreso' ? 'ingreso' : 'gasto', 'sin IVA'].filter(Boolean).join(' · ')) + (presPorPeriodo(d) ? ' · ' + texto(nomPeriodo()) : '') + '</p>' +
+          '<div class="eco-dl">' + x.ant.map(function (a) { return dato('Real la ' + a.p.nombre, eur0(a.real)); }).join('') +
+          dato('Real ahora', eur0(real)) + dato('Previsto ahora', antes ? eur0(antes) : 'Sin previsto') + '</div>' +
+          (x.rec != null ? '<div class="u-bloque eco-rec"><b>Recomendado: ' + eur0(x.rec) + '</b><p class="u-nota">' + texto(x.razon) + '</p>' +
+            '<button type="button" class="u-btn" id="p-usar">Usar lo recomendado</button></div>' : (x.razon ? '<p class="u-nota">' + texto(x.razon) + '</p>' : '')) +
+          (S.medidas && S.medidas._error ? '<p class="u-error">No se han podido contar ' + texto(Object.keys(M).join(' ni ').toLowerCase()) + ' (' + texto(S.medidas._error) + '): lo recomendado es lo real de la anterior.</p>' : '') +
+          '<div class="u-campos" id="p-lista">' + ks.map(function (k) { return entrada(nombre('des', k), partes[k], k, x.partes ? x.partes[k] : null); }).join('') +
+          (verGen ? entrada(ks.length ? 'General' : 'Previsto', gen, '', x.partes ? null : x.rec) : '') + '</div>' +
+          '<p class="u-nota" id="p-tot"></p><p class="u-error" role="alert" hidden></p><div class="n-botones">' +
+          '<button type="button" class="u-btn u-btn-accion" id="p-guardar">Guardar lo previsto</button><button type="button" class="u-btn" data-cerrar>Cancelar</button>' +
+          (pest.indexOf('MOVIMIENTOS') >= 0 ? '<button type="button" class="u-btn u-btn-texto" id="p-movs">Ver sus movimientos</button>' : '') + '</div>';
         ventana(h, function () {
+          var bg = vent.querySelector('#p-guardar');
           function entradas() { return [].slice.call(vent.querySelectorAll('#p-lista [data-pre]')); }
-          function tipoDe(i) { var c = ix.cat[i.closest('[data-pcat]').getAttribute('data-pcat')]; return c ? c.TIPO : ''; }
-          function totales(nuevo) {
-            var t = { Ingreso: 0, Gasto: 0 };
-            entradas().forEach(function (i) { t[tipoDe(i)] += nuevo ? cts(i.value) : Number(i.getAttribute('data-antes')) || 0; });
-            return t;
-          }
+          function nuevo() { var t = 0; entradas().forEach(function (i) { t += cts(i.value); }); return t; }
           function pintaTot() {
-            var a = totales(false), n = totales(true);
-            vent.querySelector('#p-tot').textContent = 'Ingresos previstos ' + eur0(n.Ingreso) + ' · gastos previstos ' + eur0(n.Gasto) + ' · beneficio previsto ' + eur0(n.Ingreso - n.Gasto) +
-              (a.Ingreso !== n.Ingreso || a.Gasto !== n.Gasto ? ' (antes ' + eur0(a.Ingreso - a.Gasto) + ')' : '');
-          }
-          function usar(cat) {
-            entradas().forEach(function (i) {
-              if (cat && i.closest('[data-pcat]').getAttribute('data-pcat') !== cat) return;
-              var r = i.getAttribute('data-rec'); if (r !== '') i.value = eur(Number(r)).replace(' €', '');
-            });
-            pintaTot();
+            var n = nuevo();
+            vent.querySelector('#p-tot').textContent = ks.length ? 'Total previsto: ' + eur0(n) + (n !== antes ? ' (antes ' + eur0(antes) + ')' : '') : (n !== antes ? 'Antes ' + eur0(antes) : '');
+            if (bg.getAttribute('data-ok')) { bg.removeAttribute('data-ok'); bg.textContent = 'Guardar lo previsto'; }
           }
           pintaTot();
           vent.querySelector('#p-lista').addEventListener('input', pintaTot);
-          vent.querySelector('#p-todas').onclick = function () { usar(''); };
-          vent.querySelector('#p-lista').addEventListener('click', function (e) { var b = e.target.closest('[data-usar]'); if (b) usar(b.getAttribute('data-usar')); });
-          var bg = vent.querySelector('#p-guardar');
+          var bu = vent.querySelector('#p-usar');
+          if (bu) bu.onclick = function () { entradas().forEach(function (i) { var r = i.getAttribute('data-rec'); if (r !== '') i.value = eur(Number(r)).replace(' €', ''); }); pintaTot(); };
+          var bm = vent.querySelector('#p-movs');
+          if (bm) bm.onclick = function () { cerrar(); verMovs({ cat: String(idCat) }, 'PRESUPUESTO'); };
           bg.onclick = function () {
             var cs = entradas().filter(function (i) { return cts(i.value) !== (Number(i.getAttribute('data-antes')) || 0); });
             if (!cs.length) { verError(['No has cambiado nada.']); return; }
             if (!bg.getAttribute('data-ok')) {
-              var a = totales(false), n = totales(true), cats = {};
-              cs.forEach(function (i) { cats[i.closest('[data-pcat]').getAttribute('data-pcat')] = 1; });
+              // Confirmar: lo que cambia en la categoría y en el beneficio previsto del periodo.
+              var pi = 0, pg = 0, n = nuevo(), dif = n - antes;
+              presupuesto(d, per).forEach(function (r) { if (esReparto(d, r.cat)) return; if (r.tipo === 'Ingreso') pi += r.previsto; else if (r.tipo === 'Gasto') pg += r.previsto; });
+              var b0 = pi - pg, b1 = b0 + (c.TIPO === 'Ingreso' ? dif : -dif);
               verError([]);
-              vent.querySelector('#p-tot').innerHTML = '<b>Cambias ' + Object.keys(cats).length + (Object.keys(cats).length === 1 ? ' categoría' : ' categorías') + '.</b> Ingresos previstos ' + eur0(a.Ingreso) + ' → ' + eur0(n.Ingreso) +
-                ' · gastos previstos ' + eur0(a.Gasto) + ' → ' + eur0(n.Gasto) + ' · beneficio previsto ' + eur0(a.Ingreso - a.Gasto) + ' → ' + eur0(n.Ingreso - n.Gasto) + '. Cada cambio queda apuntado en el Excel con tu nombre.';
-              bg.setAttribute('data-ok', '1'); bg.textContent = 'Sí, guardar el presupuesto';
-              vent.querySelector('#p-tot').scrollIntoView({ block: 'center' });
+              vent.querySelector('#p-tot').innerHTML = '<b>' + texto(c.NOMBRE) + ': ' + eur0(antes) + ' → ' + eur0(n) + '.</b> Beneficio previsto' + (presPorPeriodo(d) ? ' de la ' + texto(nomPeriodo()) : '') + ': ' + eur0(b0) + ' → ' + eur0(b1) + '. Queda apuntado en el Excel con tu nombre.';
+              bg.setAttribute('data-ok', '1'); bg.textContent = 'Sí, guardar lo previsto';
               return;
             }
             var ops = cs.map(function (i) {
-              var id = i.getAttribute('data-pre'), n = cts(i.value) / 100, cat = i.closest('[data-pcat]').getAttribute('data-pcat'), des = i.getAttribute('data-des');
+              var id = i.getAttribute('data-pre'), n = cts(i.value) / 100, des = i.getAttribute('data-des');
               if (id) return function () { return T.actualizar('PRESUPUESTOS', id, { IMPORTE: n }); };
-              var nv = { ID_CATEGORIA: cat, IMPORTE: n };
+              var nv = { ID_CATEGORIA: c.ID, IMPORTE: n };
               if (presPorPeriodo(d)) nv[P] = per.id;
               if (conDes && des) nv[DS] = des;
               return function () { return T.crear('PRESUPUESTOS', nv); };
             });
             cerrar();
-            Promise.all(ops.map(function (f) { return f(); })).then(function () { if (ctx.abierta()) ctx.aviso('Presupuesto de la ' + nomPeriodo() + ' guardado en el Excel.'); }, function () {});
+            Promise.all(ops.map(function (f) { return f(); })).then(function () { if (ctx.abierta()) ctx.aviso('Lo previsto de ' + c.NOMBRE + ' guardado en el Excel.'); }, function () {});
           };
-          // Si cambia algo después de pedir confirmar, se vuelve a pedir.
-          vent.querySelector('#p-lista').addEventListener('input', function () { if (bg.getAttribute('data-ok')) { bg.removeAttribute('data-ok'); bg.textContent = 'Revisar y guardar el presupuesto'; } });
         });
       }
 
@@ -1016,6 +1007,7 @@
       el.addEventListener('click', function (e) {
         var t = e.target;
         var b = t.closest('[data-tab]'); if (b) { if (b.getAttribute('data-tab') === 'MOVIMIENTOS') S.mov.desde = ''; if (b.getAttribute('data-tab') === 'CAJA') S.caja.cue = ''; irA(b.getAttribute('data-tab')); return; }
+        if (t.closest('[data-fuera]')) return; // un enlace a Drive se abre en otra pestaña, sin abrir la fila
         if (t.closest('[data-cerrar]')) { cerrar(); return; }
         if (velo.contains(t)) return; // lo de dentro de una ventana lo lleva su ventana
         var g = t.closest('[data-grupo]');
@@ -1031,7 +1023,6 @@
           var ac = a.getAttribute('data-accion');
           if (ac === 'apuntar') formMov(null);
           else if (ac === 'factura') formFac(null);
-          else if (ac === 'preparar') prepararPres();
           else if (ac === 'vermas') { S.mov.ver += VER; pintar(); }
           else if (ac === 'vermascaja') { S.caja.ver = (S.caja.ver || VER) + VER; pintar(); }
           else if (ac === 'ceros') { S.ceros = !S.ceros; pintar(); }
@@ -1047,6 +1038,7 @@
         if (!tr) return;
         if (tr.hasAttribute('data-mov')) { var m = T.fila('MOVIMIENTOS', tr.getAttribute('data-mov')); if (m && !m._nueva) fichaMov(m); }
         else if (tr.hasAttribute('data-fac')) { var f = T.fila('FACTURAS', tr.getAttribute('data-fac')); if (f && !f._nueva) formFac(f); }
+        else if (tr.hasAttribute('data-precat')) formPresCat(tr.getAttribute('data-precat'));
         else if (tr.hasAttribute('data-vercat')) { if (pest.indexOf('MOVIMIENTOS') >= 0) verMovs({ cat: tr.getAttribute('data-vercat') }, S.tab); }
         else if (tr.hasAttribute('data-verdes')) { S.des = tr.getAttribute('data-verdes'); pintar(); window.scrollTo(0, 0); }
         else if (tr.hasAttribute('data-cuenta')) { S.caja.cue = tr.getAttribute('data-cuenta'); S.caja.ver = VER; pintar(); window.scrollTo(0, 0); }
