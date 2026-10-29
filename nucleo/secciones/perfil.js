@@ -186,9 +186,12 @@
     return '<section class="pf-bloque u-perfil"><h2 class="n-grupo">Tu cuenta</h2><dl>' +
       '<dt>Cuenta</dt><dd>' + texto(ctx.correo || '') + '</dd>' +
       '<dt>Secciones</dt><dd>' + texto(ves || 'Solo Perfil') + '</dd>' +
-      '<dt>Dispositivo</dt><dd>Sesión guardada en este dispositivo</dd></dl>' +
-      '<a class="u-btn" href="?salir">Cerrar sesión</a>' +
-      '<p class="u-nota">Al cerrar la sesión tendrás que volver a entrar con tu cuenta de Google.</p></section>';
+      '<dt>Dispositivo</dt><dd>' + (ctx.como ? 'Viendo como ' + texto(ctx.persona) + ' desde la cuenta de ' + texto(ctx.como.persona) : 'Sesión guardada en este dispositivo') + '</dd></dl>' +
+      // T0273: quien administra puede entrar como otra persona (el marco abre la ventana); viéndola, solo volver a su cuenta.
+      (ctx.como ? '<button type="button" class="u-btn" data-n-volver>Volver a mi cuenta</button>' :
+        '<div class="n-botones">' + (ctx.verComo ? '<button type="button" class="u-btn" data-n-como>Entrar como otra persona</button>' : '') +
+        '<a class="u-btn" href="?salir">Cerrar sesión</a></div>' +
+        '<p class="u-nota">Al cerrar la sesión tendrás que volver a entrar con tu cuenta de Google.</p>') + '</section>';
   }
 
   /** Las secciones que van dentro de Perfil («enPerfil», T0269: Pedir a Utilo), como botones al final. */

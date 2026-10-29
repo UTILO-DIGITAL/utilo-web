@@ -92,7 +92,7 @@ body.u { margin: 0; background: var(--color-fondo); color: var(--color-texto);
 .u .u-tabla { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; background: var(--color-superficie);
   border: 1px solid var(--color-linea); border-radius: var(--radio); }
 .u .u-tabla th:first-child { border-top-left-radius: var(--radio); } .u .u-tabla th:last-child { border-top-right-radius: var(--radio); }
-.u .u-tabla th { position: sticky; top: 0; z-index: 1; text-align: left; vertical-align: bottom; padding: var(--e2) var(--e3);
+.u .u-tabla th { position: sticky; top: var(--tope, 0px); z-index: 1; text-align: left; vertical-align: bottom; padding: var(--e2) var(--e3);
   background: var(--color-superficie); border-bottom: 1px solid var(--color-borde-campo);
   font: 700 12px/1.3 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; }
 .u .u-tabla td { padding: var(--e2) var(--e3); border-bottom: 1px solid var(--color-linea); vertical-align: top; }
@@ -114,7 +114,7 @@ body.u { margin: 0; background: var(--color-fondo); color: var(--color-texto);
   background: var(--color-texto); color: var(--color-fondo); font: 600 15px/1.4 var(--fuente-texto); box-shadow: var(--sombra-flota); }
 
 /* ---------- Ventanas (lo único que flota lleva sombra) ---------- */
-.u .u-velo { position: fixed; inset: 0; z-index: 60; background: var(--color-velo); display: none;
+.u .u-velo { position: fixed; inset: var(--tope, 0px) 0 0; z-index: 60; background: var(--color-velo); display: none;
   align-items: flex-start; justify-content: center; overflow-y: auto; padding: 6vh var(--e3); }
 .u .u-velo.abierto { display: flex; }
 .u .u-ventana { background: var(--color-fondo); color: var(--color-texto); border-radius: var(--radio);
@@ -271,6 +271,25 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .n-ventana h2 { font-size: 20px; }
 .u .n-ventana textarea { width: 100%; }
 .u .n-botones { display: flex; flex-wrap: wrap; gap: var(--e2); }
+/* T0273 · Viendo como otra persona: la franja de arriba, siempre a la vista, también con una ventana abierta (va por encima
+ * de los velos, y --tope, su alto, baja lo que se queda fijo arriba: cabeceras de tabla, barras y ventanas), y la lista de
+ * la ventana para elegir a quién. */
+.u .n-como { position: sticky; top: 0; z-index: 65; display: flex; align-items: center; gap: var(--e3);
+  padding: var(--e2) var(--e4); background: var(--color-destacado); color: var(--color-texto); border-bottom: 1px solid var(--color-linea); }
+.u .n-como p { margin: 0; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; line-height: 1.3; }
+.u .n-como small { display: block; font-size: 13px; }
+@media (max-width: 599px) { .u .n-como small { display: none; } .u .n-como .u-btn { padding: 0 var(--e3); } }
+/* Dentro de una ventana (su propia zona de desplazamiento) lo fijo arriba va arriba del todo. */
+.u .u-velo > *, .u .gs-velo > *, .u #alta-velo > *, .u .ver-velo > *, .u .sol-velo > *, .u .fv-velo > * { --tope: 0px; }
+.u .n-como .u-btn { flex: none; color: var(--color-texto); border-color: var(--color-texto); }
+@media (min-width: 900px) { .u .n-como { padding-left: var(--e5); padding-right: var(--e5); } }
+.u .n-como-lista { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); max-height: 50vh; overflow-y: auto; }
+.u .n-como-lista button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 44px;
+  padding: var(--e2) var(--e1); border: 0; border-bottom: 1px solid var(--color-linea); background: transparent; color: var(--color-texto);
+  font: 400 15px/1.3 var(--fuente-texto); text-align: left; cursor: pointer; }
+.u .n-como-lista button:hover { background: var(--color-bloque); }
+.u .n-como-lista button:disabled { opacity: .55; cursor: default; }
+.u .n-como-lista span { font-size: 13px; color: var(--color-suave); overflow-wrap: anywhere; }
 /* Una lista partida en varias tablas (por grupos) con las mismas columnas en todas: la primera, fija. */
 .u .n-tabla-2 { table-layout: fixed; }
 .u .n-tabla-2 th:first-child { width: 42%; }
@@ -969,7 +988,7 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
 @media (max-width: 520px) { .u .gs5 .gs-fotos { grid-template-columns: repeat(2, minmax(0, 1fr)); } .u .gs5 .gs-foto-p { width: 44px; height: 44px; } }
 
 /* Ventanas (fichas): hoja sobre un velo; pie fijo con «Cerrar» y «Guardar N cambios». */
-.u .gs5 .gs-velo { position: fixed; inset: 0; z-index: 60; background: var(--color-velo); display: flex; align-items: flex-start; justify-content: center;
+.u .gs5 .gs-velo { position: fixed; inset: var(--tope, 0px) 0 0; z-index: 60; background: var(--color-velo); display: flex; align-items: flex-start; justify-content: center;
   padding: 6vh var(--e3); overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .u .gs5 .gs-hoja { background: var(--color-fondo); color: var(--color-texto); width: 100%; max-width: 600px; border-radius: var(--radio); padding: var(--e5);
   font-size: 15px; margin-bottom: var(--e5); box-shadow: var(--sombra-flota); }
