@@ -497,6 +497,10 @@
         liga: guardado(CLAVE + 'liga'), fecha: '', jornada: null, golAmbito: guardado(CLAVE + 'golamb') || 'liga', q: '', mios: guardado(CLAVE + 'mios2') ? guardado(CLAVE + 'mios2') === 'si' : !programa && lista(cfg.ACTA_TODAS).indexOf(ctx.perfil) < 0, leido: false };
       // Un árbitro viene a ver sus partidos: entra en Partidos, de todas las competiciones y solo los suyos.
       var arbitra = !programa && quien.actaTodas.indexOf(ctx.perfil) < 0;
+      // T0277: desde Perfil (?s=ligas&partido=PAR…, al tocar un partido o un acta por cerrar) se abre la ficha de ese partido,
+      // con Partidos en su día detrás. El parámetro se quita de la dirección para que al volver no se abra otra vez.
+      var urlP = new URL(location.href), pedido = urlP.searchParams.get('partido') || '';
+      if (pedido) { urlP.searchParams.delete('partido'); history.replaceState(history.state, '', urlP.pathname + urlP.search); }
       if (!S.tab) S.tab = pest[0];
       if (arbitra && !S.comp) S.comp = '*';
 
@@ -1525,7 +1529,22 @@
         tBusca = setTimeout(function () { var r = cont.querySelector('#lg-gol-res'); if (r) r.innerHTML = htmlGolRes(); }, 150);
       });
       ctx.alCambiar(function (t) { if (TABLAS.indexOf(t) >= 0 && !velo.classList.contains('abierto')) pintar(); });
-      ctx.tablas.leer(TABLAS).then(function () { S.leido = true; pintar(); }, function (e) {
+      /** Pone Partidos en la temporada, competición, liga y día de un partido (T0277). false si no está. */
+      function irA(id) {
+        var p = T.fila('PARTIDOS', id), l = p && T.fila('LIGAS', p.ID_LIGA), c = l && T.fila('COMPETICIONES', l.ID_COMPETICION);
+        if (!p) return false;
+        S.tab = 'PARTIDOS'; S.fecha = String(p.FECHA || '');
+        if (c) { S.temp = String(c.ID_TEMPORADA || ''); if (S.comp !== '*') S.comp = String(c.ID); S.liga = String(l.ID); }
+        return true;
+      }
+      ctx.tablas.leer(TABLAS).then(function () {
+        S.leido = true;
+        var ir = pedido && irA(pedido);
+        pintar();
+        if (ir) ficha(pedido);
+        else if (pedido) ctx.aviso('Ese partido ya no está en Ligas.');
+        pedido = '';
+      }, function (e) {
         cont.innerHTML = '<p class="u-error">No se han podido leer las ligas.</p><p class="u-nota">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Vuelve a abrir la sección para probar otra vez.</p>';
       });
       // Los nombres del staff y los colores de los equipos: los guardados, al momento; los de ahora, por detrás.

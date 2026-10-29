@@ -366,6 +366,12 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .pf-dl dt { font-size: 12px; font-weight: 700; color: var(--color-suave); padding-top: 2px; }
 .u .pf-dl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .u .n-lista tbody tr.pf-fila-abre td:first-child::before { transition: none; } }
+/* T0277: una fila que lleva a otra sección (un partido a su ficha en Ligas): se toca entera; el enlace, en la primera columna. */
+.u .n-lista tbody tr.pf-fila-ir { cursor: pointer; }
+.u .n-lista tbody tr.pf-fila-ir:hover td { background: var(--color-bloque); }
+.u .n-lista tbody tr.pf-fila-ir td:first-child a { color: inherit; font-weight: 700; text-decoration: none; }
+.u .n-lista tbody tr.pf-fila-ir td:first-child a::after { content: " ›"; color: var(--color-suave); }
+.u .pf-ir { margin: var(--e2) 0 0; font-size: 14px; }
 .u .pf-et { display: none; }
 .u .pf-ver-todas { margin: var(--e3) 0 0; }
 .u .pf-ver-todas a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; color: var(--color-principal-oscuro); }
