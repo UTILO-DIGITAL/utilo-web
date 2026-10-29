@@ -941,10 +941,21 @@
   }
 
   var PASOS = { sinConfirmar: ['Sin confirmar', 'pr'], confirmado: ['Esperando al proveedor', 'ec'], recibido: ['En el local', 'co'] };
+  var PASOS_PED = [['sinConfirmar', 'Preparado'], ['confirmado', 'Confirmado'], ['recibido', 'En el local']];
   /**
-   * Un pedido, en pocas líneas (Javi: minimalista): número y estado, proveedor y fechas, lo que falta para el siguiente
-   * paso y cómo van sus camisetas con las jugadoras. Lo demás (colores y tallas, lo pagado, notas, extracto y factura),
-   * plegado en «Detalle». A la vista, solo el botón del paso siguiente y el PDF.
+   * Lo que cuesta un pedido, sin IVA: lo pagado según su factura o, si no la tiene, los precios de sus líneas (los del
+   * catálogo del proveedor al pedirlo). { total, unidad, factura } en céntimos, o null si no hay precio.
+   */
+  function importePedido(p, lineas, unidades) {
+    var c = costePedido(p);
+    if (c) return { total: c.base, unidad: c.unidad, factura: true };
+    var t = 0, con = 0;
+    lineas.forEach(function (l) { var pu = cam5Cts_(l.PRECIO_UNIDAD), n = Number(l.CANTIDAD) || 0; if (pu !== null) { t += pu * n; con += n; } });
+    return con && con === unidades ? { total: t, unidad: t / con, factura: false } : null;
+  }
+  /**
+   * Un pedido: lo que se ve sin abrir (estado, camisetas, precio, la barra de sus pasos y la de las jugadoras que ya
+   * tienen la suya) y, en «Detalle», los colores y tallas, lo que falta entregar, la factura y las notas.
    */
   function htmlPedido(p, lineas, jug) {
     var paso = cam5Paso_(p), unidades = lineas.reduce(function (s, l) { return s + (Number(l.CANTIDAD) || 0); }, 0);
@@ -954,16 +965,27 @@
       porColor[l.ID_COLOR].n += Number(l.CANTIDAD) || 0;
       porColor[l.ID_COLOR].t[l.TALLA] = (porColor[l.ID_COLOR].t[l.TALLA] || 0) + (Number(l.CANTIDAD) || 0);
     });
-    var nuevo = !!p._nueva, id = texto(p.ID);
+    var nuevo = !!p._nueva, id = texto(p.ID), i = PASOS_PED.map(function (x) { return x[0]; }).indexOf(paso);
     var conJug = Object.keys(jug).filter(function (e) { return e !== 'Sin camiseta'; }).reduce(function (n, e) { return n + jug[e]; }, 0), ent = jug['Entregada'] || 0;
+    var imp = nuevo ? null : importePedido(p, lineas, unidades);
     var falta = paso === 'sinConfirmar' ? 'Falta mandarlo al proveedor y marcarlo confirmado.' :
       paso === 'confirmado' ? 'Esperando a que llegue' + (p.FECHA_ESTIMADA ? ' (hacia el ' + fecha(p.FECHA_ESTIMADA) + ')' : '') + '.' : 'Llegó el ' + fecha(p.FECHA_RECIBIDO) + '.';
     var raro = paso !== 'recibido' && !nuevo && (jug['Por preparar'] || jug['Preparada'] || jug['Entregada']);
     return '<li class="cm-ped' + (p._pendiente ? ' cm-guardando' : '') + '"><div class="cm-ped-cab"><b>' + texto(nuevo ? 'Pedido nuevo' : p.ID) + '</b>' +
       '<span class="n-estado n-e-' + PASOS[paso][1] + '">' + PASOS[paso][0] + '</span></div>' +
-      '<p class="u-nota">' + texto([p.ID_PROVEEDOR ? nombreProveedor(p.ID_PROVEEDOR) : '', unidades ? plural(unidades, 'camiseta', 'camisetas') : '', p.FECHA_PEDIDO ? 'pedido el ' + fecha(p.FECHA_PEDIDO) : ''].filter(String).join(' · ')) + '</p>' +
+      '<p class="u-nota">' + texto([p.ID_PROVEEDOR ? nombreProveedor(p.ID_PROVEEDOR) : '', p.FECHA_PEDIDO ? 'pedido el ' + fecha(p.FECHA_PEDIDO) : ''].filter(String).join(' · ')) + '</p>' +
+      '<dl class="cm-ped-cifras"><div><dt>Camisetas</dt><dd>' + unidades + '</dd></div>' +
+        '<div><dt>Precio unidad</dt><dd>' + (imp ? eur(imp.unidad) : '—') + '</dd></div>' +
+        '<div><dt>Total</dt><dd>' + (imp ? eur(imp.total) : '—') + '</dd></div></dl>' +
+      (imp ? '<p class="u-nota cm-ped-iva">Sin IVA · ' + (imp.factura ? 'según su factura' : 'según el catálogo del proveedor') + '</p>' :
+        nuevo ? '' : '<p class="u-nota cm-ped-iva">Sin precio: enlaza su factura o pon el precio en el catálogo del proveedor.</p>') +
       (nuevo ? '<p class="u-nota">Creando el pedido, sus líneas y las camisetas en el Excel…</p>' :
-        '<p class="cm-ped-l1">' + texto(falta) + (conJug ? ' Jugadoras: <b>' + ent + ' de ' + conJug + '</b> entregadas.' : unidades ? ' Para el local.' : '') + '</p>' +
+        '<ol class="cm-pasos" aria-label="Paso ' + (i + 1) + ' de ' + PASOS_PED.length + '">' + PASOS_PED.map(function (x, k) {
+          return '<li class="' + (k < i || paso === 'recibido' ? 'cm-hecho' : k === i ? 'cm-ahora' : '') + '"><i></i><small>' + x[1] + '</small></li>';
+        }).join('') + '</ol>' +
+        '<p class="cm-ped-l1">' + texto(falta) + '</p>' +
+        (conJug ? '<p class="cm-ped-j">Jugadoras: <b>' + ent + ' de ' + conJug + '</b> ya la tienen</p><div class="cm-barra" aria-hidden="true"><i style="width:' + Math.round(100 * ent / conJug) + '%"></i></div>' :
+          unidades ? '<p class="cm-ped-j u-nota">Para el local (sin jugadoras).</p>' : '') +
         (raro ? '<p class="u-mal">Ya hay camisetas suyas en el local y no consta como llegado: márcalo con «Ha llegado».</p>' : '') +
         '<details class="cm-ped-det"><summary>Detalle</summary>' +
         (orden.length ? '<ul class="cm-ped-l">' + orden.map(function (col) {
