@@ -70,26 +70,83 @@
     return h + '</section>';
   }
 
-  function htmlBloque(b) {
+  /** La vista elegida de cada bloque con vistas (por su id), mientras la página está abierta. */
+  var ELEGIDA = {};
+  /**
+   * Un bloque con vistas (T0255): { id, titulo, vista (la de por defecto), vistas: [{ id, grupo, titulo, …lo de un bloque }] }.
+   * Arriba sale «Ver» con un desplegable (agrupado por grupo) y debajo, la vista elegida como un bloque más.
+   */
+  function htmlBloque(b, i) {
+    if (b.error || !b.vistas || !b.vistas.length) return htmlUno(b, '', i);
+    var k = b.id || b.titulo, sel = ELEGIDA[k] || b.vista;
+    var v = b.vistas.filter(function (x) { return x.id === sel; })[0] || b.vistas[0], grupo = null, ops = '';
+    b.vistas.forEach(function (x) {
+      if ((x.grupo || '') !== grupo) { ops += (grupo !== null && grupo !== '' ? '</optgroup>' : '') + (x.grupo ? '<optgroup label="' + texto(x.grupo) + '">' : ''); grupo = x.grupo || ''; }
+      ops += '<option value="' + texto(x.id) + '"' + (x === v ? ' selected' : '') + '>' + texto(x.titulo) + '</option>';
+    });
+    if (grupo) ops += '</optgroup>';
+    var ver = '<label class="pf-ver"><span>Ver</span><select data-pfvista="' + i + '">' + ops + '</select></label>';
+    return htmlUno(Object.assign({}, b, v, { titulo: b.titulo, vistas: null, _vista: v.id }), ver, i);
+  }
+
+  function htmlUno(b, ver, i) {
     if (b.error) return htmlError(b);
     var cols = b.columnas || [], filas = b.filas || [];
-    var h = '<section class="pf-bloque"><h2 class="n-grupo">' + texto(b.titulo) + (b.cuantas != null ? ' <span class="u-cifra">' + b.cuantas + '</span>' : '') + '</h2>';
+    var h = '<section class="pf-bloque" data-pfb="' + i + '"><div class="pf-cab"><h2 class="n-grupo">' + texto(b.titulo) + (b.cuantas != null ? ' <span class="u-cifra">' + b.cuantas + '</span>' : '') + '</h2>' + (ver || '') + '</div>';
+    if (b.cifras && b.cifras.length) h += htmlCifras(b.cifras);
     if (b.nota) h += '<p class="u-nota">' + texto(b.nota) + '</p>';
-    if (!filas.length) return h + (b.nota ? '' : '<p class="u-vacio">' + texto(b.vacio || 'No hay nada tuyo aquí por ahora.') + '</p>') + '</section>';
-    var suma = b.sumar ? cols.filter(function (c) { return c.nombre === b.sumar; })[0] : null;
-    h += '<table class="u-tabla n-lista"><thead><tr>' + cols.map(function (c) { return '<th' + (num(c.tipo) ? ' class="num"' : '') + '>' + texto(c.titulo) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    if (!filas.length) h += b.nota ? '' : '<p class="u-vacio">' + texto(b.vacio || 'No hay nada tuyo aquí por ahora.') + '</p>';
+    else {
+      h += htmlTabla(cols, filas, b.sumar, b.total);
+      if (b.cuantas > filas.length) h += '<p class="u-nota">Y ' + plural(b.cuantas - filas.length, 'más', 'más') + '.</p>';
+    }
+    return h + htmlAccion(b.accion) + htmlDetalle(b.detalle, b._vista, b.id || b.titulo) + '</section>';
+  }
+
+  /** Una tabla de un bloque; con sumar, el total debajo. Una columna de tipo «marca» sale como una etiqueta (Pagado, Por cobrar…). */
+  function htmlTabla(cols, filas, sumar, total) {
+    var suma = sumar ? cols.filter(function (c) { return c.nombre === sumar; })[0] : null;
+    return '<table class="u-tabla n-lista"><thead><tr>' + cols.map(function (c) { return '<th' + (num(c.tipo) ? ' class="num"' : '') + '>' + texto(c.titulo) + '</th>'; }).join('') + '</tr></thead><tbody>' +
       filas.map(function (f) {
         return '<tr>' + cols.map(function (c, i) {
           var v = valor(f[c.nombre], c.tipo);
-          return '<td' + (num(c.tipo) ? ' class="num"' : i === 0 ? ' class="u-tabla-t"' : '') + ' data-t="' + texto(c.titulo) + '">' + (v ? texto(v) : '<span class="u-tabla-s">—</span>') + '</td>';
+          if (c.tipo === 'marca' && v) v = '<span class="pf-marca" data-m="' + texto(String(v).split(' ')[0].toLowerCase()) + '">' + texto(v) + '</span>';
+          else v = v ? texto(v) : '';
+          var cl = [num(c.tipo) ? 'num' : i === 0 ? 'u-tabla-t' : '', v ? '' : 'pf-vacia'].filter(Boolean).join(' '); // vacía: en el móvil no sale
+          return '<td' + (cl ? ' class="' + cl + '"' : '') + ' data-t="' + texto(c.titulo) + '">' + (v || '<span class="u-tabla-s">—</span>') + '</td>';
         }).join('') + '</tr>';
       }).join('') + '</tbody>' +
-      (suma && b.total != null ? '<tfoot><tr>' + cols.map(function (c, i) {
-        return c === suma ? '<td class="num" data-t="Total">' + texto(valor(b.total, suma.tipo)) + '</td>' : '<td>' + (i === 0 ? 'Total' : '') + '</td>';
+      (suma && total != null ? '<tfoot><tr>' + cols.map(function (c, i) {
+        return c === suma ? '<td class="num" data-t="Total">' + texto(valor(total, suma.tipo)) + '</td>' : '<td>' + (i === 0 ? 'Total' : '') + '</td>';
       }).join('') + '</tr></tfoot>' : '') +
       '</table>';
-    if (b.cuantas > filas.length) h += '<p class="u-nota">Y ' + plural(b.cuantas - filas.length, 'más', 'más') + '.</p>';
-    return h + '</section>';
+  }
+
+  /** Lo que se despliega, abierto o no (por bloque), mientras la página está abierta. */
+  var ABIERTO = {};
+  /**
+   * El detalle de un bloque, plegado debajo (T0255): { titulo, columnas, filas, nota }. Si las filas llevan _en (las vistas en
+   * las que salen), solo las de la vista elegida.
+   */
+  function htmlDetalle(d, vista, k) {
+    if (!d || !d.filas) return '';
+    var filas = d.filas.filter(function (f) { return !f._en || !vista || f._en.indexOf(vista) >= 0; });
+    if (!filas.length) return '';
+    return '<details class="pf-detalle" data-pfdet="' + texto(k) + '"' + (ABIERTO[k] ? ' open' : '') + '><summary>' + texto(d.titulo || 'Ver el detalle') + ' <span class="u-cifra">' + filas.length + '</span></summary>' +
+      (d.nota ? '<p class="u-nota">' + texto(d.nota) + '</p>' : '') + htmlTabla(d.columnas || [], filas) + '</details>';
+  }
+
+
+  /** Las cifras de un bloque, grandes y arriba: [{ titulo, valor, tipo, destacar }]. */
+  function htmlCifras(cs) {
+    return '<div class="pf-cifras">' + cs.map(function (c) {
+      return '<div' + (c.destacar ? ' class="pf-destacar"' : '') + '><b class="u-cifra">' + texto(valor(c.valor, c.tipo) || '0') + '</b><span>' + texto(c.titulo) + '</span></div>';
+    }).join('') + '</div>';
+  }
+  /** El botón de un bloque ({ texto, enlace }): un enlace https que se abre aparte (p. ej. un WhatsApp con el mensaje escrito). */
+  function htmlAccion(a) {
+    if (!a || !/^https:\/\//.test(String(a.enlace || ''))) return '';
+    return '<div class="n-botones pf-accion"><a class="u-btn u-btn-accion" href="' + texto(a.enlace) + '" target="_blank" rel="noopener">' + texto(a.texto || 'Abrir') + '</a></div>';
   }
 
   function htmlCuenta(ctx) {
@@ -104,11 +161,26 @@
 
   window.UN.registrar('PERFIL', {
     abrir: function (el, ctx) {
+      var visto = null; // lo que se está enseñando
+      function bloques(d) { return (d.bloques || []).map(htmlBloque).join(''); }
+      // Cambiar la vista de un bloque solo vuelve a pintar ese bloque.
+      el.addEventListener('change', function (e) {
+        var s = e.target.closest('[data-pfvista]');
+        if (!s || !visto) return;
+        var i = Number(s.getAttribute('data-pfvista')), b = (visto.bloques || [])[i], sec = s.closest('.pf-bloque');
+        if (!b || !sec) return;
+        ELEGIDA[b.id || b.titulo] = s.value;
+        sec.outerHTML = htmlBloque(b, i);
+        var n = el.querySelector('[data-pfvista="' + i + '"]'); if (n) n.focus();
+      });
+      // Si el detalle de un bloque está desplegado, sigue así al cambiar de vista o al ponerse al día.
+      el.addEventListener('toggle', function (e) { var d = e.target; if (d.getAttribute && d.hasAttribute('data-pfdet')) ABIERTO[d.getAttribute('data-pfdet')] = d.open; }, true);
       function pintar(d) {
+        visto = d;
         el.innerHTML = '<div class="pf">' + htmlQuien(ctx) +
           // Sin tareas abiertas, el bloque de tareas va después de lo demás: arriba, lo que hay que hacer.
-          (d ? (d.tareas && !d.tareas.error && !d.tareas.abiertas ? (d.bloques || []).map(htmlBloque).join('') + htmlTareas(d.tareas, d.hoy)
-            : htmlTareas(d.tareas, d.hoy) + (d.bloques || []).map(htmlBloque).join('')) : cargando()) +
+          (d ? (d.tareas && !d.tareas.error && !d.tareas.abiertas ? bloques(d) + htmlTareas(d.tareas, d.hoy)
+            : htmlTareas(d.tareas, d.hoy) + bloques(d)) : cargando()) +
           htmlCuenta(ctx) +
           '<p class="u-nota pf-hora" id="pf-hora">' + (d ? 'Al día a las ' + hora(d.leido) + '.' : '') + '</p></div>';
       }
