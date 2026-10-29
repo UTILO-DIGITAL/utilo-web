@@ -842,3 +842,16 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
   .u .cm-otra .u-campo:first-child { grid-column: auto; }
   .u .cm-eqs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e3); }
 }
+
+/* ---------- Zona segura de abajo en el iPhone (T0256) ----------
+ * Las ventanas ocupan toda la pantalla en el móvil y lo último (Guardar, Cerrar…) quedaba debajo de la barra de inicio
+ * del iPhone, sin poder tocarlo. Se deja ese hueco (env(safe-area-inset-bottom), con viewport-fit=cover) al final de cada
+ * ventana y en los pies fijos. Va con html delante para ganar a kanban.css, que se carga después. */
+html .u .u-velo, html .u .gs5 .gs-velo, html .u #alta-velo, html .u .ver-velo, html .u .sol-velo, html .u .fv-velo {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--e2)); scroll-padding-bottom: env(safe-area-inset-bottom, 0px); }
+@media (max-width: 640px) {
+  html .u .u-velo, html .u .gs5 .gs-velo, html .u #alta-velo, html .u .ver-velo, html .u .sol-velo, html .u .fv-velo {
+    padding-bottom: env(safe-area-inset-bottom, 0px); }
+  html .u .u-ventana, html .u .gs5 .gs-hoja { padding-bottom: calc(var(--e4) + env(safe-area-inset-bottom, 0px)); }
+  html .u .gs5 .gs-pie { padding-bottom: calc(var(--e2) + env(safe-area-inset-bottom, 0px)); }
+}
