@@ -978,7 +978,7 @@
       }).join('') + '</div>') +
       '<p class="u-nota">' + texto([p.ID_PROVEEDOR ? nombreProveedor(p.ID_PROVEEDOR) : '', p.FECHA_PEDIDO ? 'pedido el ' + fecha(p.FECHA_PEDIDO) : '', nuevo ? '' : falta].filter(String).join(' · ')) + '</p>' +
       '<p class="cm-ped-l1"><b>' + plural(unidades, 'camiseta', 'camisetas') + '</b>' +
-        (imp ? ' · ' + eur(imp.unidad) + '/u · <b>' + eur(imp.total) + '</b> <span class="u-nota" title="' + (imp.factura ? 'Según su factura' : 'Según el catálogo del proveedor') + '">sin IVA</span>' : nuevo ? '' : ' · <span class="u-nota">sin precio</span>') + '</p>' +
+        (imp ? ' · ' + eur(imp.unidad) + '/u · <b>' + eur(imp.total) + '</b> <span class="u-nota" title="' + (imp.factura ? 'Según su factura' : 'Según el catálogo del proveedor') + '">sin IVA</span>' : nuevo ? '' : ' · <span class="u-nota">sin precio</span>') + (nuevo ? '' : htmlDocsPedido(p)) + '</p>' +
       (nuevo ? '<p class="u-nota">Creando el pedido, sus líneas y las camisetas en el Excel…</p>' :
         (conJug ? '<div class="cm-ped-j"><span>Jugadoras <b>' + ent + ' de ' + conJug + '</b></span><span class="cm-barra" aria-hidden="true"><i style="width:' + Math.round(100 * ent / conJug) + '%"></i></span></div>' :
           unidades ? '<p class="u-nota">Para el local (sin jugadoras).</p>' : '') +
@@ -993,12 +993,25 @@
           var x = ESTADOS.filter(function (y) { return y[0] === e; })[0]; return jug[e] + ' ' + (jug[e] === 1 || !x ? e : x[1]).toLowerCase();
         }).join(' · ') + '</p>' : '') +
         htmlCoste(p) + (p.NOTAS ? '<p class="u-nota">' + texto(p.NOTAS) + '</p>' : '') +
-        (/^https?:\/\//.test(String(p.ARCHIVO_URL || '')) ? '<p><a href="' + texto(p.ARCHIVO_URL) + '" target="_blank" rel="noopener">Ver el documento del pedido</a></p>' : '') +
         '<div class="n-botones"><button type="button" class="u-btn u-btn-texto" data-cm-p="' + id + '" data-cm-acc="extracto">Extracto en texto</button>' +
-        '<button type="button" class="u-btn u-btn-texto" data-cm-p="' + id + '" data-cm-acc="factura">' + (p.ID_FACTURA ? 'Cambiar factura' : 'Enlazar factura') + '</button></div></details>' +
+        (p.ID_FACTURA ? '<button type="button" class="u-btn u-btn-texto" data-cm-p="' + id + '" data-cm-acc="factura">Cambiar factura</button>' : '') + '</div></details>' +
         '<div class="n-botones">' + (paso === 'sinConfirmar' ? '<button type="button" class="u-btn" data-cm-p="' + id + '" data-cm-acc="confirmar">Marcar confirmado</button>' :
           paso === 'confirmado' ? '<button type="button" class="u-btn" data-cm-p="' + id + '" data-cm-acc="llegado">Ha llegado</button>' : '') +
         '<button type="button" class="u-btn' + (paso === 'recibido' ? '' : ' u-btn-texto') + '" data-cm-p="' + id + '" data-cm-acc="pdf">PDF para el proveedor</button></div>') + '</li>';
+  }
+
+  /**
+   * Los papeles del pedido a la vista: su factura (abre el PDF de FACTURAS · ARCHIVO_URL) y el documento del pedido, si
+   * lo tiene. Sin factura, «Enlazar factura».
+   */
+  function htmlDocsPedido(p) {
+    var url = function (u) { return /^https?:\/\//.test(String(u || '')); };
+    var a = function (u, t) { return '<a href="' + texto(u) + '" target="_blank" rel="noopener">' + t + ' ↗</a>'; };
+    var f = p.ID_FACTURA ? S.T.fila('FACTURAS', p.ID_FACTURA) : null, l = [];
+    if (f) l.push(url(f.ARCHIVO_URL) ? a(f.ARCHIVO_URL, 'Factura ' + texto(f.NUMERO || f.ID)) : '<span class="u-nota">Factura ' + texto(f.NUMERO || f.ID) + ' (sin PDF en Economía)</span>');
+    else l.push('<button type="button" data-cm-p="' + texto(p.ID) + '" data-cm-acc="factura">Enlazar factura</button>');
+    if (url(p.ARCHIVO_URL)) l.push(a(p.ARCHIVO_URL, 'Documento del pedido'));
+    return '<span class="cm-ped-docs"> · ' + l.join(' · ') + '</span>';
   }
 
   function darLibres(b, m) {
