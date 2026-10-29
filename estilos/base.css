@@ -1239,6 +1239,48 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
 .u .cm-otra .u-campo:first-child { grid-column: 1 / -1; }
 .u .cm-rec-pie { border-top: 1px solid var(--color-linea); padding-top: var(--e3); display: flex; flex-direction: column; gap: var(--e2); }
 .u .cm-rec-pie p { margin: 0; }
+/* T0268 · pack de camisetas incluidas, personalizadas y catálogo de cada proveedor */
+.u .cm-pers { display: inline-block; padding: 0 var(--e1); border: 1px solid var(--estado-pr); border-radius: var(--radio-peq); color: var(--estado-pr); font-weight: 700; font-size: 12px; line-height: 1.5; }
+.u .cm-pack-l { margin: 0 0 var(--e2); font-size: 14px; }
+.u .cm-pack-c { font-weight: 700; letter-spacing: .02em; overflow-wrap: anywhere; }
+.u p.cm-pack-c { margin: 2px 0 var(--e2); font-size: 16px; }
+.u .cm-packs { margin-top: var(--e6); }
+.u .cm-packs .n-grupo { margin-bottom: var(--e2); }
+.u .cm-prov-b { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--e1); flex: none; }
+.u .cm-ct li, .u .cm-pp-cols li { display: grid; grid-template-columns: minmax(0, 1fr) 7.5em 5em; align-items: center; gap: var(--e2); padding: var(--e1) 0; }
+.u .cm-pp-cols li { grid-template-columns: minmax(0, 1fr) auto; }
+.u .cm-pp-cols li > span { display: flex; align-items: center; }
+.u .cm-ct-cod, .u .cm-ct-pre { width: 100%; min-height: 44px; padding: 0 var(--e2); border: 1.5px solid var(--color-borde-campo); border-radius: var(--radio); font: inherit; color: var(--color-texto); background: var(--color-superficie); }
+.u .cm-pack-t { margin: var(--e2) 0 0; font-size: 13px; font-weight: 700; color: var(--color-suave); }
+.u .cm-en-linea { min-height: 0; padding: 0; vertical-align: baseline; font-size: inherit; }
+.u .cm-pack-cab { display: flex; align-items: baseline; gap: var(--e3); margin-top: var(--e2); }
+.u .cm-pack-cab .cm-pack-t { margin: 0; }
+.u .cm-pp-t td, .u .cm-pp-t th { vertical-align: middle; }
+.u .cm-pp-n { width: 4.2em; min-height: 40px !important; padding: 0 var(--e1) !important; text-align: center; }
+.u .cm-pp-mano { border-color: var(--color-principal-oscuro) !important; background: var(--color-bloque) !important; }
+.u .cm-pp-add { display: grid; grid-template-columns: 1fr 1fr auto; gap: var(--e3); align-items: end; }
+.u .cm-ped-det { margin: var(--e2) 0; }
+.u .cm-ped-det summary { cursor: pointer; min-height: 36px; display: flex; align-items: center; gap: var(--e2); font-weight: 700; font-size: 14px; color: var(--color-principal-oscuro); }
+.u .cm-ped-f { margin: 0 0 var(--e3); }
+.u .cm-temp-intro { margin: 0 0 var(--e3); }
+.u .cm-temp-intro summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 700; color: var(--color-principal-oscuro); }
+.u .cm-temp-intro ol { margin: 0 0 var(--e2); padding-left: 1.3em; display: grid; gap: var(--e1); font-size: 14px; }
+.u .cm-temp .cm-dl { margin-top: var(--e2); }
+.u .cm-temp .cm-dl select { min-height: 40px; max-width: 100%; }
+.u .cm-ped-l1 { margin: var(--e1) 0; font-size: 14px; }
+.u .cm-ped-j { display: flex; align-items: center; gap: var(--e3); margin: var(--e1) 0 0; font-size: 14px; }
+.u .cm-ped-j .cm-barra { flex: 1; margin: 0; }
+.u .cm-ped-docs a, .u .cm-ped-docs button { font-weight: 700; color: var(--color-texto); }
+.u .cm-ped-docs button { padding: 0; border: 0; background: none; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.u .cm-ped-pasos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin: var(--e2) 0 var(--e1); }
+.u .cm-ped-pasos i { height: 4px; border-radius: var(--radio-peq); background: var(--color-linea); }
+.u .cm-ped-pasos .cm-hecho { background: var(--color-bien); }
+.u .cm-ped-reg { margin: 0 0 var(--e1); font-size: 13px; }
+.u .cm-ped-reg summary { cursor: pointer; }
+.u .cm-ped-reg ol { margin: var(--e1) 0 var(--e2); padding: 0 0 0 var(--e3); border-left: 2px solid var(--color-linea); list-style: none; }
+.u .cm-ped-reg li { margin: 0 0 var(--e1); }
+.u .cm-cobro-l { display: block; font-weight: 400; margin-top: 2px; }
+.u .cm-ct-todos { display: grid; grid-template-columns: 1fr auto; gap: var(--e3); align-items: end; margin: var(--e3) 0; }
 /* En el móvil, los filtros en una fila que se desliza y los campos uno debajo de otro: la lista empieza arriba. */
 @media (max-width: 899px) {
   .u .cm-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 calc(var(--e4) * -1); padding: 0 var(--e4); }
