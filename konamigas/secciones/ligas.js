@@ -18,7 +18,9 @@
  * - Cada cambio se ve al momento y va al motor por detrás; si dice que no, vuelve a como estaba.
  *
  * Personalización (config.json · nucleo.secciones.ligas.config, declarada en su modulo.json): PESTANAS, PUNTOS,
- * SIN_CLASIFICACION, ACTA_TODAS, PROGRAMAR, GOLEADORAS y AYUDA.
+ * SIN_CLASIFICACION, ACTA_TODAS, PROGRAMAR, GOLEADORAS, ACTUALIZAR_PAGOS y AYUDA.
+ * - T0274: a quien puede (ACTUALIZAR_PAGOS, Socio), al final, cómo está la copia de los pagos y las tarifas del staff (de
+ *   ECONOMIA a COMPETICION, para que árbitros y gestores vean sus cobros sin ECONOMIA) y «Actualizar pagos del staff».
  */
 (function () {
   'use strict';
@@ -422,7 +424,26 @@
     return r;
   }
 
-  var CALC = { hoy: hoy, fecha: fecha, fechaDia: fechaDia, lunes: lunes, sumarDias: sumarDias, temporadaActual: temporadaActual, ligasDe: ligasDe,
+  /**
+   * T0274 · Cómo está la copia de los pagos y las tarifas del staff (ligasPagosStaff del motor): { ultima, noche, error } →
+   * las frases para Socio. ahora: 'aaaa-mm-ddThh:mm' (para ver si la copia de la noche lleva días sin hacerse).
+   * { ultima: texto, nocheMal: texto o '', error: texto o '', avisos: [texto], mas: n }.
+   */
+  function estadoCopia(e, ahora) {
+    e = e || {};
+    var u = e.ultima, n = e.noche;
+    var cuando = function (s) { var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})/.exec(String(s || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] + ' a las ' + m[4] : String(s || ''); };
+    var dias = function (s) { var a = deIso(s), b = deIso(ahora); return a && b ? Math.round((b - a) / 86400000) : 0; };
+    var out = { ultima: '', nocheMal: '', error: e.error || '', avisos: u && u.avisos ? u.avisos : [], mas: u && u.mas || 0 };
+    out.ultima = !u ? 'Todavía no se han copiado nunca.' : 'Última copia: ' + cuando(u.cuando) + ' (' + (u.quien === 'Cada noche' ? 'la de cada noche' : u.quien || '—') + '): ' +
+      u.pagos + (u.pagos === 1 ? ' pago' : ' pagos') + ' y ' + u.tarifas + (u.tarifas === 1 ? ' tarifa.' : ' tarifas.');
+    if (n && n.error) out.nocheMal = 'La copia de la noche del ' + cuando(n.cuando).split(' a las')[0] + ' ha fallado: ' + n.error;
+    else if (!n || !n.cuando) out.nocheMal = 'La copia de cada noche todavía no está en marcha: la pone Utilo.';
+    else if (dias(n.cuando) > 2) out.nocheMal = 'La copia de cada noche no se hace desde el ' + cuando(n.cuando).split(' a las')[0] + ': avisa a Utilo.';
+    return out;
+  }
+
+  var CALC = { hoy: hoy, estadoCopia: estadoCopia, fecha: fecha, fechaDia: fechaDia, lunes: lunes, sumarDias: sumarDias, temporadaActual: temporadaActual, ligasDe: ligasDe,
     jornadas: jornadas, jornadaInicial: jornadaInicial, clasificacion: clasificacion, goleadoras: goleadoras, golesEquipo: golesEquipo,
     descansan: descansan, equiposDe: equiposDe, puedeActa: puedeActa, conResultado: conResultado, incompleto: incompleto, huecosMover: huecosMover, huecoEn: huecoEn, arbitroEn: arbitroEn, jornadaMovible: jornadaMovible,
     textoAviso: textoAviso, fechaLarga: fechaLarga, recuperacionDe: recuperacionDe, aplazadosPendientes: aplazadosPendientes, huecosLibres: huecosLibres,
@@ -488,9 +509,41 @@
         '<div class="lg-elige" id="lg-elige"></div></div></div>' +
         '<div class="u-pestanas" role="tablist">' + pest.map(function (p) { return '<button type="button" role="tab" data-tab="' + p + '">' + PESTANAS[p] + '</button>'; }).join('') + '</div>' +
         '<div id="lg-cont" class="lg-cont"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div>' +
+        '<div id="lg-copia" class="u-bloque" hidden></div>' +
         '<div class="u-velo" id="lg-velo"><div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="lg-vt"><div class="n-ventana" id="lg-vent"></div></div></div>';
       var cont = el.querySelector('#lg-cont'), velo = el.querySelector('#lg-velo'), vent = el.querySelector('#lg-vent');
       var selTemp = el.querySelector('#lg-temp'), chkMios = el.querySelector('#lg-mios'), elige = el.querySelector('#lg-elige');
+
+      /* ---------- pagos y tarifas del staff (T0274) ---------- */
+
+      // Árbitros y gestores no tienen ECONOMIA: sus cobros y su nivel salen de una copia en COMPETICION que el motor rehace
+      // al apuntar un pago en Economía y cada noche. Quien puede (ACTUALIZAR_PAGOS, Socio) ve al final cómo está y la rehace.
+      var copiaEl = el.querySelector('#lg-copia'), copiaPuede = !!ctx.admin || lista(cfg.ACTUALIZAR_PAGOS).indexOf(ctx.perfil) >= 0, copiaE = null, copiando = false;
+      function pintarCopia() {
+        if (!copiaPuede || !copiaE) { copiaEl.hidden = true; return; }
+        var x = estadoCopia(copiaE, hoy() + 'T00:00');
+        copiaEl.hidden = false;
+        copiaEl.innerHTML = '<p><b>Pagos y tarifas del staff</b></p>' +
+          '<p class="u-nota">Árbitros y gestores no tienen Economía: sus cobros y su nivel salen de una copia que se hace sola al apuntar un pago a staff en Economía y cada noche. Si has cambiado algo a mano en el Excel ECONOMIA, cópialos ahora.</p>' +
+          '<p class="u-nota">' + texto(x.ultima) + '</p>' +
+          (x.nocheMal ? '<p class="u-error">' + texto(x.nocheMal) + '</p>' : '') + (x.error ? '<p class="u-error">' + texto(x.error) + '</p>' : '') +
+          (x.avisos.length ? '<details><summary class="u-nota">' + (x.avisos.length + x.mas === 1 ? '1 pago parece de staff, pero no es de nadie de STAFF: no se copia' :
+            (x.avisos.length + x.mas) + ' pagos parecen de staff, pero no son de nadie de STAFF: no se copian') + '</summary><ul class="u-nota">' +
+            x.avisos.map(function (a) { return '<li>' + texto(a) + '</li>'; }).join('') + (x.mas ? '<li>y ' + x.mas + ' más</li>' : '') + '</ul></details>' : '') +
+          '<p><button type="button" class="u-btn" data-accion="copiar"' + (copiando ? ' disabled' : '') + '>' + (copiando ? 'Copiando…' : 'Actualizar pagos del staff') + '</button></p>';
+      }
+      function copiar() {
+        if (copiando) return;
+        copiando = true; pintarCopia();
+        ctx.llamar('ligasPagosStaff', [true]).then(function (e) {
+          copiando = false; copiaE = e || {}; pintarCopia();
+          var u = copiaE.ultima;
+          if (ctx.abierta() && u) ctx.aviso(u.cambiada ? 'Pagos del staff copiados: ' + u.pagos + ' pagos y ' + u.tarifas + ' tarifas.' : 'Los pagos del staff ya estaban al día.');
+        }, function (err) {
+          copiando = false; pintarCopia();
+          if (ctx.abierta()) ctx.aviso('No se han podido copiar: ' + String(err.message).replace(/^\w+:\s*/, ''));
+        });
+      }
 
       /* ---------- datos ---------- */
 
@@ -1452,6 +1505,7 @@
         b = t.closest('[data-golamb]'); if (b) { S.golAmbito = b.getAttribute('data-golamb'); guardado(CLAVE + 'golamb', S.golAmbito); pintar(); return; }
         b = t.closest('[data-accion="jornadas"]'); if (b) { formJornadas(); return; }
         b = t.closest('[data-accion="recuperar"]'); if (b) { formRecuperar(actual.liga.ID, null); return; }
+        b = t.closest('[data-accion="copiar"]'); if (b) { copiar(); return; }
         b = t.closest('[data-ir-pend]'); if (b) { S.comp = '*'; S.mios = true; S.fecha = b.getAttribute('data-ir-pend'); pintar(); return; }
         b = t.closest('[data-p]'); if (b) ficha(b.getAttribute('data-p'));
       });
@@ -1480,6 +1534,7 @@
         if (ix) ix.staff = indice(staff.staff);
         if (ctx.abierta() && !velo.classList.contains('abierto')) pintar();
       }, function () {});
+      if (copiaPuede) ctx.llamar('ligasPagosStaff', [false]).then(function (e) { copiaE = e || {}; pintarCopia(); }, function () {});
       ctx.llamar('ligasColores').then(function (r) {
         colores = r || {}; guardadoJson(KCOL, colores);
         if (ctx.abierta() && !velo.classList.contains('abierto')) pintar();
