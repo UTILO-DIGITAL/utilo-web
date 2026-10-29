@@ -979,7 +979,7 @@
       (nuevo ? '' : htmlRegistro(p)) +
       '<p class="u-nota">' + texto([p.ID_PROVEEDOR ? nombreProveedor(p.ID_PROVEEDOR) : '', p.FECHA_PEDIDO ? 'pedido el ' + fecha(p.FECHA_PEDIDO) : '', nuevo ? '' : falta].filter(String).join(' · ')) + '</p>' +
       '<p class="cm-ped-l1"><b>' + plural(unidades, 'camiseta', 'camisetas') + '</b>' +
-        (imp ? ' · ' + eur(imp.unidad) + '/u · <b>' + eur(imp.total) + '</b> <span class="u-nota" title="' + (imp.factura ? 'Según su factura' : 'Según el catálogo del proveedor') + '">sin IVA</span>' : nuevo ? '' : ' · <span class="u-nota">sin precio</span>') + (nuevo ? '' : htmlDocsPedido(p)) + '</p>' +
+        (imp ? ' · ' + eur(imp.unidad) + '/u · <b>' + eur(imp.total) + '</b> <span class="u-nota" title="' + (imp.factura ? 'Lo pagado, según su factura' : 'Los precios del pedido (los del catálogo del proveedor al pedirlo)') + '">sin IVA (' + (imp.factura ? 'factura' : 'pedido') + ')</span>' : nuevo ? '' : ' · <span class="u-nota">sin precio</span>') + (nuevo ? '' : htmlDocsPedido(p)) + '</p>' +
       (nuevo ? '<p class="u-nota">Creando el pedido, sus líneas y las camisetas en el Excel…</p>' :
         (conJug ? '<div class="cm-ped-j"><span>Jugadoras <b>' + ent + ' de ' + conJug + '</b></span><span class="cm-barra" aria-hidden="true"><i style="width:' + Math.round(100 * ent / conJug) + '%"></i></span></div>' :
           unidades ? '<p class="u-nota">Para el local (sin jugadoras).</p>' : '') +
@@ -1019,6 +1019,7 @@
     var l = [], alta = false, llego = false;
     String(p.LOG || '').split('\n').forEach(function (t) {
       var m = /^(\d{2}\/\d{2}\/\d{4})(?: (\d{2}:\d{2}))? · (.+?) · (.*)$/.exec(t.trim()); if (!m) return;
+      if (/^Migración/i.test(m[3])) return; // la carga de la migración no es algo que haya pasado con el pedido
       var partes = m[4].split(' · '), hechos = partes.pop(), que = partes.join(' · '), cosas = [];
       if (/^Alta/.test(m[4])) { alta = true; cosas.push('Pedido creado' + (m[4].replace(/^Alta( · )?/, '') ? ' · ' + m[4].replace(/^Alta( · )?/, '') : '')); }
       else hechos.split('; ').forEach(function (h) {
@@ -1032,7 +1033,8 @@
     var d = function (v) { return fecha(v).replace(/^(\d{2}\/\d{2}\/\d{4}).*/, '$1'); };
     if (!alta && p.FECHA_PEDIDO) l.unshift({ dia: d(p.FECHA_PEDIDO), hora: '', quien: '', que: 'Pedido creado' });
     if (!llego && p.FECHA_RECIBIDO) l.push({ dia: d(p.FECHA_RECIBIDO), hora: '', quien: '', que: 'Ha llegado al local' });
-    return l;
+    var clave = function (x) { var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(x.dia); return (m ? m[3] + m[2] + m[1] : x.dia) + (x.hora || ''); };
+    return l.map(function (x, i) { x.i = i; return x; }).sort(function (a, b) { return clave(a) < clave(b) ? -1 : clave(a) > clave(b) ? 1 : a.i - b.i; });
   }
   function htmlRegistro(p) {
     var l = registroPedido(p); if (!l.length) return '';
@@ -1172,7 +1174,7 @@
       var prov = sp ? sp.value : '', cat = prov ? cam5Catalogo_(S.T.filas('CATALOGO'), prov, m) : {};
       if (pc) {
         var u = prov ? ultimoPrecio(prov, m) : null;
-        pc.innerHTML = prov ? contactoProveedor(prov) + '<p class="u-nota">' + (u ? 'Último precio pagado: <b>' + eur(u.unidad) + '/camiseta</b> sin IVA (' + texto(u.p.ID) + ').' : 'Ningún pedido suyo de este modelo tiene factura todavía.') + '</p>' : '';
+        pc.innerHTML = prov ? contactoProveedor(prov) + '<p class="u-nota">' + (u ? 'Para comparar: en su último pedido con factura (' + texto(u.p.ID) + ') pagasteis <b>' + eur(u.unidad) + '/camiseta</b> sin IVA.' : 'Ningún pedido suyo de este modelo tiene factura todavía.') + '</p>' : '';
       }
       if (!pl) return;
       // Con data-resumen (el pack: muchas líneas iguales), solo el total; si no, la tabla con el código de ese proveedor.
@@ -1184,8 +1186,9 @@
       });
       pl.innerHTML = (pl.hasAttribute('data-resumen') ? '' : '<div class="u-tabla-caja"><table class="u-tabla"><thead><tr><th>Color (código)</th><th>Dorsal</th><th>Talla</th><th class="num">Cuántas</th></tr></thead><tbody>' +
         filas.join('') + '</tbody></table></div>') +
-        (prov ? '<p class="u-nota">' + plural(n, 'camiseta', 'camisetas') + (total ? ' · según su tarifa, <b>' + eur(total) + '</b> sin IVA' : '') +
-          (sinPrecio ? ' · ' + plural(sinPrecio, 'sin precio en su catálogo', 'sin precio en su catálogo') : '') + '</p>' : '');
+        (prov ? '<p class="u-nota">' + plural(n, 'camiseta', 'camisetas') + (total ? ' · según su catálogo, <b>' + eur(total) + '</b> sin IVA' : '') +
+          (sinPrecio ? (total ? ' · ' + plural(sinPrecio, 'camiseta', 'camisetas') + ' de colores sin precio' : ' · su catálogo aún no tiene precio para este modelo') +
+            ': ponlo en «Proveedores › Catálogo»' : '') + '.</p>' : '');
     };
     if (sp) sp.onchange = ver;
     ver();
@@ -1558,7 +1561,7 @@
       (l.length ? '<ul class="cm-prov-l">' + l.map(function (m) {
         var cs = compsDeModelo(m.ID);
         return '<li><div class="cm-rec-c"><b>' + texto(m.NOMBRE || m.ID) + '</b>' +
-          '<span class="u-nota">' + texto([m.PRENDA, m.ID_PROVEEDOR ? 'Proveedor habitual: ' + nombreProveedor(m.ID_PROVEEDOR) : 'Sin proveedor habitual', plural(n[m.ID] || 0, 'camiseta', 'camisetas')].filter(String).join(' · ')) + '</span>' +
+          '<span class="u-nota">' + texto([m.PRENDA, m.ID_PROVEEDOR ? 'Proveedor habitual: ' + nombreProveedor(m.ID_PROVEEDOR) : 'Sin proveedor habitual', plural(n[m.ID] || 0, 'camiseta de jugadora', 'camisetas de jugadoras')].filter(String).join(' · ')) + '</span>' +
           '<span class="u-nota">' + (cs.length ? 'Va en: ' + texto(cs.map(function (x) { return nombreComp(x.ID_COMPETICION) + ' (' + plural(Number(x.CAMISETAS_INCLUIDAS) || 0, 'camiseta', 'camisetas') + ' por jugadora)'; }).join(', ')) : 'No está en ninguna competición') + '</span>' +
           (m.NOTAS ? '<span class="u-nota">' + texto(m.NOTAS) + '</span>' : '') + '</div>' +
           '<button type="button" class="u-btn u-btn-texto" data-cm-mod="' + texto(m.ID) + '">Cambiar</button></li>';
@@ -1747,7 +1750,12 @@
     var nomCol = function (c) { var cod = codigoColor(c, p.ID_PROVEEDOR, p.ID_MODELO); return (cod ? cod + ' - ' : '') + String(nombreColor(c)).toUpperCase(); };
     var hex = function (c) { var h = String(color(c).COLOR_HEX || ''); return /^#[0-9a-f]{6}$/i.test(h) ? h.toUpperCase() : ''; };
     var mues = function (h) { return h ? '<i class="m" style="background:' + h + '"></i>' : ''; };
-    var precio = function (c) { var pu = cat[c] ? cat[c].precio : null; return pu === null ? '' : eur(pu); };
+    // El precio de cada color: el de sus líneas (el del catálogo al pedirlo) si todas valen lo mismo; si no, el del catálogo de hoy.
+    var precio = function (c) {
+      var ps = porColor[c].l.map(function (x) { return cam5Cts_(x.PRECIO_UNIDAD); }).filter(function (v) { return v !== null; });
+      var pu = ps.length === porColor[c].l.length && ps.every(function (v) { return v === ps[0]; }) ? ps[0] : cat[c] ? cat[c].precio : null;
+      return pu === null ? '' : eur(pu);
+    };
     var temp = nombreTemp(p.ID_TEMPORADA), paso = PASOS[cam5Paso_(p)][0];
     var fila = function (k, val) { return val ? '<tr><th>' + k + '</th><td>' + val + '</td></tr>' : ''; };
     var ahora = new Date(), cuando = fecha(hoy()) + ' ' + dos(ahora.getHours()) + ':' + dos(ahora.getMinutes());
@@ -1772,7 +1780,7 @@
       fila('Fecha del pedido', texto(fecha(p.FECHA_PEDIDO))) + fila('Lo necesitamos hacia el', texto(fecha(p.FECHA_ESTIMADA))) +
       fila('Temporada', texto(temp)) + fila('Modelo', texto([mod.NOMBRE, mod.PRENDA].filter(Boolean).join(' · '))) +
       fila('Total camisetas', texto(total + ' (' + plural(cols.length, 'color', 'colores') + ')')) +
-      fila('Importe según tarifa', importe ? texto(eur(importe) + ' sin IVA' + (sinPrecio ? ' (sin precio: ' + sinPrecio + ' camisetas)' : '')) : '') +
+      fila('Importe del pedido', importe ? texto(eur(importe) + ' sin IVA' + (sinPrecio ? ' (sin precio: ' + sinPrecio + ' camisetas)' : '')) : '') +
       fila('Estado', texto(paso)) + fila('Notas', texto(p.NOTAS || '')) + '</table>' +
       '<h2>RESUMEN POR COLOR Y TALLA</h2><table class="res"><thead><tr><th>Color camiseta</th><th>Hex</th><th>Color estampado</th>' +
       tallas.map(function (t) { return '<th class="num">' + texto(t) + '</th>'; }).join('') + '<th class="num">Total</th>' + (importe ? '<th class="der">Precio</th>' : '') + '</tr></thead><tbody>' +
