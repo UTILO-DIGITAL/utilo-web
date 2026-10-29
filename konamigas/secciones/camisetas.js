@@ -181,7 +181,11 @@
         if (S === yo && !S.N) { S.errorN = e.message; pintar(false); }
       });
     },
-    cerrar: function () { cerrarVentana(); S = null; }
+    cerrar: function () {
+      // T0258: la lista de cada árbitro para su Perfil, con lo último (el árbitro no lee los Excel de Camisetas).
+      if (S) S.ctx.llamar('camisetas5ArbitroGuardar', []).catch(function () {});
+      cerrarVentana(); S = null;
+    }
   });
   if (ANCHO.addEventListener) ANCHO.addEventListener('change', function () { if (S && S.vista === 'stock') pintar(false); });
 
