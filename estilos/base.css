@@ -311,6 +311,34 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .pf-carga { display: flex; flex-direction: column; align-items: center; gap: var(--e3); padding: var(--e6) 0; }
 .u .pf .u-perfil dl { margin-top: 0; }
 .u .pf-hora { margin: 0; }
+.u .pf-cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--e2); margin: 0 0 var(--e3); }
+.u .pf-cifras > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-tarjeta, var(--color-bloque)); }
+.u .pf-cifras b { font: var(--peso-titulos) 22px/1.1 var(--fuente-titulos); color: var(--color-principal-oscuro); overflow-wrap: anywhere; }
+.u .pf-cifras span { font-size: 12px; color: var(--color-suave); }
+.u .pf-cifras .pf-destacar { box-shadow: inset 0 0 0 2px var(--color-accion); }
+.u .pf-cifras .pf-destacar b { color: var(--color-texto); }
+@media (max-width: 639px) { .u .pf-cifras { grid-template-columns: 1fr 1fr; } .u .pf-cifras > div:last-child:nth-child(odd) { grid-column: 1 / -1; } }
+.u .pf-accion { margin-top: var(--e3); }
+.u .pf-cab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e3); margin: 0 0 var(--e2); }
+.u .pf-cab .n-grupo { margin: 0; }
+.u .pf-ver { display: flex; align-items: center; gap: var(--e2); font-size: 13px; color: var(--color-suave); min-width: 0; }
+.u .pf-ver select { min-width: 0; max-width: 100%; }
+.u .pf-detalle { margin-top: var(--e3); border-top: 1px solid var(--color-linea); padding-top: var(--e2); }
+.u .pf-detalle > summary { cursor: pointer; padding: var(--e2) 0; font-weight: 700; color: var(--color-principal-oscuro); min-height: 44px; display: flex; align-items: center; gap: var(--e2); }
+.u .pf-detalle[open] > summary { margin-bottom: var(--e2); }
+.u .pf-detalle > summary { list-style: none; }
+.u .pf-detalle > summary::-webkit-details-marker { display: none; }
+.u .pf-detalle > summary::before { content: ""; flex: none; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s; }
+.u .pf-detalle[open] > summary::before { transform: rotate(45deg); }
+.u .pf-marca { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--color-bloque); color: var(--color-texto); white-space: nowrap; }
+.u .pf-marca[data-m="pagado"] { background: var(--color-bien); color: var(--color-superficie, #fff); }
+.u .pf-marca[data-m="por"] { box-shadow: inset 0 0 0 2px var(--color-accion); background: transparent; }
+@media (max-width: 639px) {
+  /* En el móvil, las celdas vacías no salen y el «·» va delante de cada dato (no detrás), para que no quede uno suelto al final. */
+  .u .pf-bloque .n-lista td.pf-vacia { display: none; }
+  .u .pf-bloque .n-lista tbody td::after { content: none; }
+  .u .pf-bloque .n-lista tbody td:nth-child(n+3):not(.pf-vacia)::before { content: '  ·  '; white-space: pre; color: var(--color-suave); }
+}
 
 /* ---------- Piezas de las secciones del núcleo (T0257) ----------
  * Pestañas de una sección, filtros encima de una lista, formulario en dos columnas en la ventana, una cifra mala
@@ -389,6 +417,253 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
   white-space: pre-wrap; overflow-wrap: anywhere; }
 .u .pd-r b { display: block; font-size: 12px; color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .02em; }
 
+/* ---------- Ligas de Konamigas (T0255, konamigas/secciones/ligas.js) ----------
+ * Arriba la temporada y, en botones, la competición y su liga; debajo las pestañas. Los partidos, una lista con líneas:
+ * hora y campo a la izquierda, los dos equipos uno debajo del otro con el color de su camiseta y su resultado (gana en
+ * negrita), y el estado y el árbitro. Los de quien ha entrado llevan una franja del color principal. La ficha es un
+ * marcador: cada equipo con su color arriba y, debajo, quién marcó. El color de cada equipo es un dato (--c), no de la
+ * marca. Solo variables. */
+/* Filtros: en el ordenador, a la vista (la línea de resumen no sale); en el móvil, recogidos en esa línea, que los abre. */
+.u .lg-filtros-res { display: none; }
+@media (max-width: 639px) {
+  .u .lg-filtros { margin: 0 0 var(--e3); border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); }
+  .u .lg-filtros-res { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); width: 100%; min-height: 52px; padding: var(--e2) var(--e3);
+    border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .u .lg-filtros-res > span:first-child { display: flex; flex-direction: column; min-width: 0; }
+  .u .lg-filtros-res b { font-size: 15px; overflow-wrap: anywhere; }
+  .u .lg-filtros-res small { font-size: 12px; color: var(--color-suave); }
+  .u .lg-filtros-cambiar { flex: none; font-weight: 700; font-size: 14px; color: var(--color-principal-oscuro); text-decoration: underline; }
+  .u .lg-filtros-cuerpo { display: none; padding: 0 var(--e3) var(--e3); border-top: 1px solid var(--color-linea); }
+  .u .lg-filtros.abierto .lg-filtros-cuerpo { display: block; padding-top: var(--e3); }
+  .u .lg-filtros .lg-barra, .u .lg-filtros .lg-elige { margin-bottom: var(--e2); }
+  .u .lg-filtros .lg-fila-chips { flex-wrap: wrap; overflow: visible; }
+}
+/* Un equipo que descansa en la jornada (ligas con un número impar de equipos): una línea más, sin marcador. */
+.u .lg-p-descansa { cursor: default; color: var(--color-suave); }
+.u .lg-p-descansa:hover { background: none; }
+.u .lg-p-descansa .lg-pi b { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; }
+.u .lg-pdes { grid-column: 2 / 5; justify-self: center; display: flex; align-items: center; gap: var(--e2); font-size: 15px; }
+@media (max-width: 639px) { .u .lg-pdes { grid-column: 2 / 5; } }
+.u .lg-barra { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--e3); margin: 0 0 var(--e3); }
+.u .lg-barra .lg-temp { flex: 0 1 180px; }
+.u .lg-barra .lg-temp select { width: 100%; }
+.u .lg-barra [hidden] { display: none; }
+.u .lg-elige { display: flex; flex-direction: column; gap: var(--e2); margin: 0 0 var(--e3); }
+.u .lg-elige:empty { display: none; }
+.u .lg-fila-chips, .u .lg-jornadas { display: flex; gap: var(--e2); overflow-x: auto; padding: 2px 0 var(--e1); scrollbar-width: none; }
+.u .lg-fila-chips::-webkit-scrollbar, .u .lg-jornadas::-webkit-scrollbar { display: none; }
+.u .lg-fila-chips button, .u .lg-jornadas button { flex: none; min-height: 44px; padding: 0 var(--e3); border-radius: var(--radio); cursor: pointer;
+  border: 1.5px solid var(--color-borde-campo); background: var(--color-superficie); color: var(--color-texto); font: 700 14px/1.2 var(--fuente-texto); }
+.u .lg-fila-chips button[aria-pressed=true], .u .lg-jornadas button[aria-pressed=true] { background: var(--color-principal); border-color: var(--color-principal); color: var(--color-sobre-principal); }
+/* La liga va debajo de su competición, más pequeña: se ve que es de ella. */
+.u .lg-chips-liga button { min-height: 40px; font-size: 13px; font-weight: 600; border-width: 1px; }
+.u .lg-chips-liga button[aria-pressed=true] { background: var(--color-bloque); border-color: var(--color-principal-oscuro); color: var(--color-principal-oscuro); }
+.u .lg-jornadas button { min-width: 48px; padding: 0 var(--e2); font-variant-numeric: tabular-nums; }
+.u .lg-jornadas button.lg-hecha:not([aria-pressed=true]) { color: var(--color-suave); border-color: var(--color-linea); }
+.u .lg-cont { padding-top: var(--e4); }
+/* Partidos: una tira con los días de juego (J1, J2… y JR, la jornada de recuperación, en el color de «En curso»), que se
+   desplaza a los lados; el día abierto, en el color principal. Los ya jugados, más suaves. */
+.u .lg-dias { display: flex; align-items: center; gap: var(--e1); margin: 0 0 var(--e3); }
+.u .lg-dias .u-btn-icono { flex: none; font-size: 22px; }
+.u .lg-dias-tira { flex: 1 1 auto; min-width: 0; display: flex; gap: var(--e2); overflow-x: auto; scrollbar-width: none; padding: 2px; }
+.u .lg-dias-tira::-webkit-scrollbar { display: none; }
+.u .lg-dias-tira button { flex: none; width: 64px; min-height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  border: 1.5px solid var(--color-borde-campo); border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto); cursor: pointer; font: inherit; }
+.u .lg-dias-tira b { font: 700 16px/1.1 var(--fuente-texto); font-variant-numeric: tabular-nums; }
+.u .lg-dias-tira small { font-size: 11px; color: var(--color-suave); white-space: nowrap; }
+/* Un día jugado entero: en verde suave (el color de Jugado), para verlo de un vistazo. */
+.u .lg-dias-tira .lg-completa:not([aria-pressed=true]) { border-color: var(--estado-co); background: color-mix(in srgb, var(--estado-co) 10%, var(--color-superficie)); color: var(--estado-co); }
+.u .lg-dias-tira .lg-jr { border-color: var(--estado-ec); color: var(--estado-ec); background: color-mix(in srgb, var(--estado-ec) 8%, var(--color-superficie)); }
+.u .lg-dias-tira .lg-hoy:not([aria-pressed=true]) { box-shadow: inset 0 -3px 0 var(--color-accion); }
+.u .lg-dias-tira [aria-pressed=true] { background: var(--color-principal); border-color: var(--color-principal); color: var(--color-sobre-principal); }
+.u .lg-dias-tira [aria-pressed=true] small { color: var(--color-sobre-principal); }
+.u .lg-dias-tira .lg-jr[aria-pressed=true] { background: var(--estado-ec); border-color: var(--estado-ec); }
+/* La barrita de cada día: un trozo por partido (verde jugado, rojo anulado, gris aplazado, vacío por jugar), con los
+   colores de estado comunes. Sobre el día abierto, el vacío se ve en el color del texto claro. */
+.u .lg-dias-tira button { padding-bottom: 6px; }
+.u .lg-barrita { display: flex; gap: 1px; width: 36px; height: 5px; margin-top: 3px; border-radius: 3px; overflow: hidden; }
+.u .lg-barrita i, .u .lg-leyenda i { display: block; min-width: 3px; }
+.u .lg-s-jugado { background: var(--estado-co); }
+.u .lg-s-anulado { background: var(--estado-bl); }
+.u .lg-s-aplazado { background: color-mix(in srgb, var(--estado-x) 55%, var(--color-superficie)); }
+.u .lg-s-pendiente { background: transparent; box-shadow: inset 0 0 0 1px var(--color-borde-campo); }
+.u .lg-dias-tira [aria-pressed=true] .lg-s-pendiente { box-shadow: inset 0 0 0 1px var(--color-sobre-principal); }
+.u .lg-dias-tira [aria-pressed=true] .lg-barrita { outline: 1px solid var(--color-sobre-principal); }
+.u .lg-leyenda { display: flex; flex-wrap: wrap; gap: 0 var(--e3); margin: calc(var(--e2) * -1) 0 var(--e3); font-size: 11px; color: var(--color-suave); }
+.u .lg-leyenda span { display: inline-flex; align-items: center; gap: var(--e1); }
+.u .lg-leyenda i { width: 10px; height: 5px; border-radius: 2px; }
+/* En el móvil, sin flechas (se desliza con el dedo) y más estrechos: caben siete, el abierto en medio. */
+@media (max-width: 639px) { .u .lg-dias .u-btn-icono { display: none; } .u .lg-dias-tira { gap: 6px; } .u .lg-dias-tira button { width: 44px; min-height: 48px; } .u .lg-dias-tira b { font-size: 15px; } .u .lg-dias-tira small { font-size: 10px; } }
+.u .lg-jr-t { color: var(--estado-ec); }
+/* Un anulado por culpa de un equipo: su 0-5, en el color de anulado. */
+.u .lg-pc-an b, .u .lg-mcentro-an { color: var(--estado-bl) !important; }
+/* Un día marcado como festivo o descanso que tiene partidos: una marca roja en la esquina de la tira. */
+.u .lg-dias-tira button { position: relative; }
+.u .lg-dias-tira .lg-choque::after { content: "!"; position: absolute; top: -6px; right: -4px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--estado-bl); color: var(--color-superficie); font: 700 11px/16px var(--fuente-texto); text-align: center; }
+/* Estadísticas: cifras en fila (goles, partidos, media, máxima goleadora); en el móvil, de dos en dos. */
+.u .lg-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e2); margin: 0 0 var(--e3); }
+.u .lg-stats > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-tarjeta, var(--color-bloque)); }
+.u .lg-stats b { font: var(--peso-titulos) 22px/1.1 var(--fuente-titulos); color: var(--color-principal-oscuro); overflow-wrap: anywhere; }
+.u .lg-stats > div:last-child b { font-size: 16px; }
+.u .lg-stats span { font-size: 12px; color: var(--color-suave); }
+@media (max-width: 639px) { .u .lg-stats { grid-template-columns: 1fr 1fr; } }
+.u .n-ventana .lg-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* Cada jugadora de la lista abre su ficha. */
+.u .lg-jug { flex: 1 1 auto; min-width: 0; display: flex; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.u .lg-jug:hover b { text-decoration: underline; }
+/* Goleadoras: de la liga o de toda la competición, buscador y lista con el puesto, la jugadora (dorsal) y sus goles. */
+.u .lg-gol-cab { display: flex; flex-direction: column; gap: var(--e2); margin: 0 0 var(--e3); }
+.u .lg-gol-busca input { width: 100%; max-width: 420px; }
+.u .lg-gol-eq { margin: 0 0 var(--e4); }
+.u .lg-gol-eq .lg-sub { display: flex; justify-content: space-between; gap: var(--e3); }
+.u .lg-pos { flex: none; width: 2em; color: var(--color-suave); font-size: 13px; }
+.u .lg-cero { color: var(--color-suave); }
+.u .lg-cero .lg-n { color: var(--color-suave); }
+.u .lg-n small { font: 400 12px/1 var(--fuente-texto); color: var(--color-suave); }
+/* Recuperar: la hora y el campo de cada partido. */
+.u .lg-rec-horas { display: grid; grid-template-columns: 1fr; gap: var(--e3); }
+@media (min-width: 640px) { .u .lg-rec-horas { grid-template-columns: 1fr 1fr; } }
+.u .lg-rec-horas select { width: 100%; }
+.u .lg-cab { margin: 0 0 var(--e3); font-size: 14px; color: var(--color-suave); }
+.u .lg-cab p { margin: 0; }
+.u .lg-jcab { margin: var(--e4) 0 0; }
+.u .lg-jfecha { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--e3); margin: 2px 0 0; font-size: 15px; color: var(--color-suave); }
+.u .lg-jfecha > span { font-weight: 600; }
+/* Cambiar la fecha de la jornada: un enlace discreto junto al título, no un botón grande (Javi). */
+.u .lg-jcambiar { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--color-suave); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.u .lg-jcambiar:hover { color: var(--color-principal-oscuro); }
+.u .lg-jcab .n-grupo { margin: 0; }
+.u .lg-dia { font: 700 13px/1.3 var(--fuente-texto); text-transform: uppercase; letter-spacing: .02em; color: var(--color-principal-oscuro); margin: var(--e4) 0 var(--e2); }
+.u .lg-dia.lg-hoy { color: var(--color-texto); }
+.u .lg-aviso { margin: 0 0 var(--e2); padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-bloque); font-size: 14px; font-weight: 600; }
+/* El color de la camiseta de un equipo: un cuadrito con borde, para que se vea también un blanco. */
+.u .lg-color { flex: none; width: 12px; height: 12px; border-radius: var(--radio-peq); background: var(--c); border: 1px solid var(--color-borde-campo); }
+.u .lg-color-no { background: transparent; border-style: dashed; }
+.u .lg-eqt { display: inline-flex; align-items: center; gap: var(--e2); min-width: 0; }
+.u .lg-eqt > span { display: flex; flex-direction: column; min-width: 0; }
+.u .lg-eqt small { font-size: 12px; color: var(--color-suave); font-weight: 400; }
+.u .lg-lista { border-top: 1px solid var(--color-linea); margin: 0 0 var(--e3); }
+/* Un partido: a la izquierda la hora, el campo y el árbitro; en el centro solo el marcador (local, resultado o «vs»,
+   visitante); en el ordenador, a la derecha un hueco del mismo ancho para que el marcador quede centrado. Debajo del
+   marcador, por qué no se juega como estaba. */
+.u .lg-p { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto minmax(0, 1fr) 76px; grid-template-areas: "i l c v ." "i a a a .";
+  align-items: center; gap: 0 var(--e3); width: 100%; padding: var(--e3) var(--e2); text-align: left;
+  border: 0; border-bottom: 1px solid var(--color-linea); border-left: 4px solid transparent; background: none; color: inherit; font: inherit; cursor: pointer; }
+.u .lg-p:hover { background: color-mix(in srgb, var(--color-bloque) 60%, var(--color-superficie)); }
+.u .lg-p.lg-mio { border-left-color: var(--color-principal); }
+.u .lg-pi { grid-area: i; align-self: start; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.u .lg-pi b { font-size: 16px; }
+.u .lg-pi small { font-size: 12px; color: var(--color-suave); overflow-wrap: anywhere; line-height: 1.3; }
+.u .lg-pl, .u .lg-pv { display: flex; align-items: center; gap: var(--e2); min-width: 0; font-size: 16px; line-height: 1.25; }
+.u .lg-pl { grid-area: l; justify-content: flex-end; text-align: right; }
+.u .lg-pv { grid-area: v; justify-content: flex-start; }
+.u .lg-nom { min-width: 0; overflow-wrap: anywhere; }
+.u .lg-gana { font-weight: 700; }
+.u .lg-pc { grid-area: c; display: flex; align-items: center; justify-content: center; min-width: 64px; min-height: 40px; padding: 0 var(--e2);
+  border-radius: var(--radio); background: var(--color-tarjeta, var(--color-bloque)); }
+.u .lg-pc b { font: var(--peso-titulos) 22px/1 var(--fuente-titulos); color: var(--color-principal-oscuro); white-space: nowrap; }
+.u .lg-pc b span { margin: 0 .2em; color: var(--color-suave); }
+.u .lg-pvs { background: none; color: var(--color-suave); font-size: 13px; font-weight: 600; }
+.u .lg-pa { grid-area: a; justify-self: center; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--e1) var(--e2); margin-top: var(--e2); }
+.u .lg-pliga { font-size: 12px; color: var(--color-suave); }
+.u .lg-p-fuera .lg-pl, .u .lg-p-fuera .lg-pv { color: var(--color-suave); }
+.u .lg-p-fuera .lg-pi b { text-decoration: line-through; color: var(--color-suave); }
+@media (max-width: 639px) {
+  .u .lg-p { grid-template-columns: 52px minmax(0, 1fr) auto minmax(0, 1fr); grid-template-areas: "i l c v" "i a a a"; gap: 0 var(--e2); padding: var(--e3) var(--e1) var(--e3) var(--e2); }
+  .u .lg-pl, .u .lg-pv { font-size: 14px; gap: 6px; }
+  .u .lg-pc { min-width: 50px; padding: 0 var(--e1); } .u .lg-pc b { font-size: 19px; }
+}
+/* Por qué un partido no se juega como estaba: anulado (no se recupera), aplazado (se recupera) o recuperación. */
+.u .lg-pav { padding: 1px var(--e2); border-radius: var(--radio-peq); font-size: 12px; font-weight: 700; text-align: center; }
+.u .lg-av-no { color: var(--estado-bl); background: color-mix(in srgb, var(--estado-bl) 10%, var(--color-superficie)); }
+.u .lg-av-si { color: var(--estado-pr); background: color-mix(in srgb, var(--estado-pr) 12%, var(--color-superficie)); }
+.u .lg-av-rec { color: var(--estado-ec); background: color-mix(in srgb, var(--estado-ec) 10%, var(--color-superficie)); }
+.u .lg-pav-ficha { justify-self: auto; margin: 0; padding: var(--e2) var(--e3); border-radius: var(--radio); font-size: 14px; text-align: left; }
+@media (max-width: 639px) { .u .lg-pl, .u .lg-pv { font-size: 14px; } .u .lg-p { gap: 2px var(--e2); } .u .lg-pc { min-width: 64px; } }
+/* Aplazados por recuperar, arriba de las jornadas. */
+.u .lg-pend-rec { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e3); margin: 0 0 var(--e3);
+  padding: var(--e3); border-radius: var(--radio); background: color-mix(in srgb, var(--estado-pr) 10%, var(--color-superficie)); }
+.u .lg-pend-rec > span { display: flex; flex-direction: column; min-width: 0; }
+.u .lg-pend-rec b { color: var(--estado-pr); }
+.u .lg-pend-rec small { font-size: 13px; }
+.u .lg-rec-ps { display: flex; flex-direction: column; gap: var(--e2); }
+.u .lg-rec-j { margin: 0; padding: var(--e2) var(--e3); border: 1px solid var(--color-linea); border-radius: var(--radio); }
+.u .lg-rec-j legend { padding: 0 var(--e1); font-weight: 700; }
+.u .lg-rec-j .u-check { align-items: flex-start; }
+.u .lg-h-libre:not([aria-checked=true]) { border-color: var(--color-principal-oscuro); }
+.u .lg-h-libre small { color: var(--color-principal-oscuro); font-weight: 600; }
+.u .lg-clas td.num:last-child { font-size: 15px; }
+@media (max-width: 639px) { .u .lg-clas th, .u .lg-clas td { padding-left: var(--e1); padding-right: var(--e1); } .u .lg-clas td:first-child, .u .lg-clas th:first-child { padding-left: var(--e2); } }
+.u .lg-clas td:first-child, .u .lg-clas th:first-child { width: 1%; }
+.u .lg-ranking { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
+.u .lg-ranking li { display: flex; align-items: center; gap: var(--e3); padding: var(--e2) 0; border-bottom: 1px solid var(--color-linea); }
+.u .lg-ranking .lg-eqt { flex: 1 1 auto; }
+.u .lg-ranking .lg-dorsal { display: inline-block; margin-right: 2px; }
+.u .lg-n { flex: none; font: var(--peso-titulos) 20px/1 var(--fuente-titulos); color: var(--color-principal-oscuro); }
+.u .lg-semana { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e2); }
+.u .lg-semana .n-grupo { margin: 0; min-width: 9em; text-align: center; font-variant-numeric: tabular-nums; }
+.u .lg-semana .u-btn-icono { font-size: 22px; }
+.u .lg-pend { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--e2); margin: 0 0 var(--e3); font-weight: 600; }
+/* Ficha: el marcador. Cada equipo con una franja de su color arriba; en medio el resultado (o la hora) y el estado. */
+.u .lg-marcador { display: grid; grid-template-columns: 1fr auto 1fr; gap: var(--e3); align-items: start; }
+.u .lg-mlado { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-top: var(--e2); }
+.u .lg-mlado:last-child { text-align: right; align-items: flex-end; }
+.u .lg-mcolor { display: block; width: 100%; height: 8px; border-radius: var(--radio-peq); background: var(--c); border: 1px solid var(--color-borde-campo); margin-bottom: var(--e2); }
+.u .lg-mcolor.lg-color-no { background: transparent; border-style: dashed; }
+.u .lg-mlado > b { font: var(--peso-titulos) 17px/1.2 var(--fuente-titulos); overflow-wrap: anywhere; }
+.u .lg-mlado > small { font-size: 12px; color: var(--color-suave); }
+.u .lg-mcentro { display: flex; flex-direction: column; align-items: center; gap: var(--e2); padding-top: var(--e4); }
+.u .lg-mcentro > b { font: var(--peso-titulos) 34px/1 var(--fuente-titulos); color: var(--color-principal-oscuro); white-space: nowrap; }
+.u .lg-mcentro > b span { margin: 0 .15em; color: var(--color-suave); }
+.u .lg-mcentro > b.lg-mhora { font-size: 24px; }
+.u .lg-mgoles { list-style: none; margin: var(--e2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--e1); font-size: 14px; width: 100%; }
+.u .lg-mgoles li { display: flex; align-items: baseline; gap: var(--e2); min-width: 0; }
+.u .lg-mlado:last-child .lg-mgoles li { flex-direction: row-reverse; }
+.u .lg-dorsal { flex: none; min-width: 1.9em; padding: 0 var(--e1); border-radius: var(--radio-peq); background: var(--color-bloque); text-align: center; font-weight: 700; font-size: 12px; line-height: 1.6; }
+.u .lg-veces { flex: none; font-weight: 700; }
+.u .lg-gol-otro { color: var(--color-suave); }
+@media (max-width: 639px) { .u .lg-mcentro > b { font-size: 28px; } .u .lg-mlado > b { font-size: 15px; } .u .lg-marcador { gap: var(--e2); } }
+.u .lg-datos { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: var(--e2) var(--e4); }
+.u .lg-datos dt { font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; }
+.u .lg-datos dd { margin: 0; overflow-wrap: anywhere; }
+.u .lg-sub { font-size: 16px; color: var(--color-principal-oscuro); margin: 0 0 var(--e2); }
+/* Acta */
+.u .lg-acta { display: grid; grid-template-columns: 1fr; gap: var(--e4); }
+@media (min-width: 640px) { .u .lg-acta { grid-template-columns: 1fr 1fr; } }
+.u .lg-lado { display: flex; flex-direction: column; gap: var(--e2); padding: var(--e3); border: 1px solid var(--color-linea); border-top: 6px solid var(--c, var(--color-linea));
+  border-radius: var(--radio); background: var(--color-superficie); }
+.u .lg-lado > b { font-size: 16px; overflow-wrap: anywhere; }
+.u .lg-paso { display: flex; align-items: center; gap: var(--e2); }
+.u .lg-paso input { width: 72px; text-align: center; font-size: 22px; font-variant-numeric: tabular-nums; }
+.u .lg-quien { display: flex; flex-direction: column; gap: var(--e2); }
+.u .lg-quien select { width: 100%; }
+/* Mover partidos: la regla, los huecos de la liga para elegir, qué cambia y a quién hay que avisar. */
+.u .lg-regla { margin: 0; padding: var(--e2) var(--e3); border-left: 3px solid var(--color-principal); background: var(--color-superficie); font-size: 14px; }
+.u .lg-huecos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--e2); }
+.u .lg-h { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 44px; padding: var(--e2) var(--e3); text-align: left; cursor: pointer;
+  border: 1.5px solid var(--color-borde-campo); border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto); font: 400 14px/1.3 var(--fuente-texto); }
+.u .lg-h b { font-size: 16px; }
+.u .lg-h small { font-size: 12px; color: var(--color-suave); }
+.u .lg-h[aria-checked=true] { border-color: var(--color-principal); box-shadow: inset 0 0 0 2px var(--color-principal); }
+.u .lg-h:disabled { cursor: default; border-style: dashed; border-color: var(--color-linea); color: var(--color-suave); }
+.u .lg-h-cambio:not([aria-checked=true]) small { color: var(--color-texto); font-weight: 600; }
+.u .lg-conf { display: flex; flex-direction: column; gap: var(--e3); }
+.u .lg-conf:empty { display: none; }
+.u .lg-cambios ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
+.u .lg-cambios li { display: flex; flex-direction: column; gap: 2px; padding: var(--e2) 0; border-bottom: 1px solid var(--color-linea); font-size: 14px; }
+.u .lg-avisar-ya { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: var(--e3); border-radius: var(--radio); background: var(--color-bloque); font-size: 14px; }
+.u .lg-avisar-ya b { font-size: 15px; }
+.u .lg-avisar-mal b { color: var(--color-error); }
+.u .lg-capitanas { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
+.u .lg-capitanas li { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--e1) var(--e3); padding: var(--e3) 0; border-bottom: 1px solid var(--color-linea); }
+.u .lg-capitanas .u-check { min-height: 44px; }
+.u .lg-msg { grid-column: 1 / -1; margin: 0; padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-superficie);
+  border: 1px solid var(--color-linea); font-size: 13px; line-height: 1.5; white-space: pre-line; }
+.u .lg-msg b { color: var(--color-principal-oscuro); }
+.u .n-ventana [hidden] { display: none; }
+/* El título de la ventana recibe el foco al abrirla (para el lector de pantalla), sin recuadro. */
+.u .n-ventana h2[tabindex="-1"]:focus { outline: none; }
 
 .u .n-ventana .n-grupo { margin-top: var(--e4); }
 
@@ -853,4 +1128,17 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
   .u .cm-otra { grid-template-columns: 2fr 1fr 1fr 1fr auto; }
   .u .cm-otra .u-campo:first-child { grid-column: auto; }
   .u .cm-eqs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e3); }
+}
+
+/* ---------- Zona segura de abajo en el iPhone (T0256) ----------
+ * Las ventanas ocupan toda la pantalla en el móvil y lo último (Guardar, Cerrar…) quedaba debajo de la barra de inicio
+ * del iPhone, sin poder tocarlo. Se deja ese hueco (env(safe-area-inset-bottom), con viewport-fit=cover) al final de cada
+ * ventana y en los pies fijos. Va con html delante para ganar a kanban.css, que se carga después. */
+html .u .u-velo, html .u .gs5 .gs-velo, html .u #alta-velo, html .u .ver-velo, html .u .sol-velo, html .u .fv-velo {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--e2)); scroll-padding-bottom: env(safe-area-inset-bottom, 0px); }
+@media (max-width: 640px) {
+  html .u .u-velo, html .u .gs5 .gs-velo, html .u #alta-velo, html .u .ver-velo, html .u .sol-velo, html .u .fv-velo {
+    padding-bottom: env(safe-area-inset-bottom, 0px); }
+  html .u .u-ventana, html .u .gs5 .gs-hoja { padding-bottom: calc(var(--e4) + env(safe-area-inset-bottom, 0px)); }
+  html .u .gs5 .gs-pie { padding-bottom: calc(var(--e2) + env(safe-area-inset-bottom, 0px)); }
 }
