@@ -20,6 +20,9 @@
  * - T0269: una sección con «enPerfil» (Pedir a Utilo, por defecto) no sale en el menú: se abre desde un botón al final de
  *   Perfil y, mientras está abierta, el menú marca Perfil.
  * - La sección va en la URL (?s=ejemplo). Cambiar de sección no recarga la página.
+ * - T0275: la copia de las tablas del dispositivo es de cada persona (su correo): en un dispositivo compartido, quien entra
+ *   empieza con la suya o vacía. Si entra otra persona en la misma página, se deja la copia de la anterior; al cerrar
+ *   sesión (o si el motor dice que ya no tiene acceso), se borra del dispositivo la de quien sale.
  */
 (function () {
   'use strict';
@@ -128,11 +131,18 @@
 
   function tablas() {
     if (T) return T;
-    T = window.UT.crear({ llamar: llamar, clave: C.clave || 'negocio', aviso: aviso });
+    // T0275: la copia del dispositivo es de quien ha entrado (sin correo, solo en memoria).
+    T = window.UT.crear({ llamar: llamar, clave: C.clave || 'negocio', persona: cred.correo || '', aviso: aviso });
     T.en('cambio', function (tabla, info) {
       (oyentes[actual] || []).forEach(function (f) { try { f(tabla, info); } catch (e) { if (window.console) console.error(e); } });
     });
     return T;
+  }
+
+  /** T0275 · Deja la copia de las tablas de quien estaba (otra persona entra o sale); con olvidar, la borra del dispositivo. */
+  function soltarTablas(correo, olvidar) {
+    if (T) { T.cerrar(); T = null; }
+    if (olvidar && correo && window.UT.olvidar) window.UT.olvidar(C.clave || 'negocio', correo);
   }
 
   /** Las secciones que ves y, al final, Perfil (la sección PERFIL si el cliente la tiene; si no, la del marco). */
@@ -161,6 +171,7 @@
 
   /** Pinta el marco entero y abre la sección de la URL (o la primera). */
   function marco(c) {
+    if (T && T.persona() !== String(c.correo || '').trim().toLowerCase()) soltarTablas();  // T0275: otra persona, otra copia
     cred = c;
     document.body.className = 'u u-con-barra';
     document.body.innerHTML = bandaDev(cred.dev) + htmlMenu() +
@@ -287,7 +298,7 @@
       guardar(nuevo);
       marco(nuevo);
     }, function (e) {
-      if (e.acceso) { borrar(); acceso(String(e.message).replace(/^ACCESO:\s*/, '')); return; }
+      if (e.acceso) { borrar(); soltarTablas(cred.correo, true); acceso(String(e.message).replace(/^ACCESO:\s*/, '')); return; }
       if (/^CONECTAR:/.test(e.message)) { conectarYEntrar(e); return; }
       aviso('No se ha podido comprobar tu acceso: ' + String(e.message).replace(/^\w+:\s*/, ''));
     });
@@ -306,8 +317,14 @@
   /* ---------- arranque ---------- */
 
   function arrancar() {
-    if (new URLSearchParams(location.search).get('salir') !== null) { borrar(); window.UG.salir(); history.replaceState(null, '', location.pathname); }
+    if (new URLSearchParams(location.search).get('salir') !== null) {
+      soltarTablas((leer() || {}).correo, true);  // T0275: la copia de quien sale no se queda en el dispositivo
+      borrar(); window.UG.salir(); history.replaceState(null, '', location.pathname);
+    }
     var guardada = leer();
+    // T0275: si la llave de Google es de otra cuenta que la sesión guardada, no se pinta lo de la guardada.
+    var deLlave = String((window.UG.correo && window.UG.correo()) || '').trim().toLowerCase();
+    if (guardada && deLlave && guardada.correo && deLlave !== String(guardada.correo).trim().toLowerCase()) guardada = null;
     if (guardada && guardada.persona && (window.UG.llave() || (window.UG.tieneSesion && window.UG.tieneSesion()))) {
       marco(guardada);  // al momento, con lo guardado
       comprobar();      // y por detrás, con el motor

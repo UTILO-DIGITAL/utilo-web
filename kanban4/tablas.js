@@ -28,6 +28,11 @@
  * partes que se van leyendo se juntan en la misma copia (filas, fila, actualizar… funcionan igual) y cada una se refresca
  * por su cuenta. Así no se baja entera una tabla de miles de filas para ver una temporada o una jugadora.
  * Valores: texto; números; true/false; fecha 'aaaa-mm-dd'; fecha y hora 'aaaa-mm-ddThh:mm'; hora 'hh:mm'; vacío ''.
+ * T0275 · La copia del dispositivo es de cada persona: UT.crear({ …, persona: correo }) guarda y lee con la clave
+ * 'ut:<negocio>:<correo>:<tabla>', así quien entra en un dispositivo compartido empieza con su copia o vacía, nunca con
+ * la de otra persona. Con persona vacía, solo memoria. Al crearla se borra la copia del negocio de antes de T0275 (sin
+ * persona). T.cerrar() la deja de usar (otra persona entra en la misma página: lo que aún llegue no se guarda ni se pinta)
+ * y UT.olvidar(negocio, correo) borra del dispositivo la copia de esa persona (al cerrar sesión). Sin persona, como antes.
  */
 (function () {
   'use strict';
@@ -63,6 +68,27 @@
       try { db.transaction('tablas', 'readwrite').objectStore('tablas').put(v, k); } catch (e) {}
     });
   }
+  /** T0275 · Borra del dispositivo las copias cuya clave cumple si(clave). */
+  function bdBorrarSi(si) {
+    return bd().then(function (db) {
+      if (!db) return;
+      return new Promise(function (ok) {
+        try {
+          var tx = db.transaction('tablas', 'readwrite'), q = tx.objectStore('tablas').openCursor();
+          q.onsuccess = function () { var c = q.result; if (!c) return; if (si(String(c.key))) c.delete(); c.continue(); };
+          tx.oncomplete = tx.onerror = tx.onabort = function () { ok(); };
+        } catch (e) { ok(); }
+      });
+    });
+  }
+  /** T0275 · El correo, tal cual va en la clave de la copia. */
+  function deCorreo(c) { return String(c == null ? '' : c).trim().toLowerCase(); }
+  /** T0275 · Borra del dispositivo la copia de una persona en un negocio (al cerrar sesión). */
+  function olvidar(negocio, correo) {
+    var p = 'ut:' + (negocio || 'negocio') + ':' + deCorreo(correo) + ':';
+    if (!deCorreo(correo)) return Promise.resolve();
+    return bdBorrarSi(function (k) { return k.indexOf(p) === 0; });
+  }
 
   function copia(o) { var r = {}; for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) r[k] = o[k]; return r; }
   function igual(a, b) { return String(a == null ? '' : a) === String(b == null ? '' : b); }
@@ -70,14 +96,21 @@
 
   function crear(o) {
     o = o || {};
-    var clave = 'ut:' + (o.clave || 'negocio') + ':';
+    var negocio = 'ut:' + (o.clave || 'negocio') + ':';
+    // T0275: con persona, la copia es suya ('ut:<negocio>:<correo>:'); con persona vacía, solo memoria; sin ella, la del negocio.
+    var porPersona = Object.prototype.hasOwnProperty.call(o, 'persona'), persona = deCorreo(o.persona);
+    var clave = porPersona ? (persona ? negocio + persona + ':' : '') : negocio;
+    var cerrada = false;
+    // La copia del negocio de antes de T0275 ('ut:<negocio>:<tabla>', sin persona) era de quien entró la última vez: fuera.
+    if (porPersona) bdBorrarSi(function (k) { return k.indexOf(negocio) === 0 && k.slice(negocio.length).indexOf(':') < 0; });
+    function guardaLocal() { return !!clave && !cerrada; }
     var mem = {};       // tabla → { cols, filas: [objetos], ids: { ID: objeto }, v, leido, clave }
     var colas = {};     // 'tabla|id' → promesa de lo último enviado de esa fila (los cambios de una fila van en orden)
     var enVuelo = {};   // 'tabla|id' → [cambios aún sin confirmar], para no perderlos si llega un refresco
     var oyentes = { cambio: [], error: [] };
     var nuevos = 0, pendientes = 0;
 
-    function emitir(ev, a, b) { (oyentes[ev] || []).forEach(function (f) { try { f(a, b); } catch (e) { if (window.console) console.error(e); } }); }
+    function emitir(ev, a, b) { if (cerrada) return; (oyentes[ev] || []).forEach(function (f) { try { f(a, b); } catch (e) { if (window.console) console.error(e); } }); }
     function llamar(fn, args) { return Promise.resolve().then(function () { return o.llamar(fn, args); }); }
     function avisar(t) { if (o.aviso) try { o.aviso(t); } catch (e) {} }
 
@@ -130,7 +163,7 @@
     /** Copia del dispositivo, en listas (ocupa menos), sin lo que está en vuelo. */
     function guardarLocal(nombre) {
       var m = mem[nombre];
-      if (!m) return;
+      if (!m || !guardaLocal()) return;
       var filas = m.filas.filter(function (f) { return !f._nueva; }).map(function (f) { return m.cols.map(function (c) { return f[c]; }); });
       bdGuardar(clave + nombre, { cols: m.cols, filas: filas, v: m.v, leido: m.leido, entera: m.entera !== false, partes: m.partes || {} });
     }
@@ -167,6 +200,7 @@
       });
       return llamar('tablasLeer', [nombres, { desde: desde, fresco: !!fresco, partes: pm }]).then(function (r) {
         var cambiadas = [];
+        if (cerrada) return cambiadas;  // T0275: llega tarde, para una copia que ya no se usa
         nombres.forEach(function (n) {
           var t = (r.tablas || {})[n];
           if (!t || t.igual) return;
@@ -208,7 +242,7 @@
         var partes = op.partes || {};
         return Promise.all(nombres.map(function (n) {
           if (tiene(n, partes[n])) return true;
-          if (mem[n]) return false;
+          if (mem[n] || !guardaLocal()) return false;
           return bdLeer(clave + n).then(function (g) {
             if (g && !mem[n]) mem[n] = deMotor(n, g);
             return tiene(n, partes[n]);
@@ -244,6 +278,13 @@
       columnas: function (n) { return mem[n] ? mem[n].cols.slice() : []; },
       /** Cambios sin confirmar todavía (para avisar antes de cerrar la página). */
       pendientes: function () { return pendientes; },
+      /** T0275 · De quién es la copia (su correo; '' si es solo memoria o la del negocio). */
+      persona: function () { return persona; },
+      /**
+       * T0275 · Deja de usar esta copia (entra otra persona en la misma página): lo que aún llegue del motor ya no se guarda
+       * en el dispositivo ni avisa, y no se refresca al volver a la pestaña.
+       */
+      cerrar: function () { cerrada = true; mem = {}; document.removeEventListener('visibilitychange', alVolver); },
 
       /**
        * Cambia columnas de una fila: la pantalla, al momento; el Excel, por detrás. Devuelve la promesa del motor.
@@ -370,14 +411,15 @@
     };
 
     // Al volver a la pestaña, se refresca lo que se ha leído; al cerrarla con cambios en vuelo, se avisa.
-    document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState !== 'visible') return;
+    function alVolver() {
+      if (document.visibilityState !== 'visible' || cerrada) return;
       var ns = Object.keys(mem);
       if (ns.length) refrescarTodo(ns).catch(function () {});
-    });
-    window.addEventListener('beforeunload', function (e) { if (pendientes) { e.preventDefault(); e.returnValue = ''; } });
+    }
+    document.addEventListener('visibilitychange', alVolver);
+    window.addEventListener('beforeunload', function (e) { if (pendientes && !cerrada) { e.preventDefault(); e.returnValue = ''; } });
     return api;
   }
 
-  window.UT = { crear: crear };
+  window.UT = { crear: crear, olvidar: olvidar };
 })();
