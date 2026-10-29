@@ -1128,7 +1128,24 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
   .u .cm-deshacer { left: calc(var(--ancho-menu) + var(--e4)); bottom: var(--e4); }
   .u .cm-otra { grid-template-columns: 2fr 1fr 1fr 1fr auto; }
   .u .cm-otra .u-campo:first-child { grid-column: auto; }
-  .u .cm-eqs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e3); }
+  /* T0258 · en el ordenador, todo el ancho y más camisetas a la vista: los equipos en tantas columnas como quepan,
+     los filtros más bajos y cada camiseta en menos alto (la jugadora y su estado en la misma línea). */
+  .u .n-main:has(> .cm-pest) { max-width: none; }
+  .u .cm-eqs { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: var(--e3); align-items: start; }
+  .u .cm-filtros { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--e3); max-width: 1100px; }
+  .u .cm-chips { gap: var(--e1) var(--e2); }
+  .u .cm-chip { min-height: 36px; padding: 0 var(--e3); font-size: 14px; }
+  .u .cm-eq { padding: var(--e3) var(--e3) var(--e2); }
+  .u .cm-eq-cab .n-grupo { font-size: 18px; }
+  .u .cm-eq-sub, .u .cm-prox { font-size: 13px; margin-bottom: var(--e1); }
+  .u .cm-jug-n { gap: var(--e2); padding: var(--e1) 0; }
+  .u .cm-cami { width: 48px; height: 48px; }
+  .u .cm-cami b { font-size: 14px; margin-top: 7px; }
+  .u .cm-cami b.cm-cami-2 { font-size: 12px; }
+  .u .cm-jug-t { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: var(--e2); row-gap: 0; }
+  .u .cm-jug-c { flex-basis: 100%; font-size: 19px; }
+  .u .cm-jug-p { font-size: 13px; }
+  .u .cm-sig { min-width: 96px; min-height: 40px; }
 }
 
 /* ---------- Zona segura de abajo en el iPhone (T0256) ----------
