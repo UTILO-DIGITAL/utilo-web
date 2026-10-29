@@ -68,7 +68,10 @@
     });
   }
   /** «entrar», con los errores tal cual (ACCESO: vuelve a la pantalla de entrada). T0273: como, el correo de otra persona. */
-  function entrar(como) { return window.UG.llamar(C.api, como ? { fn: 'entrar', como: como } : { fn: 'entrar' }); }
+  function entrar(como) {
+    como = typeof como === 'string' && /^[^@\s]+@[^@\s]+$/.test(como) ? como : ''; // solo un correo
+    return window.UG.llamar(C.api, como ? { fn: 'entrar', como: como } : { fn: 'entrar' });
+  }
   function inicio() {
     return fetch(C.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: 'inicio' }) })
       .then(function (r) { if (!r.ok) throw new Error('No hay conexión con el motor del negocio (' + r.status + ').'); return r.json(); })
@@ -100,7 +103,8 @@
       var b = $('n-entrar').querySelector('button');
       b.onclick = function () {
         b.disabled = true; b.textContent = 'Entrando…';
-        window.UG.entrar().then(entrar).then(function (r) {
+        // T0273: sin pasar la llave que devuelve Google a entrar (su argumento es «como»).
+        window.UG.entrar().then(function () { return entrar(); }).then(function (r) {
           window.UG.recordarCorreo(r.correo || '');
           var cred = credDe(r);
           guardar(cred); borrarComo(); marco(cred); // T0273: al entrar con Google, siempre con la cuenta propia
