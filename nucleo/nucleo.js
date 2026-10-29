@@ -23,6 +23,12 @@
  * - T0275: la copia de las tablas del dispositivo es de cada persona (su correo): en un dispositivo compartido, quien entra
  *   empieza con la suya o vacía. Si entra otra persona en la misma página, se deja la copia de la anterior; al cerrar
  *   sesión (o si el motor dice que ya no tiene acceso), se borra del dispositivo la de quien sale.
+ * - T0273 · Entrar como otra persona: quien administra elige a alguien de la tabla de accesos (botón en Perfil, data-n-como)
+ *   y la app se pinta como la ve esa persona: su perfil, su menú y lo suyo. Cada llamada al motor lleva «como» (su correo)
+ *   y el motor comprueba que quien llama administra (si no, «COMO:» y se vuelve a la cuenta propia). Arriba, siempre, la
+ *   franja «Viendo como …» con «Volver a mi cuenta» (data-n-volver). Se recuerda en la pestaña (sessionStorage): al
+ *   recargar sigue igual y al cerrarla se vuelve a la cuenta propia. Su copia de las tablas va aparte
+ *   (<correo de quien administra>><correo de ella>) y se borra al volver.
  */
 (function () {
   'use strict';
@@ -40,11 +46,29 @@
   function leer() { try { return JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) { return null; } }
   function guardar(o) { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) {} }
   function borrar() { try { localStorage.removeItem(CLAVE); } catch (e) {} }
+  // T0273: viendo como otra persona, lo que dijo el motor de ella, solo en esta pestaña.
+  var COMO = 'nucleo_como_' + (C.clave || 'negocio');
+  function leerComo() { try { return JSON.parse(sessionStorage.getItem(COMO) || 'null'); } catch (e) { return null; } }
+  function guardarComo(o) { try { sessionStorage.setItem(COMO, JSON.stringify(o)); } catch (e) {} }
+  function borrarComo() { try { sessionStorage.removeItem(COMO); } catch (e) {} }
+  function bajo(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
+  /** T0275/T0273 · De quién es la copia de las tablas: su correo o, viendo como otra persona, «<quien administra>><ella>». */
+  function copiaDe(c) { return !c ? '' : c.como && c.como.correo ? bajo(c.como.correo) + '>' + bajo(c.correo) : bajo(c.correo); }
 
-  /** Llamada al motor con la llave de Google; pide conectar un Excel si falta (google.js · UG.seccion). */
-  function llamar(fn, args) { return window.UG.seccion(C.api, { fn: fn, args: args || [] }, CLAVE); }
-  /** «entrar», con los errores tal cual (ACCESO: vuelve a la pantalla de entrada). */
-  function entrar() { return window.UG.llamar(C.api, { fn: 'entrar' }); }
+  /**
+   * Llamada al motor con la llave de Google; pide conectar un Excel si falta (google.js · UG.seccion). T0273: viendo como
+   * otra persona, lleva «como»; si el motor no lo deja (COMO:), se vuelve a la cuenta propia.
+   */
+  function llamar(fn, args) {
+    var c = { fn: fn, args: args || [] };
+    if (cred && cred.como) c.como = cred.correo;
+    return window.UG.seccion(C.api, c, CLAVE).catch(function (e) {
+      if (/^COMO:/.test(e.message) && c.como && cred && cred.como && cred.correo === c.como) volver(e.message.replace(/^COMO:\s*/, ''));
+      throw new Error(String(e.message).replace(/^COMO:\s*/, ''));
+    });
+  }
+  /** «entrar», con los errores tal cual (ACCESO: vuelve a la pantalla de entrada). T0273: como, el correo de otra persona. */
+  function entrar(como) { return window.UG.llamar(C.api, como ? { fn: 'entrar', como: como } : { fn: 'entrar' }); }
   function inicio() {
     return fetch(C.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: 'inicio' }) })
       .then(function (r) { if (!r.ok) throw new Error('No hay conexión con el motor del negocio (' + r.status + ').'); return r.json(); })
@@ -79,7 +103,7 @@
         window.UG.entrar().then(entrar).then(function (r) {
           window.UG.recordarCorreo(r.correo || '');
           var cred = credDe(r);
-          guardar(cred); marco(cred);
+          guardar(cred); borrarComo(); marco(cred); // T0273: al entrar con Google, siempre con la cuenta propia
         }, function (e) {
           if (/^CONECTAR:/.test(e.message)) { conectarYEntrar(e); return; }
           b.disabled = false; b.textContent = ant.persona ? 'Continuar con Google' : 'Entrar con Google';
@@ -105,7 +129,9 @@
   }
 
   function credDe(r) {
-    return { persona: r.persona, correo: r.correo || '', perfil: r.perfil || '', admin: !!r.admin, negocio: r.negocio || '', dev: r.dev || '', secciones: r.secciones || [] };
+    var o = { persona: r.persona, correo: r.correo || '', perfil: r.perfil || '', admin: !!r.admin, negocio: r.negocio || '', dev: r.dev || '', secciones: r.secciones || [] };
+    if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
+    return o;
   }
 
   /** En DEV, la banda «DEV · rama · commit · modo» (la misma que DEV.gs del motor: colores fijos, solo en DEV). */
@@ -132,7 +158,7 @@
   function tablas() {
     if (T) return T;
     // T0275: la copia del dispositivo es de quien ha entrado (sin correo, solo en memoria).
-    T = window.UT.crear({ llamar: llamar, clave: C.clave || 'negocio', persona: cred.correo || '', aviso: aviso });
+    T = window.UT.crear({ llamar: llamar, clave: C.clave || 'negocio', persona: copiaDe(cred), aviso: aviso });
     T.en('cambio', function (tabla, info) {
       (oyentes[actual] || []).forEach(function (f) { try { f(tabla, info); } catch (e) { if (window.console) console.error(e); } });
     });
@@ -171,11 +197,11 @@
 
   /** Pinta el marco entero y abre la sección de la URL (o la primera). */
   function marco(c) {
-    if (T && T.persona() !== String(c.correo || '').trim().toLowerCase()) soltarTablas();  // T0275: otra persona, otra copia
+    if (T && T.persona() !== copiaDe(c)) soltarTablas();  // T0275: otra persona, otra copia
     cred = c;
-    document.body.className = 'u u-con-barra';
+    document.body.className = 'u u-con-barra' + (cred.como ? ' n-viendo-como' : '');
     document.body.innerHTML = bandaDev(cred.dev) + htmlMenu() +
-      '<div id="sx-panel"><header class="u-cab n-cab"><h1 id="n-titulo"></h1>' +
+      '<div id="sx-panel">' + htmlComo() + '<header class="u-cab n-cab"><h1 id="n-titulo"></h1>' +
       '<a class="n-quien" href="?s=perfil" data-sx="PERFIL"><span>' + texto(cred.persona) + '</span>' + (cred.perfil ? '<small>' + texto(cred.perfil) + '</small>' : '') + '</a></header>' +
       '<main class="u-main n-main" id="n-sec"></main></div>' +
       '<div class="u-aviso" id="n-aviso" role="status" hidden></div>';
@@ -184,7 +210,99 @@
       this.setAttribute('aria-label', p ? 'Desplegar el menú' : 'Plegar el menú'); this.title = this.getAttribute('aria-label');
       try { if (p) localStorage.setItem(MENU_CLAVE, '1'); else localStorage.removeItem(MENU_CLAVE); } catch (e) {}
     };
+    tope();
     abrir(pedida() || menu()[0].id, false);
+  }
+
+  /* ---------- T0273 · entrar como otra persona ---------- */
+
+  /** La franja de arriba mientras quien administra ve como otra persona. */
+  function htmlComo() {
+    if (!cred.como) return '';
+    return '<div class="n-como" id="n-como" role="status"><p><span>Viendo como</span> <strong>' + texto(cred.persona) + '</strong>' +
+      (cred.perfil ? ' · ' + texto(cred.perfil) : '') + '<small>Lo que guardes queda a tu nombre: «' + texto(cred.como.persona + ' como ' + cred.persona) + '».</small></p>' +
+      '<button type="button" class="u-btn" data-n-volver>Volver a mi cuenta</button></div>';
+  }
+  /** Lo que ocupa la franja (--tope), para que lo que se queda fijo arriba al bajar (cabeceras de tabla…) quede debajo. */
+  var obsTope = null;
+  function tope() {
+    if (obsTope) { obsTope.disconnect(); obsTope = null; }
+    var f = $('n-como'), poner = function () { document.body.style.setProperty('--tope', (f ? f.offsetHeight : 0) + 'px'); };
+    if (!f) { document.body.style.removeProperty('--tope'); return; }
+    poner();
+    if (window.ResizeObserver) { obsTope = new ResizeObserver(poner); obsTope.observe(f); }
+  }
+
+  /** La ventana para elegir como quién entrar: las personas de la tabla de accesos (solo quien administra; lo comprueba el motor). */
+  function verComo() {
+    if (!cred || !cred.admin || cred.como || $('n-como-velo')) return;
+    var velo = document.createElement('div');
+    velo.className = 'u-velo abierto'; velo.id = 'n-como-velo';
+    velo.innerHTML = '<div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="n-como-t"><div class="n-ventana">' +
+      '<h2 id="n-como-t">Entrar como otra persona</h2>' +
+      '<p class="u-nota">Verás la app como la ve: su perfil, su menú y lo suyo. Puedes guardar cambios, y quedarán a tu nombre. ' +
+      'Se usan tus permisos de Google: si no tiene compartido algún Excel, tú sí verás lo que hay en él.</p>' +
+      '<label class="u-campo"><span class="u-etiqueta">Buscar</span><input type="search" id="n-como-buscar" placeholder="Nombre, correo o perfil" autocomplete="off"></label>' +
+      '<div id="n-como-lista" aria-live="polite"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div>' +
+      '<div class="n-botones"><button type="button" class="u-btn" id="n-como-cerrar">Cerrar sin elegir</button></div></div></div>';
+    document.body.appendChild(velo);
+    var lista = $('n-como-lista'), buscar = $('n-como-buscar'), ps = null, antes = document.activeElement;
+    function cerrar() {
+      document.removeEventListener('keydown', tecla);
+      if (velo.parentNode) velo.parentNode.removeChild(velo);
+      if (antes && antes.focus && document.body.contains(antes)) antes.focus();
+    }
+    function tecla(e) { if (e.key === 'Escape') cerrar(); }
+    function pintar() {
+      if (!ps) return;
+      var q = bajo(buscar.value), xs = ps.filter(function (p) { return !q || bajo(p.persona + ' ' + p.correo + ' ' + p.perfil).indexOf(q) >= 0; });
+      lista.innerHTML = !ps.length ? '<p class="u-vacio">No hay nadie más con acceso a la app. Se añade en la tabla de accesos del negocio.</p>' :
+        !xs.length ? '<p class="u-vacio">Nadie coincide con «' + texto(buscar.value) + '». Prueba con otra parte del nombre o del correo.</p>' :
+        '<ul class="n-como-lista">' + xs.map(function (p) {
+          return '<li><button type="button" data-c="' + texto(p.correo) + '"><strong>' + texto(p.persona) + '</strong><span>' + texto(p.perfil) + ' · ' + texto(p.correo) + '</span></button></li>';
+        }).join('') + '</ul>';
+    }
+    document.addEventListener('keydown', tecla);
+    velo.addEventListener('click', function (e) {
+      if (e.target === velo || e.target.id === 'n-como-cerrar') { cerrar(); return; }
+      var b = e.target.closest && e.target.closest('button[data-c]');
+      if (!b) return;
+      var p = ps.filter(function (x) { return x.correo === b.getAttribute('data-c'); })[0];
+      [].forEach.call(lista.querySelectorAll('button'), function (x) { x.disabled = true; });
+      lista.insertAdjacentHTML('afterbegin', '<p class="u-nota" role="status">Entrando como ' + texto(p.persona) + '…</p>');
+      entrarComo(p.correo).then(cerrar, function (x) {
+        pintar();
+        lista.insertAdjacentHTML('afterbegin', '<p class="u-error" role="alert">No se ha podido entrar como ' + texto(p.persona) + ': ' +
+          texto(String(x.message).replace(/^\w+:\s*/, '')) + '</p>');
+      });
+    });
+    buscar.addEventListener('input', pintar);
+    buscar.focus();
+    llamar('nucleoPersonas').then(function (r) { ps = r || []; pintar(); }, function (e) {
+      lista.innerHTML = '<p class="u-error" role="alert">No se ha podido cargar la lista: ' + texto(e.message) + '</p><p class="u-nota">Cierra esta ventana y vuelve a probar.</p>';
+    });
+  }
+
+  /** Entra como esa persona: el motor dice qué ve y lo comprueba; la pantalla se pinta como la suya. */
+  function entrarComo(correo) {
+    return entrar(correo).then(function (r) {
+      var c = credDe(r);
+      if (!c.como) throw new Error('El motor no ha dejado entrar como esa persona.');
+      guardarComo(c);
+      marco(c);
+    }, function (e) { throw new Error(String(e.message).replace(/^(COMO|ACCESO):\s*/, '')); });
+  }
+
+  /** Vuelve a la cuenta de quien administra y borra del dispositivo la copia de lo que ha visto como la otra persona. */
+  function volver(msg) {
+    var c = cred;
+    borrarComo();
+    if (c && c.como) soltarTablas(copiaDe(c), true);
+    var g = leer();
+    if (!g || !g.persona) { acceso(msg || ''); return; }
+    marco(g);
+    comprobar();
+    if (msg) aviso(msg);
   }
 
   function pedida() {
@@ -254,6 +372,8 @@
     return {
       id: s.id, titulo: s.titulo, persona: cred.persona, perfil: cred.perfil, admin: cred.admin, config: s.config || {},
       // T0259: las secciones que ves, en orden; T0269: con enPerfil (y su icono) las que van dentro de Perfil.
+      // T0273: como, quien administra si está viendo como esta persona ({ correo, persona }); verComo, la ventana para elegir (solo quien administra).
+      como: cred.como || null, verComo: cred.admin && !cred.como ? verComo : null,
       correo: cred.correo || '', secciones: todas().map(function (x) { return x.enPerfil ? { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true } : { id: x.id, titulo: x.titulo }; }),
       tablas: tablas(),
       alCambiar: function (f) { (oyentes[s.id] = oyentes[s.id] || []).push(f); },
@@ -281,9 +401,11 @@
       '<span>' + texto(cred.admin ? (cred.perfil ? cred.perfil + ' · administras el negocio' : 'Administras el negocio') : cred.perfil) + '</span></div>' +
       '<dl><dt>Cuenta</dt><dd>' + texto(cred.correo || '') + '</dd>' +
       '<dt>Secciones</dt><dd>' + texto(ves || 'Ninguna') + '</dd>' +
-      '<dt>Dispositivo</dt><dd>Sesión guardada en este dispositivo</dd></dl>' +
-      '<a class="u-btn" href="?salir">Cerrar sesión</a>' +
-      '<p class="u-nota">Al cerrar la sesión tendrás que volver a entrar con tu cuenta de Google.</p>' +
+      '<dt>Dispositivo</dt><dd>' + (cred.como ? 'Viendo como ' + texto(cred.persona) + ' desde la cuenta de ' + texto(cred.como.persona) : 'Sesión guardada en este dispositivo') + '</dd></dl>' +
+      (cred.como ? '<button type="button" class="u-btn" data-n-volver>Volver a mi cuenta</button>' :
+        '<div class="n-botones">' + (cred.admin ? '<button type="button" class="u-btn" data-n-como>Entrar como otra persona</button>' : '') +
+        '<a class="u-btn" href="?salir">Cerrar sesión</a></div>' +
+        '<p class="u-nota">Al cerrar la sesión tendrás que volver a entrar con tu cuenta de Google.</p>') +
       (dentro.length ? '<div class="n-botones">' + dentro.map(function (s) {
         return '<a class="u-btn" href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '">' + texto(s.titulo) + '</a>';
       }).join('') + '</div>' : '') + '</div>';
@@ -291,14 +413,23 @@
 
   /** Comprueba con el motor quién eres y qué ves; si ha cambiado, vuelve a pintar el marco. */
   function comprobar() {
-    entrar().then(function (r) {
+    var antes = cred, como = antes.como ? antes.correo : '';
+    entrar(como).then(function (r) {
+      if (cred !== antes) return; // mientras, se ha entrado como otra persona o se ha vuelto
       var nuevo = credDe(r);
       nuevo.correo = nuevo.correo || cred.correo;
+      if (como && !nuevo.como) { volver(); return; }
       if (JSON.stringify(nuevo) === JSON.stringify(cred)) return;
-      guardar(nuevo);
+      if (como) guardarComo(nuevo); else guardar(nuevo);
       marco(nuevo);
     }, function (e) {
-      if (e.acceso) { borrar(); soltarTablas(cred.correo, true); acceso(String(e.message).replace(/^ACCESO:\s*/, '')); return; }
+      if (cred !== antes) return;
+      // T0273: el motor ya no deja ver como esa persona (ya no administras, o ella ya no puede entrar): a tu cuenta.
+      if (/^COMO:/.test(e.message)) { volver(String(e.message).replace(/^COMO:\s*/, '')); return; }
+      if (e.acceso) {
+        var yo = antes.como ? antes.como.correo : antes.correo;
+        borrar(); borrarComo(); soltarTablas(yo, true); acceso(String(e.message).replace(/^ACCESO:\s*/, '')); return;
+      }
       if (/^CONECTAR:/.test(e.message)) { conectarYEntrar(e); return; }
       aviso('No se ha podido comprobar tu acceso: ' + String(e.message).replace(/^\w+:\s*/, ''));
     });
@@ -307,6 +438,9 @@
   /* ---------- navegación ---------- */
 
   document.addEventListener('click', function (e) {
+    // T0273: «Entrar como otra persona» (en Perfil) y «Volver a mi cuenta» (franja y Perfil), estén donde estén.
+    var b = e.target.closest && e.target.closest('[data-n-como], [data-n-volver]');
+    if (b && cred) { e.preventDefault(); if (b.hasAttribute('data-n-volver')) volver(); else verComo(); return; }
     var a = e.target.closest && e.target.closest('a[data-sx]');
     if (!a || !cred || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
     e.preventDefault();
@@ -318,17 +452,20 @@
 
   function arrancar() {
     if (new URLSearchParams(location.search).get('salir') !== null) {
-      soltarTablas((leer() || {}).correo, true);  // T0275: la copia de quien sale no se queda en el dispositivo
-      borrar(); window.UG.salir(); history.replaceState(null, '', location.pathname);
+      soltarTablas((leer() || {}).correo, true);  // T0275: la copia de quien sale no se queda en el dispositivo (T0273: ni la de «como»)
+      borrar(); borrarComo(); window.UG.salir(); history.replaceState(null, '', location.pathname);
     }
     var guardada = leer();
     // T0275: si la llave de Google es de otra cuenta que la sesión guardada, no se pinta lo de la guardada.
     var deLlave = String((window.UG.correo && window.UG.correo()) || '').trim().toLowerCase();
     if (guardada && deLlave && guardada.correo && deLlave !== String(guardada.correo).trim().toLowerCase()) guardada = null;
     if (guardada && guardada.persona && (window.UG.llave() || (window.UG.tieneSesion && window.UG.tieneSesion()))) {
-      marco(guardada);  // al momento, con lo guardado
+      // T0273: si en esta pestaña estaba viendo como otra persona (y es la misma cuenta), sigue igual.
+      var como = leerComo();
+      if (como && (!como.como || bajo(como.como.correo) !== bajo(guardada.correo))) { borrarComo(); como = null; }
+      marco(como || guardada);  // al momento, con lo guardado
       comprobar();      // y por detrás, con el motor
-    } else acceso('');
+    } else { borrarComo(); acceso(''); }
   }
   // Con la página ya leída: así, una sección que va en la misma página (después de este archivo) ya se ha registrado.
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arrancar); else arrancar();

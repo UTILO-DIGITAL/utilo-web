@@ -33,6 +33,8 @@
  * la de otra persona. Con persona vacía, solo memoria. Al crearla se borra la copia del negocio de antes de T0275 (sin
  * persona). T.cerrar() la deja de usar (otra persona entra en la misma página: lo que aún llegue no se guarda ni se pinta)
  * y UT.olvidar(negocio, correo) borra del dispositivo la copia de esa persona (al cerrar sesión). Sin persona, como antes.
+ * T0273: persona puede ser '<correo>><correo>' (quien administra viendo como otra persona); olvidar a quien administra
+ * borra también esas.
  */
 (function () {
   'use strict';
@@ -83,11 +85,11 @@
   }
   /** T0275 · El correo, tal cual va en la clave de la copia. */
   function deCorreo(c) { return String(c == null ? '' : c).trim().toLowerCase(); }
-  /** T0275 · Borra del dispositivo la copia de una persona en un negocio (al cerrar sesión). */
+  /** T0275 · Borra del dispositivo la copia de una persona en un negocio (al cerrar sesión); T0273: y las de «como» suyas. */
   function olvidar(negocio, correo) {
-    var p = 'ut:' + (negocio || 'negocio') + ':' + deCorreo(correo) + ':';
+    var p = 'ut:' + (negocio || 'negocio') + ':' + deCorreo(correo);
     if (!deCorreo(correo)) return Promise.resolve();
-    return bdBorrarSi(function (k) { return k.indexOf(p) === 0; });
+    return bdBorrarSi(function (k) { return k.indexOf(p + ':') === 0 || k.indexOf(p + '>') === 0; });
   }
 
   function copia(o) { var r = {}; for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) r[k] = o[k]; return r; }
