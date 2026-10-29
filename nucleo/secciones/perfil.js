@@ -106,7 +106,13 @@
     if (b.cifras && b.cifras.length) h += htmlCifras(b.cifras);
     if (b.nota) h += '<p class="u-nota">' + texto(b.nota) + '</p>';
     if (!filas.length) h += b.nota ? '' : '<p class="u-vacio">' + texto(b.vacio || 'No hay nada tuyo aquí por ahora.') + '</p>';
-    else {
+    else if (b.plegar) {
+      // T0269: la tabla, plegada debajo de las cifras y el botón; se despliega al tocar «plegar» (p. ej. «Ver los partidos»).
+      var k = 'tabla:' + (b.id || b.titulo);
+      return h + htmlAccion(b.accion) + '<details class="pf-detalle" data-pfdet="' + texto(k) + '"' + (ABIERTO[k] ? ' open' : '') + '><summary>' + texto(b.plegar) +
+        ' <span class="u-cifra">' + filas.length + '</span></summary>' + htmlTabla(cols, filas, b.sumar, b.total) + '</details>' +
+        htmlDetalle(b.detalle, b._vista, b.id || b.titulo) + '</section>';
+    } else {
       h += htmlTabla(cols, filas, b.sumar, b.total);
       if (b.cuantas > filas.length) h += '<p class="u-nota">Y ' + plural(b.cuantas - filas.length, 'más', 'más') + '.</p>';
     }
