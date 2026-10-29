@@ -280,7 +280,7 @@
    * Los estilos son los gs- de estilos/base.css (bloque «Gestión de Konamigas»). */
 
   var BASE = ['TEMPORADAS', 'COMPETICIONES', 'LIGAS', 'EQUIPOS', 'INSCRIPCIONES_EQUIPOS', 'JUGADORAS', 'STAFF', 'COLORES', 'FOTOS', 'REVISIONES'];
-  var ECO = ['TARIFAS', 'DESCUENTOS', 'MOVIMIENTOS'];
+  var ECO = ['TARIFAS', 'DESCUENTOS', 'MOVIMIENTOS', 'CATEGORIAS'];
   var IJ = 'INSCRIPCIONES_JUGADORAS';
   // Las fotos van en la ficha de cada jugadora y las sin vincular se asignan desde el Resumen: FOTOS en PESTANAS se ignora.
   var PESTANAS = { RESUMEN: 'Resumen', EQUIPOS: 'Equipos', JUGADORAS: 'Jugadoras', REVISIONES: 'Revisiones' };
@@ -932,15 +932,38 @@
           : T.crear('REVISIONES', { TIPO: 'Aviso: ' + id, ID_REGISTRO: reg, MOTIVO: t + (por ? ' · ' + por : ''), RESUELTO: true, FECHA: hoy() });
         p.then(function () { if (ctx.abierta()) ctx.aviso('Aviso dado por bueno: ya no avisa.'); }, function () {});
       }
+      /**
+       * La categoría de Economía de las señales (config SENALES): al dar de baja un equipo, el motor pasa a ella sus cobros de
+       * inscripción. senalSinPasar: los cobros de un equipo de baja que aún no están en ella (bajas de antes, o migradas).
+       */
+      var SENAL = PAGOS ? txt(cfg.SENALES) : '';
+      function catSenal() { var n = norm(SENAL); return n ? T.filas('CATEGORIAS').filter(function (c) { return norm(c.NOMBRE) === n; })[0] || null : null; }
+      function senalSinPasar(ie) {
+        if (!SENAL || ie.ESTADO !== 'Baja') return [];
+        var c = catSenal();
+        return d.mov.filter(function (m) { return m.TIPO === 'Ingreso' && /^inscripci[oó]n/i.test(txt(m.REF_TIPO)) && String(m.REF_ID) === String(ie.ID) && (!c || String(m.ID_CATEGORIA) !== String(c.ID)); });
+      }
+      /** «Pasar N cobros a …»: gestion5Senales con los equipos de baja que tienen cobros sin pasar; luego se vuelven a leer. */
+      function pasarSenales(b) {
+        b.disabled = true; b.textContent = 'Pasando…';
+        ctx.llamar('gestion5Senales', [b.getAttribute('data-senales').split(',')]).then(function (r) {
+          var n = ((r && r.MOVIMIENTOS) || []).length;
+          return T.refrescar(['MOVIMIENTOS', 'CATEGORIAS'], true).then(function () { if (ctx.abierta()) { ctx.aviso(plural(n, 'cobro pasado', 'cobros pasados') + ' a «' + SENAL + '» en Economía.'); pintar(); } });
+        }, function (e) { if (ctx.abierta()) { ctx.aviso('No se han podido pasar: ' + String(e.message).replace(/^\w+:\s*/, '')); pintar(); } });
+      }
       /** Señales de los equipos de baja de la temporada: lo que pagaron y se queda como ingreso. No es una alerta. */
       function htmlSenales(vis) {
         var xs = vis.filter(function (i) { if (i.ESTADO !== 'Baja' || i.ORIGEN === 'Clasificación') return false; var p = pagoDe(i); return p && p.senal > 0; });
         if (!xs.length) return '';
         var tot = xs.reduce(function (n, i) { return n + pagoDe(i).senal; }, 0);
+        var sin = xs.filter(function (i) { return senalSinPasar(i).length; }), nSin = sin.reduce(function (n, i) { return n + senalSinPasar(i).length; }, 0);
         return '<details class="gs-alt gs-senales"' + (altAb.senales ? ' open' : '') + ' data-alt="senales"><summary><span>Señales de equipos de baja · ' + plural(xs.length, 'equipo', 'equipos') + '</span><em class="gs-pos">' + eurC(tot) + '</em></summary>' +
-          '<p class="gs-nota">Se dieron de baja después de pagar: no deben nada y lo pagado se queda como ingreso.</p><div class="gs-lista">' + xs.map(function (i) {
+          '<p class="gs-nota">Se dieron de baja después de pagar: no deben nada y lo pagado se queda como ingreso' + (SENAL ? ', en Economía en la categoría «' + texto(SENAL) + '»' : '') + '.</p>' +
+          (nSin ? '<p class="gs-ir"><button type="button" class="gs-b2" data-senales="' + texto(sin.map(function (i) { return i.ID; }).join(',')) + '">Pasar ' + plural(nSin, 'cobro', 'cobros') + ' a «' + texto(SENAL) + '»</button></p>' : '') +
+          '<div class="gs-lista">' + xs.map(function (i) {
             return '<button type="button" class="gs-item" data-ie="' + texto(i.ID) + '"><div class="gs-min"><div class="gs-t">' + punto(i.ID_COLOR) + texto(nomIe(i.ID)) + '</div>' +
-              '<div class="gs-s">' + texto([nomComp(i.ID_COMPETICION), nom('lig', i.ID_LIGA)].filter(Boolean).join(' · ')) + '</div></div><div class="gs-d">' + eurC(pagoDe(i).senal) + '</div></button>';
+              '<div class="gs-s">' + texto([nomComp(i.ID_COMPETICION), nom('lig', i.ID_LIGA)].filter(Boolean).join(' · ')) + '</div>' +
+              (senalSinPasar(i).length ? '<div class="gs-tags">' + tag('Sin pasar a Economía', 'gs-tag-g') + '</div>' : '') + '</div><div class="gs-d">' + eurC(pagoDe(i).senal) + '</div></button>';
           }).join('') + '</div></details>';
       }
       function htmlResumen() {
@@ -1344,7 +1367,9 @@
           html += '<div class="gs-sec">Pagos</div><div class="gs-dl">' +
             fila('Cobrado', eurC(p.cobrado) + (p.cobros ? ' (' + plural(p.cobros, 'movimiento', 'movimientos') + ')' : '')) +
             fila('Señal', p.senal > 0 ? '<b>' + eurC(p.senal) + ' · se queda</b>' : p.cobros ? '<span class="gs-opc">Devuelta</span>' : '<span class="gs-opc">No pagó nada</span>') + '</div>' +
-            '<p class="gs-nota">Equipo de baja: no debe nada y lo que pagó se queda como ingreso (no se devuelve). Si se le devuelve, se apunta en Economía como gasto con la referencia «Inscripción» · ' + texto(ie.ID) + '.</p>';
+            '<p class="gs-nota">Equipo de baja: no debe nada y lo que pagó se queda como ingreso (no se devuelve)' +
+            (SENAL && p.senal > 0 ? (senalSinPasar(ie).length ? '. Sus cobros aún no están en la categoría «' + texto(SENAL) + '» de Economía: pásalos desde Resumen › Señales de equipos de baja' : ', en Economía en la categoría «' + texto(SENAL) + '»') : '') +
+            '. Si se le devuelve, se apunta en Economía como gasto con la referencia «Inscripción» · ' + texto(ie.ID) + '.</p>';
         } else if (p) {
           html += '<div class="gs-sec">Pagos</div>' + (p.incluida ? '<p class="gs-nota">Incluida en otra inscripción: no se cobra.</p>' : '<div class="gs-dl">' +
             fila('Precio', p.sinTarifa ? '<span class="gs-amb">Sin tarifa en TARIFAS para esta competición</span>' : eurC(p.precio)) +
@@ -1685,6 +1710,7 @@
         var t = e.target, b;
         if (t.closest('[data-cerrar]')) { cerrar(); return; }
         if (t.closest('[data-asignar]')) { asignador(); return; }
+        if ((b = t.closest('[data-senales]'))) { pasarSenales(b); return; }
         if ((b = t.closest('[data-ver-foto]'))) { var fv = T.fila('FOTOS', b.getAttribute('data-ver-foto')); if (fv) verFoto(fv); return; }
         if ((b = t.closest('[data-noella]'))) {
           var fn = T.fila('FOTOS', b.getAttribute('data-noella'));
