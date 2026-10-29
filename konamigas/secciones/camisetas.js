@@ -203,6 +203,17 @@
     // El color de la camiseta es un dato del Excel (COLORES.COLOR_HEX), no un color de la marca.
     return /^#[0-9a-f]{6}$/i.test(h) ? '<i class="cm-color" style="background:' + h + '" aria-hidden="true"></i>' : '';
   }
+  /**
+   * La camiseta dibujada: rellena de su color (COLORES.COLOR_HEX, un dato del Excel) y con el dorsal encima, en blanco o
+   * en oscuro según lo claro que sea el color. Es lo que se reconoce de un vistazo en el campo.
+   */
+  function camiseta(c, peq) {
+    var h = String(color(c.ID_COLOR).COLOR_HEX || ''), ok = /^#[0-9a-f]{6}$/i.test(h), claro = true;
+    if (ok) { var r = parseInt(h.substr(1, 2), 16), g = parseInt(h.substr(3, 2), 16), b = parseInt(h.substr(5, 2), 16); claro = (r * 299 + g * 587 + b * 114) / 1000 > 150; }
+    return '<span class="cm-cami' + (peq ? ' cm-cami-p' : '') + (claro ? ' cm-cami-clara' : '') + '" aria-hidden="true"' + (ok ? ' style="--cm-c:' + h + '"' : '') + '>' +
+      '<svg viewBox="0 0 24 24"><path d="M8 3l-5 3 2 4 3-1v12h8V9l3 1 2-4-5-3c-.5 1.5-2 2.5-4 2.5S8.5 4.5 8 3z"/></svg>' +
+      '<b>' + texto(c.DORSAL || '–') + '</b></span>';
+  }
   function nombreModelo(id) { var m = S.T.fila('MODELOS', id); return m ? m.NOMBRE || id : id; }
   function talla(c) { return [c.DORSAL ? 'Dorsal ' + c.DORSAL : 'Sin dorsal', c.TALLA].filter(String).join(' · '); }
   function cami(f) { return (f.DORSAL || '—') + ' · ' + (f.TALLA || '?'); }
@@ -353,10 +364,12 @@
   function htmlJugadora(x) {
     var c = x.c, s = x.s, sig = siguiente(s);
     var est = s === 'recuperar' ? '<span class="n-estado n-e-bl">Por recuperar</span>' : s === 'quitar' ? '<span class="n-estado n-e-bl">Baja: quitar la camiseta</span>' : chipEstado(c.ESTADO);
-    return '<li class="cm-jug' + (c._pendiente ? ' cm-guardando' : '') + '"><button type="button" class="cm-jug-n" data-cm-cam="' + texto(c.ID) + '">' +
-      '<b>' + texto(x.q.jugadora || c.ID_INSCRIPCION_JUGADORA) + '</b>' +
-      '<span class="u-nota">' + punto(c.ID_COLOR) + texto([talla(c), nombreColor(c.ID_COLOR)].join(' · ')) + '</span>' +
-      '<span class="cm-jug-e">' + est + (c._pendiente ? ' <span class="u-nota">Guardando…</span>' : c.ESTADO === 'Entregada' && c.FECHA_ENTREGA ? ' <span class="u-nota">' + fecha(c.FECHA_ENTREGA) + '</span>' : '') + '</span></button>' +
+    // Lo primero, la camiseta (color, dorsal y talla); la jugadora, debajo.
+    return '<li class="cm-jug' + (c._pendiente ? ' cm-guardando' : '') + '"><button type="button" class="cm-jug-n" data-cm-cam="' + texto(c.ID) + '"' +
+      ' aria-label="' + texto([c.DORSAL ? 'Dorsal ' + c.DORSAL : 'Sin dorsal', c.TALLA, nombreColor(c.ID_COLOR), x.q.jugadora].filter(String).join(', ')) + '">' +
+      camiseta(c) + '<span class="cm-jug-t"><span class="cm-jug-c"><b>' + texto(c.TALLA || '?') + '</b> ' + texto(nombreColor(c.ID_COLOR)) + '</span>' +
+      '<span class="cm-jug-p">' + texto(x.q.jugadora || c.ID_INSCRIPCION_JUGADORA) + '</span>' +
+      '<span class="cm-jug-e">' + est + (c._pendiente ? ' <span class="u-nota">Guardando…</span>' : c.ESTADO === 'Entregada' && c.FECHA_ENTREGA ? ' <span class="u-nota">' + fecha(c.FECHA_ENTREGA) + '</span>' : '') + '</span></span></button>' +
       (sig ? '<button type="button" class="u-btn cm-sig' + (sig[2] ? ' cm-sig-' + sig[2] : '') + '" data-cm-sig="' + texto(c.ID) + '"' +
         (sig[2] ? ' aria-label="' + texto(sig[1] + ' la camiseta de ' + (x.q.jugadora || c.ID)) + '"' : '') + '>' + texto(sig[1]) + '</button>' : '') + '</li>';
   }
@@ -427,7 +440,8 @@
     var eq = quien(l[0]).equipo;
     var v = ventana('<h2>Entregar a ' + texto(eq) + '</h2><p class="u-nota">Marca como entregadas las camisetas preparadas de este equipo. Quita las que no estés entregando ahora.</p>' +
       '<ul class="cm-lista-ok">' + l.map(function (c) {
-        return '<li><label class="u-check"><input type="checkbox" checked data-cm-id="' + texto(c.ID) + '"> <span><b>' + texto(quien(c).jugadora || c.ID) + '</b> <span class="u-nota">' + texto(talla(c)) + '</span></span></label></li>';
+        return '<li><label class="u-check cm-ok-c"><input type="checkbox" checked data-cm-id="' + texto(c.ID) + '"> ' + camiseta(c, true) +
+          '<span><b>' + texto([c.TALLA, nombreColor(c.ID_COLOR)].filter(String).join(' · ')) + '</b> <span class="u-nota">' + texto(quien(c).jugadora || c.ID) + '</span></span></label></li>';
       }).join('') + '</ul>' +
       '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="ce-ok"></button><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cancelar</button></div>');
     var ok = v.querySelector('#ce-ok');
