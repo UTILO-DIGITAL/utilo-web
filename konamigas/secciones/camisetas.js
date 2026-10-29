@@ -211,8 +211,8 @@
     var h = String(color(c.ID_COLOR).COLOR_HEX || ''), ok = /^#[0-9a-f]{6}$/i.test(h), claro = true;
     if (ok) { var r = parseInt(h.substr(1, 2), 16), g = parseInt(h.substr(3, 2), 16), b = parseInt(h.substr(5, 2), 16); claro = (r * 299 + g * 587 + b * 114) / 1000 > 150; }
     return '<span class="cm-cami' + (peq ? ' cm-cami-p' : '') + (claro ? ' cm-cami-clara' : '') + '" aria-hidden="true"' + (ok ? ' style="--cm-c:' + h + '"' : '') + '>' +
-      '<svg viewBox="0 0 24 24"><path d="M8 3l-5 3 2 4 3-1v12h8V9l3 1 2-4-5-3c-.5 1.5-2 2.5-4 2.5S8.5 4.5 8 3z"/></svg>' +
-      '<b>' + texto(c.DORSAL || '–') + '</b></span>';
+      '<svg viewBox="0 0 24 24"><path d="M6.5 3 1.5 6.2l2.1 4.2 2.9-1.1V21.5h11V9.3l2.9 1.1 2.1-4.2L17.5 3c-.7 1.7-2.8 2.8-5.5 2.8S7.2 4.7 6.5 3z"/></svg>' +
+      '<b' + (String(c.DORSAL || '').length > 1 ? ' class="cm-cami-2"' : '') + '>' + texto(c.DORSAL || '–') + '</b></span>';
   }
   function nombreModelo(id) { var m = S.T.fila('MODELOS', id); return m ? m.NOMBRE || id : id; }
   function talla(c) { return [c.DORSAL ? 'Dorsal ' + c.DORSAL : 'Sin dorsal', c.TALLA].filter(String).join(' · '); }
@@ -348,7 +348,8 @@
       var aDar = todas.filter(function (x) { return !x.q.baja && x.s !== 'Sin camiseta'; }), ent = aDar.filter(function (x) { return x.s === 'Entregada'; }).length;
       var prep = todas.filter(function (x) { return x.s === 'Preparada'; });
       var x0 = todas[0].q;
-      return '<section class="cm-eq"><div class="cm-eq-cab"><h2 class="n-grupo">' + punto(x0.colorEq) + texto(x0.equipo || 'Sin equipo') + '</h2>' +
+      return '<section class="cm-eq"><div class="cm-eq-cab"><h2 class="n-grupo">' + punto(x0.colorEq) + texto(x0.equipo || 'Sin equipo') +
+        (x0.colorEq ? ' <span class="cm-eq-color">' + texto(nombreColor(x0.colorEq)) + '</span>' : '') + '</h2>' +
         '<span class="u-cifra' + (aDar.length && ent === aDar.length ? ' cm-ok' : '') + '">' + ent + ' de ' + aDar.length + '</span></div>' +
         '<div class="cm-barra" aria-hidden="true"><i style="width:' + (aDar.length ? Math.round(100 * ent / aDar.length) : 100) + '%"></i></div>' +
         '<p class="u-nota cm-eq-sub">' + texto([S.comp.charAt(0) === 'T' ? x0.compNombre : '', x0.liga].filter(String).join(' · ')) + '</p>' +
@@ -367,7 +368,7 @@
     // Lo primero, la camiseta (color, dorsal y talla); la jugadora, debajo.
     return '<li class="cm-jug' + (c._pendiente ? ' cm-guardando' : '') + '"><button type="button" class="cm-jug-n" data-cm-cam="' + texto(c.ID) + '"' +
       ' aria-label="' + texto([c.DORSAL ? 'Dorsal ' + c.DORSAL : 'Sin dorsal', c.TALLA, nombreColor(c.ID_COLOR), x.q.jugadora].filter(String).join(', ')) + '">' +
-      camiseta(c) + '<span class="cm-jug-t"><span class="cm-jug-c"><b>' + texto(c.TALLA || '?') + '</b> ' + texto(nombreColor(c.ID_COLOR)) + '</span>' +
+      camiseta(c) + '<span class="cm-jug-t"><span class="cm-jug-c">' + texto((c.DORSAL || '–') + (c.TALLA || '?')) + '</span>' +
       '<span class="cm-jug-p">' + texto(x.q.jugadora || c.ID_INSCRIPCION_JUGADORA) + '</span>' +
       '<span class="cm-jug-e">' + est + (c._pendiente ? ' <span class="u-nota">Guardando…</span>' : c.ESTADO === 'Entregada' && c.FECHA_ENTREGA ? ' <span class="u-nota">' + fecha(c.FECHA_ENTREGA) + '</span>' : '') + '</span></span></button>' +
       (sig ? '<button type="button" class="u-btn cm-sig' + (sig[2] ? ' cm-sig-' + sig[2] : '') + '" data-cm-sig="' + texto(c.ID) + '"' +
@@ -441,7 +442,7 @@
     var v = ventana('<h2>Entregar a ' + texto(eq) + '</h2><p class="u-nota">Marca como entregadas las camisetas preparadas de este equipo. Quita las que no estés entregando ahora.</p>' +
       '<ul class="cm-lista-ok">' + l.map(function (c) {
         return '<li><label class="u-check cm-ok-c"><input type="checkbox" checked data-cm-id="' + texto(c.ID) + '"> ' + camiseta(c, true) +
-          '<span><b>' + texto([c.TALLA, nombreColor(c.ID_COLOR)].filter(String).join(' · ')) + '</b> <span class="u-nota">' + texto(quien(c).jugadora || c.ID) + '</span></span></label></li>';
+          '<span><b>' + texto((c.DORSAL || '–') + (c.TALLA || '?')) + '</b> <span class="u-nota">' + texto(quien(c).jugadora || c.ID) + '</span></span></label></li>';
       }).join('') + '</ul>' +
       '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="ce-ok"></button><button type="button" class="u-btn u-btn-texto" data-cm-cerrar>Cancelar</button></div>');
     var ok = v.querySelector('#ce-ok');
