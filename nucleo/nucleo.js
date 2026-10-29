@@ -17,6 +17,8 @@
  *   momento (kanban4/tablas.js, una copia para todas las secciones), llamar a sus funciones del motor y avisar.
  * - Perfil va siempre al final del menú: si el cliente tiene la sección PERFIL (T0259), esa; si no, la del marco
  *   (quién eres, tu perfil y cerrar sesión).
+ * - T0269: una sección con «enPerfil» (Pedir a Utilo, por defecto) no sale en el menú: se abre desde un botón al final de
+ *   Perfil y, mientras está abierta, el menú marca Perfil.
  * - La sección va en la URL (?s=ejemplo). Cambiar de sección no recarga la página.
  */
 (function () {
@@ -133,13 +135,15 @@
     return T;
   }
 
-  /** Secciones del menú: las que ves y, al final, Perfil (la sección PERFIL si el cliente la tiene; si no, la del marco). */
-  function menu() {
+  /** Las secciones que ves y, al final, Perfil (la sección PERFIL si el cliente la tiene; si no, la del marco). */
+  function todas() {
     var ss = (cred.secciones || []).filter(function (s) { return s.id !== 'PERFIL'; });
     var p = (cred.secciones || []).filter(function (s) { return s.id === 'PERFIL'; })[0] || { id: 'PERFIL', titulo: 'Perfil', icono: ICONO_PERFIL, propia: true };
     return ss.concat([p]);
   }
-  function seccion(id) { return menu().filter(function (s) { return s.id === id; })[0] || null; }
+  /** Las del menú: todas menos las que van dentro de Perfil (T0269). */
+  function menu() { return todas().filter(function (s) { return !s.enPerfil; }); }
+  function seccion(id) { return todas().filter(function (s) { return s.id === id; })[0] || null; }
 
   function htmlMenu() {
     var plegado = false;
@@ -177,19 +181,23 @@
     return seccion(s) ? s : '';
   }
 
-  /** Abre una sección dentro del marco: título, menú, su JS (la primera vez) y su abrir(el, ctx). */
-  function abrir(id, push) {
+  /**
+   * Abre una sección dentro del marco: título, menú, su JS (la primera vez) y su abrir(el, ctx). Con push, la apunta en la
+   * URL; href, si el enlace lleva algo más para la sección (T0269: ?s=kanban&asignado=…).
+   */
+  function abrir(id, push, href) {
     var s = seccion(id) || menu()[0];
     if (abierta && abierta.def && abierta.def.cerrar) { try { abierta.def.cerrar(); } catch (e) {} }
     abierta = null;
     oyentes[actual] = [];
     actual = s.id;
+    var marcada = s.enPerfil ? 'PERFIL' : s.id; // una sección de dentro de Perfil marca Perfil en el menú (T0269)
     [].forEach.call(document.querySelectorAll('.sx a[data-sx]'), function (a) {
-      if (a.getAttribute('data-sx') === s.id) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+      if (a.getAttribute('data-sx') === marcada) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
     $('n-titulo').textContent = s.titulo;
     document.title = s.titulo + ' · ' + (C.nombreApp || cred.negocio || '');
-    if (push) history.pushState({ s: s.id }, '', '?s=' + s.id.toLowerCase());
+    if (push) history.pushState({ s: s.id }, '', href && /^\?s=/.test(href) ? href : '?s=' + s.id.toLowerCase());
     window.scrollTo(0, 0); document.body.scrollTop = 0;
     var el = $('n-sec');
     if (s.propia) { el.innerHTML = htmlPerfil(); return; }
@@ -223,7 +231,8 @@
   /**
    * Lo que recibe cada sección en abrir(el, ctx):
    * - id, titulo, persona, perfil, admin y config (su personalización de config.json · nucleo, con los valores por defecto).
-   * - correo y secciones (T0259): la cuenta con la que ha entrado y las secciones de su menú ({ id, titulo }), en orden.
+   * - correo y secciones (T0259): la cuenta con la que ha entrado y las secciones que ve ({ id, titulo }), en orden; las de
+   *   dentro de Perfil, con enPerfil e icono (T0269).
    * - tablas: las tablas al momento (UT de kanban4/tablas.js): leer, filas, fila, actualizar, crear, borrar.
    * - alCambiar(f): f(tabla, info) cada vez que cambia una tabla, solo mientras la sección está abierta.
    * - llamar(fn, args): una función de su «api» del motor (recibe ctx en el motor). Devuelve una promesa.
@@ -233,7 +242,8 @@
   function ctxDe(s) {
     return {
       id: s.id, titulo: s.titulo, persona: cred.persona, perfil: cred.perfil, admin: cred.admin, config: s.config || {},
-      correo: cred.correo || '', secciones: menu().map(function (x) { return { id: x.id, titulo: x.titulo }; }), // T0259
+      // T0259: las secciones que ves, en orden; T0269: con enPerfil (y su icono) las que van dentro de Perfil.
+      correo: cred.correo || '', secciones: todas().map(function (x) { return x.enPerfil ? { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true } : { id: x.id, titulo: x.titulo }; }),
       tablas: tablas(),
       alCambiar: function (f) { (oyentes[s.id] = oyentes[s.id] || []).push(f); },
       llamar: llamar,
@@ -252,16 +262,20 @@
     tAviso = setTimeout(function () { a.hidden = true; }, 5000);
   }
 
-  /** Perfil del marco, mientras el cliente no tenga la sección PERFIL: quién eres, tu perfil y cerrar sesión. */
+  /** Perfil del marco, mientras el cliente no tenga la sección PERFIL: quién eres, tu perfil, las de dentro de Perfil y cerrar sesión. */
   function htmlPerfil() {
-    var ves = (cred.secciones || []).map(function (s) { return s.titulo; }).join(', ');
+    var ves = menu().filter(function (s) { return s.id !== 'PERFIL'; }).map(function (s) { return s.titulo; }).join(', ');
+    var dentro = todas().filter(function (s) { return s.enPerfil; });
     return '<div class="u-perfil"><div class="u-perfil-quien"><strong>' + texto(cred.persona) + '</strong>' +
       '<span>' + texto(cred.admin ? (cred.perfil ? cred.perfil + ' · administras el negocio' : 'Administras el negocio') : cred.perfil) + '</span></div>' +
       '<dl><dt>Cuenta</dt><dd>' + texto(cred.correo || '') + '</dd>' +
       '<dt>Secciones</dt><dd>' + texto(ves || 'Ninguna') + '</dd>' +
       '<dt>Dispositivo</dt><dd>Sesión guardada en este dispositivo</dd></dl>' +
       '<a class="u-btn" href="?salir">Cerrar sesión</a>' +
-      '<p class="u-nota">Al cerrar la sesión tendrás que volver a entrar con tu cuenta de Google.</p></div>';
+      '<p class="u-nota">Al cerrar la sesión tendrás que volver a entrar con tu cuenta de Google.</p>' +
+      (dentro.length ? '<div class="n-botones">' + dentro.map(function (s) {
+        return '<a class="u-btn" href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '">' + texto(s.titulo) + '</a>';
+      }).join('') + '</div>' : '') + '</div>';
   }
 
   /** Comprueba con el motor quién eres y qué ves; si ha cambiado, vuelve a pintar el marco. */
@@ -285,7 +299,7 @@
     var a = e.target.closest && e.target.closest('a[data-sx]');
     if (!a || !cred || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
     e.preventDefault();
-    abrir(a.getAttribute('data-sx'), true);
+    abrir(a.getAttribute('data-sx'), true, a.getAttribute('href'));
   });
   window.addEventListener('popstate', function () { if (cred) abrir(pedida() || menu()[0].id, false); });
 
