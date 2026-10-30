@@ -512,7 +512,8 @@
         '<label class="u-check lg-mios" hidden><input type="checkbox" id="lg-mios"> Solo mis partidos</label></div>' +
         '<div class="lg-elige" id="lg-elige"></div></div></div>' +
         '<div class="u-pestanas" role="tablist">' + pest.map(function (p) { return '<button type="button" role="tab" data-tab="' + p + '">' + PESTANAS[p] + '</button>'; }).join('') + '</div>' +
-        '<div id="lg-cont" class="lg-cont"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div>' +
+        // T0277: si viene de Perfil a ver un partido, lo dice mientras se leen las tablas (antes, Ligas vacío con el cargador).
+        '<div id="lg-cont" class="lg-cont"><div class="kz-centro" role="status"><div class="u-carga"></div>' + (pedido ? '<p>Abriendo el partido…</p>' : '') + '</div></div>' +
         '<div id="lg-copia" class="u-bloque" hidden></div>' +
         '<div class="u-velo" id="lg-velo"><div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="lg-vt"><div class="n-ventana" id="lg-vent"></div></div></div>';
       var cont = el.querySelector('#lg-cont'), velo = el.querySelector('#lg-velo'), vent = el.querySelector('#lg-vent');

@@ -67,7 +67,7 @@
       .concat(t.porEstado.map(function (e) { return '<span class="n-estado n-e-' + (ESTADOS[e.estado.toLowerCase()] || 'x') + '">' + texto(e.estado) + ' <span class="u-cifra">' + e.n + '</span></span>'; }))
       .filter(Boolean).join('') : '';
     var h = '<section class="pf-bloque"><h2 class="n-grupo">' + texto(t.titulo) + ' <span class="u-cifra">' + t.abiertas + '</span></h2>';
-    if (!t.abiertas) return h + '<p class="u-vacio">No tienes tareas abiertas. Las que te asignen aparecen aquí.</p>' + htmlVerTareas(ctx) + '</section>';
+    if (!t.abiertas) return ''; // T0277 (Javi): sin nada que enseñar, no sale; las que te asignen saldrán aquí
     h += '<div class="pf-resumen">' + resumen + '</div>' +
       '<table class="u-tabla n-lista"><thead><tr><th>Tarea</th><th>Estado</th><th>Fecha límite</th></tr></thead><tbody>' +
       t.filas.map(function (f) {
