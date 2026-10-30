@@ -4,7 +4,7 @@
  * Lo tuyo en el negocio: quién eres y con qué perfil, tus tareas más urgentes (las vencidas primero) con el enlace a
  * todas en Tareas, las listas que el cliente activa en su configuración (tus partidos, tus pedidos…), lo que aportan otras
  * secciones (lo que te falta por cobrar…), cerrar sesión y, al final, las secciones que van dentro de Perfil (Pedir a
- * Utilo, T0269). Cómo se configura: docs/SECCION_PERFIL.md de utilo-apps.
+ * Utilo, T0269) y la versión con sus novedades (T0283, la pinta el marco). Cómo se configura: docs/SECCION_PERFIL.md de utilo-apps.
  *
  * - Todo sale de una llamada al motor (perfilDatos), que lee con la capa de tablas y solo devuelve tus filas: las tablas
  *   enteras no llegan al navegador.
@@ -254,7 +254,7 @@
           // Sin tareas abiertas, el bloque de tareas va después de lo demás: arriba, lo que hay que hacer.
           (d ? (d.tareas && !d.tareas.error && !d.tareas.abiertas ? bloques(d) + htmlTareas(d.tareas, d.hoy, ctx)
             : htmlTareas(d.tareas, d.hoy, ctx) + bloques(d)) : cargando()) +
-          htmlCuenta(ctx) + htmlDentro(ctx) +
+          htmlCuenta(ctx) + htmlDentro(ctx) + (window.UN.htmlVersion ? window.UN.htmlVersion() : '') + // T0283: versión y novedades
           '<p class="u-nota pf-hora" id="pf-hora">' + (d ? 'Al día a las ' + hora(d.leido) + '.' : '') + '</p></div>';
       }
       var guardado = leer(ctx);

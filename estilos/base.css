@@ -290,6 +290,17 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .n-como-lista button:hover { background: var(--color-bloque); }
 .u .n-como-lista button:disabled { opacity: .55; cursor: default; }
 .u .n-como-lista span { font-size: 13px; color: var(--color-suave); overflow-wrap: anywhere; }
+/* T0283 · Versión y novedades (bloque de Perfil y su ventana). */
+.u .n-nuevo { display: inline-block; margin-left: var(--e1); padding: 0 6px; border-radius: 999px; background: var(--color-accion);
+  color: var(--color-sobre-accion); font: 600 12px/1.6 var(--fuente-texto); vertical-align: middle; }
+.u .n-versiones { list-style: none; margin: 0; padding: 0; }
+.u .n-versiones > li { padding: var(--e3) 0; border-top: 1px solid var(--color-linea); }
+.u .n-versiones > li:first-child { border-top: 0; padding-top: 0; }
+.u .n-versiones h3 { margin: 0 0 var(--e1); font-size: 16px; }
+.u .n-versiones h3 small { font: 400 13px/1 var(--fuente-texto); color: var(--color-suave); margin-left: var(--e1); }
+.u .n-versiones ul { margin: 0; padding-left: 1.2em; }
+.u .n-versiones ul li + li { margin-top: var(--e1); }
+.u .n-versiones .u-nota { margin: 0; }
 /* Una lista partida en varias tablas (por grupos) con las mismas columnas en todas: la primera, fija. */
 .u .n-tabla-2 { table-layout: fixed; }
 .u .n-tabla-2 th:first-child { width: 42%; }
