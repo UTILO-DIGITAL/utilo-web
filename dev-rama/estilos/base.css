@@ -1,0 +1,1360 @@
+/*
+ * Hoja de estilos común de las vistas de Utilo · T0150 · PROTOCOLO DISEÑO UTILO 1.1
+ * Vale para todas las marcas: los colores, las letras y el radio salen de las variables de
+ * [negocio]/marca.css, que se carga antes. Aquí no hay ningún color de marca escrito a mano.
+ * Excepción del protocolo: los colores de estado del kanban (y los de cliente y error, que también
+ * son funcionales) son iguales para todos y van aquí con su HEX.
+ * Todo va dentro de .u (la clase del <body>), para no tocar páginas que aún no usan esta hoja.
+ */
+
+:root {
+  /* Estados del kanban: funcionales, iguales para todas las marcas. Texto blanco > 4,5:1. */
+  --estado-bl: #B42318;   /* Bloqueada */
+  --estado-ni: #5F6663;   /* No iniciada */
+  --estado-ec: #1F5FA8;   /* En curso */
+  --estado-pr: #9A5208;   /* Pendiente de revisión */
+  --estado-co: #2F6B47;   /* Completada */
+  --estado-x:  #5F6663;   /* Sin estado conocido */
+  /* Color de cada cliente en el kanban (franja y etiqueta), funcional. */
+  --cliente-1: #6A4FC4; --cliente-2: #2366B3; --cliente-3: #B23A6B; --cliente-4: #3F7420;
+  --cliente-5: #96520F; --cliente-6: #8A4469; --cliente-7: #3949AB; --cliente-8: #6D4C41;
+  --color-error: #B42318;
+  /* T0149: dinero a favor (Economía): funcional, el mismo verde que Completada. */
+  --color-bien: #2F6B47;
+
+  /* Tonos derivados de la marca (sin HEX nuevos) */
+  --color-linea: color-mix(in srgb, var(--color-texto) 14%, var(--color-fondo));
+  --color-borde-campo: color-mix(in srgb, var(--color-texto) 55%, var(--color-fondo));
+  --color-suave: color-mix(in srgb, var(--color-texto) 78%, var(--color-fondo));
+  --color-velo: color-mix(in srgb, var(--color-texto) 55%, transparent);
+  --sombra-flota: 0 6px 20px color-mix(in srgb, var(--color-texto) 22%, transparent);
+
+  /* T0149: forma del indicador de carga y de las cabeceras de estado del kanban. Por defecto, el anillo con punto de Utilo
+     (radio 50 % y hueco de 3 px); otra marca las cambia en su marca.css. Van como valor de reserva en cada regla (var(--x, …))
+     porque marca.css se carga antes que esta hoja. */
+
+  /* Espacios en múltiplos de 4 */
+  --e1: 4px; --e2: 8px; --e3: 12px; --e4: 16px; --e5: 24px; --e6: 32px; --e7: 48px;
+
+  /* T0224: alto de la barra de secciones del móvil sin la zona segura (56 px de botón + 1 px de borde) */
+  --alto-barra: 57px;
+  /* T0225: ancho del menú lateral del ordenador (desde 900 px) */
+  --ancho-menu: 232px;
+  --ancho-menu-plegado: 68px;
+}
+
+/* ---------- Página ---------- */
+.u, .u * { box-sizing: border-box; }
+body.u { margin: 0; background: var(--color-fondo); color: var(--color-texto);
+  font: 400 15px/1.45 var(--fuente-texto); -webkit-text-size-adjust: 100%;
+  /* T0224: sin zoom con doble toque (el pellizco lo quita kanban4/app.js) y nada bajo el notch con el móvil en horizontal */
+  touch-action: manipulation; padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.u h1, .u h2, .u h3 { font-family: var(--fuente-titulos); font-weight: var(--peso-titulos); line-height: 1.2; margin: 0; }
+.u a { color: var(--color-principal-oscuro); }
+.u :focus-visible { outline: 3px solid var(--color-principal-oscuro); outline-offset: 2px; }
+.u .u-cifra, .u table td.num { font-variant-numeric: tabular-nums; }
+.u .u-oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- Botones: uno solo de acción por pantalla; los demás, con contorno ---------- */
+.u .u-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--e2);
+  min-height: 44px; padding: 0 var(--e4); border-radius: var(--radio); cursor: pointer; text-decoration: none;
+  font: 700 15px/1.2 var(--fuente-texto); background: transparent; color: var(--color-principal-oscuro);
+  border: 1.5px solid var(--color-principal-oscuro); }
+.u .u-btn:disabled { opacity: .55; cursor: default; }
+/* Texto blanco sobre coral solo grande y en negrita (protocolo, apartado 7) */
+.u .u-btn-accion { background: var(--color-accion); color: var(--color-sobre-accion); border-color: var(--color-accion);
+  font-size: 19px; padding: 0 var(--e5); }
+.u .u-btn-claro { background: var(--color-fondo); color: var(--color-principal-oscuro); border-color: var(--color-fondo); }
+.u .u-btn-texto { border-color: transparent; padding: 0 var(--e2); text-decoration: underline; }
+.u .u-btn-icono { width: 44px; padding: 0; }
+.u .u-btn svg, .u .u-icono { width: 20px; height: 20px; flex: none; stroke: currentColor; fill: none;
+  stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- Campos ---------- */
+.u .u-campo { display: flex; flex-direction: column; gap: var(--e1); min-width: 0; }
+.u .u-etiqueta { font: 700 12px/1.3 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .02em; }
+.u input:not([type=checkbox]):not([type=radio]), .u select, .u textarea {
+  font: 600 15px/1.3 var(--fuente-texto); color: var(--color-texto); background: var(--color-superficie);
+  border: 1.5px solid var(--color-borde-campo); border-radius: var(--radio); padding: 0 var(--e3);
+  min-height: 44px; max-width: 100%; min-width: 0; }
+.u textarea { padding: var(--e2) var(--e3); font-weight: 400; line-height: 1.45; resize: vertical; }
+.u input::placeholder, .u textarea::placeholder { color: var(--color-suave); font-weight: 400; }
+.u input[type=checkbox], .u input[type=radio] { width: 20px; height: 20px; margin: 0; accent-color: var(--color-principal-oscuro); }
+@media (hover: none) { .u input:not([type=checkbox]):not([type=radio]), .u select, .u textarea { font-size: 16px; } }
+
+/* ---------- Etiquetas pequeñas ---------- */
+.u .u-chip { display: inline-flex; align-items: center; gap: var(--e1); padding: 1px var(--e2); border-radius: var(--radio-peq);
+  background: var(--color-bloque); color: var(--color-texto); font: 700 12px/1.6 var(--fuente-texto); white-space: nowrap; }
+
+/* ---------- Tablas (T0225): datos que se comparan, en el ordenador. En el móvil, cada sección pinta su lista ----------
+ * Cabecera fija al bajar, filas separadas por una línea, cifras a la derecha con números de ancho fijo.
+ * Una fila que abre su ficha lleva tabindex="0" y se marca al pasar el ratón. */
+.u .u-tabla { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; background: var(--color-superficie);
+  border: 1px solid var(--color-linea); border-radius: var(--radio); }
+.u .u-tabla th:first-child { border-top-left-radius: var(--radio); } .u .u-tabla th:last-child { border-top-right-radius: var(--radio); }
+.u .u-tabla th { position: sticky; top: var(--tope, 0px); z-index: 1; text-align: left; vertical-align: bottom; padding: var(--e2) var(--e3);
+  background: var(--color-superficie); border-bottom: 1px solid var(--color-borde-campo);
+  font: 700 12px/1.3 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; }
+.u .u-tabla td { padding: var(--e2) var(--e3); border-bottom: 1px solid var(--color-linea); vertical-align: top; }
+.u .u-tabla tr:last-child td { border-bottom: 0; }
+.u .u-tabla .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.u .u-tabla td.u-tabla-t { font-weight: 700; }
+.u .u-tabla td.u-tabla-s { color: var(--color-suave); }
+.u .u-tabla tr[tabindex] { cursor: pointer; }
+.u .u-tabla tr[tabindex]:hover td { background: color-mix(in srgb, var(--color-bloque) 60%, var(--color-superficie)); }
+.u .u-tabla tr[tabindex]:focus-visible { outline: 3px solid var(--color-principal-oscuro); outline-offset: -3px; }
+
+/* ---------- Bloques, avisos y pantallas vacías ---------- */
+.u .u-bloque { background: var(--color-bloque); border-radius: var(--radio); padding: var(--e3) var(--e4); }
+.u .u-nota { font-size: 13px; color: var(--color-suave); }
+.u .u-error { color: var(--color-error); font-weight: 700; }
+.u .u-vacio { color: var(--color-suave); padding: var(--e3) 0; }
+.u .u-aviso { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--e5) + env(safe-area-inset-bottom, 0px));
+  z-index: 70; max-width: calc(100% - var(--e6)); padding: var(--e3) var(--e4); border-radius: var(--radio);
+  background: var(--color-texto); color: var(--color-fondo); font: 600 15px/1.4 var(--fuente-texto); box-shadow: var(--sombra-flota); }
+
+/* ---------- Ventanas (lo único que flota lleva sombra) ---------- */
+.u .u-velo { position: fixed; inset: var(--tope, 0px) 0 0; z-index: 60; background: var(--color-velo); display: none;
+  align-items: flex-start; justify-content: center; overflow-y: auto; padding: 6vh var(--e3); }
+.u .u-velo.abierto { display: flex; }
+.u .u-ventana { background: var(--color-fondo); color: var(--color-texto); border-radius: var(--radio);
+  width: 100%; max-width: 560px; box-shadow: var(--sombra-flota); overflow: hidden; }
+@media (max-width: 640px) { .u .u-velo { padding: 0; } .u .u-ventana { border-radius: 0; min-height: 100%; max-width: none; } }
+
+/* ---------- Indicador de carga: el anillo con punto de la marca ---------- */
+.u .u-carga { position: relative; width: 36px; height: 36px; margin: 0 auto; border-radius: var(--radio-punto, 50%);
+  border: 4px solid var(--color-principal); }
+.u .u-carga::after { content: ""; position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px;
+  border-radius: var(--radio-punto, 50%); background: var(--color-accion); animation: u-punto 1.2s ease-in-out infinite; }
+@keyframes u-punto { 50% { transform: scale(.4); opacity: .4; } }
+
+/* ---------- Pantallas de carga y de acceso (kanban web) ---------- */
+.u .kz { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: var(--e4); }
+.u .kz-caja { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: var(--e4); }
+.u .kz-caja.kz-centro { text-align: center; }
+.u .kz-marca { font: var(--peso-titulos) 34px/1 var(--fuente-titulos); color: var(--color-principal); margin: 0 0 var(--e2); }
+.u .kz-caja h1 { font-size: 30px; color: var(--color-principal-oscuro); margin-bottom: var(--e2); }
+.u .kz-caja label { display: flex; flex-direction: column; gap: var(--e1); font: 700 12px/1.3 var(--fuente-texto);
+  color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .02em; }
+.u .kz-caja select, .u .kz-caja input { width: 100%; font-size: 16px; }
+.u .kz-caja input[type=password] { letter-spacing: .4em; text-align: center; font-variant-numeric: tabular-nums; }
+.u .kz-caja button { width: 100%; }
+.u .kz-aviso { min-height: 1.3em; margin: 0; color: var(--color-error); font-weight: 700; font-size: 14px; }
+.u .kz-ayuda { margin: 0; font-size: 14px; color: var(--color-suave); }
+.u .kz-caja p { margin: 0; }
+
+/* ---------- Barra de secciones: abajo en el móvil, menú a la izquierda en el ordenador (T0225) ----------
+ * T0224: los botones quedan por encima de la zona segura (barra de inicio y esquinas del iPhone); el fondo de la barra
+ * sí llega hasta abajo. Necesita viewport-fit=cover en el viewport: sin él, iOS da 0 en env(safe-area-inset-*). */
+.u .sx, .sx.u-sx { position: fixed; left: 0; right: 0; bottom: 0; z-index: 45; background: var(--color-fondo);
+  border-top: 1px solid var(--color-linea);
+  padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  font-family: var(--fuente-texto); }
+.sx.u-sx .sx-in { display: flex; align-items: stretch; max-width: 640px; margin: 0 auto; }
+.sx.u-sx a { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 56px; padding: var(--e1) 2px; text-decoration: none; color: var(--color-suave); font: 700 12px/1.2 var(--fuente-texto);
+  border-top: 3px solid transparent; }
+.sx.u-sx a[aria-current=page] { color: var(--color-principal-oscuro); border-top-color: var(--color-principal); }
+.sx.u-sx a:focus-visible { outline: 3px solid var(--color-principal-oscuro); outline-offset: -3px; }
+.sx.u-sx svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+/* T0218: el contador de Nuevas de la Bandeja va en su sección de la barra (lo mueve BANDEJA_WEB del motor) */
+.sx.u-sx a[data-sx=BANDEJA] { position: relative; }
+.sx.u-sx a .bj-n { position: absolute; top: 4px; left: calc(50% + 6px); min-width: 18px; margin: 0; padding: 0 5px; font-size: 11px; line-height: 18px; }
+body.u-con-barra { padding-bottom: calc(var(--alto-barra) + var(--e1) + env(safe-area-inset-bottom, 0px)) !important; }
+/* T0224: en el móvil la página (html) no se mueve y el scroll lo hace el body. Así iOS no desplaza la barra fija con el
+   rebote ni al esconder sus barras, y lo que va debajo de la barra nunca se queda a la vista. */
+@media (max-width: 899px) {
+  html:has(> body.u-con-barra) { height: 100%; overflow: hidden; }
+  body.u-con-barra { height: 100%; overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
+}
+/* T0225: el nombre de la app y quién ha entrado solo salen en el menú del ordenador */
+.sx.u-sx .sx-marca, .sx.u-sx .sx-quien { display: none; }
+/* T0225: en el ordenador, menú fijo a la izquierda, como una web. El contenido empieza a su derecha y usa todo el ancho.
+ * El menú es la única pieza de color de la marca: principal oscuro a toda la altura (el texto claro sobre él pasa de 4,5:1
+ * en las dos marcas); las cabeceras de las secciones pasan a fondo claro (kanban.css y cada módulo de sección).
+ * La sección abierta, con --color-menu-elegido (por defecto el fondo de la página; una marca lo cambia en su marca.css).
+ * Perfil, abajo del todo, con el nombre de quien ha entrado. */
+@media (min-width: 900px) {
+  .u .sx, .sx.u-sx { top: 0; right: auto; bottom: 0; width: var(--ancho-menu); border-top: 0; padding: 0; overflow-y: auto;
+    background: var(--color-principal-oscuro); color: var(--color-sobre-principal); }
+  .sx.u-sx .sx-in { flex-direction: column; align-items: stretch; gap: var(--e1); max-width: none; min-height: 100%; margin: 0;
+    padding: var(--e4) var(--e3) var(--e4); }
+  .sx.u-sx .sx-marca { display: block; padding: var(--e1) var(--e3) var(--e5); font: var(--peso-titulos) 20px/1.2 var(--fuente-titulos);
+    color: var(--color-sobre-principal); }
+  .sx.u-sx a { flex: 0 0 auto; flex-direction: row; justify-content: flex-start; gap: var(--e3); min-height: 44px; padding: 0 var(--e3);
+    border-top: 0; border-radius: var(--radio); font-size: 15px; color: var(--color-sobre-principal); }
+  .sx.u-sx a:hover, .sx.u-sx .sx-plegar:hover { background: color-mix(in srgb, var(--color-sobre-principal) 14%, var(--color-principal-oscuro)); }
+  .sx.u-sx a[aria-current=page] { background: var(--color-menu-elegido, var(--color-fondo)); color: var(--color-sobre-menu-elegido, var(--color-principal-oscuro)); }
+  .sx.u-sx a:focus-visible, .sx.u-sx .sx-plegar:focus-visible { outline: 3px solid var(--color-sobre-principal); outline-offset: 2px; }
+  .sx.u-sx a[data-sx=PERFIL] { margin-top: auto; padding-top: var(--e2); padding-bottom: var(--e2); }
+  .sx.u-sx a[data-sx=PERFIL] > span { display: flex; flex-direction: column; min-width: 0; }
+  .sx.u-sx .sx-quien { display: block; font-weight: 400; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sx.u-sx svg { width: 20px; height: 20px; }
+  .sx.u-sx a .bj-n, .sx.u-sx a .bj-n.hay { position: static; margin-left: auto; font-size: 12px; line-height: 1.7;
+    background: var(--color-sobre-principal); color: var(--color-principal-oscuro); }
+  .sx.u-sx a[aria-current=page] .bj-n { background: var(--color-sobre-menu-elegido, var(--color-principal-oscuro)); color: var(--color-menu-elegido, var(--color-fondo)); }
+  body.u-con-barra { padding-bottom: 0 !important; padding-left: var(--ancho-menu); --medio-menu: calc(var(--ancho-menu) / 2); }
+  /* Lo que flota centrado (avisos) se centra en el contenido, no en la ventana */
+  body.u-con-barra .u-aviso, body.u-con-barra #alta-aviso, body.u-con-barra #estado-aviso { left: calc(50% + var(--medio-menu)); }
+  /* Plegar el menú: arriba, junto al nombre de la app */
+  .sx.u-sx .sx-cab { display: flex; align-items: center; gap: var(--e2); padding: 0 0 var(--e5) var(--e3); }
+  .sx.u-sx .sx-marca { flex: 1 1 auto; min-width: 0; padding: 0; }
+  .sx.u-sx .sx-plegar { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0;
+    border: 0; border-radius: var(--radio); background: transparent; color: var(--color-sobre-principal); cursor: pointer; }
+  .sx.u-sx, body.u-con-barra { transition: width .18s, padding-left .18s; }
+  /* Plegado: una franja con los iconos; el nombre de cada sección sale al pasar el ratón (title) */
+  body.u-menu-plegado { --ancho-menu: var(--ancho-menu-plegado); }
+  body.u-menu-plegado .sx.u-sx .sx-in { padding-left: var(--e2); padding-right: var(--e2); }
+  body.u-menu-plegado .sx.u-sx .sx-cab { padding-left: 0; justify-content: center; }
+  body.u-menu-plegado .sx.u-sx .sx-marca { display: none; }
+  body.u-menu-plegado .sx.u-sx .sx-plegar svg { transform: rotate(180deg); }
+  body.u-menu-plegado .sx.u-sx a { justify-content: center; padding: 0; position: relative; }
+  body.u-menu-plegado .sx.u-sx a > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  body.u-menu-plegado .sx.u-sx a .bj-n { position: absolute; top: 2px; right: 2px; margin: 0; min-width: 18px; padding: 0 4px; font-size: 11px; line-height: 18px; }
+}
+.sx.u-sx .sx-plegar, .sx.u-sx .sx-cab { display: none; }
+@media (min-width: 900px) { .sx.u-sx .sx-cab { display: flex; } .sx.u-sx .sx-plegar { display: inline-flex; } }
+
+/* ---------- Cabecera de sección ---------- */
+.u .u-cab { background: var(--color-principal); color: var(--color-sobre-principal); padding: var(--e4) var(--e4) var(--e3); }
+.u .u-cab h1 { font-size: 24px; }
+/* T0225: junto al menú del ordenador, la cabecera va sobre el fondo de la página (el color de la marca es el menú) */
+@media (min-width: 900px) {
+  body.u-con-barra .u-cab { background: var(--color-fondo); color: var(--color-texto); border-bottom: 1px solid var(--color-linea);
+    padding-left: var(--e5); padding-right: var(--e5); }
+  body.u-con-barra .u-cab h1 { color: var(--color-principal-oscuro); }
+  body.u-con-barra .u-main { padding-left: var(--e5); padding-right: var(--e5); }
+}
+.u .u-main { padding: var(--e5) var(--e4); max-width: 640px; }
+
+/* ---------- Perfil ---------- */
+.u .u-perfil-quien { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--e1) var(--e3); padding-bottom: var(--e4);
+  border-bottom: 1px solid var(--color-linea); }
+.u .u-perfil-quien strong { font: var(--peso-titulos) 22px/1.2 var(--fuente-titulos); }
+.u .u-perfil-quien span { color: var(--color-suave); }
+.u .u-perfil dl { margin: var(--e4) 0; display: grid; grid-template-columns: max-content 1fr; gap: var(--e2) var(--e4); }
+.u .u-perfil dt { font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; }
+.u .u-perfil dd { margin: 0; }
+
+/* ---------- Movimiento: solo para explicar un cambio; nada si el móvil pide reducirlo ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .u *, .u *::before, .u *::after { animation: none !important; transition: none !important; }
+}
+
+/* ---------- Con barra de secciones abajo: lo que flota sube por encima ---------- */
+.u .u-perfil .u-nota { margin-top: var(--e3); }
+@media (max-width: 899px) {
+  body.u-con-barra #alta-btn { bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
+  body.u-con-barra #alta-aviso, body.u-con-barra #estado-aviso { bottom: calc(136px + env(safe-area-inset-bottom, 0px)) !important; }
+}
+/* Al abrir otra sección se oculta el tablero (las ventanas de versión y de peticiones siguen disponibles) */
+/* T0208: la ventana de Google para elegir archivos (.picker-dialog) también se ve dentro de una sección. */
+body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.ver-velo):not(.sol-velo):not(.picker-dialog):not(.picker-dialog-bg) { display: none !important; }
+
+/* ---------- Marco del núcleo 5.0 (T0253, nucleo/nucleo.js) ----------
+ * Usa la barra de secciones, la cabecera (.u-cab) y Perfil de arriba. Aquí solo lo suyo: quién ha entrado en la cabecera
+ * (en el móvil; en el ordenador ya sale en el menú), el ancho del contenido y piezas comunes que usan las secciones. */
+.u .n-cab { display: flex; align-items: center; gap: var(--e3); }
+.u .n-cab h1 { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.u .n-quien { flex: none; max-width: 45%; min-height: 44px; display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
+  color: inherit; text-decoration: none; font: 700 14px/1.25 var(--fuente-texto); text-align: right; }
+.u .n-quien span, .u .n-quien small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u .n-quien small { font-weight: 400; font-size: 13px; }
+@media (min-width: 900px) { .u .n-quien { display: none; } }
+.u .n-main { max-width: 960px; }
+.u .n-main > .kz-centro { padding: var(--e6) 0; text-align: center; }
+.u .n-ayuda { margin: 0 0 var(--e4); }
+.u .n-grupo { font-size: 17px; margin: var(--e5) 0 var(--e2); color: var(--color-principal-oscuro); }
+.u .n-grupo:first-child { margin-top: 0; }
+.u .n-grupo .u-cifra { font-family: var(--fuente-texto); font-weight: 400; color: var(--color-suave); }
+.u .n-ventana { padding: var(--e5) var(--e4); display: flex; flex-direction: column; gap: var(--e4); }
+.u .n-ventana h2 { font-size: 20px; }
+.u .n-ventana textarea { width: 100%; }
+.u .n-botones { display: flex; flex-wrap: wrap; gap: var(--e2); }
+/* T0273 · Viendo como otra persona: la franja de arriba, siempre a la vista, también con una ventana abierta (va por encima
+ * de los velos, y --tope, su alto, baja lo que se queda fijo arriba: cabeceras de tabla, barras y ventanas), y la lista de
+ * la ventana para elegir a quién. */
+.u .n-como { position: sticky; top: 0; z-index: 65; display: flex; align-items: center; gap: var(--e3);
+  padding: var(--e2) var(--e4); background: var(--color-destacado); color: var(--color-texto); border-bottom: 1px solid var(--color-linea); }
+.u .n-como p { margin: 0; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; line-height: 1.3; }
+.u .n-como small { display: block; font-size: 13px; }
+@media (max-width: 599px) { .u .n-como small { display: none; } .u .n-como .u-btn { padding: 0 var(--e3); } }
+/* Dentro de una ventana (su propia zona de desplazamiento) lo fijo arriba va arriba del todo. */
+.u .u-velo > *, .u .gs-velo > *, .u #alta-velo > *, .u .ver-velo > *, .u .sol-velo > *, .u .fv-velo > * { --tope: 0px; }
+.u .n-como .u-btn { flex: none; color: var(--color-texto); border-color: var(--color-texto); }
+@media (min-width: 900px) { .u .n-como { padding-left: var(--e5); padding-right: var(--e5); } }
+.u .n-como-lista { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); max-height: 50vh; overflow-y: auto; }
+.u .n-como-lista button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 44px;
+  padding: var(--e2) var(--e1); border: 0; border-bottom: 1px solid var(--color-linea); background: transparent; color: var(--color-texto);
+  font: 400 15px/1.3 var(--fuente-texto); text-align: left; cursor: pointer; }
+.u .n-como-lista button:hover { background: var(--color-bloque); }
+.u .n-como-lista button:disabled { opacity: .55; cursor: default; }
+.u .n-como-lista span { font-size: 13px; color: var(--color-suave); overflow-wrap: anywhere; }
+/* Una lista partida en varias tablas (por grupos) con las mismas columnas en todas: la primera, fija. */
+.u .n-tabla-2 { table-layout: fixed; }
+.u .n-tabla-2 th:first-child { width: 42%; }
+.u .n-tabla-2 td { overflow-wrap: anywhere; }
+@media (min-width: 640px) { .u .n-tabla-2 th:first-child { width: 30%; } }
+
+/* ---------- Piezas del núcleo para listas (T0259) ----------
+ * .n-estado: el estado de una tarea como texto con un cuadradito de su color (colores funcionales de arriba).
+ * .n-lista: una tabla que en el móvil (menos de 640 px) se lee como lista: cada fila, un bloque; la primera columna en
+ *   negrita y las demás seguidas, cada una con su título delante (data-t). */
+.u .n-estado { display: inline-flex; align-items: center; gap: var(--e1); white-space: nowrap; font-weight: 600; }
+.u .n-estado::before { content: ''; flex: none; width: 10px; height: 10px; border-radius: var(--radio-peq); background: var(--estado, var(--estado-x)); }
+.u .n-e-ni { --estado: var(--estado-ni); } .u .n-e-ec { --estado: var(--estado-ec); } .u .n-e-bl { --estado: var(--estado-bl); }
+.u .n-e-pr { --estado: var(--estado-pr); } .u .n-e-co { --estado: var(--estado-co); } .u .n-e-x { --estado: var(--estado-x); }
+.u .n-lista tfoot td { font-weight: 700; border-top: 1px solid var(--color-borde-campo); border-bottom: 0; }
+@media (max-width: 639px) {
+  .u .n-lista, .u .n-lista tbody, .u .n-lista tfoot, .u .n-lista tr { display: block; }
+  .u .n-lista thead { display: none; }
+  .u .n-lista tr { padding: var(--e2) var(--e3); border-bottom: 1px solid var(--color-linea); }
+  .u .n-lista tbody tr:last-child { border-bottom: 0; }
+  .u .n-lista td { display: inline; padding: 0; border: 0; }
+  .u .n-lista td:first-child { display: block; margin-bottom: var(--e1); }
+  .u .n-lista td + td:not(:empty)::after { content: '  ·  '; white-space: pre; color: var(--color-suave); }
+  .u .n-lista td:last-child::after { content: none !important; }
+  .u .n-lista td.num { text-align: left; }
+  .u .n-lista tfoot tr { border-top: 1px solid var(--color-borde-campo); }
+  .u .n-lista tfoot td { border: 0; }
+  .u .n-lista tfoot td.num::before { content: none; }
+}
+
+/* ---------- Perfil del núcleo (T0259, nucleo/secciones/perfil.js) ---------- */
+.u .pf { display: flex; flex-direction: column; gap: var(--e5); }
+.u .pf .u-perfil-quien { padding-bottom: var(--e3); }
+.u .pf-bloque .n-grupo { margin: 0 0 var(--e2); }
+.u .pf-resumen { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e4); margin-bottom: var(--e3); font-size: 14px; }
+.u .pf-vencida { color: var(--color-error); font-weight: 700; }
+.u .pf-fecha { white-space: nowrap; }
+.u .pf-carga { display: flex; flex-direction: column; align-items: center; gap: var(--e3); padding: var(--e6) 0; }
+.u .pf .u-perfil dl { margin-top: 0; }
+.u .pf-hora { margin: 0; }
+.u .pf-cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--e2); margin: 0 0 var(--e3); }
+.u .pf-cifras > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-tarjeta, var(--color-bloque)); }
+.u .pf-cifras b { font: var(--peso-titulos) 22px/1.1 var(--fuente-titulos); color: var(--color-principal-oscuro); overflow-wrap: anywhere; }
+.u .pf-cifras span { font-size: 12px; color: var(--color-suave); }
+.u .pf-cifras .pf-destacar { box-shadow: inset 0 0 0 2px var(--color-accion); }
+.u .pf-cifras .pf-destacar b { color: var(--color-texto); }
+@media (max-width: 639px) { .u .pf-cifras { grid-template-columns: 1fr 1fr; } .u .pf-cifras > div:last-child:nth-child(odd) { grid-column: 1 / -1; } }
+.u .pf-accion { margin-top: var(--e3); }
+.u .pf-cab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e3); margin: 0 0 var(--e2); }
+.u .pf-cab .n-grupo { margin: 0; }
+.u .pf-ver { display: flex; align-items: center; gap: var(--e2); font-size: 13px; color: var(--color-suave); min-width: 0; }
+.u .pf-ver select { min-width: 0; max-width: 100%; }
+.u .pf-detalle { margin-top: var(--e3); border-top: 1px solid var(--color-linea); padding-top: var(--e2); }
+.u .pf-detalle > summary { cursor: pointer; padding: var(--e2) 0; font-weight: 700; color: var(--color-principal-oscuro); min-height: 44px; display: flex; align-items: center; gap: var(--e2); }
+.u .pf-detalle[open] > summary { margin-bottom: var(--e2); }
+.u .pf-detalle > summary { list-style: none; }
+.u .pf-detalle > summary::-webkit-details-marker { display: none; }
+.u .pf-detalle > summary::before { content: ""; flex: none; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s; }
+.u .pf-detalle[open] > summary::before { transform: rotate(45deg); }
+.u .pf-marca { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--color-bloque); color: var(--color-texto); white-space: nowrap; }
+.u .pf-marca[data-m="pagado"] { background: var(--color-bien); color: var(--color-superficie, #fff); }
+.u .pf-marca[data-m="por"], .u .pf-marca[data-m="falta"] { box-shadow: inset 0 0 0 2px var(--color-accion); background: transparent; }
+/* T0269: cabecera de cada grupo de filas de un bloque (Próximos, Jugados), el enlace a todas tus tareas y los botones de
+ * las secciones que van dentro de Perfil (Pedir a Utilo). */
+.u .n-lista tbody tr.pf-grupo th { position: static; padding: var(--e2) var(--e3); border-radius: 0; font-size: 13px; text-align: left;
+  color: var(--color-principal-oscuro); background: var(--color-bloque); border-bottom: 1px solid var(--color-linea); }
+.u .n-lista tbody tr.pf-grupo th .u-cifra { font-weight: 400; color: var(--color-suave); }
+.u .n-lista tbody tr.pf-fila-abre td:first-child::before { content: ""; display: inline-block; width: 6px; height: 6px; margin: 0 var(--e2) 2px 0;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s; }
+.u .n-lista tbody tr.pf-fila-abre[aria-expanded="true"] td:first-child::before { transform: rotate(45deg); }
+.u .n-lista tbody tr.pf-fila-abre[aria-expanded="true"] td { border-bottom: 0; }
+.u .n-lista tbody tr.pf-fila-detalle td { background: var(--color-bloque); }
+.u .pf-dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--e1) var(--e3); margin: 0; font-size: 14px; }
+.u .pf-dl dt { font-size: 12px; font-weight: 700; color: var(--color-suave); padding-top: 2px; }
+.u .pf-dl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .u .n-lista tbody tr.pf-fila-abre td:first-child::before { transition: none; } }
+/* T0277: una fila que lleva a otra sección (un partido a su ficha en Ligas): se toca entera; el enlace, en la primera columna. */
+.u .n-lista tbody tr.pf-fila-ir { cursor: pointer; }
+.u .n-lista tbody tr.pf-fila-ir:hover td { background: var(--color-bloque); }
+.u .n-lista tbody tr.pf-fila-ir td:first-child a { color: inherit; font-weight: 700; text-decoration: none; }
+.u .n-lista tbody tr.pf-fila-ir td:first-child a::after { content: " ›"; color: var(--color-suave); }
+.u .pf-ir { margin: var(--e2) 0 0; font-size: 14px; }
+.u .pf-et { display: none; }
+.u .pf-ver-todas { margin: var(--e3) 0 0; }
+.u .pf-ver-todas a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; color: var(--color-principal-oscuro); }
+.u .pf-dentro .u-btn { display: inline-flex; align-items: center; gap: var(--e2); }
+.u .pf-dentro .u-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+@media (max-width: 639px) {
+  /* En el móvil, las celdas vacías no salen y el «·» va delante de cada dato (no detrás), para que no quede uno suelto al final. */
+  .u .pf-bloque .n-lista td.pf-vacia { display: none; }
+  .u .pf-bloque .n-lista tbody td::after { content: none; }
+  .u .pf-bloque .n-lista tbody td:nth-child(n+3):not(.pf-vacia)::before { content: '  ·  '; white-space: pre; color: var(--color-suave); }
+  .u .pf-bloque .n-lista tfoot td:empty { display: none; }
+  .u .pf-bloque .n-lista tfoot td::after { content: none; }
+  .u .pf-bloque .n-lista tbody tr.pf-grupo { padding: 0; }
+  .u .pf-bloque .n-lista tbody tr.pf-fila-detalle td { display: block; padding: var(--e2) 0 0; background: transparent; }
+  .u .pf-bloque .n-lista tbody tr.pf-fila-detalle { background: var(--color-bloque); }
+  .u .pf-bloque .n-lista tbody tr.pf-fila-detalle[hidden] { display: none; }
+  .u .pf-bloque .pf-et { display: inline; color: var(--color-suave); }
+  .u .pf-bloque .n-lista tfoot td.num { display: block; }
+  .u .pf-bloque .n-lista tfoot td.num::before { content: attr(data-t) " "; font-weight: 400; color: var(--color-suave); }
+  .u .pf-bloque .n-lista tbody tr.pf-grupo th { display: block; }
+}
+
+/* ---------- Piezas de las secciones del núcleo (T0257) ----------
+ * Pestañas de una sección, filtros encima de una lista, formulario en dos columnas en la ventana, una cifra mala
+ * (en negativo, pasada de presupuesto) y la fila de total de una tabla. Solo variables. */
+.u .u-pestanas { display: flex; gap: var(--e1); overflow-x: auto; border-bottom: 1px solid var(--color-linea); scrollbar-width: none; }
+.u .u-pestanas::-webkit-scrollbar { display: none; }
+.u .u-pestanas button { flex: none; min-height: 44px; padding: 0 var(--e3); border: 0; border-bottom: 3px solid transparent; background: none;
+  color: var(--color-suave); font: 700 14px/1.2 var(--fuente-texto); cursor: pointer; }
+.u .u-pestanas button[aria-selected=true] { color: var(--color-principal-oscuro); border-bottom-color: var(--color-principal); }
+.u .u-filtros { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--e2) var(--e3); margin: 0 0 var(--e3); }
+.u .u-filtros .u-campo { flex: 1 1 140px; max-width: 240px; }
+.u .u-filtros .u-campo:first-child { flex-basis: 200px; max-width: none; }
+.u .u-check { display: inline-flex; align-items: center; gap: var(--e2); min-height: 44px; font-size: 14px; cursor: pointer; }
+.u .u-campos { display: grid; grid-template-columns: 1fr; gap: var(--e3); }
+.u .u-campos .u-campo > input, .u .u-campos .u-campo > select, .u .u-campos .u-campo > textarea { width: 100%; }
+.u .u-campos [hidden] { display: none; }
+.u .u-campos > .u-nota { margin: calc(var(--e2) * -1) 0 0; }
+@media (min-width: 640px) { .u .u-campos { grid-template-columns: 1fr 1fr; } .u .u-campos .u-ancho { grid-column: 1 / -1; } }
+.u .u-mal { color: var(--color-error); font-weight: 700; }
+.u .u-tabla td.u-tabla-t .u-nota { font-weight: 400; }
+/* Una tabla que no cabe en el móvil se desplaza en su caja, nunca la página. Columnas solo para pantallas anchas. */
+.u .u-tabla-caja { max-width: 100%; overflow-x: auto; margin: 0 0 var(--e2); }
+.u .u-tabla-caja > .u-tabla { margin: 0; }
+@media (max-width: 639px) { .u .u-solo-ancho { display: none; } }
+@media (min-width: 640px) { .u .u-solo-movil { display: none; } }
+.u .u-tabla tr.u-tabla-total td, .u .u-tabla tr.eco-total td { font-weight: 700; border-top: 1px solid var(--color-borde-campo); }
+
+/* Economía (nucleo/secciones/economia.js): periodo y pestañas arriba; título de bloque con su botón al lado. */
+.u .eco-barra { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--e3) var(--e4); margin: 0 0 var(--e4); }
+.u .eco-barra .eco-per { flex: 0 1 220px; }
+.u .eco-barra .u-pestanas { flex: 1 1 320px; min-width: 0; }
+.u .eco-cab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e3); margin: 0 0 var(--e3); }
+.u .eco-cab .n-grupo, .u .eco-cab .u-nota { margin: 0; }
+.u .eco-tabla { margin: 0 0 var(--e2); }
+.u .eco-tabla td.num { width: 1%; }
+.u .eco-anulada { text-decoration: line-through; color: var(--color-suave); }
+.u .u-tabla-caja + .u-btn { margin-top: var(--e2); }
+
+/* Economía 1.1 (T0272): el aspecto de la Economía 4.1 publicada. Tres cifras clave en tarjeta (la de Beneficio, en el
+ * color principal, con el periodo en la letra de destacar), barras de lo real frente a lo previsto, desplegables, la
+ * ficha de un movimiento, el interruptor Entra / Sale / Entre cuentas y el botón de añadir, que flota. Solo variables. */
+.u .eco-cont { padding-bottom: 72px; }
+.u .eco-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e2); margin: 0 0 var(--e2); }
+.u .eco-kpi { min-width: 0; padding: var(--e3) var(--e4); border-radius: var(--radio); background: var(--color-tarjeta-cab, var(--color-bloque)); }
+.u .eco-kpi.eco-grande { grid-column: 1 / -1; background: var(--color-principal); color: var(--color-sobre-principal); }
+.u .eco-kpi b { display: block; font: 700 12px/1.3 var(--fuente-texto); letter-spacing: .04em; text-transform: uppercase; color: var(--color-suave); }
+.u .eco-kpi.eco-grande b { color: inherit; }
+.u .eco-pint { font: 400 18px/1 var(--fuente-destacar, var(--fuente-titulos)); text-transform: none; letter-spacing: 0; color: var(--color-destacado, inherit); margin-left: var(--e1); }
+.u .eco-val { display: block; margin-top: var(--e1); font: var(--peso-titulos) 22px/1.2 var(--fuente-titulos); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.u .eco-grande .eco-val { font-size: 30px; color: var(--color-destacado, inherit); }
+.u .eco-sub { display: block; margin-top: var(--e1); font-size: 13px; }
+@media (min-width: 640px) { .u .eco-kpis { grid-template-columns: 1.4fr 1fr 1fr; } .u .eco-kpi.eco-grande { grid-column: auto; } }
+.u .eco-mini { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e2); margin: 0 0 var(--e3); }
+.u .eco-mini > button { min-height: 44px; padding: var(--e2); border: 0; border-radius: var(--radio); background: var(--color-tarjeta-cab, var(--color-bloque));
+  color: inherit; font: inherit; text-align: center; cursor: pointer; }
+.u .eco-mini strong { display: block; font: var(--peso-titulos) 18px/1.2 var(--fuente-titulos); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.u .eco-mini small { font-size: 12px; font-weight: 600; color: var(--color-suave); }
+.u .eco-bien { color: var(--color-bien); }
+.u .eco-barra-p { height: 8px; margin-top: var(--e2); overflow: hidden; border-radius: var(--radio-peq); background: var(--color-linea); }
+.u .eco-barra-p i { display: block; height: 100%; background: var(--color-principal); }
+.u .eco-barra-p i.eco-pasado { background: var(--color-error); }
+.u .eco-card { margin: 0 0 var(--e3); padding: 0 var(--e4); border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-tarjeta, var(--color-superficie)); }
+.u .eco-grupo + .eco-grupo { border-top: 1px solid var(--color-linea); }
+.u .eco-gb, .u .eco-linea { display: block; width: 100%; padding: var(--e3) 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.u .eco-gl { display: flex; justify-content: space-between; align-items: baseline; gap: var(--e2); }
+.u .eco-gl b { font-size: 15px; font-weight: 700; min-width: 0; }
+.u .eco-num { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.u .eco-gs { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 var(--e2); margin-top: var(--e1); font-size: 13px; color: var(--color-suave); }
+.u .eco-gs b { font-weight: 700; }
+.u .eco-flecha { display: inline-block; width: 14px; color: var(--color-suave); transition: transform .15s; }
+.u [aria-expanded=true] .eco-flecha, .u details[open] > summary .eco-flecha { transform: rotate(90deg); }
+.u .eco-lineas { padding: 0 0 var(--e2) var(--e4); }
+.u .eco-linea { padding: var(--e2) 0; border-top: 1px solid var(--color-linea); }
+.u .eco-linea .eco-gl b { font-size: 14px; font-weight: 600; }
+.u .eco-linea .eco-barra-p { height: 4px; margin-top: var(--e1); }
+.u .eco-linea .eco-gs { font-size: 12px; }
+.u .eco-ir { color: var(--color-principal-oscuro); font-weight: 700; }
+.u .eco-desp > summary { display: flex; justify-content: space-between; align-items: center; gap: var(--e2); min-height: 44px; padding: var(--e2) 0; list-style: none; cursor: pointer; }
+.u .eco-desp > summary::-webkit-details-marker { display: none; }
+.u .eco-desp > summary .u-nota { margin: 0; white-space: nowrap; }
+.u .eco-desp[open] { padding-bottom: var(--e3); }
+.u .eco-rf { display: flex; justify-content: space-between; gap: var(--e2); padding: var(--e2) 0; border-top: 1px solid var(--color-linea); font-size: 14px; }
+.u .eco-rf > span:last-child { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.u .eco-rf small { display: block; font-size: 12px; font-weight: 400; color: var(--color-suave); }
+.u .eco-rf-sub { padding: var(--e1) 0 var(--e1) var(--e4); border-top: 0; font-size: 13px; color: var(--color-suave); }
+.u .eco-rf-sub > span:last-child { font-weight: 400; }
+.u .eco-rf-tot { font-weight: 700; }
+.u .eco-bloques { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 var(--e5); align-items: start; }
+@media (min-width: 1100px) { .u .eco-bloques { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.u .eco-aviso { margin: 0 0 var(--e2); padding: var(--e3); border: 1px solid var(--color-linea); border-left: 4px solid var(--color-error); border-radius: var(--radio); background: var(--color-superficie); }
+.u .eco-aviso.eco-amb { border-left-color: var(--estado-pr); }
+.u .eco-aviso p { margin: var(--e1) 0 0; font-size: 14px; }
+.u .eco-volver { margin: 0 0 var(--e2); }
+.u .eco-filtro-des .u-campo:first-child { flex: 0 1 280px; }
+/* Ficha de un movimiento */
+.u .eco-dimp { margin: 0 0 var(--e2); font: var(--peso-titulos) 30px/1.2 var(--fuente-titulos); font-variant-numeric: tabular-nums; }
+.u .eco-dl { margin: 0 0 var(--e3); border-top: 1px solid var(--color-linea); }
+.u .eco-df { display: flex; justify-content: space-between; gap: var(--e3); padding: var(--e2) 0; border-bottom: 1px solid var(--color-linea); font-size: 14px; }
+.u .eco-df > span:first-child { flex: none; color: var(--color-suave); }
+.u .eco-df > span:last-child { text-align: right; font-weight: 600; overflow-wrap: anywhere; }
+.u .eco-df .u-btn-texto { min-height: 0; padding: 0; }
+.u .eco-hist > summary { display: flex; align-items: center; min-height: 44px; color: var(--color-principal-oscuro); font-weight: 700; font-size: 14px; cursor: pointer; }
+.u .eco-hist pre { margin: 0; padding: var(--e2) var(--e3); border-radius: var(--radio-peq); background: var(--color-bloque); color: var(--color-suave);
+  font: 400 13px/1.45 var(--fuente-texto); white-space: pre-wrap; }
+/* Entra / Sale / Entre cuentas, como en la 4.1 */
+.u .eco-sw { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e1); margin: 0 0 var(--e3); padding: var(--e1); border-radius: var(--radio); background: var(--color-bloque); }
+.u .eco-sw button { min-height: 44px; padding: 0 var(--e1); border: 1px solid transparent; border-radius: var(--radio-peq); background: transparent; color: var(--color-suave);
+  font: 700 14px/1.2 var(--fuente-texto); cursor: pointer; }
+.u .eco-sw button[aria-pressed=true] { border-color: var(--color-linea); background: var(--color-superficie); color: var(--color-texto); }
+.u .eco-sw button[aria-pressed=true][data-tipo=Ingreso] { color: var(--color-bien); }
+.u .eco-sw button[aria-pressed=true][data-tipo=Gasto] { color: var(--color-error); }
+.u .u-campo input.eco-imp { font-size: 22px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.u .eco-opc { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--color-suave); }
+/* Presupuesto de una categoría: la recomendación en su bloque, con su botón; importes alineados a la derecha */
+.u .eco-rec { display: flex; flex-direction: column; align-items: flex-start; gap: var(--e2); }
+.u .eco-rec .u-nota { margin: 0; }
+.u .eco-rec .eco-dl { align-self: stretch; margin: 0; }
+.u #p-lista input { text-align: right; font-variant-numeric: tabular-nums; }
+/* Abrir una factura en Drive (enlace que se abre en otra pestaña) */
+.u .eco-drive { font-weight: 700; white-space: nowrap; }
+/* Añadir movimiento: lo único que flota en la sección, abajo a la derecha, encima de la barra de secciones del móvil */
+.u .eco-fab { position: fixed; right: var(--e4); bottom: calc(var(--e4) + env(safe-area-inset-bottom, 0px)); z-index: 44; min-height: 52px; padding: 0 var(--e5);
+  border: 0; border-radius: var(--radio); background: var(--color-accion); color: var(--color-sobre-accion); font: 800 17px/1 var(--fuente-texto); box-shadow: var(--sombra-flota); cursor: pointer; }
+@media (max-width: 899px) { body.u-con-barra .eco-fab { bottom: calc(var(--alto-barra) + var(--e3) + env(safe-area-inset-bottom, 0px)); } }
+
+/* ---------- Pedir a Utilo (T0262, nucleo/secciones/pedir.js) ----------
+ * Formulario y, al lado en el ordenador (debajo en el móvil), lo que ha pedido el negocio. Lista con líneas, no tarjetas.
+ * El estado de cada petición lleva el color del estado del kanban equivalente (funcional). */
+.u .pd { display: grid; gap: var(--e6); }
+@media (min-width: 900px) { .u .pd { grid-template-columns: minmax(320px, 400px) 1fr; align-items: start; } }
+.u .pd-h { font-size: 20px; color: var(--color-principal-oscuro); margin-bottom: var(--e2); }
+.u .pd-form { display: flex; flex-direction: column; gap: var(--e3); }
+.u .pd-form .n-ayuda { margin: 0; }
+.u .pd-tipos { border: 0; margin: 0; padding: 0; display: grid; gap: var(--e2); }
+.u .pd-tipos legend { padding: 0; margin-bottom: var(--e2); }
+.u .pd-tipo { display: flex; align-items: center; gap: var(--e3); min-height: 44px; padding: var(--e2) var(--e3); cursor: pointer;
+  border: 1.5px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); }
+.u .pd-tipo:has(input:checked) { border-color: var(--color-principal-oscuro); }
+.u .pd-tipo span { display: flex; flex-direction: column; }
+.u .pd-tipo small { color: var(--color-suave); font-size: 13px; }
+.u .pd-form textarea { width: 100%; min-height: 120px; }
+.u .pd-fila { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); }
+.u .pd-urg { display: flex; align-items: center; gap: var(--e2); min-height: 44px; font-weight: 700; cursor: pointer; }
+.u .pd-cont { font-variant-numeric: tabular-nums; }
+.u .pd-captura { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e3); }
+.u .pd-elegir { cursor: pointer; }
+.u .pd-mini { width: 96px; height: 72px; object-fit: cover; border: 1px solid var(--color-linea); border-radius: var(--radio); }
+.u .pd-priv, .u .pd-msg { margin: 0; }
+.u .pd-enviar { width: 100%; }
+.u .pd-lcab { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e2) var(--e3); margin-bottom: var(--e2); }
+.u .pd-lcab .pd-h { margin: 0; flex: 1 1 auto; }
+.u .pd-ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
+.u .pd-s { padding: var(--e3) 0; border-bottom: 1px solid var(--color-linea); }
+.u .pd-enviando { color: var(--color-suave); }
+.u .pd-top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e1) var(--e2); font-size: 14px; }
+.u .pd-e { display: inline-block; padding: 0 var(--e2); border-radius: var(--radio-peq); font: 700 12px/1.6 var(--fuente-texto); color: var(--color-superficie); }
+.u .pd-e-ni { background: var(--estado-ni); } .u .pd-e-ec { background: var(--estado-ec); } .u .pd-e-co { background: var(--estado-co); }
+.u .pd-e-pr { background: var(--estado-pr); } .u .pd-e-x { background: var(--estado-x); }
+.u .pd-f { margin-left: auto; color: var(--color-suave); font-variant-numeric: tabular-nums; }
+.u .pd-txt { margin: var(--e2) 0 var(--e1); white-space: pre-wrap; overflow-wrap: anywhere; }
+.u .pd-m { overflow-wrap: anywhere; }
+.u .pd-r { margin-top: var(--e2); padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-bloque); font-size: 14px;
+  white-space: pre-wrap; overflow-wrap: anywhere; }
+.u .pd-r b { display: block; font-size: 12px; color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .02em; }
+
+/* ---------- Ligas de Konamigas (T0255, konamigas/secciones/ligas.js) ----------
+ * Arriba la temporada y, en botones, la competición y su liga; debajo las pestañas. Los partidos, una lista con líneas:
+ * hora y campo a la izquierda, los dos equipos uno debajo del otro con el color de su camiseta y su resultado (gana en
+ * negrita), y el estado y el árbitro. Los de quien ha entrado llevan una franja del color principal. La ficha es un
+ * marcador: cada equipo con su color arriba y, debajo, quién marcó. El color de cada equipo es un dato (--c), no de la
+ * marca. Solo variables. */
+/* Filtros: en el ordenador, a la vista (la línea de resumen no sale); en el móvil, recogidos en esa línea, que los abre. */
+.u .lg-filtros-res { display: none; }
+@media (max-width: 639px) {
+  .u .lg-filtros { margin: 0 0 var(--e3); border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); }
+  .u .lg-filtros-res { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); width: 100%; min-height: 52px; padding: var(--e2) var(--e3);
+    border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .u .lg-filtros-res > span:first-child { display: flex; flex-direction: column; min-width: 0; }
+  .u .lg-filtros-res b { font-size: 15px; overflow-wrap: anywhere; }
+  .u .lg-filtros-res small { font-size: 12px; color: var(--color-suave); }
+  .u .lg-filtros-cambiar { flex: none; font-weight: 700; font-size: 14px; color: var(--color-principal-oscuro); text-decoration: underline; }
+  .u .lg-filtros-cuerpo { display: none; padding: 0 var(--e3) var(--e3); border-top: 1px solid var(--color-linea); }
+  .u .lg-filtros.abierto .lg-filtros-cuerpo { display: block; padding-top: var(--e3); }
+  .u .lg-filtros .lg-barra, .u .lg-filtros .lg-elige { margin-bottom: var(--e2); }
+  .u .lg-filtros .lg-fila-chips { flex-wrap: wrap; overflow: visible; }
+}
+/* Un equipo que descansa en la jornada (ligas con un número impar de equipos): una línea más, sin marcador. */
+.u .lg-p-descansa { cursor: default; color: var(--color-suave); }
+.u .lg-p-descansa:hover { background: none; }
+.u .lg-p-descansa .lg-pi b { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; }
+.u .lg-pdes { grid-column: 2 / 5; justify-self: center; display: flex; align-items: center; gap: var(--e2); font-size: 15px; }
+@media (max-width: 639px) { .u .lg-pdes { grid-column: 2 / 5; } }
+.u .lg-barra { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--e3); margin: 0 0 var(--e3); }
+.u .lg-barra .lg-temp { flex: 0 1 180px; }
+.u .lg-barra .lg-temp select { width: 100%; }
+.u .lg-barra [hidden] { display: none; }
+.u .lg-elige { display: flex; flex-direction: column; gap: var(--e2); margin: 0 0 var(--e3); }
+.u .lg-elige:empty { display: none; }
+.u .lg-fila-chips, .u .lg-jornadas { display: flex; gap: var(--e2); overflow-x: auto; padding: 2px 0 var(--e1); scrollbar-width: none; }
+.u .lg-fila-chips::-webkit-scrollbar, .u .lg-jornadas::-webkit-scrollbar { display: none; }
+.u .lg-fila-chips button, .u .lg-jornadas button { flex: none; min-height: 44px; padding: 0 var(--e3); border-radius: var(--radio); cursor: pointer;
+  border: 1.5px solid var(--color-borde-campo); background: var(--color-superficie); color: var(--color-texto); font: 700 14px/1.2 var(--fuente-texto); }
+.u .lg-fila-chips button[aria-pressed=true], .u .lg-jornadas button[aria-pressed=true] { background: var(--color-principal); border-color: var(--color-principal); color: var(--color-sobre-principal); }
+/* La liga va debajo de su competición, más pequeña: se ve que es de ella. */
+.u .lg-chips-liga button { min-height: 40px; font-size: 13px; font-weight: 600; border-width: 1px; }
+.u .lg-chips-liga button[aria-pressed=true] { background: var(--color-bloque); border-color: var(--color-principal-oscuro); color: var(--color-principal-oscuro); }
+.u .lg-jornadas button { min-width: 48px; padding: 0 var(--e2); font-variant-numeric: tabular-nums; }
+.u .lg-jornadas button.lg-hecha:not([aria-pressed=true]) { color: var(--color-suave); border-color: var(--color-linea); }
+.u .lg-cont { padding-top: var(--e4); }
+/* Partidos: una tira con los días de juego (J1, J2… y JR, la jornada de recuperación, en el color de «En curso»), que se
+   desplaza a los lados; el día abierto, en el color principal. Los ya jugados, más suaves. */
+.u .lg-dias { display: flex; align-items: center; gap: var(--e1); margin: 0 0 var(--e3); }
+.u .lg-dias .u-btn-icono { flex: none; font-size: 22px; }
+.u .lg-dias-tira { flex: 1 1 auto; min-width: 0; display: flex; gap: var(--e2); overflow-x: auto; scrollbar-width: none; padding: 2px; }
+.u .lg-dias-tira::-webkit-scrollbar { display: none; }
+.u .lg-dias-tira button { flex: none; width: 64px; min-height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  border: 1.5px solid var(--color-borde-campo); border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto); cursor: pointer; font: inherit; }
+.u .lg-dias-tira b { font: 700 16px/1.1 var(--fuente-texto); font-variant-numeric: tabular-nums; }
+.u .lg-dias-tira small { font-size: 11px; color: var(--color-suave); white-space: nowrap; }
+/* Un día jugado entero: en verde suave (el color de Jugado), para verlo de un vistazo. */
+.u .lg-dias-tira .lg-completa:not([aria-pressed=true]) { border-color: var(--estado-co); background: color-mix(in srgb, var(--estado-co) 10%, var(--color-superficie)); color: var(--estado-co); }
+.u .lg-dias-tira .lg-jr { border-color: var(--estado-ec); color: var(--estado-ec); background: color-mix(in srgb, var(--estado-ec) 8%, var(--color-superficie)); }
+.u .lg-dias-tira .lg-hoy:not([aria-pressed=true]) { box-shadow: inset 0 -3px 0 var(--color-accion); }
+.u .lg-dias-tira [aria-pressed=true] { background: var(--color-principal); border-color: var(--color-principal); color: var(--color-sobre-principal); }
+.u .lg-dias-tira [aria-pressed=true] small { color: var(--color-sobre-principal); }
+.u .lg-dias-tira .lg-jr[aria-pressed=true] { background: var(--estado-ec); border-color: var(--estado-ec); }
+/* La barrita de cada día: un trozo por partido (verde jugado, rojo anulado, gris aplazado, vacío por jugar), con los
+   colores de estado comunes. Sobre el día abierto, el vacío se ve en el color del texto claro. */
+.u .lg-dias-tira button { padding-bottom: 6px; }
+.u .lg-barrita { display: flex; gap: 1px; width: 36px; height: 5px; margin-top: 3px; border-radius: 3px; overflow: hidden; }
+.u .lg-barrita i, .u .lg-leyenda i { display: block; min-width: 3px; }
+.u .lg-s-jugado { background: var(--estado-co); }
+.u .lg-s-anulado { background: var(--estado-bl); }
+.u .lg-s-aplazado { background: color-mix(in srgb, var(--estado-x) 55%, var(--color-superficie)); }
+.u .lg-s-pendiente { background: transparent; box-shadow: inset 0 0 0 1px var(--color-borde-campo); }
+.u .lg-dias-tira [aria-pressed=true] .lg-s-pendiente { box-shadow: inset 0 0 0 1px var(--color-sobre-principal); }
+.u .lg-dias-tira [aria-pressed=true] .lg-barrita { outline: 1px solid var(--color-sobre-principal); }
+.u .lg-leyenda { display: flex; flex-wrap: wrap; gap: 0 var(--e3); margin: calc(var(--e2) * -1) 0 var(--e3); font-size: 11px; color: var(--color-suave); }
+.u .lg-leyenda span { display: inline-flex; align-items: center; gap: var(--e1); }
+.u .lg-leyenda i { width: 10px; height: 5px; border-radius: 2px; }
+/* En el móvil, sin flechas (se desliza con el dedo) y más estrechos: caben siete, el abierto en medio. */
+@media (max-width: 639px) { .u .lg-dias .u-btn-icono { display: none; } .u .lg-dias-tira { gap: 6px; } .u .lg-dias-tira button { width: 44px; min-height: 48px; } .u .lg-dias-tira b { font-size: 15px; } .u .lg-dias-tira small { font-size: 10px; } }
+.u .lg-jr-t { color: var(--estado-ec); }
+/* Un anulado por culpa de un equipo: su 0-5, en el color de anulado. */
+.u .lg-pc-an b, .u .lg-mcentro-an { color: var(--estado-bl) !important; }
+/* Un día marcado como festivo o descanso que tiene partidos: una marca roja en la esquina de la tira. */
+.u .lg-dias-tira button { position: relative; }
+.u .lg-dias-tira .lg-choque::after { content: "!"; position: absolute; top: -6px; right: -4px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--estado-bl); color: var(--color-superficie); font: 700 11px/16px var(--fuente-texto); text-align: center; }
+/* Estadísticas: cifras en fila (goles, partidos, media, máxima goleadora); en el móvil, de dos en dos. */
+.u .lg-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e2); margin: 0 0 var(--e3); }
+.u .lg-stats > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-tarjeta, var(--color-bloque)); }
+.u .lg-stats b { font: var(--peso-titulos) 22px/1.1 var(--fuente-titulos); color: var(--color-principal-oscuro); overflow-wrap: anywhere; }
+.u .lg-stats > div:last-child b { font-size: 16px; }
+.u .lg-stats span { font-size: 12px; color: var(--color-suave); }
+@media (max-width: 639px) { .u .lg-stats { grid-template-columns: 1fr 1fr; } }
+.u .n-ventana .lg-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* Cada jugadora de la lista abre su ficha. */
+.u .lg-jug { flex: 1 1 auto; min-width: 0; display: flex; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.u .lg-jug:hover b { text-decoration: underline; }
+/* Goleadoras: de la liga o de toda la competición, buscador y lista con el puesto, la jugadora (dorsal) y sus goles. */
+.u .lg-gol-cab { display: flex; flex-direction: column; gap: var(--e2); margin: 0 0 var(--e3); }
+.u .lg-gol-busca input { width: 100%; max-width: 420px; }
+.u .lg-gol-eq { margin: 0 0 var(--e4); }
+.u .lg-gol-eq .lg-sub { display: flex; justify-content: space-between; gap: var(--e3); }
+.u .lg-pos { flex: none; width: 2em; color: var(--color-suave); font-size: 13px; }
+.u .lg-cero { color: var(--color-suave); }
+.u .lg-cero .lg-n { color: var(--color-suave); }
+.u .lg-n small { font: 400 12px/1 var(--fuente-texto); color: var(--color-suave); }
+/* Recuperar: la hora y el campo de cada partido. */
+.u .lg-rec-horas { display: grid; grid-template-columns: 1fr; gap: var(--e3); }
+@media (min-width: 640px) { .u .lg-rec-horas { grid-template-columns: 1fr 1fr; } }
+.u .lg-rec-horas select { width: 100%; }
+.u .lg-cab { margin: 0 0 var(--e3); font-size: 14px; color: var(--color-suave); }
+.u .lg-cab p { margin: 0; }
+.u .lg-jcab { margin: var(--e4) 0 0; }
+.u .lg-jfecha { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--e3); margin: 2px 0 0; font-size: 15px; color: var(--color-suave); }
+.u .lg-jfecha > span { font-weight: 600; }
+/* Cambiar la fecha de la jornada: un enlace discreto junto al título, no un botón grande (Javi). */
+.u .lg-jcambiar { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--color-suave); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.u .lg-jcambiar:hover { color: var(--color-principal-oscuro); }
+.u .lg-jcab .n-grupo { margin: 0; }
+.u .lg-dia { font: 700 13px/1.3 var(--fuente-texto); text-transform: uppercase; letter-spacing: .02em; color: var(--color-principal-oscuro); margin: var(--e4) 0 var(--e2); }
+.u .lg-dia.lg-hoy { color: var(--color-texto); }
+.u .lg-aviso { margin: 0 0 var(--e2); padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-bloque); font-size: 14px; font-weight: 600; }
+/* El color de la camiseta de un equipo: un cuadrito con borde, para que se vea también un blanco. */
+.u .lg-color { flex: none; width: 12px; height: 12px; border-radius: var(--radio-peq); background: var(--c); border: 1px solid var(--color-borde-campo); }
+.u .lg-color-no { background: transparent; border-style: dashed; }
+.u .lg-eqt { display: inline-flex; align-items: center; gap: var(--e2); min-width: 0; }
+.u .lg-eqt > span { display: flex; flex-direction: column; min-width: 0; }
+.u .lg-eqt small { font-size: 12px; color: var(--color-suave); font-weight: 400; }
+.u .lg-lista { border-top: 1px solid var(--color-linea); margin: 0 0 var(--e3); }
+/* Un partido: a la izquierda la hora, el campo y el árbitro; en el centro solo el marcador (local, resultado o «vs»,
+   visitante); en el ordenador, a la derecha un hueco del mismo ancho para que el marcador quede centrado. Debajo del
+   marcador, por qué no se juega como estaba. */
+.u .lg-p { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto minmax(0, 1fr) 76px; grid-template-areas: "i l c v ." "i a a a .";
+  align-items: center; gap: 0 var(--e3); width: 100%; padding: var(--e3) var(--e2); text-align: left;
+  border: 0; border-bottom: 1px solid var(--color-linea); border-left: 4px solid transparent; background: none; color: inherit; font: inherit; cursor: pointer; }
+.u .lg-p:hover { background: color-mix(in srgb, var(--color-bloque) 60%, var(--color-superficie)); }
+.u .lg-p.lg-mio { border-left-color: var(--color-principal); }
+.u .lg-pi { grid-area: i; align-self: start; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.u .lg-pi b { font-size: 16px; }
+.u .lg-pi small { font-size: 12px; color: var(--color-suave); overflow-wrap: anywhere; line-height: 1.3; }
+.u .lg-pl, .u .lg-pv { display: flex; align-items: center; gap: var(--e2); min-width: 0; font-size: 16px; line-height: 1.25; }
+.u .lg-pl { grid-area: l; justify-content: flex-end; text-align: right; }
+.u .lg-pv { grid-area: v; justify-content: flex-start; }
+.u .lg-nom { min-width: 0; overflow-wrap: anywhere; }
+.u .lg-gana { font-weight: 700; }
+/* Un partido al que le falta un equipo en PARTIDOS (fallo de los datos): el hueco, marcado. */
+.u .lg-falta .lg-nom { color: var(--estado-bl); font-style: italic; font-size: 14px; }
+.u .lg-pc { grid-area: c; display: flex; align-items: center; justify-content: center; min-width: 64px; min-height: 40px; padding: 0 var(--e2);
+  border-radius: var(--radio); background: var(--color-tarjeta, var(--color-bloque)); }
+.u .lg-pc b { font: var(--peso-titulos) 22px/1 var(--fuente-titulos); color: var(--color-principal-oscuro); white-space: nowrap; }
+.u .lg-pc b span { margin: 0 .2em; color: var(--color-suave); }
+.u .lg-pvs { background: none; color: var(--color-suave); font-size: 13px; font-weight: 600; }
+.u .lg-pa { grid-area: a; justify-self: center; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--e1) var(--e2); margin-top: var(--e2); }
+.u .lg-pliga { font-size: 12px; color: var(--color-suave); }
+.u .lg-p-fuera .lg-pl, .u .lg-p-fuera .lg-pv { color: var(--color-suave); }
+.u .lg-p-fuera .lg-pi b { text-decoration: line-through; color: var(--color-suave); }
+@media (max-width: 639px) {
+  .u .lg-p { grid-template-columns: 52px minmax(0, 1fr) auto minmax(0, 1fr); grid-template-areas: "i l c v" "i a a a"; gap: 0 var(--e2); padding: var(--e3) var(--e1) var(--e3) var(--e2); }
+  .u .lg-pl, .u .lg-pv { font-size: 14px; gap: 6px; }
+  .u .lg-pc { min-width: 50px; padding: 0 var(--e1); } .u .lg-pc b { font-size: 19px; }
+}
+/* Por qué un partido no se juega como estaba: anulado (no se recupera), aplazado (se recupera) o recuperación. */
+.u .lg-pav { padding: 1px var(--e2); border-radius: var(--radio-peq); font-size: 12px; font-weight: 700; text-align: center; }
+.u .lg-av-no { color: var(--estado-bl); background: color-mix(in srgb, var(--estado-bl) 10%, var(--color-superficie)); }
+.u .lg-av-si { color: var(--estado-pr); background: color-mix(in srgb, var(--estado-pr) 12%, var(--color-superficie)); }
+.u .lg-av-rec { color: var(--estado-ec); background: color-mix(in srgb, var(--estado-ec) 10%, var(--color-superficie)); }
+.u .lg-pav-ficha { justify-self: auto; margin: 0; padding: var(--e2) var(--e3); border-radius: var(--radio); font-size: 14px; text-align: left; }
+@media (max-width: 639px) { .u .lg-pl, .u .lg-pv { font-size: 14px; } .u .lg-p { gap: 2px var(--e2); } .u .lg-pc { min-width: 64px; } }
+/* Aplazados por recuperar, arriba de las jornadas. */
+.u .lg-pend-rec { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e3); margin: 0 0 var(--e3);
+  padding: var(--e3); border-radius: var(--radio); background: color-mix(in srgb, var(--estado-pr) 10%, var(--color-superficie)); }
+.u .lg-pend-rec > span { display: flex; flex-direction: column; min-width: 0; }
+.u .lg-pend-rec b { color: var(--estado-pr); }
+.u .lg-pend-rec small { font-size: 13px; }
+.u .lg-rec-ps { display: flex; flex-direction: column; gap: var(--e2); }
+.u .lg-rec-j { margin: 0; padding: var(--e2) var(--e3); border: 1px solid var(--color-linea); border-radius: var(--radio); }
+.u .lg-rec-j legend { padding: 0 var(--e1); font-weight: 700; }
+.u .lg-rec-j .u-check { align-items: flex-start; }
+.u .lg-h-libre:not([aria-checked=true]) { border-color: var(--color-principal-oscuro); }
+.u .lg-h-libre small { color: var(--color-principal-oscuro); font-weight: 600; }
+.u .lg-clas td.num:last-child { font-size: 15px; }
+@media (max-width: 639px) { .u .lg-clas th, .u .lg-clas td { padding-left: var(--e1); padding-right: var(--e1); } .u .lg-clas td:first-child, .u .lg-clas th:first-child { padding-left: var(--e2); } }
+.u .lg-clas td:first-child, .u .lg-clas th:first-child { width: 1%; }
+.u .lg-ranking { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
+.u .lg-ranking li { display: flex; align-items: center; gap: var(--e3); padding: var(--e2) 0; border-bottom: 1px solid var(--color-linea); }
+.u .lg-ranking .lg-eqt { flex: 1 1 auto; }
+.u .lg-ranking .lg-dorsal { display: inline-block; margin-right: 2px; }
+.u .lg-n { flex: none; font: var(--peso-titulos) 20px/1 var(--fuente-titulos); color: var(--color-principal-oscuro); }
+.u .lg-semana { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e2); }
+.u .lg-semana .n-grupo { margin: 0; min-width: 9em; text-align: center; font-variant-numeric: tabular-nums; }
+.u .lg-semana .u-btn-icono { font-size: 22px; }
+.u .lg-pend { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--e2); margin: 0 0 var(--e3); font-weight: 600; }
+/* Ficha: el marcador. Cada equipo con una franja de su color arriba; en medio el resultado (o la hora) y el estado. */
+.u .lg-marcador { display: grid; grid-template-columns: 1fr auto 1fr; gap: var(--e3); align-items: start; }
+.u .lg-mlado { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-top: var(--e2); }
+.u .lg-mlado:last-child { text-align: right; align-items: flex-end; }
+.u .lg-mcolor { display: block; width: 100%; height: 8px; border-radius: var(--radio-peq); background: var(--c); border: 1px solid var(--color-borde-campo); margin-bottom: var(--e2); }
+.u .lg-mcolor.lg-color-no { background: transparent; border-style: dashed; }
+.u .lg-mlado > b { font: var(--peso-titulos) 17px/1.2 var(--fuente-titulos); overflow-wrap: anywhere; }
+.u .lg-mlado > small { font-size: 12px; color: var(--color-suave); }
+.u .lg-mcentro { display: flex; flex-direction: column; align-items: center; gap: var(--e2); padding-top: var(--e4); }
+.u .lg-mcentro > b { font: var(--peso-titulos) 34px/1 var(--fuente-titulos); color: var(--color-principal-oscuro); white-space: nowrap; }
+.u .lg-mcentro > b span { margin: 0 .15em; color: var(--color-suave); }
+.u .lg-mcentro > b.lg-mhora { font-size: 24px; }
+.u .lg-mgoles { list-style: none; margin: var(--e2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--e1); font-size: 14px; width: 100%; }
+.u .lg-mgoles li { display: flex; align-items: baseline; gap: var(--e2); min-width: 0; }
+.u .lg-mlado:last-child .lg-mgoles li { flex-direction: row-reverse; }
+.u .lg-dorsal { flex: none; min-width: 1.9em; padding: 0 var(--e1); border-radius: var(--radio-peq); background: var(--color-bloque); text-align: center; font-weight: 700; font-size: 12px; line-height: 1.6; }
+.u .lg-veces { flex: none; font-weight: 700; }
+.u .lg-gol-otro { color: var(--color-suave); }
+@media (max-width: 639px) { .u .lg-mcentro > b { font-size: 28px; } .u .lg-mlado > b { font-size: 15px; } .u .lg-marcador { gap: var(--e2); } }
+.u .lg-datos { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: var(--e2) var(--e4); }
+.u .lg-datos dt { font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; }
+.u .lg-datos dd { margin: 0; overflow-wrap: anywhere; }
+.u .lg-sub { font-size: 16px; color: var(--color-principal-oscuro); margin: 0 0 var(--e2); }
+/* Acta */
+.u .lg-acta { display: grid; grid-template-columns: 1fr; gap: var(--e4); }
+@media (min-width: 640px) { .u .lg-acta { grid-template-columns: 1fr 1fr; } }
+.u .lg-lado { display: flex; flex-direction: column; gap: var(--e2); padding: var(--e3); border: 1px solid var(--color-linea); border-top: 6px solid var(--c, var(--color-linea));
+  border-radius: var(--radio); background: var(--color-superficie); }
+.u .lg-lado > b { font-size: 16px; overflow-wrap: anywhere; }
+.u .lg-paso { display: flex; align-items: center; gap: var(--e2); }
+.u .lg-paso input { width: 72px; text-align: center; font-size: 22px; font-variant-numeric: tabular-nums; }
+.u .lg-quien { display: flex; flex-direction: column; gap: var(--e2); }
+.u .lg-quien select { width: 100%; }
+/* Mover partidos: la regla, los huecos de la liga para elegir, qué cambia y a quién hay que avisar. */
+.u .lg-regla { margin: 0; padding: var(--e2) var(--e3); border-left: 3px solid var(--color-principal); background: var(--color-superficie); font-size: 14px; }
+.u .lg-huecos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--e2); }
+.u .lg-h { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 44px; padding: var(--e2) var(--e3); text-align: left; cursor: pointer;
+  border: 1.5px solid var(--color-borde-campo); border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto); font: 400 14px/1.3 var(--fuente-texto); }
+.u .lg-h b { font-size: 16px; }
+.u .lg-h small { font-size: 12px; color: var(--color-suave); }
+.u .lg-h[aria-checked=true] { border-color: var(--color-principal); box-shadow: inset 0 0 0 2px var(--color-principal); }
+.u .lg-h:disabled { cursor: default; border-style: dashed; border-color: var(--color-linea); color: var(--color-suave); }
+.u .lg-h-cambio:not([aria-checked=true]) small { color: var(--color-texto); font-weight: 600; }
+.u .lg-conf { display: flex; flex-direction: column; gap: var(--e3); }
+.u .lg-conf:empty { display: none; }
+.u .lg-cambios ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
+.u .lg-cambios li { display: flex; flex-direction: column; gap: 2px; padding: var(--e2) 0; border-bottom: 1px solid var(--color-linea); font-size: 14px; }
+.u .lg-avisar-ya { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: var(--e3); border-radius: var(--radio); background: var(--color-bloque); font-size: 14px; }
+.u .lg-avisar-ya b { font-size: 15px; }
+.u .lg-avisar-mal b { color: var(--color-error); }
+.u .lg-capitanas { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
+.u .lg-capitanas li { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--e1) var(--e3); padding: var(--e3) 0; border-bottom: 1px solid var(--color-linea); }
+.u .lg-capitanas .u-check { min-height: 44px; }
+.u .lg-msg { grid-column: 1 / -1; margin: 0; padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-superficie);
+  border: 1px solid var(--color-linea); font-size: 13px; line-height: 1.5; white-space: pre-line; }
+.u .lg-msg b { color: var(--color-principal-oscuro); }
+.u .n-ventana [hidden] { display: none; }
+/* El título de la ventana recibe el foco al abrirla (para el lector de pantalla), sin recuadro. */
+.u .n-ventana h2[tabindex="-1"]:focus { outline: none; }
+
+.u .n-ventana .n-grupo { margin-top: var(--e4); }
+
+/* ---------- Gestión de Konamigas (T0256, konamigas/secciones/gestion5.js) ----------
+ * Copia del aspecto de la Gestión publicada (kanban4/gestion.js, sus css() y cssExtra() con el prefijo gs-), sin Camisetas.
+ * Solo variables de marca.css y de esta hoja; el único color que viene de fuera es el de la camiseta de cada equipo
+ * (COLORES.COLOR_HEX del Excel), que es un dato. La sección ocupa todo el ancho del contenido: su barra (la temporada
+ * pintada, la hora de los datos, ↻ y las pestañas) sigue a la cabecera del marco, en azul en el móvil y sobre el fondo
+ * claro junto al menú del ordenador, sin repetir el título. Todo va dentro de .gs5 (la raíz de la sección): la Gestión
+ * publicada (4.1) también usa clases gs- con sus estilos propios y carga esta hoja, y así no le cambia nada. */
+.u .n-main:has(> .gs5) { max-width: none; padding: 0; }
+.u .n-cab:has(+ .n-main > .gs5) { padding-bottom: var(--e1); border-bottom: 0; }
+.u .gs5 { --gs-c: var(--color-principal); --gs-a: var(--color-accion); --gs-v: var(--color-bien); --gs-r: var(--color-error);
+  --gs-g: var(--color-suave); --gs-l: var(--color-linea); --gs-f: var(--color-tarjeta-cab, var(--color-bloque)); --gs-am: var(--estado-pr);
+  font: 400 14px/1.45 var(--fuente-texto); color: var(--color-texto); }
+.u .gs5 button { font-family: var(--fuente-texto); }
+.u .gs5 [hidden] { display: none !important; }
+html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
+
+/* Barra de la sección: la temporada (la palabra pintada de la marca, una vez), la hora de los datos, ↻ y las pestañas. */
+.u .gs5 .gs-cab { background: var(--color-principal); color: var(--color-sobre-principal); padding: 0 var(--e4); display: flex; flex-wrap: wrap;
+  align-items: center; gap: var(--e1) var(--e3); }
+.u .gs5 .gs-cab > p { flex: 1 1 100%; margin: 0; font-size: 13px; display: flex; align-items: center; gap: var(--e3); font-variant-numeric: tabular-nums; }
+.u .gs5 .gs-pint { font: 400 22px/1.1 var(--fuente-destacar, var(--fuente-titulos)); color: var(--color-destacado); transform: rotate(-3deg); display: inline-block; }
+.u .gs5 .gs-re { min-width: 44px; min-height: 36px; margin-left: calc(-1 * var(--e2)); background: transparent; border: 0; color: inherit; font-size: 18px; padding: 0; cursor: pointer; }
+.u .gs5 .gs-re:disabled { opacity: .5; cursor: wait; }
+.u .gs5 .gs-tabs { flex: 1 1 100%; display: flex; gap: 2px; margin: 0 calc(-1 * var(--e4)); padding: 0 var(--e2); overflow-x: auto; scrollbar-width: none; }
+.u .gs5 .gs-tabs::-webkit-scrollbar { display: none; }
+.u .gs5 .gs-tabs button { flex: 0 0 auto; min-height: 44px; background: transparent; border: 0; color: var(--color-sobre-principal); opacity: .75;
+  font: 700 14px/1 var(--fuente-texto); padding: 0 var(--e3); border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; }
+.u .gs5 .gs-tabs button[aria-selected=true] { opacity: 1; border-bottom-color: var(--color-destacado); }
+@media (min-width: 900px) {
+  body.u-con-barra .gs5 .gs-cab { background: var(--color-fondo); color: var(--color-texto); border-bottom: 1px solid var(--color-linea); padding: 0 var(--e5); }
+  body.u-con-barra .gs5 .gs-pint { color: var(--color-principal-oscuro); }
+  body.u-con-barra .gs5 .gs-cab > p { color: var(--color-suave); }
+  body.u-con-barra .gs5 .gs-re { color: var(--color-principal-oscuro); }
+  body.u-con-barra .gs5 .gs-tabs { margin: 0 calc(-1 * var(--e5)); padding: 0 var(--e3); }
+  body.u-con-barra .gs5 .gs-tabs button { color: var(--color-suave); opacity: 1; }
+  body.u-con-barra .gs5 .gs-tabs button[aria-selected=true] { color: var(--color-principal-oscuro); border-bottom-color: var(--color-principal-oscuro); }
+}
+
+.u .gs5 .gs-main { max-width: 760px; margin: 0 auto; padding: var(--e4) var(--e4) var(--e7); }
+.u .gs5 .gs-ayuda { margin: 0 0 var(--e3); }
+.u .gs5 .gs-fila { display: flex; gap: var(--e2); flex-wrap: wrap; align-items: center; }
+.u .gs5 input[type=date] { -webkit-appearance: none; appearance: none; width: 100%; }
+.u .gs5 textarea { width: 100%; }
+.u .gs5 .gs-sel { flex: 1 1 140px; min-width: 0; }
+.u .gs5 .gs-min { min-width: 0; }
+.u .gs5 .gs-card { background: var(--color-tarjeta, var(--color-superficie)); border: 1px solid var(--gs-l); border-radius: var(--radio); padding: var(--e3) var(--e4); margin-top: var(--e3); }
+.u .gs5 .gs-mini { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--e2); margin-top: var(--e3); }
+.u .gs5 .gs-mini-3 { grid-template-columns: repeat(3, 1fr); }
+.u .gs5 .gs-mini button { background: var(--gs-f); border: 0; border-radius: var(--radio); padding: var(--e2); text-align: center; color: inherit; cursor: pointer; min-height: 44px; }
+.u .gs5 .gs-mini b { display: block; font: var(--peso-titulos) 20px/1.2 var(--fuente-titulos); font-variant-numeric: tabular-nums; }
+.u .gs5 .gs-mini small { font-size: 12px; color: var(--gs-g); font-weight: 600; }
+.u .gs5 .gs-mini button.gs-alerta b { color: var(--gs-r); }
+.u .gs5 .gs-pos { color: var(--gs-v); } .u .gs5 .gs-neg { color: var(--gs-r); } .u .gs5 .gs-amb { color: var(--gs-am); }
+
+/* Listas: filas separadas por una línea, cifras a la derecha. Una inscripción de Baja no cuenta: fondo rojizo y raya roja. */
+.u .gs5 .gs-lista { list-style: none; margin: 0; padding: 0; }
+.u .gs5 .gs-item { display: flex; justify-content: space-between; gap: var(--e3); width: 100%; padding: var(--e3) 0; border: 0; border-top: 1px solid var(--gs-l);
+  align-items: center; background: none; color: inherit; text-align: left; cursor: pointer; font-size: 14px; }
+.u .gs5 .gs-item:first-child { border-top: 0; }
+.u .gs5 .gs-item .gs-t { font-weight: 700; font-size: 15px; display: flex; align-items: center; }
+.u .gs5 .gs-item .gs-s { font-size: 13px; color: var(--gs-g); margin-top: 2px; }
+.u .gs5 .gs-item .gs-d { text-align: right; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.u .gs5 .gs-item.gs-err { background: color-mix(in srgb, var(--gs-r) 13%, var(--color-superficie)); border-left: 4px solid var(--gs-r);
+  padding-left: var(--e3); padding-right: var(--e3); border-radius: var(--radio); }
+.u .gs5 .gs-tabla tr.gs-err td { background: color-mix(in srgb, var(--gs-r) 13%, var(--color-superficie)); }
+.u .gs5 .gs-tabla tr.gs-err td:first-child { box-shadow: inset 4px 0 0 var(--gs-r); }
+.u .gs5 .gs-tabla tr.gs-err:hover td { background: color-mix(in srgb, var(--gs-r) 19%, var(--color-superficie)); }
+.u .gs5 .gs-alta { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--gs-g); }
+.u .gs5 .gs-s .gs-alta { opacity: .75; font-size: .92em; }
+.u .gs5 .gs-cuenta { margin: var(--e3) 2px 0; font-size: 13px; color: var(--gs-g); }
+
+/* Botones de filtro (con su contador) y etiquetas pequeñas. */
+.u .gs5 .gs-chips { display: flex; gap: var(--e2); flex-wrap: wrap; margin-top: var(--e1); }
+.u .gs5 .gs-chip { min-height: 40px; border: 1.5px solid var(--color-borde-campo); background: var(--color-superficie); border-radius: var(--radio); padding: 0 var(--e3);
+  font: 600 14px/1 var(--fuente-texto); color: inherit; cursor: pointer; font-variant-numeric: tabular-nums; }
+.u .gs5 .gs-chip[aria-pressed=true] { background: var(--gs-c); border-color: var(--gs-c); color: var(--color-sobre-principal); }
+.u .gs5 .gs-tags { display: flex; gap: var(--e1); flex-wrap: wrap; margin-top: var(--e1); }
+.u .gs5 .gs-tag { display: inline-flex; align-items: center; gap: var(--e1); padding: 1px var(--e2); border-radius: var(--radio-peq); background: var(--gs-f);
+  color: var(--color-texto); font: 700 12px/1.6 var(--fuente-texto); }
+.u .gs5 .gs-tag-g { background: transparent; border: 1px solid var(--gs-l); color: var(--gs-g); }
+.u .gs5 .gs-tag-r { background: transparent; border: 1px solid var(--gs-r); color: var(--gs-r); }
+.u .gs5 .gs-tag-v { background: transparent; border: 1px solid var(--gs-v); color: var(--gs-v); }
+.u .gs5 .gs-tag-a { background: transparent; border: 1px solid var(--gs-am); color: var(--gs-am); }
+.u .gs5 .gs-tag.gs-tag-err { background: var(--gs-r); border: 1px solid var(--gs-r); color: var(--color-superficie); }
+.u .gs5 .gs-opc { font-weight: 400; color: var(--gs-g); text-transform: none; letter-spacing: 0; }
+.u .gs5 .gs-nota { font-size: 13px; color: var(--gs-g); font-weight: 400; margin: var(--e1) 0 0; text-transform: none; letter-spacing: 0; }
+.u .gs5 .gs-aviso-b { font-size: 13px; color: var(--gs-g); margin: var(--e2) 0 0; }
+.u .gs5 .gs-mas-n { text-align: center; color: var(--gs-g); font-size: 13px; padding: var(--e3) 0 2px; }
+.u .gs5 .gs-ir { margin: var(--e2) 0 2px; }
+.u .gs5 .gs-vacio { color: var(--gs-g); padding: var(--e6) var(--e2); text-align: center; }
+.u .gs5 .gs-cargando { text-align: center; color: var(--gs-g); padding: var(--e7) var(--e2); display: flex; flex-direction: column; gap: var(--e3); }
+.u .gs5 .gs-error { border: 1px solid var(--gs-r); border-left-width: 4px; color: var(--gs-r); background: var(--color-superficie); font-weight: 700;
+  border-radius: var(--radio); padding: var(--e3); margin-top: var(--e3); }
+.u .gs5 .gs-enl { background: none; border: 0; padding: 0; font: inherit; color: var(--color-principal-oscuro); text-decoration: underline; cursor: pointer; min-height: 32px; }
+/* El color de la camiseta del equipo: es un dato, no un adorno. */
+.u .gs5 .gs-color { display: inline-block; width: 13px; height: 13px; border-radius: 50%; border: 1px solid var(--color-borde-campo); vertical-align: -2px;
+  margin-right: var(--e2); flex: none; }
+
+/* Tarjetas de lo que hay que revisar (avisos y revisiones): título, qué pasa, los datos, botones de solución y, al final,
+ * «Ver la ficha» y «Dar por bueno» (que abre «Por qué (opcional)» y «Confirmar»). Franja de 4 px con el color de aviso. */
+.u .gs5 .gs-tjs { display: flex; flex-direction: column; gap: var(--e2); margin: var(--e2) 0 var(--e1); }
+.u .gs5 .gs-tarjeta { background: var(--color-superficie); border: 1px solid var(--gs-l); border-left: 4px solid var(--gs-am); border-radius: var(--radio);
+  padding: var(--e3); font-size: 14px; min-width: 0; }
+.u .gs5 .gs-tj-t { font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }
+.u .gs5 .gs-tj-t .gs-color { margin-right: var(--e1); }
+.u .gs5 .gs-tj-p { margin: var(--e1) 0 0; }
+.u .gs5 .gs-tj-d { margin-top: var(--e2); font-size: 13px; color: var(--gs-g); overflow-wrap: anywhere; }
+.u .gs5 .gs-tj-d .gs-df { color: var(--color-texto); }
+.u .gs5 .gs-tj-s { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--e2); margin-top: var(--e3); }
+.u .gs5 .gs-tj-s .gs-b2, .u .gs5 .gs-tj-s a.gs-b2 { font-size: 14px; }
+.u .gs5 .gs-tj-c { margin-top: 0; flex: 1 1 200px; }
+.u .gs5 .gs-tj-c.gs-ancho, .u .gs5 .gs-tj-s .gs-ancho { flex-basis: 100%; }
+.u .gs5 .gs-tj-cols { margin-top: var(--e1); }
+.u .gs5 .gs-tj-was { display: flex; flex-wrap: wrap; gap: var(--e2); flex: 1 1 100%; }
+.u .gs5 .gs-tj-was .gs-b2 { font-size: 14px; }
+.u .gs5 .gs-tj-cols .gs-chip { display: inline-flex; align-items: center; text-transform: none; letter-spacing: 0; font-size: 13px; }
+.u .gs5 .gs-tj-err { margin: var(--e2) 0 0; color: var(--gs-r); font-weight: 700; }
+.u .gs5 .gs-tj-pie { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e1) var(--e4); margin-top: var(--e2); }
+.u .gs5 .gs-tj-pie .gs-enl { font-size: 13px; font-weight: 700; min-height: 36px; }
+.u .gs5 .gs-tj-pie .gs-ult { color: var(--gs-g); margin-left: auto; }
+.u .gs5 .gs-tj-pos { min-height: 36px; padding: 0 var(--e3); font-size: 14px; }
+.u .gs5 .gs-tj-pos[aria-expanded=true] { background: var(--gs-f); }
+/* Posponer: plazo (1 semana, 2 semanas, 1 mes o hasta una fecha), por qué y el botón que dice hasta cuándo. */
+.u .gs5 .gs-posp { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); padding: var(--e2) 0 var(--e1); }
+.u .gs5 .gs-posp > .gs-chips { flex: 1 1 100%; margin-top: 0; }
+.u .gs5 .gs-posp .gs-chip { min-height: 36px; font-size: 13px; }
+.u .gs5 .gs-posp input[type=date] { flex: 0 1 180px; width: auto; }
+.u .gs5 .gs-posp input[data-porque] { flex: 1 1 200px; min-width: 0; }
+.u .gs5 .gs-posp .gs-b2 { flex: none; }
+.u .gs5 .gs-resu-b { display: flex; flex-wrap: wrap; gap: 0 var(--e3); flex: none; }
+.u .gs5 .gs-resu-p .gs-resu-i { align-items: flex-start; padding: var(--e2) 0; }
+.u .gs5 .gs-tj-dec { margin: var(--e2) 0 0; color: var(--color-texto); }
+.u .gs5 .gs-tj-foto .gs-foto-g { min-height: 160px; max-width: 480px; }
+.u .gs5 .gs-tj-foto .gs-foto-g img { max-height: 360px; }
+.u .gs5 .gs-tj-cols .gs-chip .gs-opc { margin-left: var(--e1); }
+.u .gs5 .gs-cands { display: flex; flex-direction: column; flex: 1 1 100%; border-top: 1px solid var(--gs-l); }
+.u .gs5 .gs-cand { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2); padding: var(--e2) 0; border-bottom: 1px solid var(--gs-l); }
+.u .gs5 .gs-cand .gs-t { font-weight: 700; }
+.u .gs5 .gs-cand .gs-s { font-size: 13px; color: var(--gs-g); }
+.u .gs5 .gs-cand .gs-minis { margin-top: var(--e1); }
+.u .gs5 .gs-comp { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--e3); color: var(--color-texto); font-size: 14px; }
+.u .gs5 .gs-comp-i { border: 1px solid var(--gs-l); border-radius: var(--radio); padding: var(--e2) var(--e3); min-width: 0; }
+.u .gs5 .gs-comp-i .gs-t { font-weight: 700; margin-bottom: var(--e1); }
+.u .gs5 .gs-comp-i .gs-df span:last-child { font-weight: 600; }
+.u .gs5 .gs-bueno { flex: 1 1 100%; display: flex; gap: var(--e2); padding: var(--e1) 0 var(--e2); }
+.u .gs5 .gs-bueno input { flex: 1 1 auto; min-width: 0; }
+.u .gs5 .gs-bueno .gs-b2 { flex: none; }
+.u .gs5 .gs-resu { border-top: 1px solid var(--gs-l); margin-top: var(--e1); }
+.u .gs5 .gs-resu-i { display: flex; justify-content: space-between; align-items: center; gap: var(--e3); padding: var(--e1) 0; border-bottom: 1px solid var(--gs-l); font-size: 14px; }
+.u .gs5 .gs-resu-i > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.u .gs5 .gs-resu-i .gs-enl { flex: none; font-size: 13px; font-weight: 700; }
+.u .gs5 .gs-sintel { display: inline-flex; align-items: center; min-height: 44px; font-size: 13px; color: var(--gs-g); }
+/* Fotos: miniaturas en cuadrícula (ficha de la jugadora), la foto grande (visor y asignador) y las pequeñas para comparar. */
+.u .gs5 .gs-foto { display: flex; align-items: center; justify-content: center; overflow: hidden; background: var(--gs-f); border-radius: var(--radio-peq); }
+.u .gs5 .gs-foto img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.u .gs5 .gs-foto .u-carga { width: 24px; height: 24px; }
+.u .gs5 .gs-foto-no { padding: var(--e2); text-align: center; font-size: 13px; }
+.u .gs5 .gs-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--e3); margin-top: var(--e2); }
+.u .gs5 .gs-fig { margin: 0; display: flex; flex-direction: column; gap: var(--e1); min-width: 0; }
+.u .gs5 .gs-fbtn-ver { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.u .gs5 .gs-fbtn-ver .gs-foto { aspect-ratio: 1; width: 100%; }
+.u .gs5 .gs-fig figcaption { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.u .gs5 .gs-fig .gs-enl { align-self: flex-start; font-size: 13px; font-weight: 700; }
+.u .gs5 .gs-grande { display: flex; justify-content: center; margin: var(--e2) 0; }
+.u .gs5 .gs-foto-g { width: 100%; min-height: 200px; max-height: 60vh; }
+.u .gs5 .gs-foto-g img { width: auto; height: auto; max-width: 100%; max-height: 60vh; object-fit: contain; }
+.u .gs5 .gs-velo-foto { z-index: 61; }
+.u .gs5 .gs-hoja-foto { max-width: 900px; padding: var(--e4); }
+.u .gs5 .gs-hoja-ancha { max-width: 760px; }
+.u .gs5 .gs-as-cab { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e1) var(--e3); margin-top: var(--e2); }
+.u .gs5 .gs-as-cab b { font: var(--peso-titulos) 17px/1.2 var(--fuente-titulos); color: var(--color-principal-oscuro); }
+.u .gs5 .gs-as-nav { justify-content: center; }
+.u .gs5 .gs-cols .gs-chip { display: inline-flex; align-items: center; }
+.u .gs5 .gs-cols .gs-chip .gs-color { margin-right: var(--e1); }
+.u .gs5 .gs-as-j { align-items: center; }
+.u .gs5 .gs-minis { display: flex; align-items: center; gap: var(--e1); flex: none; }
+.u .gs5 .gs-foto-p { width: 52px; height: 52px; }
+.u .gs5 .gs-mas-f { font-size: 13px; font-weight: 700; color: var(--gs-g); padding-left: 2px; }
+.u .gs5 .gs-alt-s { display: flex; justify-content: space-between; align-items: center; gap: var(--e2); width: 100%; min-height: 32px; padding: 0; border: 0;
+  background: none; color: inherit; text-align: left; cursor: pointer; font-size: 15px; }
+.u .gs5 .gs-alt-s em { font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
+@media (max-width: 520px) { .u .gs5 .gs-fotos { grid-template-columns: repeat(2, minmax(0, 1fr)); } .u .gs5 .gs-foto-p { width: 44px; height: 44px; } }
+
+/* Ventanas (fichas): hoja sobre un velo; pie fijo con «Cerrar» y «Guardar N cambios». */
+.u .gs5 .gs-velo { position: fixed; inset: var(--tope, 0px) 0 0; z-index: 60; background: var(--color-velo); display: flex; align-items: flex-start; justify-content: center;
+  padding: 6vh var(--e3); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.u .gs5 .gs-hoja { background: var(--color-fondo); color: var(--color-texto); width: 100%; max-width: 600px; border-radius: var(--radio); padding: var(--e5);
+  font-size: 15px; margin-bottom: var(--e5); box-shadow: var(--sombra-flota); }
+.u .gs5 .gs-hoja h2 { margin: 0 0 var(--e2); font: var(--peso-titulos) 24px/1.2 var(--fuente-titulos); color: var(--color-principal-oscuro);
+  display: flex; justify-content: space-between; align-items: flex-start; gap: var(--e2); }
+.u .gs5 .gs-hoja h2 > span { min-width: 0; overflow-wrap: anywhere; }
+.u .gs5 .gs-hoja h2 .gs-color { width: 16px; height: 16px; vertical-align: 0; }
+.u .gs5 .gs-x { flex: none; width: 44px; height: 44px; margin: -10px -10px 0 0; background: none; border: 0; font-size: 28px; line-height: 1; cursor: pointer; color: var(--gs-g); padding: 0; }
+.u .gs5 .gs-sub { margin: -4px 0 var(--e2); }
+.u .gs5 .gs-sub2 { margin: -4px 0 var(--e2); }
+.u .gs5 .gs-sec { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--color-principal-oscuro); margin: var(--e5) 0 2px; font-weight: 700; }
+.u .gs5 .gs-sec .gs-color { margin: 0 var(--e1) 0 0; }
+.u .gs5 .gs-btns { display: flex; gap: var(--e2); flex-wrap: wrap; margin: 2px 0 var(--e2); }
+.u .gs5 .gs-btns a, .u .gs5 .gs-btns button { font-size: 14px; }
+.u .gs5 .gs-campo { display: block; margin-top: var(--e3); font: 700 12px/1.3 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase;
+  letter-spacing: .02em; min-width: 0; }
+.u .gs5 .gs-campo > select, .u .gs5 .gs-campo > input, .u .gs5 .gs-campo > textarea { display: block; width: 100%; margin-top: var(--e1); text-transform: none; letter-spacing: 0; }
+.u .gs5 .gs-campo > input + select { margin-top: var(--e2); }
+.u .gs5 .gs-dos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 var(--e3); align-items: end; }
+.u .gs5 .gs-dos > .gs-ancho { grid-column: 1 / -1; }
+.u .gs5 .gs-check { display: flex; align-items: center; gap: var(--e2); margin-top: var(--e2); font-weight: 600; font-size: 15px; min-height: 32px; }
+.u .gs5 .gs-check input { flex: none; }
+.u .gs5 .gs-acc { display: flex; justify-content: flex-end; gap: var(--e2); flex-wrap: wrap; margin-top: var(--e4); }
+.u .gs5 .gs-pie { position: sticky; bottom: calc(-1 * var(--e5)); background: var(--color-fondo); padding: var(--e3) 0 var(--e1); margin-top: var(--e4);
+  border-top: 1px solid var(--gs-l); }
+/* Un solo botón con el color de acción por pantalla (-b1); los demás, con contorno (-b2). */
+.u .gs5 .gs-b1, .u .gs5 .gs-b2 { display: inline-flex; align-items: center; justify-content: center; gap: var(--e2); min-height: 44px; border-radius: var(--radio); cursor: pointer; text-decoration: none; }
+.u .gs5 .gs-b1 { background: var(--gs-a); color: var(--color-sobre-accion); border: 0; padding: 0 var(--e5); font: 800 17px/1.2 var(--fuente-texto); }
+.u .gs5 .gs-b1:disabled, .u .gs5 .gs-b2:disabled { opacity: .6; cursor: default; }
+.u .gs5 .gs-b2 { background: transparent; color: var(--color-principal-oscuro); border: 1.5px solid var(--color-principal-oscuro); padding: 0 var(--e4); font: 700 15px/1.2 var(--fuente-texto); }
+.u .gs5 .gs-dl { border-top: 1px solid var(--gs-l); margin-top: var(--e2); }
+.u .gs5 .gs-df { display: flex; justify-content: space-between; gap: var(--e3); padding: var(--e2) 0; border-bottom: 1px solid var(--gs-l); font-size: 14px; }
+.u .gs5 .gs-df span:first-child { color: var(--gs-g); flex: none; }
+.u .gs5 .gs-df span:last-child { text-align: right; font-weight: 600; word-break: break-word; }
+.u .gs5 .gs-dtx { margin-top: var(--e3); font-size: 14px; }
+.u .gs5 .gs-dtx p { margin: var(--e1) 0 0; white-space: pre-wrap; }
+.u .gs5 .gs-hoja .gs-lista { margin-top: var(--e1); }
+.u .gs5 .gs-hoja .gs-item { padding: var(--e2) 0; min-height: 44px; }
+.u .gs5 .gs-hoja .gs-item.gs-err { padding-left: var(--e3); padding-right: var(--e3); }
+.u .gs5 .gs-hoja .gs-item .gs-t { font-size: 14px; }
+.u .gs5 .gs-elegir { border: 1px solid var(--gs-l); border-radius: var(--radio); padding: 0 var(--e3); margin-top: var(--e2); }
+@media (max-width: 640px) {
+  .u .gs5 .gs-velo { padding: 0; }
+  .u .gs5 .gs-hoja { border-radius: 0; min-height: 100%; max-width: none; margin: 0; padding: var(--e4); }
+  .u .gs5 .gs-pie { bottom: calc(-1 * var(--e4)); }
+}
+
+/* Filtros: temporada, competición y liga en una fila; en el móvil, plegados tras «Filtros» con los puestos debajo (✕ los quita). */
+.u .gs5 .gs-filtros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e2); }
+.u .gs5 .gs-filtros select { width: 100%; }
+.u .gs5 .gs-filtros-1 { grid-template-columns: minmax(0, 1fr); max-width: 280px; }
+@media (max-width: 520px) {
+  .u .gs5 .gs-filtros { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .u .gs5 .gs-filtros select:first-child { grid-column: 1 / -1; }
+  .u .gs5 .gs-filtros-1 { max-width: none; }
+}
+.u .gs5 .gs-fbtn { display: inline-flex; align-items: center; gap: var(--e2); flex: none; }
+.u .gs5 .gs-fbtn[aria-expanded=true] { background: var(--gs-f); }
+.u .gs5 .gs-fbtn::after { content: ""; width: 8px; height: 8px; margin-top: -4px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(45deg); transition: transform .15s; }
+.u .gs5 .gs-fbtn[aria-expanded=true]::after { margin-top: 4px; transform: rotate(-135deg); }
+.u .gs5 .gs-fn { min-width: 22px; padding: 0 6px; border-radius: var(--radio-peq); background: var(--color-texto); color: var(--color-fondo); font: 700 12px/1.7 var(--fuente-texto); text-align: center; }
+.u .gs5 .gs-puestos { display: flex; flex-wrap: wrap; gap: var(--e1); }
+.u .gs5 .gs-puesto { display: inline-flex; align-items: center; gap: var(--e2); min-height: 32px; max-width: 100%; padding: 0 var(--e2) 0 var(--e3);
+  border: 1px solid var(--gs-l); border-radius: var(--radio); background: var(--gs-f); color: inherit; font: 600 13px/1.2 var(--fuente-texto); cursor: pointer; }
+.u .gs5 .gs-puesto span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u .gs5 .gs-puesto i { font-style: normal; color: var(--gs-g); font-size: 15px; }
+@media (max-width: 899px) {
+  .u .gs5 .gs-filtrar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); }
+  .u .gs5 .gs-filtrar > .gs-busca { order: 1; flex: 1 1 0; min-width: 0; }
+  .u .gs5 .gs-busca input { width: 100%; min-width: 0; }
+  .u .gs5 .gs-filtrar > .gs-fbtn { order: 2; }
+  .u .gs5 .gs-filtrar > .gs-puestos { order: 3; flex: 1 1 100%; }
+  .u .gs5 .gs-filtrar > .gs-mas { order: 4; flex: 1 1 100%; }
+  .u .gs5 .gs-mas.gs-cerr { display: none; }
+  .u .gs5 .gs-mas > .gs-fila { margin-top: var(--e2); }
+  .u .gs5 .gs-filtrar > .gs-chips { order: 5; flex: 1 1 100%; margin-top: var(--e1); }
+  .u .gs5 .gs-filtrar > .gs-chips, .u .gs5 .gs-dias { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-left: calc(-1 * var(--e4)); margin-right: calc(-1 * var(--e4)); padding: 0 var(--e4); }
+  .u .gs5 .gs-filtrar > .gs-chips::-webkit-scrollbar, .u .gs5 .gs-dias::-webkit-scrollbar { display: none; }
+  .u .gs5 .gs-chips .gs-chip, .u .gs5 .gs-dias .gs-chip { flex: none; white-space: nowrap; }
+}
+
+/* Resumen: cifras y Alertas; debajo, por día, cada liga plegable con su gestor y sus equipos por nivel. */
+.u .gs5 .gs-pag { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.u .gs5 .gs-alts { padding-top: var(--e3); padding-bottom: var(--e2); }
+.u .gs5 .gs-alts-t { font: var(--peso-titulos) 16px/1.2 var(--fuente-titulos); margin-bottom: var(--e1); }
+.u .gs5 .gs-alt { border-top: 1px solid var(--gs-l); padding: var(--e2) 0; }
+.u .gs5 .gs-alt summary { display: flex; justify-content: space-between; gap: var(--e2); cursor: pointer; list-style: none; font-size: 15px; min-height: 32px; align-items: center; }
+.u .gs5 .gs-alt summary::-webkit-details-marker { display: none; }
+.u .gs5 .gs-alt summary em { font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
+.u .gs5 .gs-alt[data-vacio] summary { cursor: default; color: var(--gs-g); }
+.u .gs5 .gs-alt-i { border-top: 1px solid var(--gs-l); padding: var(--e2) 0; }
+.u .gs5 .gs-alt-a { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; width: 100%; background: none; border: 0; padding: 0;
+  text-align: left; color: inherit; cursor: pointer; font-size: 14px; min-height: 32px; }
+.u .gs5 .gs-alt-i b { display: flex; align-items: center; min-width: 0; }
+.u .gs5 .gs-alt-i b span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u .gs5 .gs-alt-i small { color: var(--gs-g); font-size: 13px; }
+.u .gs5 .gs-alt-i .gs-pag span { display: block; }
+.u .gs5 .gs-dias { display: flex; gap: var(--e2); flex-wrap: wrap; margin-top: var(--e4); }
+.u .gs5 .gs-dia-h { font: var(--peso-titulos) 20px/1.2 var(--fuente-titulos); color: var(--color-principal-oscuro); margin: var(--e5) 0 0; }
+.u .gs5 .gs-liga { padding: 0; overflow: hidden; border-color: var(--color-borde-campo); }
+.u .gs5 .gs-liga[open] { padding-bottom: var(--e1); }
+.u .gs5 .gs-liga summary { list-style: none; cursor: pointer; position: relative; padding: var(--e3) calc(var(--e4) + 28px) var(--e3) var(--e4); background: var(--gs-f); }
+.u .gs5 .gs-liga summary::-webkit-details-marker { display: none; }
+.u .gs5 .gs-liga summary::after { content: "\25BE"; position: absolute; right: var(--e4); top: var(--e3); font-size: 20px; color: var(--color-principal-oscuro); transition: transform .15s; }
+.u .gs5 .gs-liga[open] summary::after { transform: rotate(180deg); }
+.u .gs5 .gs-liga[open] summary { border-bottom: 1px solid var(--color-borde-campo); }
+.u .gs5 .gs-liga-n { font: var(--peso-titulos) 20px/1.2 var(--fuente-titulos); color: var(--color-principal-oscuro); }
+.u .gs5 .gs-liga-n small { display: block; font: 700 12px/1.3 var(--fuente-texto); letter-spacing: .04em; text-transform: uppercase; color: var(--gs-g); margin-bottom: 2px; }
+.u .gs5 .gs-liga-g { display: flex; align-items: center; gap: var(--e2); flex-wrap: wrap; margin-top: var(--e2); font-size: 14px; }
+.u .gs5 .gs-wa { display: inline-flex; align-items: center; min-height: 36px; padding: 0 var(--e3); border-radius: var(--radio); border: 1.5px solid var(--color-principal-oscuro);
+  color: var(--color-principal-oscuro); background: var(--color-superficie); text-decoration: none; font: 700 13px/1 var(--fuente-texto); }
+.u .gs5 .gs-liga-s { font-size: 13px; color: var(--gs-g); margin-top: var(--e1); }
+.u .gs5 .gs-eqr { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--e1) var(--e2); align-items: center; width: calc(100% - 2 * var(--e4)); margin: 0 var(--e4);
+  background: none; border: 0; border-top: 1px solid var(--gs-l); padding: var(--e2) 0; min-height: 44px; text-align: left; color: inherit; cursor: pointer; font-size: 14px; }
+.u .gs5 .gs-liga summary + .gs-eqr { border-top: 0; }
+.u .gs5 .gs-eqr .gs-n { font-weight: 700; font-size: 12px; background: var(--gs-f); border-radius: var(--radio-peq); padding: 2px var(--e1); text-align: center; min-width: 24px; font-variant-numeric: tabular-nums; }
+.u .gs5 .gs-eqr b { display: flex; align-items: center; min-width: 0; }
+.u .gs5 .gs-eqr b span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u .gs5 .gs-eqr small { grid-column: 2 / 4; color: var(--gs-g); font-size: 13px; }
+.u .gs5 .gs-eqr small .gs-tag { margin-left: var(--e2); }
+
+/* Ordenador (desde 900 px): todo el ancho junto al menú; las listas, en tabla (u-tabla); cifras junto a Alertas; los días en columnas. */
+@media (min-width: 900px) {
+  .u .gs5 .gs-main { max-width: none; margin: 0; padding: var(--e5) var(--e5) var(--e7); }
+  .u .gs5 .gs-res-top { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: var(--e3); align-items: start; margin-top: var(--e3); }
+  .u .gs5 .gs-res-top > .gs-mini { margin-top: 0; grid-template-columns: repeat(2, 1fr); }
+  .u .gs5 .gs-res-top > .gs-mini button { min-height: 72px; }
+  .u .gs5 .gs-res-top > .gs-alts { margin-top: 0; }
+  .u .gs5 .gs-semana { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0 var(--e4); align-items: start; }
+  .u .gs5 .gs-ligas > .gs-liga { margin-top: var(--e3); }
+  .u .gs5 .gs-tabla { margin-top: var(--e3); }
+  .u .gs5 .gs-tabla .gs-tags { margin-top: 0; }
+  .u .gs5 .gs-tabla td.u-tabla-t .gs-color { margin-right: var(--e2); }
+  .u .gs5 .gs-filtrar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); }
+  .u .gs5 .gs-filtrar > .gs-filtros, .u .gs5 .gs-filtrar > .gs-fila, .u .gs5 .gs-filtrar > .gs-mas, .u .gs5 .gs-mas > .gs-filtros, .u .gs5 .gs-mas > .gs-fila { display: contents; }
+  .u .gs5 .gs-fbtn, .u .gs5 .gs-puestos { display: none !important; }
+  .u .gs5 .gs-filtrar .gs-sel { flex: 1 1 200px; min-width: 200px; max-width: 280px; }
+  .u .gs5 .gs-filtrar #gs-temp { flex: 0 0 140px; min-width: 0; }
+  .u .gs5 .gs-filtrar input[type=search] { order: 1; flex: 2 1 260px; min-width: 260px; max-width: none; }
+  .u .gs5 .gs-filtrar > .gs-chips { order: 2; flex: 1 1 100%; margin-top: var(--e1); }
+}
+
+.u .n-ventana .u-campo > input[type=search] + select { margin-top: var(--e2); }
+/* El recurso propio de la marca (su letra «pintada», si la tiene), una vez: la temporada del resumen. */
+.u .ges-destacar { font-family: var(--fuente-destacar, inherit); font-weight: 400; letter-spacing: .01em; }
+
+/* ---------- Camisetas de Konamigas (T0258, konamigas/secciones/camisetas.js) ----------
+ * Para el móvil, de pie en el campo: zonas de 44 px, el paso siguiente de cada jugadora a la derecha y lo que se está
+ * guardando, más claro. El punto de color es el de la camiseta (un dato del Excel, COLORES.COLOR_HEX). */
+.u .cm { display: flex; flex-direction: column; gap: var(--e4); padding-top: var(--e4); }
+.u .cm-carga { display: flex; flex-direction: column; align-items: center; gap: var(--e3); padding: var(--e6) 0; }
+.u .cm .u-filtros { margin: 0; }
+.u .cm-chips, .u .cm-sw { display: flex; flex-wrap: wrap; gap: var(--e2); }
+.u .cm-chip { min-height: 44px; padding: 0 var(--e3); border: 1px solid var(--color-borde-campo); border-radius: var(--radio-peq);
+  background: var(--color-superficie); color: var(--color-texto); font: 600 14px/1.2 var(--fuente-texto); cursor: pointer; }
+.u .cm-chip[aria-pressed=true] { background: var(--color-principal); border-color: var(--color-principal); color: var(--color-sobre-principal); }
+.u .cm-chip .u-cifra { font-weight: 400; }
+.u .cm-resumen { margin: 0; font-size: 16px; }
+/* Recurso propio de Konamigas: la cifra de lo que falta, como pintada (una por pantalla). */
+.u .cm-pintada { font: 800 20px/1 var(--fuente-titulos); font-variant-numeric: tabular-nums; color: var(--color-principal-oscuro); }
+.u .cm-color { display: inline-block; flex: none; width: 12px; height: 12px; margin-right: var(--e2); vertical-align: -1px;
+  border-radius: var(--radio-peq); border: 1px solid var(--color-linea); }
+.u .cm-eq { background: var(--color-tarjeta, var(--color-superficie)); border: 1px solid var(--color-linea); border-radius: var(--radio); padding: var(--e3); }
+.u .cm-eq-cab { display: flex; align-items: baseline; justify-content: space-between; gap: var(--e3); }
+.u .cm-eq-cab .n-grupo { margin: 0; overflow-wrap: anywhere; }
+.u .cm-ok { color: var(--color-bien); font-weight: 700; }
+.u .cm-barra { height: 6px; margin: var(--e2) 0 var(--e1); border-radius: var(--radio-peq); background: var(--color-linea); overflow: hidden; }
+.u .cm-barra i { display: block; height: 100%; background: var(--color-bien); transition: width .2s; }
+.u .cm-eq-sub { margin: 0 0 var(--e2); }
+.u .cm-jugs { list-style: none; margin: 0; padding: 0; }
+.u .cm-jug { display: flex; align-items: center; gap: var(--e2); border-top: 1px solid var(--color-linea); }
+.u .cm-jug-n { flex: 1 1 auto; min-width: 0; min-height: 44px; display: flex; align-items: center; gap: var(--e3);
+  padding: var(--e2) 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.u .cm-jug-t { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+.u .cm-jug-c { font: 800 22px/1.1 var(--fuente-titulos); letter-spacing: .01em; }
+.u .cm-jug-p { font-size: 14px; color: var(--color-suave); overflow-wrap: anywhere; }
+.u .cm-hist { list-style: none; margin: 0 0 var(--e3); padding: 0 0 0 var(--e3); border-left: 2px solid var(--color-linea); display: grid; gap: var(--e2); }
+.u .cm-hist li { display: grid; gap: 2px; font-size: 14px; }
+.u .cm-hist-f { font-weight: 700; font-size: 13px; color: var(--color-suave); }
+.u .cm-hist li.cm-hist-ent .cm-hist-f { color: var(--color-texto); }
+.u .cm-prox { margin: 0 0 var(--e2); font-size: 14px; }
+.u .cm-eq-color { font: 400 15px/1.2 var(--fuente-texto); color: var(--color-suave); margin-left: var(--e1); }
+/* La camiseta dibujada: el color es el dato COLORES.COLOR_HEX; el dorsal, encima, dentro del cuerpo. */
+.u .cm-cami { --cm-c: var(--color-linea); position: relative; flex: none; width: 64px; height: 64px; display: grid; place-items: center; }
+.u .cm-cami svg { position: absolute; inset: 0; width: 100%; height: 100%; fill: var(--cm-c); stroke: var(--color-texto); stroke-width: .5; stroke-linejoin: round; }
+.u .cm-cami b { position: relative; margin-top: 10px; font: 800 18px/1 var(--fuente-titulos); color: #fff; letter-spacing: -.03em; }
+.u .cm-cami b.cm-cami-2 { font-size: 16px; }
+.u .cm-cami.cm-cami-clara b { color: #1a1a1a; }
+.u .cm-cami-p { width: 46px; height: 46px; }
+.u .cm-cami-p b { font-size: 13px; margin-top: 7px; }
+.u .cm-cami-p b.cm-cami-2 { font-size: 11px; }
+.u .cm-ok-c { align-items: center; gap: var(--e2); }
+.u .cm-jug-e { font-size: 13px; }
+.u .cm-sig { flex: none; min-width: 108px; }
+/* El botón lleva el color del estado al que pasa la camiseta (colores funcionales de los estados, texto blanco > 4,5:1). */
+.u .cm-sig-ec, .u .cm-sig-co { color: var(--color-superficie); }
+.u .cm-sig-ec { background: var(--estado-ec); border-color: var(--estado-ec); }
+.u .cm-sig-co { background: var(--estado-co); border-color: var(--estado-co); }
+/* «Deshacer» después de cada marca, encima de la barra de secciones (lo que flota lleva sombra). Lima solo sobre el azul. */
+.u .cm-deshacer { position: fixed; z-index: 50; left: max(var(--e4), env(safe-area-inset-left, 0px)); right: max(var(--e4), env(safe-area-inset-right, 0px));
+  bottom: calc(var(--alto-barra) + var(--e3) + env(safe-area-inset-bottom, 0px)); max-width: 560px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e3); padding: var(--e1) var(--e1) var(--e1) var(--e4);
+  border-radius: var(--radio); background: var(--color-principal); color: var(--color-sobre-principal); box-shadow: var(--sombra-flota); font-size: 14px; }
+.u .cm-deshacer[hidden] { display: none; }
+.u .cm-deshacer .u-btn { color: var(--color-destacado); flex: none; }
+.u .cm-lista-ok { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
+.u .cm-lista-ok li { border-bottom: 1px solid var(--color-linea); }
+.u .cm-lista-ok .u-check { width: 100%; }
+.u .cm-guardando { opacity: .65; }
+.u .cm-eq-pie:not(:empty) { margin-top: var(--e2); }
+.u .cm-dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--e2) var(--e4); margin: 0; }
+.u .cm-dl dt { font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; }
+.u .cm-dl dd { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: var(--e1); min-width: 0; overflow-wrap: anywhere; }
+.u .cm-marcas .u-btn { flex: 1 1 140px; }
+.u .cm-acciones { margin: 0; }
+.u .cm-color-b h3 { display: flex; align-items: center; gap: var(--e1); font-size: 16px; margin: 0 0 var(--e2); }
+.u .cm-celdas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: var(--e1); }
+.u .cm-celdas li { display: flex; flex-direction: column; align-items: center; padding: var(--e1) var(--e2); border: 1px solid var(--color-linea);
+  border-radius: var(--radio-peq); font-size: 13px; }
+.u .cm-celdas li b { font-size: 16px; }
+.u .cm-cuadro td.num { width: 1%; }
+.u .cm-dos { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e3); }
+.u .cm-dos[hidden] { display: none; }
+.u .cm-tipos { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0 var(--e4); }
+.u .cm-tipos legend { padding: 0; margin-bottom: var(--e1); }
+.u .cm-pedir .n-grupo { margin-bottom: var(--e2); }
+.u .cm-pedir p { margin: 0 0 var(--e3); }
+.u .cm-peds { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e3); }
+.u .cm-ped { border: 1px solid var(--color-linea); border-radius: var(--radio); padding: var(--e3); }
+.u .cm-ped p { margin: var(--e1) 0; }
+.u .cm-ped-cab { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); }
+.u .cm-ped-l { list-style: none; margin: var(--e2) 0; padding: 0; display: grid; gap: var(--e1); }
+.u .cm-ped-l li { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--e1); }
+.u .cm-ped-l .cm-color { align-self: center; margin-right: 0; }
+.u .cm-contacto { margin: 0; overflow-wrap: anywhere; user-select: text; }
+.u .cm-contacto .u-etiqueta { margin-right: var(--e1); }
+.u .cm-contacto { display: grid; gap: 2px; }
+.u .cm-contacto a { color: inherit; }
+.u .cm-contacto-b { margin: 0; }
+.u .u-campos.cm-una { grid-template-columns: 1fr; }
+.u .cm-coste { margin: var(--e1) 0 0; }
+.u .cm-sub { font-size: 1rem; margin: var(--e4) 0 var(--e2); }
+.u .cm-md-comps li { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); }
+.u .cm-md-comps .u-check { flex: 1 1 0; min-width: 0; }
+.u .cm-md-comps li.cm-md-temp { display: block; padding: var(--e3) 0 var(--e1); font-weight: 700; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--color-suave); }
+.u .cm-md-n { display: inline-flex; align-items: center; gap: var(--e2); color: var(--color-suave); }
+.u .cm-md-n input { width: 4.5em; min-height: 44px; padding: 0 var(--e2); border: 1.5px solid var(--color-borde-campo); border-radius: var(--radio); font: inherit; color: var(--color-texto); background: var(--color-superficie); }
+.u .cm-provs, .u .cm-mods { margin-top: var(--e6); }
+.u .cm-prov-l { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
+.u .cm-prov-l li { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); padding: var(--e3) 0; border-bottom: 1px solid var(--color-linea); }
+.u .cm-prov-l .cm-rec-c { display: grid; gap: 2px; min-width: 0; }
+.u .cm-extracto { margin: 0; padding: var(--e3); max-height: 50vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+  font: inherit; font-size: .95em; line-height: 1.5; user-select: text;
+  background: var(--color-fondo); border: 1px solid var(--color-linea); border-radius: var(--radio); }
+.u .cm-rec { border-top: 1px solid var(--color-linea); padding-top: var(--e3); }
+.u .cm-rec-ok .n-grupo { color: var(--color-bien); }
+.u .cm-rec-l { list-style: none; margin: var(--e2) 0 0; padding: 0; }
+.u .cm-rec-l li { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e2) var(--e3); padding: var(--e2) 0; border-bottom: 1px solid var(--color-linea); }
+.u .cm-rec-l li.cm-dif { background: var(--color-bloque); padding-left: var(--e2); padding-right: var(--e2); }
+.u .cm-rec-c { flex: 1 1 140px; display: flex; flex-direction: column; }
+.u .cm-rec-c b { display: flex; align-items: center; }
+.u .cm-paso { display: flex; align-items: center; gap: var(--e2); }
+.u .cm-paso b { min-width: 2.2em; text-align: center; font-size: 18px; }
+.u .cm-falta { flex: 1 1 100%; }
+.u .cm-otra { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e3); margin-top: var(--e3); align-items: end; }
+.u .cm-otra .u-campo:first-child { grid-column: 1 / -1; }
+.u .cm-rec-pie { border-top: 1px solid var(--color-linea); padding-top: var(--e3); display: flex; flex-direction: column; gap: var(--e2); }
+.u .cm-rec-pie p { margin: 0; }
+/* T0268 · pack de camisetas incluidas, personalizadas y catálogo de cada proveedor */
+.u .cm-pers { display: inline-block; padding: 0 var(--e1); border: 1px solid var(--estado-pr); border-radius: var(--radio-peq); color: var(--estado-pr); font-weight: 700; font-size: 12px; line-height: 1.5; }
+.u .cm-pack-l { margin: 0 0 var(--e2); font-size: 14px; }
+.u .cm-pack-c { font-weight: 700; letter-spacing: .02em; overflow-wrap: anywhere; }
+.u p.cm-pack-c { margin: 2px 0 var(--e2); font-size: 16px; }
+.u .cm-packs { margin-top: var(--e6); }
+.u .cm-packs .n-grupo { margin-bottom: var(--e2); }
+.u .cm-prov-b { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--e1); flex: none; }
+@media (max-width: 600px) {
+  .u .cm-prov-l li { flex-direction: column; align-items: stretch; gap: var(--e1); }
+  .u .cm-prov-b { justify-content: flex-start; }
+}
+.u .cm-ct li, .u .cm-pp-cols li { display: grid; grid-template-columns: minmax(0, 1fr) 7.5em 5em; align-items: center; gap: var(--e2); padding: var(--e1) 0; }
+.u .cm-pp-cols li { grid-template-columns: minmax(0, 1fr) auto; }
+.u .cm-pp-cols li > span { display: flex; align-items: center; }
+.u .cm-ct-cod, .u .cm-ct-pre { width: 100%; min-height: 44px; padding: 0 var(--e2); border: 1.5px solid var(--color-borde-campo); border-radius: var(--radio); font: inherit; color: var(--color-texto); background: var(--color-superficie); }
+.u .cm-pack-t { margin: var(--e2) 0 0; font-size: 13px; font-weight: 700; color: var(--color-suave); }
+.u .cm-en-linea { min-height: 0; padding: 0; vertical-align: baseline; font-size: inherit; }
+.u .cm-pack-cab { display: flex; align-items: baseline; gap: var(--e3); margin-top: var(--e2); }
+.u .cm-pack-cab .cm-pack-t { margin: 0; }
+.u .cm-pp-t td, .u .cm-pp-t th { vertical-align: middle; }
+/* La columna Dorsal se queda a la vista al deslizar la tabla de lado. */
+.u .cm-pp-t th:first-child, .u .cm-pp-t td:first-child { position: sticky; left: 0; z-index: 1; background: var(--color-superficie); box-shadow: 1px 0 0 var(--color-linea); }
+.u .cm-pp-n { width: 4.2em; min-height: 40px !important; padding: 0 var(--e1) !important; text-align: center; }
+.u .cm-pp-mano { border-color: var(--color-principal-oscuro) !important; background: var(--color-bloque) !important; }
+.u .cm-pp-add { display: grid; grid-template-columns: 1fr 1fr auto; gap: var(--e3); align-items: end; }
+.u .cm-ped-det { margin: var(--e2) 0; }
+.u .cm-ped-det summary { cursor: pointer; min-height: 36px; display: flex; align-items: center; gap: var(--e2); font-weight: 700; font-size: 14px; color: var(--color-principal-oscuro); }
+.u .cm-ped-f { margin: 0 0 var(--e3); }
+.u .cm-temp-intro { margin: 0 0 var(--e3); }
+.u .cm-temp-intro summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: var(--e2); font-weight: 700; color: var(--color-principal-oscuro); list-style: none; }
+.u .cm-temp-intro summary::-webkit-details-marker { display: none; }
+.u .cm-temp-intro summary::before { content: "▸"; font-size: 14px; transition: transform .15s; }
+.u .cm-temp-intro[open] summary::before { transform: rotate(90deg); }
+.u .cm-temp-intro ol { margin: 0 0 var(--e2); padding-left: 1.3em; display: grid; gap: var(--e1); font-size: 14px; }
+.u .cm-temp .cm-dl { margin-top: var(--e2); }
+.u .cm-temp .cm-dl select { min-height: 40px; max-width: 100%; }
+.u .cm-ped-l1 { margin: var(--e1) 0; font-size: 14px; }
+.u .cm-ped-j { display: flex; align-items: center; gap: var(--e3); margin: var(--e1) 0 0; font-size: 14px; }
+.u .cm-ped-j .cm-barra { flex: 1; margin: 0; }
+.u .cm-ped-docs a, .u .cm-ped-docs button { font-weight: 700; color: var(--color-texto); }
+.u .cm-ped-docs button { padding: 0; border: 0; background: none; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.u .cm-ped-pasos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin: var(--e2) 0 var(--e1); }
+.u .cm-ped-pasos i { height: 4px; border-radius: var(--radio-peq); background: var(--color-linea); }
+.u .cm-ped-pasos .cm-hecho { background: var(--color-bien); }
+.u .cm-ped-reg { margin: 0 0 var(--e1); font-size: 13px; }
+.u .cm-ped-reg summary { cursor: pointer; }
+.u .cm-ped-reg ol { margin: var(--e1) 0 var(--e2); padding: 0 0 0 var(--e3); border-left: 2px solid var(--color-linea); list-style: none; }
+.u .cm-ped-reg li { margin: 0 0 var(--e1); }
+.u .cm-cobro-l { display: block; font-weight: 400; margin-top: 2px; }
+.u .cm-ct-todos { display: grid; grid-template-columns: 1fr auto; gap: var(--e3); align-items: end; margin: var(--e3) 0; }
+/* En el móvil, los filtros en una fila que se desliza y los campos uno debajo de otro: la lista empieza arriba. */
+@media (max-width: 899px) {
+  .u .cm-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 calc(var(--e4) * -1); padding: 0 var(--e4); }
+  .u .cm-chips::-webkit-scrollbar { display: none; }
+  .u .cm-chip { flex: none; }
+  .u .cm-filtros .u-campo, .u .cm-filtros .u-campo:first-child { flex: 1 1 100%; max-width: none; }
+}
+@media (min-width: 900px) {
+  .u .cm-deshacer { left: calc(var(--ancho-menu) + var(--e4)); bottom: var(--e4); }
+  .u .cm-otra { grid-template-columns: 2fr 1fr 1fr 1fr auto; }
+  .u .cm-otra .u-campo:first-child { grid-column: auto; }
+  /* T0258 · en el ordenador, todo el ancho y más camisetas a la vista: los equipos en tantas columnas como quepan,
+     los filtros más bajos y cada camiseta en menos alto (la jugadora y su estado en la misma línea). */
+  .u .n-main:has(> .cm-pest) { max-width: none; }
+  .u .cm-eqs { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: var(--e3); align-items: start; }
+  .u .cm-filtros { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); gap: var(--e3); max-width: 1200px; }
+  .u .cm-chips { gap: var(--e1) var(--e2); }
+  .u .cm-chip { min-height: 36px; padding: 0 var(--e3); font-size: 14px; }
+  .u .cm-eq { padding: var(--e3) var(--e3) var(--e2); }
+  .u .cm-eq-cab .n-grupo { font-size: 18px; }
+  .u .cm-eq-sub, .u .cm-prox { font-size: 13px; margin-bottom: var(--e1); }
+  .u .cm-jug-n { gap: var(--e2); padding: var(--e1) 0; }
+  .u .cm-cami { width: 48px; height: 48px; }
+  .u .cm-cami b { font-size: 14px; margin-top: 7px; }
+  .u .cm-cami b.cm-cami-2 { font-size: 12px; }
+  .u .cm-jug-t { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: var(--e2); row-gap: 0; }
+  .u .cm-jug-c { flex-basis: 100%; font-size: 19px; }
+  .u .cm-jug-p { font-size: 13px; }
+  .u .cm-sig { min-width: 96px; min-height: 40px; }
+}
+
+/* ---------- Zona segura de abajo en el iPhone (T0256) ----------
+ * Las ventanas ocupan toda la pantalla en el móvil y lo último (Guardar, Cerrar…) quedaba debajo de la barra de inicio
+ * del iPhone, sin poder tocarlo. Se deja ese hueco (env(safe-area-inset-bottom), con viewport-fit=cover) al final de cada
+ * ventana y en los pies fijos. Va con html delante para ganar a kanban.css, que se carga después. */
+html .u .u-velo, html .u .gs5 .gs-velo, html .u #alta-velo, html .u .ver-velo, html .u .sol-velo, html .u .fv-velo {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--e2)); scroll-padding-bottom: env(safe-area-inset-bottom, 0px); }
+@media (max-width: 640px) {
+  html .u .u-velo, html .u .gs5 .gs-velo, html .u #alta-velo, html .u .ver-velo, html .u .sol-velo, html .u .fv-velo {
+    padding-bottom: env(safe-area-inset-bottom, 0px); }
+  html .u .u-ventana, html .u .gs5 .gs-hoja { padding-bottom: calc(var(--e4) + env(safe-area-inset-bottom, 0px)); }
+  html .u .gs5 .gs-pie { padding-bottom: calc(var(--e2) + env(safe-area-inset-bottom, 0px)); }
+}
