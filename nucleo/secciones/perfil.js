@@ -250,12 +250,14 @@
       el.addEventListener('toggle', function (e) { var d = e.target; if (d.getAttribute && d.hasAttribute('data-pfdet')) ABIERTO[d.getAttribute('data-pfdet')] = d.open; }, true);
       function pintar(d) {
         visto = d;
-        el.innerHTML = '<div class="pf">' + htmlQuien(ctx) +
+        // T0270: en el ordenador, lo tuyo a la izquierda y tu cuenta, lo que va dentro y la versión en una columna a la
+        // derecha; en el móvil, una debajo de la otra, en el mismo orden de siempre.
+        el.innerHTML = '<div class="pf">' + htmlQuien(ctx) + '<div class="pf-cols"><div class="pf-col">' +
           // Sin tareas abiertas, el bloque de tareas va después de lo demás: arriba, lo que hay que hacer.
           (d ? (d.tareas && !d.tareas.error && !d.tareas.abiertas ? bloques(d) + htmlTareas(d.tareas, d.hoy, ctx)
-            : htmlTareas(d.tareas, d.hoy, ctx) + bloques(d)) : cargando()) +
-          htmlCuenta(ctx) + htmlDentro(ctx) + (window.UN.htmlVersion ? window.UN.htmlVersion() : '') + // T0283: versión y novedades
-          '<p class="u-nota pf-hora" id="pf-hora">' + (d ? 'Al día a las ' + hora(d.leido) + '.' : '') + '</p></div>';
+            : htmlTareas(d.tareas, d.hoy, ctx) + bloques(d)) : cargando()) + '</div>' +
+          '<div class="pf-col pf-lado">' + htmlCuenta(ctx) + htmlDentro(ctx) + (window.UN.htmlVersion ? window.UN.htmlVersion() : '') + // T0283: versión y novedades
+          '<p class="u-nota pf-hora" id="pf-hora">' + (d ? 'Al día a las ' + hora(d.leido) + '.' : '') + '</p></div></div></div>';
       }
       var guardado = leer(ctx);
       pintar(guardado); // al momento: lo de la última vez (o quién eres, si es la primera)

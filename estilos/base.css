@@ -261,7 +261,9 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .n-quien span, .u .n-quien small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .u .n-quien small { font-weight: 400; font-size: 13px; }
 @media (min-width: 900px) { .u .n-quien { display: none; } }
-.u .n-main { max-width: 960px; }
+/* T0270 · Todas las secciones usan el ancho que deja el menú, con un tope para pantallas muy grandes (en el móvil no llega).
+ * Ninguna sección lo quita por su cuenta: la que tiene sitio lo reparte en columnas o rejillas, no estirándose. */
+.u .n-main { max-width: 1600px; }
 .u .n-main > .kz-centro { padding: var(--e6) 0; text-align: center; }
 .u .n-ayuda { margin: 0 0 var(--e4); }
 .u .n-grupo { font-size: 17px; margin: var(--e5) 0 var(--e2); color: var(--color-principal-oscuro); }
@@ -334,6 +336,13 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 /* ---------- Perfil del núcleo (T0259, nucleo/secciones/perfil.js) ---------- */
 .u .pf { display: flex; flex-direction: column; gap: var(--e5); }
 .u .pf .u-perfil-quien { padding-bottom: var(--e3); }
+/* T0270 · Dos columnas en el ordenador: lo tuyo (tareas y bloques) a la izquierda y tu cuenta, lo que va dentro y la versión
+ * a la derecha, más estrecha. En el móvil y en una ventana estrecha, una debajo de la otra. */
+.u .pf-cols, .u .pf-col { display: flex; flex-direction: column; gap: var(--e5); min-width: 0; }
+@media (min-width: 1200px) {
+  .u .pf-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); align-items: start; gap: var(--e6); }
+  .u .pf-lado { padding-left: var(--e5); border-left: 1px solid var(--color-linea); }
+}
 .u .pf-bloque .n-grupo { margin: 0 0 var(--e2); }
 .u .pf-resumen { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e4); margin-bottom: var(--e3); font-size: 14px; }
 .u .pf-vencida { color: var(--color-error); font-weight: 700; }
@@ -456,6 +465,11 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .eco-grande .eco-val { font-size: 30px; color: var(--color-destacado, inherit); }
 .u .eco-sub { display: block; margin-top: var(--e1); font-size: 13px; }
 @media (min-width: 640px) { .u .eco-kpis { grid-template-columns: 1.4fr 1fr 1fr; } .u .eco-kpi.eco-grande { grid-column: auto; } }
+/* T0270 · En una pantalla ancha, las cifras pequeñas (IVA, sin factura, pendientes) van al lado de las grandes, a su altura. */
+@media (min-width: 1400px) {
+  .u .eco-arriba { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--e2); margin: 0 0 var(--e3); }
+  .u .eco-arriba .eco-kpis, .u .eco-arriba .eco-mini { margin: 0; }
+}
 .u .eco-mini { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e2); margin: 0 0 var(--e3); }
 .u .eco-mini > button { min-height: 44px; padding: var(--e2); border: 0; border-radius: var(--radio); background: var(--color-tarjeta-cab, var(--color-bloque));
   color: inherit; font: inherit; text-align: center; cursor: pointer; }
@@ -666,7 +680,8 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .lg-jug:hover b { text-decoration: underline; }
 /* Goleadoras: de la liga o de toda la competición, buscador y lista con el puesto, la jugadora (dorsal) y sus goles. */
 .u .lg-gol-cab { display: flex; flex-direction: column; gap: var(--e2); margin: 0 0 var(--e3); }
-.u .lg-gol-busca input { width: 100%; max-width: 420px; }
+.u .lg-gol-busca { max-width: 420px; } /* T0270: en el campo, no en el cuadro (que se estiraba en el ordenador) */
+.u .lg-gol-busca input { width: 100%; }
 .u .lg-gol-eq { margin: 0 0 var(--e4); }
 .u .lg-gol-eq .lg-sub { display: flex; justify-content: space-between; gap: var(--e3); }
 .u .lg-pos { flex: none; width: 2em; color: var(--color-suave); font-size: 13px; }
@@ -696,6 +711,14 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .lg-eqt > span { display: flex; flex-direction: column; min-width: 0; }
 .u .lg-eqt small { font-size: 12px; color: var(--color-suave); font-weight: 400; }
 .u .lg-lista { border-top: 1px solid var(--color-linea); margin: 0 0 var(--e3); }
+/* T0270 · En una pantalla ancha, los partidos de un día en dos columnas (cada uno se sigue leyendo en una línea) y las
+ * listas de goleadoras en dos columnas, de arriba abajo. */
+@media (min-width: 1400px) {
+  .u .lg-lista { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--e5); border-top: 0; }
+  .u .lg-lista > .lg-p { border-top: 1px solid var(--color-linea); margin-bottom: -1px; }
+  .u .lg-ranking { columns: 2; column-gap: var(--e6); }
+  .u .lg-ranking li { break-inside: avoid; }
+}
 /* Un partido: a la izquierda la hora, el campo y el árbitro; en el centro solo el marcador (local, resultado o «vs»,
    visitante); en el ordenador, a la derecha un hueco del mismo ancho para que el marcador quede centrado. Debajo del
    marcador, por qué no se juega como estaba. */
@@ -828,7 +851,7 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
  * pintada, la hora de los datos, ↻ y las pestañas) sigue a la cabecera del marco, en azul en el móvil y sobre el fondo
  * claro junto al menú del ordenador, sin repetir el título. Todo va dentro de .gs5 (la raíz de la sección): la Gestión
  * publicada (4.1) también usa clases gs- con sus estilos propios y carga esta hoja, y así no le cambia nada. */
-.u .n-main:has(> .gs5) { max-width: none; padding: 0; }
+.u .n-main:has(> .gs5) { padding: 0; }
 .u .n-cab:has(+ .n-main > .gs5) { padding-bottom: var(--e1); border-bottom: 0; }
 .u .gs5 { --gs-c: var(--color-principal); --gs-a: var(--color-accion); --gs-v: var(--color-bien); --gs-r: var(--color-error);
   --gs-g: var(--color-suave); --gs-l: var(--color-linea); --gs-f: var(--color-tarjeta-cab, var(--color-bloque)); --gs-am: var(--estado-pr);
@@ -1337,9 +1360,8 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
   .u .cm-deshacer { left: calc(var(--ancho-menu) + var(--e4)); bottom: var(--e4); }
   .u .cm-otra { grid-template-columns: 2fr 1fr 1fr 1fr auto; }
   .u .cm-otra .u-campo:first-child { grid-column: auto; }
-  /* T0258 · en el ordenador, todo el ancho y más camisetas a la vista: los equipos en tantas columnas como quepan,
+  /* T0258 · en el ordenador, más camisetas a la vista: los equipos en tantas columnas como quepan,
      los filtros más bajos y cada camiseta en menos alto (la jugadora y su estado en la misma línea). */
-  .u .n-main:has(> .cm-pest) { max-width: none; }
   .u .cm-eqs { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: var(--e3); align-items: start; }
   .u .cm-filtros { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); gap: var(--e3); max-width: 1200px; }
   .u .cm-chips { gap: var(--e1) var(--e2); }

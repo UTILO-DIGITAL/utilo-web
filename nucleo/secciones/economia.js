@@ -497,7 +497,8 @@
           h += '<div class="u-filtros eco-filtro-des"><label class="u-campo"><span class="u-etiqueta">' + texto(nomDes) + '</span><select id="eco-des">' +
             opciones(ds.map(function (x) { return [x.id || '-', x.nombre]; }), S.des, 'Todas') + '</select></label></div>';
         }
-        h += '<div class="eco-kpis">' +
+        // T0270: las cifras grandes y las pequeñas, juntas: en una pantalla ancha van en la misma fila.
+        h += '<div class="eco-arriba"><div class="eco-kpis">' +
           '<div class="eco-kpi eco-grande"><b>Beneficio <span class="eco-pint">' + texto(nomPeriodo()) + '</span></b><span class="eco-val">' + eur0(r.resultado) + '</span>' +
           '<span class="eco-sub">' + (pb || pi || pg ? 'Previsto ' + eur0(pb) + ' · ' + eur0(Math.abs(desv)) + (desv >= 0 ? ' mejor' : ' peor') + ' de lo previsto' : 'Sin presupuesto') + '</span></div>' +
           '<div class="eco-kpi"><b>Ingresos</b><span class="eco-val">' + eur0(r.ingresos.base) + '</span><span class="eco-sub">' + (pi ? 'de ' + eur0(pi) + ' previstos' : 'sin IVA') + '</span></div>' +
@@ -505,7 +506,7 @@
         var pend = pendientes(d).filter(function (x) { return x.falta > 0; }), sf = sinFactura(d, per, S.des);
         h += '<div class="eco-mini"><button type="button" data-abrir="iva"><strong>' + eur0(Math.abs(r.iva)) + '</strong><small>IVA ' + (r.iva >= 0 ? 'a pagar' : 'a devolver') + '</small></button>' +
           '<button type="button" data-ir="PENDIENTE"><strong' + (sf.length ? ' class="u-mal"' : '') + '>' + sf.length + '</strong><small>Gastos sin factura ›</small></button>' +
-          '<button type="button" data-ir="PENDIENTE"><strong>' + pend.length + '</strong><small>Facturas pendientes ›</small></button></div>';
+          '<button type="button" data-ir="PENDIENTE"><strong>' + pend.length + '</strong><small>Facturas pendientes ›</small></button></div></div>';
         h += '<details class="eco-card eco-desp" id="eco-iva"' + (S.ab.iva ? ' open' : '') + '><summary><b><span class="eco-flecha" aria-hidden="true">›</span> Ingresos, gastos e IVA</b>' +
           '<span class="u-nota">' + r.n + (r.n === 1 ? ' movimiento' : ' movimientos') + '</span></summary>' +
           '<table class="u-tabla eco-tabla"><thead><tr><th></th><th class="num">Sin IVA</th><th class="num">IVA</th><th class="num u-solo-ancho">Total</th></tr></thead><tbody>' +
