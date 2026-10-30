@@ -208,6 +208,7 @@
   /** Pinta el marco entero y abre la sección de la URL (o la primera). */
   function marco(c) {
     if (T && T.persona() !== copiaDe(c)) soltarTablas();  // T0275: otra persona, otra copia
+    if (cerrarVersiones) cerrarVersiones(false);           // T0283: la ventana de novedades se va con el body; sin darla por vista
     cred = c;
     document.body.className = 'u u-con-barra' + (cred.como ? ' n-viendo-como' : '');
     document.body.innerHTML = bandaDev(cred.dev) + htmlMenu() +
@@ -227,9 +228,11 @@
 
   /* ---------- T0283 · versión y novedades ---------- */
 
-  var VISTA = 'nucleo_version_vista_' + (C.clave || 'negocio'); // la última versión cuyas novedades se han visto aquí
-  function leerVista() { try { return localStorage.getItem(VISTA); } catch (e) { return null; } }
-  function marcarVista() { var v = cred && cred.versiones && cred.versiones[0]; if (v) try { localStorage.setItem(VISTA, v.v); } catch (e) {} }
+  // La última versión cuyas novedades se han visto aquí. DEV (dev-rama/) comparte dirección con producción: va aparte.
+  function vista() { return 'nucleo_version_vista_' + (cred && cred.dev ? 'dev_' : '') + (C.clave || 'negocio'); }
+  function leerVista() { try { return localStorage.getItem(vista()); } catch (e) { return null; } }
+  function marcarVista() { var v = cred && cred.versiones && cred.versiones[0]; if (v) try { localStorage.setItem(vista(), v.v); } catch (e) {} }
+  var cerrarVersiones = null; // la ventana abierta: cerrarVersiones(darPorVista)
 
   /** Las versiones con novedades que no se han visto en este dispositivo (la primera vez, solo la actual, si trae). */
   function sinVer() {
@@ -256,24 +259,28 @@
     velo.className = 'u-velo abierto'; velo.id = 'n-ver-velo';
     velo.innerHTML = '<div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="n-ver-t"><div class="n-ventana">' +
       '<h2 id="n-ver-t">' + (nuevas.length ? 'Novedades' : 'Versiones') + '</h2>' +
-      '<ol class="n-versiones">' + cred.versiones.map(function (x) {
-        var ns = x.novedades || [];
+      '<ol class="n-versiones">' + cred.versiones.map(function (x, k) {
+        var ns = x.novedades || [], primera = k === cred.versiones.length - 1;
         return '<li><h3>Versión ' + texto(x.v) + (nuevas.indexOf(x.v) >= 0 ? ' <span class="n-nuevo">Nueva</span>' : '') +
           (x.fecha ? ' <small>' + texto(x.fecha) + '</small>' : '') + '</h3>' +
           (ns.length ? '<ul>' + ns.map(function (n) { return '<li>' + texto(n) + '</li>'; }).join('') + '</ul>'
-            : '<p class="u-nota">Arreglos y mejoras por dentro: nada cambia en cómo se usa.</p>') + '</li>';
+            : '<p class="u-nota">' + (primera ? 'Primera versión.' : 'Arreglos y mejoras por dentro: nada cambia en cómo se usa.') + '</p>') + '</li>';
       }).join('') + '</ol>' +
       '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="n-ver-cerrar">Entendido</button></div></div></div>';
     document.body.appendChild(velo);
-    function cerrar() {
-      document.removeEventListener('keydown', tecla);
+    function cerrar(darPorVista) {
+      cerrarVersiones = null;
+      document.removeEventListener('keydown', tecla, true);
       if (velo.parentNode) velo.parentNode.removeChild(velo);
+      if (darPorVista === false) return;
       marcarVista();
       var b = document.querySelector('[data-n-versiones] .n-nuevo'); if (b) b.parentNode.removeChild(b);
       if (antes && antes.focus && document.body.contains(antes)) antes.focus();
     }
-    function tecla(e) { if (e.key === 'Escape') cerrar(); }
-    document.addEventListener('keydown', tecla);
+    // Escape cierra solo esta ventana (va antes que las de las secciones y no sigue hacia ellas).
+    function tecla(e) { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); cerrar(); } }
+    document.addEventListener('keydown', tecla, true);
+    cerrarVersiones = cerrar;
     velo.addEventListener('click', function (e) { if (e.target === velo || e.target.id === 'n-ver-cerrar') cerrar(); });
     $('n-ver-cerrar').focus();
   }
