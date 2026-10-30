@@ -17,7 +17,7 @@
  * inscritos) y, al abrir una jugadora, la de esa jugadora (partes de kanban4/tablas.js, T0256).
  * Los avisos y lo que falta por pagar se calculan aquí (CALC, más abajo), sin fórmulas en el Excel.
  *
- * Personalización (config.json · nucleo.secciones.gestion5.config, declarada en su modulo.json): PESTANAS, PAGOS, AYUDA.
+ * Personalización (config.json · nucleo.secciones.gestion5.config, declarada en su modulo.json): PESTANAS, PAGOS, SENALES, CAMISETAS, AYUDA.
  */
 (function () {
   'use strict';
@@ -543,6 +543,17 @@
         x.textContent = S.hora ? 'Datos de las ' + S.hora : 'Datos guardados en este dispositivo';
       }
       function ahora() { var f = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; }; return p(f.getHours()) + ':' + p(f.getMinutes()); }
+      /**
+       * T0290 · Al abrir, el motor separa en Economía lo cobrado de camisetas (config CAMISETAS; como mucho cada 15 minutos):
+       * lo que pasa del precio de la inscripción, partiendo un cobro si hace falta. Lo que debe cada equipo no cambia (cuenta
+       * todos los cobros de la inscripción); si ha movido algo, se vuelve a leer MOVIMIENTOS. Si falla, no se dice nada.
+       */
+      function repartir() {
+        if (!PAGOS || !txt(cfg.CAMISETAS)) return;
+        ctx.llamar('gestion5Repartir', [{ hacer: true, auto: true }]).then(function (r) {
+          if (r && (r.MOVIMIENTOS.length || r.borrados.length)) return T.refrescar(['MOVIMIENTOS'], true);
+        }).then(null, function () {});
+      }
       /** ↻: vuelve a leer del Excel las tablas y la parte de la temporada. */
       function releer() {
         var b = el.querySelector('#gs-re'); if (b) b.disabled = true;
@@ -1510,7 +1521,8 @@
             filaCamisetas(p) +
             fila('Cobrado', eurC(p.cobrado) + (p.cobros ? ' (' + plural(p.cobros, 'movimiento', 'movimientos') + ')' : '')) +
             (p.sinTarifa ? '' : fila('Pendiente', p.falta > 0 ? '<b class="gs-neg">Faltan ' + eurC(p.falta) + '</b>' + (p.camisetas && p.camisetas.total ? ' · ' + texto(desglose(p)) : '') : p.falta < 0 ? '<b class="gs-pos">Ha pagado ' + eurC(-p.falta) + ' de más</b>' : '<span class="gs-pos">Al día</span>')) + '</div>' +
-            '<p class="gs-nota">Los cobros se apuntan en Economía con la referencia «Inscripción» · ' + texto(ie.ID) + ', también los de las camisetas personalizadas.</p>');
+            '<p class="gs-nota">Los cobros se apuntan en Economía con la referencia «Inscripción» · ' + texto(ie.ID) + ', también los de las camisetas personalizadas' +
+              (txt(cfg.CAMISETAS) ? ': lo que pasa del precio de la inscripción se pasa solo a «' + texto(txt(cfg.CAMISETAS)) + '»' : '') + '.</p>');
         }
         html += '<div class="gs-sec">Plantilla (' + (cargandoPl ? '…' : nAct) + ')</div>' +
           campo({ id: 'e-ID_CAPITANA', t: 'select', et: 'Capitana', v: ie.ID_CAPITANA, opts: capis, vacio: capis.length ? '— Sin capitana —' : 'Todavía no tiene jugadoras' }) +
@@ -2010,7 +2022,7 @@
       // local: lo que falta se pide al motor, pero lo que ya está no se refresca solo: lo refresca refrescar, para saber la hora.
       T.leer(tablas, { local: true }).then(function () {
         S.leido = true; pintar();
-        T.refrescar(tablas).then(function () { S.hora = ahora(); ponerHora(); }, function () {});
+        T.refrescar(tablas).then(function () { S.hora = ahora(); ponerHora(); repartir(); }, function () {});
       }, function (e) {
         main.innerHTML = '<div class="gs-error" role="alert">No se han podido leer los equipos.</div><p class="gs-nota">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Pulsa ↻ o vuelve a abrir la sección.</p>';
       });
