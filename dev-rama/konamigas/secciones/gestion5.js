@@ -56,6 +56,85 @@
   /** IDs que salen en un texto («J01322 Ana Hernández / J01885 …» → ['J01322', 'J01885']). */
   function ids(t) { return (String(t || '').match(/\b[A-Z]{1,3}-?\d{3,6}\b/g) || []).filter(function (x, i, a) { return a.indexOf(x) === i; }); }
 
+  // --- inicio de las cuentas de Camisetas (T0287: copiadas de CAMISETAS5_CUENTAS.js; probar-gestion.js comprueba que son iguales) ---
+  var CAM5_TALLAS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+  function cam5Txt_(v) { return String(v === undefined || v === null ? '' : v).trim(); }
+  function cam5Num_(v) { var n = Number(v); return isFinite(n) ? n : 0; }
+  /** Orden por dorsal (número) y después por talla (XS a XXL). */
+  function cam5Orden_(a, b) {
+    var na = parseInt(a.DORSAL, 10), nb = parseInt(b.DORSAL, 10);
+    na = isNaN(na) ? 9999 : na; nb = isNaN(nb) ? 9999 : nb;
+    if (na !== nb) return na - nb;
+    if (cam5Txt_(a.DORSAL) !== cam5Txt_(b.DORSAL)) return cam5Txt_(a.DORSAL) < cam5Txt_(b.DORSAL) ? -1 : 1;
+    return CAM5_TALLAS.indexOf(cam5Txt_(a.TALLA)) - CAM5_TALLAS.indexOf(cam5Txt_(b.TALLA));
+  }
+  /** El pack de una competición (filas de PACKS): [{ DORSAL, TALLA }] por dorsal. */
+  function cam5Pack_(packs, comp) {
+    comp = cam5Txt_(comp);
+    return (packs || []).filter(function (p) { return p && cam5Txt_(p.ID) && cam5Txt_(p.ID_COMPETICION) === comp && cam5Txt_(p.DORSAL); })
+      .map(function (p) { return { DORSAL: cam5Txt_(p.DORSAL), TALLA: cam5Txt_(p.TALLA) }; }).sort(cam5Orden_);
+  }
+  /**
+   * Lo incluido de un equipo según el pack de su competición. camisetas: las del equipo; pack: cam5Pack_; porJugadora:
+   * camisetas incluidas por jugadora (MODELOS_COMPETICION · CAMISETAS_INCLUIDAS, 1 si no se dice); bajas: { ID_INSCRIPCION: true }.
+   * No cuentan las «Sin camiseta» ni las de las bajas. De la más antigua a la más reciente (por ID), cada camiseta con un dorsal
+   * y una talla del pack que nadie del equipo ha cogido antes va incluida, si su jugadora no ha gastado ya las suyas; las demás
+   * son personalizadas.
+   * { incluida: { ID: true|false }, libres: [{ DORSAL, TALLA }] (del pack, con el dorsal sin usar en el equipo),
+   *   repetidos: [{ DORSAL, ids: [ID] }] (dorsales que llevan dos o más jugadoras), personalizadas: n, incluidas: n }
+   */
+  function cam5Incluidas_(camisetas, pack, porJugadora, bajas) {
+    bajas = bajas || {};
+    var maxJ = porJugadora === undefined || porJugadora === null || porJugadora === '' ? 1 : cam5Num_(porJugadora);
+    var hueco = {}, usado = {}, porJug = {}, dorsales = {}, r = { incluida: {}, libres: [], repetidos: [], personalizadas: 0, incluidas: 0 };
+    (pack || []).forEach(function (p) { hueco[cam5Txt_(p.DORSAL)] = cam5Txt_(p.TALLA); });
+    (camisetas || []).filter(function (c) {
+      return c && cam5Txt_(c.ID) && cam5Txt_(c.ESTADO) !== 'Sin camiseta' && !bajas[cam5Txt_(c.ID_INSCRIPCION_JUGADORA)];
+    }).sort(function (a, b) { return cam5Txt_(a.ID) < cam5Txt_(b.ID) ? -1 : 1; }).forEach(function (c) {
+      var d = cam5Txt_(c.DORSAL), j = cam5Txt_(c.ID_INSCRIPCION_JUGADORA);
+      if (d) {
+        (dorsales[d] = dorsales[d] || { j: {}, ids: [] }).ids.push(cam5Txt_(c.ID));
+        dorsales[d].j[j] = 1;
+      }
+      var si = !!d && hueco[d] === cam5Txt_(c.TALLA) && !usado[d] && (porJug[j] || 0) < maxJ;
+      if (si) { usado[d] = 1; porJug[j] = (porJug[j] || 0) + 1; r.incluidas++; } else r.personalizadas++;
+      r.incluida[cam5Txt_(c.ID)] = si;
+    });
+    r.libres = (pack || []).filter(function (p) { return !dorsales[cam5Txt_(p.DORSAL)]; });
+    r.repetidos = Object.keys(dorsales).filter(function (d) { return Object.keys(dorsales[d].j).length > 1; })
+      .map(function (d) { return { DORSAL: d, ids: dorsales[d].ids }; }).sort(cam5Orden_);
+    return r;
+  }
+  /** Sí de un booleano del Excel (true, 'TRUE', 'Sí'…). */
+  function cam5Si_(v) { return v === true || /^(true|s[ií]|1)$/i.test(cam5Txt_(v)); }
+  /** Importe del Excel → euros, sin redondear (acepta 10, '10,50', '1.234,56 €' o '1234.56'); null si está vacío. */
+  function cam5Eur_(v) {
+    if (typeof v === 'number') return isFinite(v) ? v : null;
+    var s = cam5Txt_(v).replace(/\s|€/g, '');
+    if (!s) return null;
+    var n = Number(s.indexOf(',') >= 0 ? s.replace(/\./g, '').replace(',', '.') : s);
+    return isFinite(n) ? n : null;
+  }
+  /** Importe del Excel → céntimos; null si está vacío. */
+  function cam5Cts_(v) { var n = cam5Eur_(v); return n === null ? null : Math.round(n * 100); }
+  /**
+   * La tarifa «Camiseta» (lo que se cobra por una personalizada con la inscripción) de una competición: la de TARIFAS con
+   * CONCEPTO Camiseta de su temporada, de esa competición o sin REF_ID, vigente ese día ('aaaa-mm-dd'; FECHA_DESDE y
+   * FECHA_HASTA). { precio: céntimos sin IVA, iva: %, total: céntimos con IVA (del precio exacto: 8,2645 € + 21 % = 10 €) } o null.
+   */
+  function cam5Tarifa_(tarifas, comp, temp, dia) {
+    var f = function (v) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(cam5Txt_(v)) || /^(\d{2})\/(\d{2})\/(\d{4})/.exec(cam5Txt_(v)); return !m ? '' : m[1].length === 4 ? m[1] + '-' + m[2] + '-' + m[3] : m[3] + '-' + m[2] + '-' + m[1]; };
+    var l = (tarifas || []).filter(function (t) {
+      if (!t || cam5Txt_(t.CONCEPTO) !== 'Camiseta' || cam5Txt_(t.ID_TEMPORADA) !== cam5Txt_(temp)) return false;
+      if (cam5Txt_(t.REF_ID) && cam5Txt_(t.REF_ID) !== cam5Txt_(comp)) return false;
+      return (!f(t.FECHA_DESDE) || !dia || f(t.FECHA_DESDE) <= dia) && (!f(t.FECHA_HASTA) || !dia || f(t.FECHA_HASTA) >= dia);
+    }).sort(function (a, b) { return (cam5Txt_(b.REF_ID) ? 1 : 0) - (cam5Txt_(a.REF_ID) ? 1 : 0) || (f(b.FECHA_DESDE) < f(a.FECHA_DESDE) ? -1 : 1); });
+    if (!l.length || cam5Eur_(l[0].PRECIO) === null) return null;
+    var iva = parseFloat(cam5Txt_(l[0].TIPO_IVA).replace(',', '.')) || 0;
+    return { precio: cam5Cts_(l[0].PRECIO), iva: iva, total: Math.round(cam5Eur_(l[0].PRECIO) * (100 + iva)) };
+  }
+  // --- fin de las cuentas de Camisetas ---
+
   /** Temporadas de la más reciente a la más antigua. */
   function temporadas(d) {
     return d.tem.slice().sort(function (a, b) { return String(b.FECHA_INICIO || b.ID) < String(a.FECHA_INICIO || a.ID) ? -1 : 1; });
@@ -103,15 +182,39 @@
    * precio = la TARIFA «Inscripción equipo» de su competición (REF_ID) vigente el día que se inscribió; menos sus
    * DESCUENTOS (sin IVA, se les pone el de la tarifa); cobrado = los MOVIMIENTOS con REF_TIPO «Inscripción» y REF_ID esa
    * inscripción (un ingreso suma, un gasto, una devolución, resta). Una competición INCLUIDA no se cobra.
+   * T0287: lo que debe suma sus camisetas personalizadas (camisetas: camisetasDe), que se pagan con la inscripción y cuyos
+   * cobros van con la misma referencia. o.camisetas false: aún no se saben (sin las jugadoras de su temporada), camisetas
+   * null y no cuentan.
    * Un equipo de Baja no debe nada: lo cobrado es su señal, que se queda como ingreso (decisión de Javi, T0256), con
    * baja: true y senal (lo cobrado, o 0 si se le devolvió).
    */
-  function pago(d, ie) {
-    var p = pago0(d, ie);
+  function pago(d, ie, o) {
+    var p = pago0(d, ie, o || {});
     if (p && ie.ESTADO === 'Baja') { p.baja = true; p.falta = 0; p.senal = Math.max(0, p.cobrado || 0); }
     return p;
   }
-  function pago0(d, ie) {
+  /**
+   * T0287 · Las camisetas personalizadas de la inscripción de un equipo, con la misma cuenta que Camisetas: las de sus
+   * jugadoras según el pack de su competición (cam5Incluidas_; sin pack, todas son personalizadas), sin las «Sin camiseta»
+   * ni las de baja. Cada una cuesta la tarifa «Camiseta» de su temporada a día de hoy (cam5Tarifa_), como en Camisetas.
+   * d.cam, d.pck y d.mco: CAMISETAS, PACKS y MODELOS_COMPETICION. { n, unidad (céntimos con IVA, o null sin tarifa), total }.
+   */
+  function camisetasDe(d, ie, dia) {
+    var c = indice(d.com)[ie.ID_COMPETICION] || {}, mias = {}, bajas = {};
+    (d.ij || []).forEach(function (j) {
+      if (String(j.ID_INSCRIPCION_EQUIPO) !== String(ie.ID)) return;
+      mias[j.ID] = true;
+      if (j.ESTADO === 'Baja' || ie.ESTADO === 'Baja') bajas[j.ID] = true;
+    });
+    var cams = (d.cam || []).filter(function (x) { return mias[cam5Txt_(x.ID_INSCRIPCION_JUGADORA)]; });
+    var pack = cam5Pack_(d.pck, ie.ID_COMPETICION);
+    var mc = (d.mco || []).filter(function (m) { return String(m.ID_COMPETICION) === String(ie.ID_COMPETICION); })[0];
+    var n = pack.length ? cam5Incluidas_(cams, pack, mc ? mc.CAMISETAS_INCLUIDAS : 1, bajas).personalizadas
+      : cams.filter(function (x) { return x.ESTADO !== 'Sin camiseta' && !bajas[cam5Txt_(x.ID_INSCRIPCION_JUGADORA)]; }).length;
+    var t = n ? cam5Tarifa_(d.tar, ie.ID_COMPETICION, c.ID_TEMPORADA, dia || hoy()) : null;
+    return { n: n, unidad: t ? t.total : null, total: t ? n * t.total : 0 };
+  }
+  function pago0(d, ie, o) {
     var c = indice(d.com)[ie.ID_COMPETICION];
     if (!c) return null;
     if (c.INCLUIDA === true || ie.ORIGEN === 'Clasificación') return { incluida: true, precio: 0, descuento: 0, cobrado: 0, falta: 0 };
@@ -126,11 +229,16 @@
       var tot = conIva(cts(m.BASE), m.TIPO_IVA);
       if (m.TIPO === 'Ingreso') { cobrado += tot; n++; } else if (m.TIPO === 'Gasto') { cobrado -= tot; n++; }
     });
-    if (!t) return { sinTarifa: true, precio: 0, descuento: 0, cobrado: cobrado, cobros: n, falta: 0 };
+    var cam = o.camisetas === false ? null : camisetasDe(d, ie, o.hoy);
+    if (!t) return { sinTarifa: true, precio: 0, descuento: 0, camisetas: cam, cobrado: cobrado, cobros: n, falta: 0 };
     var desc = 0;
     d.des.forEach(function (x) { if (String(x.ID_INSCRIPCION_EQUIPO) === String(ie.ID)) desc += cts(x.IMPORTE); });
     var precio = conIva(cts(t.PRECIO), t.TIPO_IVA), descuento = conIva(desc, t.TIPO_IVA);
-    return { precio: precio, descuento: descuento, cobrado: cobrado, cobros: n, falta: precio - descuento - cobrado };
+    // Lo cobrado llena primero la inscripción y lo que sobra va a las camisetas (Javi, T0287): un equipo no puede tener las
+    // camisetas pagadas y la inscripción no.
+    var ins = precio - descuento, camT = cam ? cam.total : 0, sobra = Math.max(0, cobrado - ins);
+    return { precio: precio, descuento: descuento, camisetas: cam, cobrado: cobrado, cobros: n, falta: ins + camT - cobrado,
+      faltaInscripcion: Math.max(0, ins - Math.max(0, cobrado)), faltaCamisetas: Math.max(0, camT - sobra) };
   }
 
   /**
@@ -152,8 +260,12 @@
       out.push({ id: 'capitana-fuera', k: 'capitana', t: 'La capitana no está en la plantilla' });
     if (!ie.ID_CAPITANA && conf) out.push({ id: 'capitana-sin', k: 'capitana', t: 'Sin capitana' });
     if (ctxT.pagos && conf) {
-      var p = pago(d, ie);
-      if (p && !p.incluida && !p.sinTarifa && p.falta > 0) out.push({ id: 'pago', k: 'pago', t: 'Faltan ' + eur(p.falta) });
+      var p = pago(d, ie, { camisetas: ctxT.ijLeidas });
+      // T0287: dos avisos (Javi): lo que falta de la inscripción y lo que falta de camisetas, cada uno se pospone o se da por bueno aparte.
+      if (p && !p.incluida && !p.sinTarifa && p.falta > 0) {
+        if (p.faltaInscripcion) out.push({ id: 'pago', k: 'pago', t: 'Faltan ' + eur(p.faltaInscripcion) + ' de inscripción' });
+        if (p.faltaCamisetas) out.push({ id: 'camisetas', k: 'pago', t: 'Faltan ' + eur(p.faltaCamisetas) + ' de camisetas' });
+      }
     }
     return sinResueltos(out, ie.ID, ctxT);
   }
@@ -266,7 +378,7 @@
   }
 
   var CALC = { cts: cts, eur: eur, edad: edad, fecha: fecha, ids: ids, norm: norm, temporadas: temporadas, temporadaActual: temporadaActual,
-    compsDe: compsDe, iesDe: iesDe, cuenta: cuenta, plantilla: plantilla, pago: pago, contexto: contexto, avisosEquipo: avisosEquipo,
+    compsDe: compsDe, iesDe: iesDe, cuenta: cuenta, plantilla: plantilla, pago: pago, camisetasDe: camisetasDe, contexto: contexto, avisosEquipo: avisosEquipo,
     avisosJugadora: avisosJugadora, buscarJugadoras: buscarJugadoras, problemasJugadora: problemasJugadora, nombreJug: nombreJug,
     avisosResueltos: avisosResueltos, esAviso: esAviso, ijsValidas: ijsValidas,
     avisosPospuestos: avisosPospuestos, esPospuesto: esPospuesto };
@@ -280,7 +392,8 @@
    * Los estilos son los gs- de estilos/base.css (bloque «Gestión de Konamigas»). */
 
   var BASE = ['TEMPORADAS', 'COMPETICIONES', 'LIGAS', 'EQUIPOS', 'INSCRIPCIONES_EQUIPOS', 'JUGADORAS', 'STAFF', 'COLORES', 'FOTOS', 'REVISIONES'];
-  var ECO = ['TARIFAS', 'DESCUENTOS', 'MOVIMIENTOS'];
+  // T0287: CAMISETAS, PACKS y MODELOS_COMPETICION, para sumar las personalizadas a lo que debe cada equipo.
+  var ECO = ['TARIFAS', 'DESCUENTOS', 'MOVIMIENTOS', 'CAMISETAS', 'PACKS', 'MODELOS_COMPETICION'];
   var IJ = 'INSCRIPCIONES_JUGADORAS';
   // Las fotos van en la ficha de cada jugadora y las sin vincular se asignan desde el Resumen: FOTOS en PESTANAS se ignora.
   var PESTANAS = { RESUMEN: 'Resumen', EQUIPOS: 'Equipos', JUGADORAS: 'Jugadoras', REVISIONES: 'Revisiones' };
@@ -370,7 +483,8 @@
         return {
           tem: T.filas('TEMPORADAS'), com: T.filas('COMPETICIONES'), lig: T.filas('LIGAS'), eqs: T.filas('EQUIPOS'), ie: T.filas('INSCRIPCIONES_EQUIPOS'),
           ij: T.filas(IJ), jug: T.filas('JUGADORAS'), stf: T.filas('STAFF'), col: T.filas('COLORES'), fot: T.filas('FOTOS'), rev: T.filas('REVISIONES'),
-          tar: PAGOS ? T.filas('TARIFAS') : [], des: PAGOS ? T.filas('DESCUENTOS') : [], mov: PAGOS ? T.filas('MOVIMIENTOS') : []
+          tar: PAGOS ? T.filas('TARIFAS') : [], des: PAGOS ? T.filas('DESCUENTOS') : [], mov: PAGOS ? T.filas('MOVIMIENTOS') : [],
+          cam: PAGOS ? T.filas('CAMISETAS') : [], pck: PAGOS ? T.filas('PACKS') : [], mco: PAGOS ? T.filas('MODELOS_COMPETICION') : []
         };
       }
       var d, tem, ix, ies, cx, memo, porIe;
@@ -399,7 +513,13 @@
         return h ? '<i class="gs-color" style="background:' + texto(h) + '" title="' + texto(nom('col', idColor)) + '"></i>' : '';
       }
       function guardando(f) { return f && (f._pendiente || f._nueva) ? tag('Guardando', 'gs-tag-g') : ''; }
-      function pagoDe(i) { if (!PAGOS) return null; var k = String(i.ID); if (!(k in memo.pago)) memo.pago[k] = pago(d, i); return memo.pago[k]; }
+      /** Las camisetas de un equipo se saben si están leídas las jugadoras de su temporada (la que se ve). */
+      function pagoDe(i) {
+        if (!PAGOS) return null;
+        var k = String(i.ID);
+        if (!(k in memo.pago)) memo.pago[k] = pago(d, i, { camisetas: jugLeidas() && ies.some(function (x) { return String(x.ID) === k; }) });
+        return memo.pago[k];
+      }
       function falta(i) { var p = pagoDe(i); return p && !p.incluida && !p.sinTarifa && p.falta > 0 ? p.falta : 0; }
       function avE(i) { var k = String(i.ID); if (!memo.avE[k]) memo.avE[k] = avisosEquipo(d, i, cx); return memo.avE[k]; }
       function avJ(j) { var k = String(j.ID); if (!memo.avJ[k]) memo.avJ[k] = avisosJugadora(d, j, cx); return memo.avJ[k]; }
@@ -510,13 +630,31 @@
 
       /* ---------- RESUMEN: cifras, alertas y, por día, cada liga con sus equipos ---------- */
 
+      /** T0287 · «3 camisetas personalizadas × 10 € (30 €)». */
+      function textoCamisetas(c) {
+        return plural(c.n, 'camiseta personalizada', 'camisetas personalizadas') + (c.unidad === null ? '' : ' × ' + eurC(c.unidad) + ' (' + eurC(c.total) + ')');
+      }
+      /** T0287 · De qué es lo que falta: lo cobrado llena primero la inscripción. «100 € de inscripción y 30 € de camisetas». */
+      function desglose(p) {
+        var a = [];
+        if (p.faltaInscripcion) a.push(eurC(p.faltaInscripcion) + ' de inscripción');
+        if (p.faltaCamisetas) a.push(eurC(p.faltaCamisetas) + ' de camisetas');
+        return a.length ? a.join(' y ') : 'inscripción y camisetas pagadas';
+      }
+      /** T0287 · La fila de las camisetas personalizadas en los pagos de la ficha (no sale si no tiene). */
+      function filaCamisetas(p) {
+        var c = p.camisetas;
+        if (!c) return fila('Camisetas', '<span class="gs-opc">…</span>');
+        if (!c.n) return '';
+        return fila('Camisetas', texto(textoCamisetas(c)) + (c.unidad === null ? ' · <span class="gs-amb">falta la tarifa «Camiseta» de esta temporada en Economía</span>' : ''));
+      }
       function estadoPago(i) {
         if (!PAGOS || i.ESTADO !== 'Confirmada') return '';
         var p = pagoDe(i);
         if (!p) return '';
         if (p.incluida) return '<span class="gs-pag gs-pos">Incluida</span>';
         if (p.sinTarifa) return '<span class="gs-pag gs-amb">Sin tarifa</span>';
-        if (p.falta > 0) return '<span class="gs-pag gs-neg">' + (p.cobrado <= 0 ? 'Sin pagar · ' : 'Faltan ') + eurC(p.falta) + '</span>';
+        if (p.falta > 0) return '<span class="gs-pag gs-neg">' + (p.cobrado <= 0 ? 'Sin pagar · ' : 'Faltan ') + eurC(p.falta) + (p.faltaInscripcion ? '' : ' de camisetas') + '</span>';
         return '<span class="gs-pag gs-pos">Pagado</span>';
       }
       function edadMedia(idIe) {
@@ -548,9 +686,15 @@
        * Una tarjeta: { titulo, texto, datos, sol, bueno } para el aviso a de la inscripción reg (IE… de equipo o IJ… de jugadora).
        * bueno: 'principal' cuando dar por bueno es la solución («Ya lo sabemos»).
        */
+      // T0287 (Javi): en Alertas, cada aviso es una línea (su título) y al tocarla se abre la tarjeta entera.
+      var plegar = false;
       function tarjeta(c, attrs, enFicha, ver) {
+        if (plegar) return '<details class="gs-tjp"><summary>' + c.titulo + '</summary>' + tarjeta0(c, attrs, enFicha, ver, true) + '</details>';
+        return tarjeta0(c, attrs, enFicha, ver);
+      }
+      function tarjeta0(c, attrs, enFicha, ver, sinTitulo) {
         return '<div class="gs-tarjeta' + (c.clase ? ' ' + c.clase : '') + '" ' + attrs + '>' +
-          '<div class="gs-tj-t">' + c.titulo + '</div>' + (c.texto ? '<p class="gs-tj-p">' + c.texto + '</p>' : '') +
+          (sinTitulo ? '' : '<div class="gs-tj-t">' + c.titulo + '</div>') + (c.texto ? '<p class="gs-tj-p">' + c.texto + '</p>' : '') +
           (c.datos ? '<div class="gs-tj-d">' + c.datos + '</div>' : '') +
           (c.sol ? '<div class="gs-tj-s">' + c.sol + '</div>' : '') + '<p class="gs-tj-err" role="alert" hidden></p>' +
           '<div class="gs-tj-pie">' + (!enFicha && ver ? '<button type="button" class="gs-enl" ' + ver + '>Ver la ficha</button>' : '') +
@@ -649,10 +793,17 @@
               : 'La capitana apuntada (' + texto(nombreJug(cap) || ie.ID_CAPITANA) + ') no está en la plantilla de este año.';
             c.sol = (ops.length ? selCampo('capitana', ops, 'Elige de la plantilla', 'Capitana') + btnSol('capitana', 'Poner de capitana') : '<p class="gs-nota">Todavía no tiene jugadoras inscritas.</p>') +
               (a.id === 'capitana-fuera' ? btnSol('quitar-cap', 'Quitar capitana') : '');
-          } else if (a.id === 'pago') {
-            var p = pagoDe(ie) || {}, r = staff(ie.ID_RESPONSABLE);
-            c.titulo = n + ' · Faltan ' + eurC(p.falta || 0);
-            c.texto = 'Faltan ' + eurC(p.falta || 0) + ' de la inscripción: precio ' + eurC(p.precio || 0) + ' − descuento ' + eurC(p.descuento || 0) + ' − cobrado ' + eurC(p.cobrado || 0) + '.';
+          } else if (a.id === 'pago' || a.id === 'camisetas') {
+            var p = pagoDe(ie) || {}, r = staff(ie.ID_RESPONSABLE), ins = (p.precio || 0) - (p.descuento || 0);
+            if (a.id === 'pago') {
+              c.titulo = n + ' · Faltan ' + eurC(p.faltaInscripcion || 0) + ' de inscripción';
+              c.texto = 'Faltan ' + eurC(p.faltaInscripcion || 0) + ' de la inscripción: precio ' + eurC(p.precio || 0) + ' − descuento ' + eurC(p.descuento || 0) + ' − cobrado ' + eurC(p.cobrado || 0) + '.' +
+                (p.faltaCamisetas ? ' Además faltan ' + eurC(p.faltaCamisetas) + ' de camisetas (otro aviso).' : '');
+            } else {
+              c.titulo = n + ' · Faltan ' + eurC(p.faltaCamisetas || 0) + ' de camisetas';
+              c.texto = 'Faltan ' + eurC(p.faltaCamisetas || 0) + ' de camisetas personalizadas: ' + textoCamisetas(p.camisetas || { n: 0, unidad: null }) +
+                (p.cobrado > ins && ins >= 0 ? ', y de lo cobrado ' + eurC(p.cobrado - ins) + ' ya van a camisetas' : '') + '. Lo cobrado llena primero la inscripción.';
+            }
             c.datos = 'Los cobros se apuntan en Economía con la referencia «Inscripción» · ' + texto(ie.ID) + ': cuando se apunte lo que falta, el aviso se va solo.';
             c.sol = waCap + (r ? (wa(r.TELEFONO) ? aWa(r.TELEFONO, 'Escribir al responsable (' + txt(r.APODO || r.NOMBRE) + ')') : '<span class="gs-sintel">Responsable ' + texto(r.APODO || r.NOMBRE) + ': sin teléfono en STAFF</span>') : '');
             c.posponerNota = 'Úsalo si ya estáis en ello con el equipo (p. ej. pagará más tarde). El dinero sigue contando en Por pagar hasta que se apunte el cobro en Economía; ese día vuelve a avisar solo.';
@@ -955,7 +1106,7 @@
         // Cada aviso, una tarjeta.
         var cartas = function (xs) { var o = []; xs.forEach(function (x) { x.avs.forEach(function (a) { o.push(tarjetaAviso(a, x.i.ID, false)); }); }); return o; };
         var deAv = function (xs, f) { return xs.map(function (i) { return { i: i, avs: avE(i).filter(f) }; }).filter(function (x) { return x.avs.length; }); };
-        var alPago = deAv(eqs, function (a) { return a.id === 'pago'; });
+        var alPago = deAv(eqs, function (a) { return a.k === 'pago'; });
         var sinConf = deAv(vis.filter(cuenta), function (a) { return a.id === 'solicitada'; });
         var sinLiga = deAv(eqs, function (a) { return a.id === 'liga'; });
         var problemas = deAv(eqs, function (a) { return a.k !== 'pago' && a.k !== 'liga'; });
@@ -965,6 +1116,7 @@
         var revs = pest.indexOf('REVISIONES') >= 0 ? d.rev.filter(function (r) { return r.RESUELTO !== true && !esAviso(r) && !esPospuesto(r); }) : [];
         var nAl = alPago.length + sinConf.length + problemas.length + sinLiga.length + jAl.length + fotos.length + revs.length;
 
+        plegar = true;
         var h = '<div class="gs-filtrar">' + filtrosPlegables() + '</div><div class="gs-res-top">' +
           '<div class="gs-mini gs-mini-' + (PAGOS ? 4 : 3) + '">' +
           '<button type="button" data-ir="EQUIPOS" data-irf="inscritos"><b>' + eqs.length + '</b><small>Equipos</small></button>' +
@@ -981,6 +1133,7 @@
           htmlAlerta('Fotos sin vincular', fotos.length ? [tarjetaFotos(fotos.length)] : []) +
           (pest.indexOf('REVISIONES') >= 0 ? htmlAlerta('Revisiones sin resolver', revs.map(tarjetaRev), ['REVISIONES', '']) : '') +
           (PAGOS ? htmlSenales(vis) : '') + '</div></div>';
+        plegar = false;
 
         // Días con ligas (por el día de juego de LIGAS), en orden de la semana; al final, los equipos sin liga.
         var grupos = {};
@@ -1312,7 +1465,7 @@
 
       /** Ficha de la inscripción de un equipo: liga y organización, seguimiento, pagos, plantilla, el equipo y la inscripción. */
       function fichaEquipo(ie) {
-        var e = ix.eqs[ie.ID_EQUIPO] || {}, pl = plantilla(d, ie.ID), av = avisosEquipo(d, ie, cx), p = PAGOS ? pago(d, ie) : null;
+        var e = ix.eqs[ie.ID_EQUIPO] || {}, pl = plantilla(d, ie.ID), av = avisosEquipo(d, ie, cx), p = pagoDe(ie);
         var cap = ix.jug[ie.ID_CAPITANA], c = ix.com[ie.ID_COMPETICION] || {}, esTem = String(c.ID_TEMPORADA) === String(tem.ID);
         var otras = d.ie.filter(function (x) { return String(x.ID_EQUIPO) === String(ie.ID_EQUIPO) && x !== ie; })
           .sort(function (a, b) { return String(b.FECHA_INSCRIPCION) < String(a.FECHA_INSCRIPCION) ? -1 : 1; });
@@ -1354,9 +1507,10 @@
           html += '<div class="gs-sec">Pagos</div>' + (p.incluida ? '<p class="gs-nota">Incluida en otra inscripción: no se cobra.</p>' : '<div class="gs-dl">' +
             fila('Precio', p.sinTarifa ? '<span class="gs-amb">Sin tarifa en TARIFAS para esta competición</span>' : eurC(p.precio)) +
             (p.descuento ? fila('Descuento', eurC(p.descuento)) : '') +
+            filaCamisetas(p) +
             fila('Cobrado', eurC(p.cobrado) + (p.cobros ? ' (' + plural(p.cobros, 'movimiento', 'movimientos') + ')' : '')) +
-            (p.sinTarifa ? '' : fila('Pendiente', p.falta > 0 ? '<b class="gs-neg">Faltan ' + eurC(p.falta) + '</b>' : p.falta < 0 ? '<b class="gs-pos">Ha pagado ' + eurC(-p.falta) + ' de más</b>' : '<span class="gs-pos">Al día</span>')) + '</div>' +
-            '<p class="gs-nota">Los cobros se apuntan en Economía con la referencia «Inscripción» · ' + texto(ie.ID) + '.</p>');
+            (p.sinTarifa ? '' : fila('Pendiente', p.falta > 0 ? '<b class="gs-neg">Faltan ' + eurC(p.falta) + '</b>' + (p.camisetas && p.camisetas.total ? ' · ' + texto(desglose(p)) : '') : p.falta < 0 ? '<b class="gs-pos">Ha pagado ' + eurC(-p.falta) + ' de más</b>' : '<span class="gs-pos">Al día</span>')) + '</div>' +
+            '<p class="gs-nota">Los cobros se apuntan en Economía con la referencia «Inscripción» · ' + texto(ie.ID) + ', también los de las camisetas personalizadas.</p>');
         }
         html += '<div class="gs-sec">Plantilla (' + (cargandoPl ? '…' : nAct) + ')</div>' +
           campo({ id: 'e-ID_CAPITANA', t: 'select', et: 'Capitana', v: ie.ID_CAPITANA, opts: capis, vacio: capis.length ? '— Sin capitana —' : 'Todavía no tiene jugadoras' }) +

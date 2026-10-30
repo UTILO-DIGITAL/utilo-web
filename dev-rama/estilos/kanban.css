@@ -549,9 +549,9 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
 .f-tirar.listo { color: var(--color-accion); }
 
 /* ===================== Kanban del núcleo 5.0 (T0254, nucleo/secciones/kanban.js) =====================
- * El tablero y la ficha de arriba, dentro del marco del núcleo: el tablero ocupa todo el ancho del panel y la ficha se abre
+ * El tablero y la ficha de arriba, dentro del marco del núcleo: el tablero ocupa el ancho del marco y la ficha se abre
  * en la ventana de T0172, sin marco: se pinta dentro y baja con su propio desplazamiento. */
-.u .n-main.kb { max-width: none; padding: 0; }
+.u .n-main.kb { padding: 0; }
 .u .n-main.kb .kb-vacio { padding: var(--e4); }
 .u .fv-caja.kb-ficha { display: block; overflow-y: auto; overscroll-behavior: contain; }
 .u .kb-ficha .barra { padding: var(--e3) var(--e4); }

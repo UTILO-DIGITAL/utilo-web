@@ -1531,7 +1531,7 @@
       });
       ctx.alCambiar(function (t) { if (TABLAS.indexOf(t) >= 0 && !velo.classList.contains('abierto')) pintar(); });
       /** Pone Partidos en la temporada, competición, liga y día de un partido (T0277). false si no está. */
-      function irA(id) {
+      function irAPartido(id) {
         var p = T.fila('PARTIDOS', id), l = p && T.fila('LIGAS', p.ID_LIGA), c = l && T.fila('COMPETICIONES', l.ID_COMPETICION);
         if (!p) return false;
         S.tab = 'PARTIDOS'; S.fecha = String(p.FECHA || '');
@@ -1540,7 +1540,7 @@
       }
       ctx.tablas.leer(TABLAS).then(function () {
         S.leido = true;
-        var ir = pedido && irA(pedido);
+        var ir = pedido && irAPartido(pedido);
         pintar();
         if (ir) ficha(pedido);
         else if (pedido) ctx.aviso('Ese partido ya no está en Ligas.');
