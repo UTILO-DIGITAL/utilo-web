@@ -29,6 +29,9 @@
  *   franja «Viendo como …» con «Volver a mi cuenta» (data-n-volver). Se recuerda en la pestaña (sessionStorage): al
  *   recargar sigue igual y al cerrarla se vuelve a la cuenta propia. Su copia de las tablas va aparte
  *   (<correo de quien administra>><correo de ella>) y se borra al volver.
+ * - T0283 · Versiones: «entrar» trae la versión que se ve («5.0-1.2») y las publicadas con sus novedades. Perfil enseña
+ *   el bloque «Versión» (UN.htmlVersion) con «Ver las novedades» (data-n-versiones), que abre la ventana con la lista. Si
+ *   hay una versión con novedades que no se ha visto en este dispositivo, la ventana se abre sola una vez al entrar.
  */
 (function () {
   'use strict';
@@ -133,7 +136,8 @@
   }
 
   function credDe(r) {
-    var o = { persona: r.persona, correo: r.correo || '', perfil: r.perfil || '', admin: !!r.admin, negocio: r.negocio || '', dev: r.dev || '', secciones: r.secciones || [] };
+    var o = { persona: r.persona, correo: r.correo || '', perfil: r.perfil || '', admin: !!r.admin, negocio: r.negocio || '', dev: r.dev || '', secciones: r.secciones || [],
+      version: r.version || '', versiones: Array.isArray(r.versiones) ? r.versiones : [] }; // T0283
     if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
     return o;
   }
@@ -156,7 +160,9 @@
 
   window.UN = {
     /** Cada sección se registra al cargar su JS: UN.registrar('EJEMPLO', { abrir: function (el, ctx) {}, cerrar: function () {} }). */
-    registrar: function (id, def) { DEF[String(id).toUpperCase()] = def; }
+    registrar: function (id, def) { DEF[String(id).toUpperCase()] = def; },
+    /** T0283: el bloque «Versión» de Perfil (vacío si no hay versión: DEV, local sin ejemplo). */
+    htmlVersion: function () { return htmlVersion(); }
   };
 
   function tablas() {
@@ -216,6 +222,65 @@
     };
     tope();
     abrir(pedida() || menu()[0].id, false);
+    avisarVersiones();
+  }
+
+  /* ---------- T0283 · versión y novedades ---------- */
+
+  var VISTA = 'nucleo_version_vista_' + (C.clave || 'negocio'); // la última versión cuyas novedades se han visto aquí
+  function leerVista() { try { return localStorage.getItem(VISTA); } catch (e) { return null; } }
+  function marcarVista() { var v = cred && cred.versiones && cred.versiones[0]; if (v) try { localStorage.setItem(VISTA, v.v); } catch (e) {} }
+
+  /** Las versiones con novedades que no se han visto en este dispositivo (la primera vez, solo la actual, si trae). */
+  function sinVer() {
+    var vs = (cred && cred.versiones) || [], vista = leerVista(), i = -1;
+    vs.forEach(function (x, k) { if (i < 0 && x.v === vista) i = k; });
+    return (vista === null ? vs.slice(0, 1) : i < 0 ? vs : vs.slice(0, i)).filter(function (x) { return (x.novedades || []).length; });
+  }
+
+  /** El bloque «Versión» de Perfil: cuál es y, si hay lista, el botón para ver las novedades. */
+  function htmlVersion() {
+    if (!cred || !cred.version) return '';
+    var vs = cred.versiones || [], ult = vs[0] && vs[0].v === cred.version ? vs[0] : null, nuevas = sinVer().length;
+    return '<section class="pf-bloque n-version" aria-label="Versión"><h2 class="n-grupo">Versión</h2>' +
+      '<p>Usas la versión <strong>' + texto(cred.version) + '</strong>' + (ult && ult.fecha ? ', del ' + texto(ult.fecha) : '') + '.</p>' +
+      (vs.length ? '<div class="n-botones"><button type="button" class="u-btn" data-n-versiones>Ver las novedades' +
+        (nuevas ? ' <span class="n-nuevo">' + (nuevas === 1 ? 'nueva' : nuevas + ' nuevas') + '</span>' : '') + '</button></div>' : '') + '</section>';
+  }
+
+  /** La ventana con las versiones publicadas y sus novedades, la más reciente arriba. Las no vistas, marcadas «Nueva». */
+  function verVersiones() {
+    if (!cred || !(cred.versiones || []).length || $('n-ver-velo')) return;
+    var nuevas = sinVer().map(function (x) { return x.v; }), antes = document.activeElement;
+    var velo = document.createElement('div');
+    velo.className = 'u-velo abierto'; velo.id = 'n-ver-velo';
+    velo.innerHTML = '<div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="n-ver-t"><div class="n-ventana">' +
+      '<h2 id="n-ver-t">' + (nuevas.length ? 'Novedades' : 'Versiones') + '</h2>' +
+      '<ol class="n-versiones">' + cred.versiones.map(function (x) {
+        var ns = x.novedades || [];
+        return '<li><h3>Versión ' + texto(x.v) + (nuevas.indexOf(x.v) >= 0 ? ' <span class="n-nuevo">Nueva</span>' : '') +
+          (x.fecha ? ' <small>' + texto(x.fecha) + '</small>' : '') + '</h3>' +
+          (ns.length ? '<ul>' + ns.map(function (n) { return '<li>' + texto(n) + '</li>'; }).join('') + '</ul>'
+            : '<p class="u-nota">Arreglos y mejoras por dentro: nada cambia en cómo se usa.</p>') + '</li>';
+      }).join('') + '</ol>' +
+      '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="n-ver-cerrar">Entendido</button></div></div></div>';
+    document.body.appendChild(velo);
+    function cerrar() {
+      document.removeEventListener('keydown', tecla);
+      if (velo.parentNode) velo.parentNode.removeChild(velo);
+      marcarVista();
+      var b = document.querySelector('[data-n-versiones] .n-nuevo'); if (b) b.parentNode.removeChild(b);
+      if (antes && antes.focus && document.body.contains(antes)) antes.focus();
+    }
+    function tecla(e) { if (e.key === 'Escape') cerrar(); }
+    document.addEventListener('keydown', tecla);
+    velo.addEventListener('click', function (e) { if (e.target === velo || e.target.id === 'n-ver-cerrar') cerrar(); });
+    $('n-ver-cerrar').focus();
+  }
+
+  /** Al entrar: si hay novedades sin ver, la ventana se abre sola (una vez; viendo como otra persona, no). */
+  function avisarVersiones() {
+    if (cred && !cred.como && sinVer().length) verVersiones();
   }
 
   /* ---------- T0273 · entrar como otra persona ---------- */
@@ -415,7 +480,7 @@
         '<p class="u-nota">Al cerrar la sesión tendrás que volver a entrar con tu cuenta de Google.</p>') +
       (dentro.length ? '<div class="n-botones">' + dentro.map(function (s) {
         return '<a class="u-btn" href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '">' + texto(s.titulo) + '</a>';
-      }).join('') + '</div>' : '') + '</div>';
+      }).join('') + '</div>' : '') + '</div>' + htmlVersion();
   }
 
   /** Comprueba con el motor quién eres y qué ves; si ha cambiado, vuelve a pintar el marco. */
@@ -446,8 +511,8 @@
 
   document.addEventListener('click', function (e) {
     // T0273: «Entrar como otra persona» (en Perfil) y «Volver a mi cuenta» (franja y Perfil), estén donde estén.
-    var b = e.target.closest && e.target.closest('[data-n-como], [data-n-volver]');
-    if (b && cred) { e.preventDefault(); if (b.hasAttribute('data-n-volver')) volver(); else verComo(); return; }
+    var b = e.target.closest && e.target.closest('[data-n-como], [data-n-volver], [data-n-versiones]');
+    if (b && cred) { e.preventDefault(); if (b.hasAttribute('data-n-volver')) volver(); else if (b.hasAttribute('data-n-versiones')) verVersiones(); else verComo(); return; }
     var a = e.target.closest && e.target.closest('a[data-sx]');
     if (!a || !cred || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
     e.preventDefault();
