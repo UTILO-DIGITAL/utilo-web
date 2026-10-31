@@ -107,14 +107,36 @@
    * trozos: [{ a, b, f (fila de la franja), suelto }] } }. Libres: dentro de lo alquilado, cada sitio donde cabe un partido (el
    * más corto de ese campo y día), pegado al anterior. Trozos: los huecos de lo alquilado sin mirar los partidos.
    */
-  function cuadrante(d, per, dura, fase) {
+  /**
+   * ¿Vale la franja f (FECHA_DESDE y FECHA_HASTA; vacías, toda la temporada) ese día (fecha) o, sin fecha, en algún
+   * momento de la fase?
+   */
+  function vale(f, fecha, fase) {
+    var a = String(f.FECHA_DESDE || ''), b = String(f.FECHA_HASTA || '');
+    if (fecha) return (!a || a <= fecha) && (!b || fecha <= b);
+    if (fase) return !((b && fase.desde && b < fase.desde) || (a && fase.hasta && fase.hasta < a));
+    return true;
+  }
+  /** Los días en que cambian las franjas dentro de la fase (cuando empieza una o el día después de que acabe otra). */
+  function cambios(d, per, fase) {
+    var ctp = {}; (d.ctps || []).forEach(function (c) { if (String(c.ID_TEMPORADA) === per) ctp[c.ID] = 1; });
+    var out = {};
+    (d.franjas || []).forEach(function (f) {
+      if (!ctp[f.ID_CAMPO_TEMPORADA]) return;
+      if (f.FECHA_DESDE) out[String(f.FECHA_DESDE)] = 1;
+      if (f.FECHA_HASTA) { var x = new Date(String(f.FECHA_HASTA) + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + 1); out[x.toISOString().slice(0, 10)] = 1; }
+    });
+    return Object.keys(out).filter(function (x) { return !fase || ((!fase.desde || x > fase.desde) && (!fase.hasta || x <= fase.hasta)); }).sort();
+  }
+
+  function cuadrante(d, per, dura, fase, fecha) {
     var B = base(d, per, dura, fase), campos = porId(d.campos), insts = porId(d.insts);
     var ctps = (d.ctps || []).filter(function (c) { return String(c.ID_TEMPORADA) === per && c.ESTADO !== 'Descartado'; });
     var ctpCampo = {}; ctps.forEach(function (c) { ctpCampo[c.ID] = c; });
     var franjas = {}; // 'campo|día' → [[desde, hasta]]
     (d.franjas || []).forEach(function (f) {
       var c = ctpCampo[f.ID_CAMPO_TEMPORADA], a = min(f.HORA_DESDE), b = min(f.HORA_HASTA, true);
-      if (!c || a === null || b === null || b <= a) return;
+      if (!c || a === null || b === null || b <= a || !vale(f, fecha, fase)) return;
       (franjas[c.ID_CAMPO + '|' + f.DIA_SEMANA] = franjas[c.ID_CAMPO + '|' + f.DIA_SEMANA] || []).push([a, b, f]);
     });
     // Campos: los contratados (o en negociación) de esa temporada y los que tienen algún partido; por instalación y nombre.
@@ -265,7 +287,7 @@
     return out;
   }
 
-  var CALC = { rellenar: rellenar, cuadrante: cuadrante, reparto: reparto, alertas: alertas, cuenta: cuenta, fases: fases, aLaVez: aLaVez, min: min, hhmm: hhmm };
+  var CALC = { vale: vale, cambios: cambios, rellenar: rellenar, cuadrante: cuadrante, reparto: reparto, alertas: alertas, cuenta: cuenta, fases: fases, aLaVez: aLaVez, min: min, hhmm: hhmm };
   if (typeof window === 'undefined' || !window.UN || !window.UN.ajustes) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -298,7 +320,13 @@
         var fase = fs.filter(function (f) { return f.ids.join() === S.fase; })[0] ||
           fs.filter(function (f) { return (!f.desde || f.desde <= hoy) && (!f.hasta || hoy <= f.hasta); })[0] || fs[0] || null;
         S.fase = fase ? fase.ids.join() : ''; S.faseObj = fase;
-        c = cuadrante(d, per, dura, fase);
+        // La semana: las franjas pueden cambiar dentro de la fase (el Cemento hasta enero). Solo si alguna tiene fechas.
+        var cs0 = cambios(d, per, fase), conFechas = (d.franjas || []).some(function (f) { return f.FECHA_DESDE || f.FECHA_HASTA; });
+        if (!conFechas) S.fecha = '';
+        else if (!S.fecha || (fase && ((fase.desde && S.fecha < fase.desde) || (fase.hasta && S.fecha > fase.hasta)))) {
+          S.fecha = fase && fase.desde && hoy < fase.desde ? fase.desde : fase && fase.hasta && hoy > fase.hasta ? fase.hasta : hoy;
+        }
+        c = cuadrante(d, per, dura, fase, S.fecha);
         var rep = function (x) { return reparto(d, per, x, fase); };
         if (c.dias.indexOf(S.dia) < 0) S.dia = c.dias[0] || '';
         var html = '<p class="u-nota n-ayuda">' + (reparte ? 'La semana de cada campo, a escala: lo alquilado de fondo y cada partido con lo que dura su liga.' +
@@ -310,7 +338,12 @@
             return '<option value="' + texto(p.id) + '"' + (p.id === per ? ' selected' : '') + '>' + texto(p.nombre) + '</option>';
           }).join('') + '</select></label>' + (fs.length > 1 ? '<label class="u-campo"><span class="u-etiqueta">Fase</span><select id="cu-fase">' + fs.map(function (f) {
             return '<option value="' + texto(f.ids.join()) + '"' + (f.ids.join() === S.fase ? ' selected' : '') + '>' + texto(f.nombre) + (f.desde ? ' · ' + fecha(f.desde) + '–' + fecha(f.hasta) : '') + '</option>';
-          }).join('') + '</select></label>' : '') + '</div>';
+          }).join('') + '</select></label>' : '') +
+          (S.fecha ? '<label class="u-campo"><span class="u-etiqueta">Semana del</span><input type="date" id="cu-fecha" value="' + texto(S.fecha) + '"' +
+            (fase && fase.desde ? ' min="' + texto(fase.desde) + '"' : '') + (fase && fase.hasta ? ' max="' + texto(fase.hasta) + '"' : '') + '></label>' : '') + '</div>' +
+          (S.fecha && cs0.length ? '<p class="aj-cu-cambios">Las franjas cambian el ' + cs0.map(function (x) {
+            return '<button type="button" class="u-btn u-btn-texto" data-fecha="' + texto(x) + '"' + (x === S.fecha ? ' aria-current="true"' : '') + '>' + fecha(x) + '</button>';
+          }).join(', ') + '. Lo alquilado es lo de la semana elegida.</p>' : '');
         html += cajaRellenar(d, per);
         if (!c.dias.length) {
           el.innerHTML = html + '<p class="u-vacio">Esta temporada todavía no tiene ligas, horarios ni campos alquilados. Se ponen en «Ligas», en «Franjas alquiladas de los campos» y en «Horarios de las ligas».</p>';
@@ -367,6 +400,8 @@
        */
       function cajaRellenar(d, per) {
         if (!puedeAlq) return '';
+        // Mientras se crean, ni se recalcula ni se ofrece otra vez (un segundo clic las repetía).
+        if (S.creando) return '<section class="aj-cu-alertas aj-cu-leve"><h3 class="n-grupo">Creando las franjas…</h3><p id="cu-rellenar-estado">' + texto(S.creando) + '</p></section>';
         var r = rellenar(d, per, dura);
         S.rellenar = r;
         if (!r.nuevas.length && !r.sinContrato.length) return '';
@@ -384,13 +419,17 @@
         if (!b.getAttribute('data-ok')) { b.setAttribute('data-ok', '1'); b.textContent = 'Sí, crear ' + r.nuevas.length + (r.nuevas.length === 1 ? ' franja' : ' franjas'); return; }
         b.disabled = true;
         var hechas = 0, mal = [];
+        S.creando = 'Empezando…';
         r.nuevas.reduce(function (p, x) {
           return p.then(function () {
-            if (est && est.isConnected) est.textContent = 'Creando ' + (hechas + 1) + ' de ' + r.nuevas.length + '…';
+            S.creando = 'Creando ' + (hechas + mal.length + 1) + ' de ' + r.nuevas.length + '…';
+            est = el.querySelector('#cu-rellenar-estado');
+            if (est) est.textContent = S.creando;
             var v = { ID_CAMPO_TEMPORADA: x.ID_CAMPO_TEMPORADA, DIA_SEMANA: x.DIA_SEMANA, HORA_DESDE: x.HORA_DESDE, HORA_HASTA: x.HORA_HASTA, NOTAS: 'Sacada de los horarios de las ligas: revisa que sea lo alquilado.' };
             return A.crear('DISPONIBILIDAD_CAMPOS', v).then(function () { hechas++; }, function (e) { mal.push(A.nombre('CAMPOS', x.campo) + ' ' + x.DIA_SEMANA.toLowerCase() + ': ' + String((e && e.message) || e)); });
           });
         }, Promise.resolve()).then(function () {
+          S.creando = '';
           ctx.aviso(hechas + (hechas === 1 ? ' franja creada' : ' franjas creadas') + (mal.length ? '; ' + mal.length + ' no: ' + mal.join(' · ') : '.'));
           pintar();
         });
@@ -459,7 +498,9 @@
         var br = el.querySelector('#cu-rellenar');
         if (br) br.onclick = function () { crearFranjas(br); };
         var sf = el.querySelector('#cu-fase');
-        if (sf) sf.onchange = function () { S.fase = sf.value; pintar(); };
+        if (sf) sf.onchange = function () { S.fase = sf.value; S.fecha = ''; pintar(); };
+        var sd = el.querySelector('#cu-fecha');
+        if (sd) sd.onchange = function () { if (sd.value) { S.fecha = sd.value; pintar(); } };
         var st = el.querySelector('#cu-todos');
         if (st) st.onchange = function () { S.todos = st.checked; pintar(); };
       }
@@ -562,8 +603,9 @@
 
       el.addEventListener('click', function (e) {
         if (sinClic) { e.preventDefault(); return; }
-        var b = e.target.closest('[data-dia], [data-hueco], [data-nuevo], [data-campo], [data-liga-ficha], [data-alq], [data-alq-nueva]');
+        var b = e.target.closest('[data-fecha], [data-dia], [data-hueco], [data-nuevo], [data-campo], [data-liga-ficha], [data-alq], [data-alq-nueva]');
         if (!b) return;
+        if (b.hasAttribute('data-fecha')) { S.fecha = b.getAttribute('data-fecha'); pintar(); return; }
         if (b.hasAttribute('data-dia')) { S.dia = b.getAttribute('data-dia'); guardado('aj_cu_dia', S.dia); pintar(); return; }
         if (b.hasAttribute('data-hueco')) { A.ficha('HUECOS', b.getAttribute('data-hueco')); return; }
         if (b.hasAttribute('data-campo')) { A.ficha('CAMPOS', b.getAttribute('data-campo')); return; }

@@ -195,17 +195,24 @@
     var ai = String(fa.FECHA_INICIO || ''), af = String(fa.FECHA_FIN || ''), bi = String(fb.FECHA_INICIO || ''), bf = String(fb.FECHA_FIN || '');
     return !((af && bi && af < bi) || (bf && ai && bf < ai));
   }
+  /** ¿Se tocan las fechas de dos filas? fechas: [columna desde, columna hasta]; vacías, abiertas (toda la temporada). */
+  function seTocan(a, b, fechas) {
+    var ai = String(a[fechas[0]] || ''), af = String(a[fechas[1]] || ''), bi = String(b[fechas[0]] || ''), bf = String(b[fechas[1]] || '');
+    return !((af && bi && af < bi) || (bf && ai && bf < ai));
+  }
   function choques(regla, e, spec, v, filas, id, perDe, dura, faseDe) {
     if (!regla) return [];
     var r = tramo(regla, v, dura);
     if (!r) return [];
     if (r[1] <= r[0]) return { mal: 'La hora de fin tiene que ser después de la de inicio.' };
+    if (regla.fechas && v[regla.fechas[0]] && v[regla.fechas[1]] && String(v[regla.fechas[1]]) < String(v[regla.fechas[0]])) return { mal: 'La fecha de fin tiene que ser después de la de inicio.' };
     var p = regla.porPeriodo && perDe ? perDe(v) : '';
     return filas.filter(function (f) {
       if (String(f[e.clave]) === String(id || '') || f._nueva || deBaja(spec, f)) return false;
       if (!regla.grupo.every(function (c) { return String(f[c]) === String(v[c]); })) return false;
       if (p && perDe(f) !== p) return false;
       if (faseDe && !faseDe(v, f)) return false; // T0292: fases que no se juegan a la vez (la liga y su copa)
+      if (regla.fechas && !seTocan(v, f, regla.fechas)) return false; // T0292: franjas de fechas distintas (hasta enero y desde febrero)
       var x = tramo(regla, f, dura);
       return !!x && x[0] < r[1] && r[0] < x[1];
     });
@@ -242,7 +249,7 @@
     });
   }
 
-  var CALC = { aLaVez: aLaVez, muestra: muestra, titulo: titulo, tituloTabla: tituloTabla, etiqueta: etiqueta, deBaja: deBaja, apagada: apagada, periodoDe: periodoDe, periodos: periodos, periodoActual: periodoActual,
+  var CALC = { seTocan: seTocan, aLaVez: aLaVez, muestra: muestra, titulo: titulo, tituloTabla: tituloTabla, etiqueta: etiqueta, deBaja: deBaja, apagada: apagada, periodoDe: periodoDe, periodos: periodos, periodoActual: periodoActual,
     verValor: verValor, leerValor: leerValor, problemas: problemas, minutos: minutos, choques: choques, notasDe: notasDe, cambios: cambios, usos: usos, filtrar: filtrar };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
@@ -785,7 +792,8 @@
           base.periodo ? function (x) { return periodoDe(E, t, x, base.periodo, fila); } : null, duraDe(t, base.solapes), juntasDe(t, base.solapes));
         if (ch.mal) mal.push(ch.mal);
         else if (ch.length) mal.push('Se pisa con ' + ch.slice(0, 3).map(function (x) {
-          var r = base.solapes, h = x[r.desde] + (r.hasta ? '–' + x[r.hasta] : '');
+          var r = base.solapes, h = x[r.desde] + (r.hasta ? '–' + x[r.hasta] : '') +
+            (r.fechas && (x[r.fechas[0]] || x[r.fechas[1]]) ? ', ' + (x[r.fechas[0]] ? 'desde ' + verValor({ tipo: 'fecha' }, x[r.fechas[0]]) : '') + (x[r.fechas[1]] ? ' hasta ' + verValor({ tipo: 'fecha' }, x[r.fechas[1]]) : '') : '');
           return nombreFila(t, x) + ' (' + h + ')';
         }).join(', ') + '. Cambia la hora.');
         return mal;

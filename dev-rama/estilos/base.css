@@ -549,6 +549,9 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 /* T0292 · Cuadrante de campos (vista de Ajustes de Konamigas): el tiempo a escala hacia abajo, lo alquilado de fondo, cada
    partido encima con lo que dura su liga, los choques en rojo; se arrastran, y desde la caja de «Partidos por meter». */
 .u .aj-cu-todos { margin: 0 0 var(--e2); }
+.u .aj-cu-cambios { margin: 0 0 var(--e3); font-size: 14px; }
+.u .aj-cu-cambios .u-btn-texto { min-height: 0; padding: 0 2px; font-weight: 700; }
+.u .aj-cu-cambios [aria-current] { background: var(--color-principal); }
 .u .aj-cu-alertas { margin: 0 0 var(--e3); padding: var(--e2) var(--e3); border-left: 4px solid var(--color-error); border-radius: var(--radio-peq);
   background: color-mix(in srgb, var(--color-error) 8%, var(--color-superficie)); }
 .u .aj-cu-alertas.aj-cu-leve { border-left-color: var(--estado-pr); background: color-mix(in srgb, var(--estado-pr) 8%, var(--color-superficie)); }
