@@ -170,7 +170,32 @@
    * si porPeriodo (perDe(fila) da el de cada una) y horas que se pisan. Sin contar la propia (id), las nuevas sin guardar
    * ni las dadas de baja. Devuelve { mal: 'texto' } si la hora de fin no es después de la de inicio.
    */
-  function choques(regla, e, spec, v, filas, id, perDe, dura) {
+  /**
+   * T0292 · El nivel de una fase en la cadena de «seguidas» ([[de, a]]): 0 si no sale de ninguna, 1 si sale de una de
+   * nivel 0 (la copa de una liga)… Sin bucles: como mucho, tantos pasos como enlaces.
+   */
+  function nivelFase(id, seguidas) {
+    var n = 0, hoy = [String(id)], vistos = {};
+    for (var paso = 0; paso <= (seguidas || []).length; paso++) {
+      var antes = [];
+      (seguidas || []).forEach(function (s) { if (hoy.indexOf(String(s[1])) >= 0 && !vistos[String(s[0])]) { vistos[String(s[0])] = 1; antes.push(String(s[0])); } });
+      if (!antes.length) return n;
+      n++; hoy = antes;
+    }
+    return n;
+  }
+  /**
+   * T0292 · ¿Se juegan a la vez dos fases (dos competiciones)? Solo si están en el mismo nivel (las que salen de otra, como
+   * las copas, van después de todas las de antes, aunque las fechas se toquen un par de días) y sus fechas (FECHA_INICIO a
+   * FECHA_FIN; sin una, abierta) se tocan.
+   */
+  function aLaVez(fa, fb, seguidas) {
+    if (!fa || !fb || String(fa.ID) === String(fb.ID)) return true;
+    if (nivelFase(fa.ID, seguidas) !== nivelFase(fb.ID, seguidas)) return false;
+    var ai = String(fa.FECHA_INICIO || ''), af = String(fa.FECHA_FIN || ''), bi = String(fb.FECHA_INICIO || ''), bf = String(fb.FECHA_FIN || '');
+    return !((af && bi && af < bi) || (bf && ai && bf < ai));
+  }
+  function choques(regla, e, spec, v, filas, id, perDe, dura, faseDe) {
     if (!regla) return [];
     var r = tramo(regla, v, dura);
     if (!r) return [];
@@ -180,6 +205,7 @@
       if (String(f[e.clave]) === String(id || '') || f._nueva || deBaja(spec, f)) return false;
       if (!regla.grupo.every(function (c) { return String(f[c]) === String(v[c]); })) return false;
       if (p && perDe(f) !== p) return false;
+      if (faseDe && !faseDe(v, f)) return false; // T0292: fases que no se juegan a la vez (la liga y su copa)
       var x = tramo(regla, f, dura);
       return !!x && x[0] < r[1] && r[0] < x[1];
     });
@@ -216,7 +242,7 @@
     });
   }
 
-  var CALC = { muestra: muestra, titulo: titulo, tituloTabla: tituloTabla, etiqueta: etiqueta, deBaja: deBaja, apagada: apagada, periodoDe: periodoDe, periodos: periodos, periodoActual: periodoActual,
+  var CALC = { aLaVez: aLaVez, muestra: muestra, titulo: titulo, tituloTabla: tituloTabla, etiqueta: etiqueta, deBaja: deBaja, apagada: apagada, periodoDe: periodoDe, periodos: periodos, periodoActual: periodoActual,
     verValor: verValor, leerValor: leerValor, problemas: problemas, minutos: minutos, choques: choques, notasDe: notasDe, cambios: cambios, usos: usos, filtrar: filtrar };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
@@ -684,6 +710,18 @@
         var sp = specDeTabla(h.tabla);
         return sp && sp.hijas ? Object.assign({}, h, { hijas: sp.hijas }) : h;
       }
+      /** Con «fase» en la regla: function (a, b) que dice si dos filas se juegan a la vez (sus competiciones), o null. */
+      function juntasDe(t, regla) {
+        if (!regla || !regla.fase) return null;
+        var camino = regla.fase.split('.');
+        var fase = function (x) {
+          var tn = t, f = x;
+          for (var i = 0; i < camino.length && f; i++) { var c = colDe(E[tn], camino[i]); f = c ? fila(c.ref, f[camino[i]]) : null; tn = c ? c.ref : tn; }
+          return f;
+        };
+        var sg = regla.seguidas ? filas(regla.seguidas.tabla).map(function (o) { return [o[regla.seguidas.de], o[regla.seguidas.a]]; }) : [];
+        return function (a, b) { return aLaVez(fase(a), fase(b), sg); };
+      }
       /** Con minutos «ID_LIGA.MINUTOS_PARTIDO», lo que dura cada fila (lo de su liga); con un número, null (no hace falta). */
       function duraDe(t, regla) {
         if (!regla || typeof regla.minutos !== 'string') return null;
@@ -744,7 +782,7 @@
         // T0292: que no se pise con otra del mismo campo y día (la regla está en la tabla de su bloque, vale también de hija).
         var base = specDeTabla(t) || spec, toda = Object.assign({}, f || {}, v);
         var ch = choques(base.solapes, e, base, toda, filas(t), f ? f[e.clave] : '',
-          base.periodo ? function (x) { return periodoDe(E, t, x, base.periodo, fila); } : null, duraDe(t, base.solapes));
+          base.periodo ? function (x) { return periodoDe(E, t, x, base.periodo, fila); } : null, duraDe(t, base.solapes), juntasDe(t, base.solapes));
         if (ch.mal) mal.push(ch.mal);
         else if (ch.length) mal.push('Se pisa con ' + ch.slice(0, 3).map(function (x) {
           var r = base.solapes, h = x[r.desde] + (r.hasta ? '–' + x[r.hasta] : '');
