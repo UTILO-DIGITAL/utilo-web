@@ -1,5 +1,9 @@
 /*
- * Cuadrante de campos · Konamigas · vistas de Ajustes (T0292): «Lo alquilado» en Franjas alquiladas y «Reparto» en Horarios de las ligas
+ * Cuadrante de campos · Konamigas (T0292) · SIN USAR desde el 31/10/2026: ninguna tabla de Ajustes lo tiene como vista.
+ * Es la base de «Planificar los campos de la temporada por periodos» (T0311): sus cálculos (fases, reparto, alertas, fechas,
+ * rellenar) y el arrastrar se aprovechan allí; lo de abajo describe cómo funcionaba como vistas «Lo alquilado» y «Reparto».
+ *
+ * Antes: vistas de Ajustes «Lo alquilado» en Franjas alquiladas y «Reparto» en Horarios de las ligas
  *
  * Lo alquilado: lo de cada día, vacío, partido en partidos, y si llega para los partidos de las ligas de ese día.
  * Reparto: lo que sigue.
