@@ -329,7 +329,8 @@
       function preparar() {
         ix = {};
         if (P && E[P]) {
-          listaPer = periodos(E, P, filas(P));
+          // Sin ID no es un periodo que se pueda elegir (nada apunta a él): fuera del selector; lo avisa su tabla.
+          listaPer = periodos(E, P, filas(P).filter(function (f) { return !vacio(f[E[P].clave]); }));
           perAhora = periodoActual(listaPer, hoy());
           if (S.per !== '-' && !listaPer.some(function (p) { return p.id === S.per; })) S.per = perAhora ? perAhora.id : '';
         }
@@ -436,9 +437,13 @@
         var conPer = P && spec.periodo && listaPer.length;
         var perDe = conPer ? function (f) { return periodoDe(E, t, f, spec.periodo, fila); } : null;
         var nBajas = todas.filter(function (f) { return deBaja(spec, f); }).length;
-        var fs = ordenar(t, spec, filtrar(todas, { spec: spec, q: S.q, bajas: S.bajas, per: conPer && S.per !== '-' ? S.per : '', periodo: perDe, textos: function (f) { return textosFila(t, spec, f); } }));
+        // T0292: filas sin clave en el Excel (borrada a mano): no se pueden abrir ni usar, y lo que apunta a ellas no las encuentra.
+        var sinId = todas.filter(function (f) { return vacio(f[E[t].clave]); });
+        var fs = ordenar(t, spec, filtrar(todas.filter(function (f) { return !vacio(f[E[t].clave]); }), { spec: spec, q: S.q, bajas: S.bajas, per: conPer && S.per !== '-' ? S.per : '', periodo: perDe, textos: function (f) { return textosFila(t, spec, f); } }));
         cont.innerHTML = '<p><button type="button" class="u-btn u-btn-texto" data-vista="">‹ ' + texto(ctx.titulo) + '</button></p>' +
           (spec.texto ? '<p class="u-nota n-ayuda">' + texto(spec.texto) + '</p>' : '') + pestanasModo(spec) +
+          (sinId.length ? '<p class="u-aviso">⚠ ' + sinId.length + (sinId.length === 1 ? ' fila no tiene ' : ' filas no tienen ') + texto(etiqueta(spec, E[t].clave).toLowerCase()) + ' en el Excel (' +
+            texto(sinId.slice(0, 3).map(function (f) { return nombreFila(t, f); }).join(', ')) + (sinId.length > 3 ? '…' : '') + '): no se pueden usar y lo que apunta a ellas no las encuentra. Hay que ponérselo en el Excel.</p>' : '') +
           '<div class="u-filtros">' +
           '<label class="u-campo"><span class="u-etiqueta">Buscar</span><input type="search" id="aj-q" value="' + texto(S.q) + '" placeholder="Escribe para buscar"></label>' +
           (conPer ? '<label class="u-campo"><span class="u-etiqueta">' + texto(nomPer) + '</span><select id="aj-per">' +

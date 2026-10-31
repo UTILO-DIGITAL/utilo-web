@@ -287,14 +287,61 @@
     return out;
   }
 
-  var CALC = { vale: vale, cambios: cambios, rellenar: rellenar, cuadrante: cuadrante, reparto: reparto, alertas: alertas, cuenta: cuenta, fases: fases, aLaVez: aLaVez, min: min, hhmm: hhmm };
+  /** Cuántos días de la semana dia (Lunes…) hay de a a b, los dos incluidos (fechas aaaa-mm-dd). */
+  function cuantos(dia, a, b) {
+    if (!a || !b || b < a) return 0;
+    var x = new Date(a + 'T12:00:00Z'), fin = new Date(b + 'T12:00:00Z'), n = 0, ds = DIAS.indexOf(dia);
+    while (x <= fin) { if ((x.getUTCDay() + 6) % 7 === ds) n++; x.setUTCDate(x.getUTCDate() + 1); }
+    return n;
+  }
+  function antesDe(f) { var x = new Date(f + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() - 1); return x.toISOString().slice(0, 10); }
+  function despuesDe(f) { var x = new Date(f + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10); }
+
+  /**
+   * Si las fechas de cada franja cuadran con cuándo se juega en ese campo y día: desde que empieza la primera liga que lo
+   * usa (su FECHA_INICIO o la de su competición) hasta que acaba la última competición (también la copa). Sin fechas, la
+   * franja vale toda la temporada (tem: FECHA_INICIO y FECHA_FIN). Devuelve [{ f, campo, dia, alq: [desde, hasta], juego:
+   * [desde, hasta] | null, sinFechas, deMas: [antes, después] (cuántos días de ese día alquilados sin partidos), faltan:
+   * [antes, después] (cuántos con partidos sin franja) }], solo las que no cuadran.
+   */
+  function fechasFranjas(d, per, tem) {
+    var ligas = porId(d.ligas), comps = porId(d.comps), ctp = {};
+    (d.ctps || []).forEach(function (c) { if (String(c.ID_TEMPORADA) === per) ctp[c.ID] = c; });
+    var juego = {};
+    (d.huecos || []).forEach(function (h) {
+      var l = ligas[h.ID_LIGA], c = l && comps[l.ID_COMPETICION];
+      if (!c || String(c.ID_TEMPORADA) !== per) return;
+      var a = String(l.FECHA_INICIO || c.FECHA_INICIO || ''), b = String(c.FECHA_FIN || '');
+      if (!a || !b) return;
+      var k = h.ID_CAMPO + '|' + h.DIA_SEMANA, j = juego[k];
+      juego[k] = j ? [a < j[0] ? a : j[0], b > j[1] ? b : j[1]] : [a, b];
+    });
+    var t0 = String((tem && tem.FECHA_INICIO) || ''), t1 = String((tem && tem.FECHA_FIN) || '');
+    var out = [];
+    (d.franjas || []).forEach(function (f) {
+      var c = ctp[f.ID_CAMPO_TEMPORADA];
+      if (!c) return;
+      var a = String(f.FECHA_DESDE || t0), b = String(f.FECHA_HASTA || t1), j = juego[c.ID_CAMPO + '|' + f.DIA_SEMANA] || null, dia = f.DIA_SEMANA;
+      if (!a || !b) return;
+      var x = { f: f, campo: c.ID_CAMPO, dia: dia, alq: [a, b], juego: j, sinFechas: !f.FECHA_DESDE && !f.FECHA_HASTA, deMas: [0, 0], faltan: [0, 0] };
+      if (!j) x.deMas = [cuantos(dia, a, b), 0];
+      else {
+        x.deMas = [a < j[0] ? cuantos(dia, a, antesDe(j[0])) : 0, b > j[1] ? cuantos(dia, despuesDe(j[1]), b) : 0];
+        x.faltan = [a > j[0] ? cuantos(dia, j[0], antesDe(a)) : 0, b < j[1] ? cuantos(dia, despuesDe(b), j[1]) : 0];
+      }
+      if (x.deMas[0] || x.deMas[1] || x.faltan[0] || x.faltan[1]) out.push(x);
+    });
+    return out;
+  }
+
+  var CALC = { fechasFranjas: fechasFranjas, cuantos: cuantos, vale: vale, cambios: cambios, rellenar: rellenar, cuadrante: cuadrante, reparto: reparto, alertas: alertas, cuenta: cuenta, fases: fases, aLaVez: aLaVez, min: min, hhmm: hhmm };
   if (typeof window === 'undefined' || !window.UN || !window.UN.ajustes) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
 
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function guardado(k, v) { try { if (v === undefined) return localStorage.getItem(k) || ''; localStorage.setItem(k, v); } catch (e) {} return ''; }
-  var TABLAS = ['CAMPOS', 'INSTALACIONES', 'CAMPOS_TEMPORADA', 'DISPONIBILIDAD_CAMPOS', 'HUECOS', 'LIGAS', 'COMPETICIONES', 'INSCRIPCIONES_EQUIPOS', 'COMPETICIONES_ORIGEN'];
+  var TABLAS = ['CAMPOS', 'INSTALACIONES', 'CAMPOS_TEMPORADA', 'DISPONIBILIDAD_CAMPOS', 'HUECOS', 'LIGAS', 'COMPETICIONES', 'INSCRIPCIONES_EQUIPOS', 'COMPETICIONES_ORIGEN', 'TEMPORADAS'];
   function fecha(s) { var m = /^(\d{4})-(\d\d)-(\d\d)/.exec(String(s || '')); return m ? m[3] + '/' + m[2] : ''; }
   var PX = 1.6;   // píxeles por minuto: un partido de 45 minutos, 72
   var IMAN = 15;  // al soltar, la hora va de 15 en 15 minutos
@@ -309,7 +356,8 @@
       var puede = reparte && A.puede('HUECOS'), puedeAlq = A.puede('DISPONIBILIDAD_CAMPOS');
       function datos() {
         return { campos: T.filas('CAMPOS'), insts: T.filas('INSTALACIONES'), ctps: T.filas('CAMPOS_TEMPORADA'), franjas: T.filas('DISPONIBILIDAD_CAMPOS'),
-          huecos: T.filas('HUECOS'), ligas: T.filas('LIGAS'), comps: T.filas('COMPETICIONES'), inscripciones: T.filas('INSCRIPCIONES_EQUIPOS'), origen: T.filas('COMPETICIONES_ORIGEN') };
+          huecos: T.filas('HUECOS'), ligas: T.filas('LIGAS'), comps: T.filas('COMPETICIONES'), inscripciones: T.filas('INSCRIPCIONES_EQUIPOS'), origen: T.filas('COMPETICIONES_ORIGEN'),
+          temporadas: T.filas('TEMPORADAS') };
       }
       function y(m) { return Math.round((m - c.rango[S.dia][0]) * PX); }
       function pintar() {
@@ -362,6 +410,7 @@
         var horas = '';
         for (var m = R[0]; m <= R[1]; m += 15) horas += '<span class="' + (m % 60 ? '' : 'aj-cu-en') + '" style="top:' + y(m) + 'px">' + (m % 30 ? '' : hhmm(m)) + '</span>';
         html += reparte ? avisos(alertas(c, rep(S.dia), S.dia)) : resumen(cuenta(c, rep(S.dia), S.dia));
+        if (!reparte) html += cajaFechas(d, per);
         html += '<label class="u-check aj-cu-todos"><input type="checkbox" id="cu-todos"' + (S.todos ? ' checked' : '') + '> Todos los campos de la temporada</label>' +
           '<div class="aj-cu-caja"><div class="aj-cu" style="grid-template-columns: 52px repeat(' + cs.length + ', minmax(140px, 1fr))">' +
           '<div></div>' + cs.map(function (k) {
@@ -434,6 +483,49 @@
           pintar();
         });
       }
+      /**
+       * Las franjas cuyas fechas no cuadran con las de las ligas que juegan en ese campo y día: alquilado de más (antes de
+       * que empiecen o después de que acaben) o falta alquilar. «Cuadrar con las ligas» recorta las de más; no alarga nada.
+       */
+      function cajaFechas(d, per) {
+        var tem = (d.temporadas || []).filter(function (t) { return String(t.ID) === per; })[0];
+        var xs = fechasFranjas(d, per, tem);
+        S.cuadrar = xs;
+        if (!xs.length) return '';
+        var dd = function (f) { return String(f).split('-').reverse().join('/'); }, pl = function (n, dia) { return n + ' ' + dia.toLowerCase() + (n === 1 ? '' : (/s$/.test(dia) ? '' : 's')); };
+        var recortables = xs.filter(function (x) { return x.juego && (x.deMas[0] || x.deMas[1]); });
+        var li = function (x) {
+          var nom = texto(A.nombre('CAMPOS', x.campo)) + ' · ' + texto(x.dia.toLowerCase()) + ' ' + texto(x.f.HORA_DESDE) + '–' + texto(x.f.HORA_HASTA), t = [];
+          if (!x.juego) t.push('no juega ninguna liga ahí en toda la temporada: ' + pl(x.deMas[0], x.dia) + ' alquilados sin partidos');
+          else {
+            if (x.deMas[0]) t.push(pl(x.deMas[0], x.dia) + ' de más antes de que empiece la liga (' + dd(x.juego[0]) + ')');
+            if (x.deMas[1]) t.push(pl(x.deMas[1], x.dia) + ' de más después de que acabe (' + dd(x.juego[1]) + ')');
+            if (x.faltan[0]) t.push('<strong>faltan ' + pl(x.faltan[0], x.dia) + '</strong>: la liga empieza el ' + dd(x.juego[0]) + ' y la franja, el ' + dd(x.alq[0]));
+            if (x.faltan[1]) t.push('<strong>faltan ' + pl(x.faltan[1], x.dia) + '</strong>: se juega hasta el ' + dd(x.juego[1]) + ' y la franja acaba el ' + dd(x.alq[1]));
+          }
+          return '<li><button type="button" class="u-btn u-btn-texto" data-alq="' + texto(x.f.ID) + '">' + nom + '</button>' + (x.sinFechas ? ' (sin fechas: toda la temporada)' : ' (' + dd(x.alq[0]) + '–' + dd(x.alq[1]) + ')') + ': ' + t.join('; ') + '.</li>';
+        };
+        return '<section class="aj-cu-alertas aj-cu-leve"><h3 class="n-grupo">Fechas que no cuadran con las ligas <span class="u-cifra">' + xs.length + '</span></h3><ul>' + xs.map(li).join('') + '</ul>' +
+          (recortables.length && puedeAlq ? '<p><button type="button" class="u-btn" id="cu-cuadrar">Cuadrar ' + recortables.length + (recortables.length === 1 ? ' franja' : ' franjas') + ' con las ligas</button> ' +
+            '<span class="u-nota" id="cu-cuadrar-estado">Pone sus fechas de la primera a la última fecha en que se juega ahí. Solo recorta lo de más; lo que falta, lo alquilas tú.</span></p>' : '') + '</section>';
+      }
+      function cuadrarFechas(b) {
+        var xs = (S.cuadrar || []).filter(function (x) { return x.juego && (x.deMas[0] || x.deMas[1]); });
+        if (!xs.length) return;
+        if (!b.getAttribute('data-ok')) { b.setAttribute('data-ok', '1'); b.textContent = 'Sí, cuadrar ' + xs.length + (xs.length === 1 ? ' franja' : ' franjas'); return; }
+        b.disabled = true;
+        var hechas = 0, mal = [];
+        xs.reduce(function (p, x) {
+          return p.then(function () {
+            // Solo recorta: la fecha nueva es la más tardía de inicio y la más temprana de fin.
+            var c = { FECHA_DESDE: x.alq[0] < x.juego[0] ? x.juego[0] : x.alq[0], FECHA_HASTA: x.alq[1] > x.juego[1] ? x.juego[1] : x.alq[1] };
+            return A.cambiar('DISPONIBILIDAD_CAMPOS', x.f.ID, c).then(function () { hechas++; }, function (e) { mal.push(String((e && e.message) || e)); });
+          });
+        }, Promise.resolve()).then(function () {
+          ctx.aviso(hechas + (hechas === 1 ? ' franja cuadrada' : ' franjas cuadradas') + ' con las ligas' + (mal.length ? '; ' + mal.length + ' no: ' + mal.join(' · ') : '.'));
+          pintar();
+        });
+      }
       /** Huecos alquilados del día frente a los partidos que necesitan sus ligas. */
       function resumen(q) {
         var pl = function (n, a, b) { return n + ' ' + (n === 1 ? a : b); };
@@ -495,6 +587,8 @@
       function oir() {
         var sp = el.querySelector('#cu-per');
         if (sp) sp.onchange = function () { A.ponerPeriodo(sp.value); S.fase = ''; pintar(); };
+        var bq = el.querySelector('#cu-cuadrar');
+        if (bq) bq.onclick = function () { cuadrarFechas(bq); };
         var br = el.querySelector('#cu-rellenar');
         if (br) br.onclick = function () { crearFranjas(br); };
         var sf = el.querySelector('#cu-fase');
