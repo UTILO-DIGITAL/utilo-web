@@ -647,7 +647,25 @@ body.aj-cu-arrastrando { cursor: grabbing; user-select: none; -webkit-user-selec
 .u .aj-or-nota { font-style: italic; }
 .u .aj-se { display: grid; gap: var(--e3); grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); align-items: start; }
 .u .aj-se-dia .aj-se-liga { margin: 0 0 var(--e2); }
-.u .aj-se-falta { color: var(--color-error); }
+.u .aj-se-comp { margin: 0 0 var(--e3); }
+.u .aj-se-comp h4 { margin: 0 0 var(--e1); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--color-suave); border-bottom: 1px solid var(--color-linea); padding-bottom: 2px; }
+.u .aj-se-liga { padding: 0; }
+.u .aj-se-cab { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: var(--e2) var(--e3); border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.u .aj-se-cab small { color: var(--color-suave); font-size: 13px; }
+.u .aj-se-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.u .aj-se-chip { background: color-mix(in srgb, var(--estado-pr) 18%, var(--color-superficie)); color: var(--color-texto); font-size: 12px; }
+.u .aj-se-chip-parada { background: var(--color-error); color: #fff; font-size: 12px; }
+.u .aj-se-pendiente { border-left: 4px solid var(--estado-pr); }
+.u .aj-se-parada { border: 1px dashed var(--color-error); border-left: 4px solid var(--color-error); background: color-mix(in srgb, var(--color-error) 6%, var(--color-superficie)); }
+.u .aj-se-parada strong { color: var(--color-suave); }
+.u .aj-se-abierta { box-shadow: 0 2px 10px rgb(0 0 0 / 12%); }
+.u .aj-se-det { padding: 0 var(--e3) var(--e3); border-top: 1px solid var(--color-linea); }
+.u .aj-se-det ul { list-style: none; margin: var(--e2) 0; padding: 0; font-size: 14px; }
+.u .aj-se-det li { display: flex; gap: 6px; padding: 2px 0; }
+.u .aj-se-det li span { flex: 0 0 18px; font-weight: 700; text-align: center; }
+.u .aj-se-ok span { color: var(--color-bien); }
+.u .aj-se-mal span { color: var(--color-error); }
+.u .aj-se-pend { margin: 0 0 var(--e3); color: var(--estado-pr); font-weight: 700; }
 .u .aj-notas { display: block; max-width: 60ch; margin-top: 2px; white-space: normal; }
 .u .aj-volver { display: inline-flex; width: auto; justify-content: flex-start; min-height: 0; padding: 0; margin: 0 0 var(--e2); }
 /* Presupuesto de una categoría: la recomendación en su bloque, con su botón; importes alineados a la derecha */
