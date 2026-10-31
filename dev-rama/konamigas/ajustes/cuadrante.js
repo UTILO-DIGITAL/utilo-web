@@ -1,0 +1,449 @@
+/*
+ * Cuadrante de campos · Konamigas · vistas de Ajustes (T0292): «Lo alquilado» en Franjas alquiladas y «Reparto» en Horarios de las ligas
+ *
+ * Lo alquilado: lo de cada día, vacío, partido en partidos, y si llega para los partidos de las ligas de ese día.
+ * Reparto: lo que sigue.
+ *
+ * La semana de una temporada, día a día: cada campo una columna y el tiempo hacia abajo, a escala (un partido de 45
+ * minutos mide 45). De fondo, lo alquilado (las franjas de DISPONIBILIDAD_CAMPOS de su campo en esa temporada); encima,
+ * cada partido de los horarios (HUECOS) con lo que dura su liga (LIGAS · MINUTOS_PARTIDO). Avisa de dos partidos en el
+ * mismo campo a la vez y de los que caen fuera de lo alquilado (si ese campo tiene franjas ese día; sin franjas, no se
+ * sabe y no avisa).
+ *
+ * Debajo, «Partidos por meter»: las ligas de ese día con los partidos que necesitan cada semana (la mitad de sus equipos,
+ * sin contar las bajas: 9 equipos, 4 partidos) y los que ya tienen sitio. Los que faltan se arrastran al hueco que encaje;
+ * un partido puesto se arrastra a otro campo u hora, o de vuelta a la caja para quitarlo. Si una liga tiene más sitios que
+ * partidos, lo dice. Arriba, las alertas del día: dos partidos a la vez, fuera de lo alquilado, partidos que faltan o sitios
+ * que sobran, y lo alquilado sin usar (campos de más). Tocar un partido abre su horario; un hueco libre, un horario nuevo ahí; un campo, su ficha. Guarda con
+ * ctx.ajustes, que comprueba lo mismo que la ficha (no se pisan). Lee las tablas que ya tiene Ajustes: no llama al motor.
+ */
+(function () {
+  'use strict';
+
+  /* ======================= cálculos (sin pantalla; se prueban en node) ======================= */
+
+  var DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+  // Lo que dura un partido sin dato de su liga; también, lo que se usa para buscar huecos libres en un campo sin partidos.
+  var DURA_SIN_DATO = 45;
+
+  function min(h, fin) {
+    var m = /^(\d\d):(\d\d)$/.exec(String(h == null ? '' : h));
+    if (!m) return null;
+    var x = Number(m[1]) * 60 + Number(m[2]);
+    return fin && x === 0 ? 1440 : x;
+  }
+  function hhmm(m) { m = m % 1440; var h = Math.floor(m / 60), x = m % 60; return (h < 10 ? '0' : '') + h + ':' + (x < 10 ? '0' : '') + x; }
+  function porId(fs) { var o = {}; (fs || []).forEach(function (f) { o[String(f.ID)] = f; }); return o; }
+  function pisan(a, b) { return a[0] < b[1] && b[0] < a[1]; }
+
+  /** Lo de una temporada que usan el cuadrante y el reparto: sus ligas, sus horarios y lo que dura cada uno. */
+  function base(d, per, dura) {
+    var ligas = porId(d.ligas), comps = porId(d.comps);
+    var perLiga = function (id) { var l = ligas[id], c = l && comps[l.ID_COMPETICION]; return c ? String(c.ID_TEMPORADA) : ''; };
+    var durH = function (h) { var x = dura ? Number(dura(h)) : 0; return x > 0 ? x : DURA_SIN_DATO; };
+    return {
+      ligas: ligas, durH: durH,
+      deTem: (d.ligas || []).filter(function (l) { return perLiga(l.ID) === per; }),
+      huecos: (d.huecos || []).filter(function (h) { return perLiga(h.ID_LIGA) === per && min(h.HORA) !== null && h.ID_CAMPO && h.DIA_SEMANA; })
+    };
+  }
+
+  /**
+   * El cuadrante de una temporada (per). d: las filas de CAMPOS, INSTALACIONES, CAMPOS_TEMPORADA, DISPONIBILIDAD_CAMPOS,
+   * HUECOS, LIGAS y COMPETICIONES. dura(hueco): lo que dura un partido de ese horario (el de su liga; sin dato, 45).
+   * Devuelve { campos: [{ id, nombre, inst, estado }], dias, rango: { día: [desde, hasta] } (en minutos, a horas enteras),
+   * de(campo, día) → { franjas: [[a, b, fila]], partidos: [{ h, a, b, choque, fuera, carril, carriles }], libres: [[a, b]],
+   * trozos: [{ a, b, f (fila de la franja), suelto }] } }. Libres: dentro de lo alquilado, cada sitio donde cabe un partido (el
+   * más corto de ese campo y día), pegado al anterior. Trozos: los huecos de lo alquilado sin mirar los partidos.
+   */
+  function cuadrante(d, per, dura) {
+    var B = base(d, per, dura), campos = porId(d.campos), insts = porId(d.insts);
+    var ctps = (d.ctps || []).filter(function (c) { return String(c.ID_TEMPORADA) === per && c.ESTADO !== 'Descartado'; });
+    var ctpCampo = {}; ctps.forEach(function (c) { ctpCampo[c.ID] = c; });
+    var franjas = {}; // 'campo|día' → [[desde, hasta]]
+    (d.franjas || []).forEach(function (f) {
+      var c = ctpCampo[f.ID_CAMPO_TEMPORADA], a = min(f.HORA_DESDE), b = min(f.HORA_HASTA, true);
+      if (!c || a === null || b === null || b <= a) return;
+      (franjas[c.ID_CAMPO + '|' + f.DIA_SEMANA] = franjas[c.ID_CAMPO + '|' + f.DIA_SEMANA] || []).push([a, b, f]);
+    });
+    // Campos: los contratados (o en negociación) de esa temporada y los que tienen algún partido; por instalación y nombre.
+    var ids = {};
+    ctps.forEach(function (c) { ids[c.ID_CAMPO] = c.ESTADO || ''; });
+    B.huecos.forEach(function (h) { if (!(h.ID_CAMPO in ids)) ids[h.ID_CAMPO] = ''; });
+    var lista = Object.keys(ids).filter(function (id) { return campos[id]; }).map(function (id) {
+      var c = campos[id], i = insts[c.ID_INSTALACION];
+      return { id: id, nombre: String(c.NOMBRE || id), inst: i ? String(i.NOMBRE || '') : '', estado: ids[id] };
+    }).sort(function (a, b) { return (a.inst + ' ' + a.nombre).localeCompare(b.inst + ' ' + b.nombre, 'es'); });
+    // Días: los que tienen partidos, franjas o alguna liga (para empezar a repartir la de un día vacío).
+    var hay = {};
+    B.huecos.forEach(function (h) { hay[h.DIA_SEMANA] = 1; });
+    Object.keys(franjas).forEach(function (k) { hay[k.split('|')[1]] = 1; });
+    B.deTem.forEach(function (l) { if (l.DIA_SEMANA) hay[l.DIA_SEMANA] = 1; });
+    var dias = DIAS.filter(function (x) { return hay[x]; });
+    // Lo más corto que dura un partido de las ligas de cada día (para los libres de un campo sin partidos).
+    var corto = {};
+    B.deTem.forEach(function (l) { var x = B.durH({ ID_LIGA: l.ID }); if (l.DIA_SEMANA) corto[l.DIA_SEMANA] = Math.min(corto[l.DIA_SEMANA] || Infinity, x); });
+    var cache = {};
+    function de(campo, dia) {
+      var k = campo + '|' + dia;
+      if (cache[k]) return cache[k];
+      var fr = franjas[k] || [];
+      var ps = B.huecos.filter(function (h) { return h.ID_CAMPO === campo && h.DIA_SEMANA === dia; }).map(function (h) {
+        var a = min(h.HORA); return { h: h, a: a, b: a + B.durH(h) };
+      }).sort(function (x, y) { return x.a - y.a || String(x.h.ID).localeCompare(String(y.h.ID)); });
+      // Carriles: dos que se pisan van uno al lado del otro (y los dos en rojo).
+      var fines = [];
+      ps.forEach(function (p) {
+        p.choque = ps.some(function (q) { return q !== p && pisan([p.a, p.b], [q.a, q.b]); });
+        p.fuera = fr.length > 0 && !fr.some(function (r) { return p.a >= r[0] && p.b <= r[1]; });
+        var i = 0; while (i < fines.length && fines[i] > p.a) i++;
+        p.carril = i; fines[i] = p.b;
+      });
+      ps.forEach(function (p) { p.carriles = p.choque ? fines.length : 1; if (!p.choque) p.carril = 0; });
+      var paso = ps.length ? Math.min.apply(null, ps.map(function (p) { return p.b - p.a; })) : (corto[dia] || DURA_SIN_DATO);
+      var libres = [];
+      fr.forEach(function (r) {
+        var m = r[0];
+        while (m + paso <= r[1]) {
+          var tapa = ps.filter(function (p) { return pisan([m, m + paso], [p.a, p.b]); });
+          if (tapa.length) { m = Math.max.apply(null, tapa.map(function (p) { return p.b; })); continue; }
+          libres.push([m, m + paso]); m += paso;
+        }
+      });
+      // Los huecos de lo alquilado, sin mirar los partidos: cada franja partida en partidos de la liga más corta de ese día
+      // (Lunes de 21:00 a 23:15 con ligas de 45: 21:00, 21:45 y 22:30). Lo que no llega a un partido, suelto.
+      var P = corto[dia] || DURA_SIN_DATO, trozos = [];
+      fr.forEach(function (r) {
+        var m = r[0];
+        for (; m + P <= r[1]; m += P) trozos.push({ a: m, b: m + P, f: r[2] });
+        if (m < r[1]) trozos.push({ a: m, b: r[1], f: r[2], suelto: true });
+      });
+      return (cache[k] = { franjas: fr, partidos: ps, libres: libres, paso: paso, trozos: trozos });
+    }
+    var rango = {};
+    dias.forEach(function (x) {
+      var a = Infinity, b = -Infinity;
+      lista.forEach(function (c) {
+        var y = de(c.id, x);
+        y.franjas.forEach(function (r) { a = Math.min(a, r[0]); b = Math.max(b, r[1]); });
+        y.partidos.forEach(function (p) { a = Math.min(a, p.a); b = Math.max(b, p.b); });
+      });
+      if (a === Infinity) { a = 20 * 60; b = 24 * 60; }
+      rango[x] = [Math.floor(a / 60) * 60, Math.min(Math.ceil(b / 60) * 60, 25 * 60)];
+    });
+    return { campos: lista, dias: dias, rango: rango, de: de };
+  }
+
+  /**
+   * Los partidos por meter de un día: [{ l (liga), equipos, partidos, puestos, faltan, sobran }]. Partidos por semana: la
+   * mitad de sus equipos (sin las bajas), redondeando hacia abajo (9 equipos, 4: una descansa); sin equipos, null (no se
+   * sabe todavía). Puestos: sus horarios de ese día. Entran las ligas de ese día y las que tienen algún horario ese día.
+   */
+  function reparto(d, per, dia) {
+    var B = base(d, per), eq = {}, pu = {};
+    (d.inscripciones || []).forEach(function (i) { if (i.ESTADO !== 'Baja') eq[i.ID_LIGA] = (eq[i.ID_LIGA] || 0) + 1; });
+    B.huecos.forEach(function (h) { if (h.DIA_SEMANA === dia) pu[h.ID_LIGA] = (pu[h.ID_LIGA] || 0) + 1; });
+    return B.deTem.filter(function (l) { return l.DIA_SEMANA === dia || pu[l.ID]; }).map(function (l) {
+      var e = eq[l.ID] || 0, n = e ? Math.floor(e / 2) : null, p = pu[l.ID] || 0;
+      return { l: l, equipos: e, partidos: n, puestos: p, faltan: n === null ? 0 : Math.max(n - p, 0), sobran: n === null ? 0 : Math.max(p - n, 0) };
+    }).sort(function (a, b) {
+      return (Number(a.l.NIVEL) || 9) - (Number(b.l.NIVEL) || 9) || String(a.l.NOMBRE).localeCompare(String(b.l.NOMBRE), 'es', { numeric: true });
+    });
+  }
+
+  /**
+   * Lo que no cuadra un día, de lo más grave a lo menos: [{ tipo, ... }]. 'choque' (dos partidos a la vez en un campo:
+   * { campo, a, huecos }), 'fuera' (un partido fuera de lo alquilado: { campo, a, hueco }), 'faltan' y 'sobran' (una liga
+   * con menos o más sitios que partidos: { liga, n }) y 'sinUsar' (un campo alquilado con sitios sin partido: { campo, libres }).
+   * c: el cuadrante; rep: el reparto de ese día.
+   */
+  function alertas(c, rep, dia) {
+    var out = [];
+    c.campos.forEach(function (k) {
+      var vistos = {};
+      c.de(k.id, dia).partidos.forEach(function (p) {
+        if (!p.choque || vistos[p.h.ID]) return;
+        var con = c.de(k.id, dia).partidos.filter(function (q) { return pisan([p.a, p.b], [q.a, q.b]); });
+        con.forEach(function (q) { vistos[q.h.ID] = 1; });
+        out.push({ tipo: 'choque', campo: k, a: p.a, huecos: con.map(function (q) { return q.h; }) });
+      });
+    });
+    c.campos.forEach(function (k) { c.de(k.id, dia).partidos.forEach(function (p) { if (p.fuera) out.push({ tipo: 'fuera', campo: k, a: p.a, hueco: p.h }); }); });
+    rep.forEach(function (r) { if (r.faltan) out.push({ tipo: 'faltan', liga: r.l, n: r.faltan }); });
+    rep.forEach(function (r) { if (r.sobran) out.push({ tipo: 'sobran', liga: r.l, n: r.sobran }); });
+    c.campos.forEach(function (k) { var l = c.de(k.id, dia).libres; if (l.length) out.push({ tipo: 'sinUsar', campo: k, libres: l }); });
+    return out;
+  }
+
+  /**
+   * Cuántos huecos hay alquilados un día frente a los partidos que necesitan sus ligas: { huecos, partidos, sinEquipos,
+   * campos }. Partidos: la suma de los de las ligas con equipos; sinEquipos: cuántas ligas no los tienen todavía.
+   */
+  function cuenta(c, rep, dia) {
+    var h = 0, n = 0;
+    c.campos.forEach(function (k) { var t = c.de(k.id, dia).trozos.filter(function (x) { return !x.suelto; }).length; h += t; if (t) n++; });
+    return { huecos: h, campos: n, partidos: rep.reduce(function (s, r) { return s + (r.partidos || 0); }, 0),
+      sinEquipos: rep.filter(function (r) { return r.partidos === null; }).length };
+  }
+
+  var CALC = { cuadrante: cuadrante, reparto: reparto, alertas: alertas, cuenta: cuenta, min: min, hhmm: hhmm };
+  if (typeof window === 'undefined' || !window.UN || !window.UN.ajustes) { if (typeof module !== 'undefined') module.exports = CALC; return; }
+
+  /* ======================= pantalla ======================= */
+
+  function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function guardado(k, v) { try { if (v === undefined) return localStorage.getItem(k) || ''; localStorage.setItem(k, v); } catch (e) {} return ''; }
+  var TABLAS = ['CAMPOS', 'INSTALACIONES', 'CAMPOS_TEMPORADA', 'DISPONIBILIDAD_CAMPOS', 'HUECOS', 'LIGAS', 'COMPETICIONES', 'INSCRIPCIONES_EQUIPOS'];
+  var PX = 1.6;   // píxeles por minuto: un partido de 45 minutos, 72
+  var IMAN = 15;  // al soltar, la hora va de 15 en 15 minutos
+
+  window.UN.ajustes('CUADRANTE', {
+    abrir: function (el, ctx) {
+      var A = ctx.ajustes, T = ctx.tablas, S = { dia: guardado('aj_cu_dia'), todos: false }, c = null, arr = null, sinClic = false;
+      var dura = function (h) { return A.dura('HUECOS', h); };
+      // Dos vistas con el mismo cuadrante: «Lo alquilado» (en Franjas alquiladas: lo alquilado, vacío, y si llega para los
+      // partidos) y «Reparto» (en Horarios de las ligas: los partidos en los huecos, arrastrando).
+      var reparte = ctx.tabla === 'HUECOS';
+      var puede = reparte && A.puede('HUECOS'), puedeAlq = A.puede('DISPONIBILIDAD_CAMPOS');
+      function datos() {
+        return { campos: T.filas('CAMPOS'), insts: T.filas('INSTALACIONES'), ctps: T.filas('CAMPOS_TEMPORADA'), franjas: T.filas('DISPONIBILIDAD_CAMPOS'),
+          huecos: T.filas('HUECOS'), ligas: T.filas('LIGAS'), comps: T.filas('COMPETICIONES'), inscripciones: T.filas('INSCRIPCIONES_EQUIPOS') };
+      }
+      function y(m) { return Math.round((m - c.rango[S.dia][0]) * PX); }
+      function pintar() {
+        if (!el.isConnected || arr) return;
+        var per = A.periodo(), lista = A.periodos(), d = datos();
+        c = cuadrante(d, per, dura);
+        if (c.dias.indexOf(S.dia) < 0) S.dia = c.dias[0] || '';
+        var html = '<p class="u-nota n-ayuda">' + (reparte ? 'La semana de cada campo, a escala: lo alquilado de fondo y cada partido con lo que dura su liga.' +
+          (puede ? ' Arrastra los partidos para cambiarlos de campo u hora, o desde la caja de abajo para ponerlos.' : '') :
+          'Lo que tienes alquilado cada día, vacío: las franjas de cada campo partidas en huecos de un partido (de lo que dura la liga más corta de ese día). ' +
+          'Arriba, si llegan para los partidos de las ligas de ese día. Los partidos se ponen en «Horarios de las ligas».' +
+          (puedeAlq ? ' Toca un hueco para cambiar su franja.' : '')) + '</p>' +
+          '<div class="u-filtros"><label class="u-campo"><span class="u-etiqueta">Temporada</span><select id="cu-per">' + lista.map(function (p) {
+            return '<option value="' + texto(p.id) + '"' + (p.id === per ? ' selected' : '') + '>' + texto(p.nombre) + '</option>';
+          }).join('') + '</select></label></div>';
+        if (!c.dias.length) {
+          el.innerHTML = html + '<p class="u-vacio">Esta temporada todavía no tiene ligas, horarios ni campos alquilados. Se ponen en «Ligas», en «Franjas alquiladas de los campos» y en «Horarios de las ligas».</p>';
+          oir(); return;
+        }
+        html += '<div class="u-pestanas" role="tablist">' + c.dias.map(function (x) {
+          var rp = reparto(d, per, x), q = cuenta(c, rp, x);
+          var n = reparte ? alertas(c, rp, x).filter(function (a) { return a.tipo !== 'sinUsar'; }).length : (q.huecos < q.partidos ? 1 : 0);
+          return '<button type="button" role="tab" data-dia="' + texto(x) + '" aria-selected="' + (x === S.dia) + '">' + texto(x) +
+            (!reparte ? ' <span class="u-cifra">' + q.huecos + '</span>' : '') + (n ? ' <span class="u-chip aj-cu-n">⚠' + (reparte ? ' ' + n : '') + '</span>' : '') + '</button>';
+        }).join('') + '</div>';
+        // Los campos de ese día (con franjas o partidos); con «Todos los campos», también los demás de la temporada.
+        var cs = c.campos.filter(function (k) { var x = c.de(k.id, S.dia); return S.todos || x.franjas.length || (reparte && x.partidos.length); });
+        if (!cs.length) cs = c.campos;
+        var R = c.rango[S.dia], alto = y(R[1]);
+        var horas = '';
+        for (var m = R[0]; m <= R[1]; m += 15) horas += '<span class="' + (m % 60 ? '' : 'aj-cu-en') + '" style="top:' + y(m) + 'px">' + (m % 30 ? '' : hhmm(m)) + '</span>';
+        html += reparte ? avisos(alertas(c, reparto(d, per, S.dia), S.dia)) : resumen(cuenta(c, reparto(d, per, S.dia), S.dia));
+        html += '<label class="u-check aj-cu-todos"><input type="checkbox" id="cu-todos"' + (S.todos ? ' checked' : '') + '> Todos los campos de la temporada</label>' +
+          '<div class="aj-cu-caja"><div class="aj-cu" style="grid-template-columns: 52px repeat(' + cs.length + ', minmax(140px, 1fr))">' +
+          '<div></div>' + cs.map(function (k) {
+            return '<div class="aj-cu-cab"><button type="button" class="u-btn u-btn-texto" data-campo="' + texto(k.id) + '">' + texto((k.inst ? k.inst + ' · ' : '') + k.nombre) + '</button>' +
+              (k.estado && k.estado !== 'Contratado' ? ' <span class="u-chip">' + texto(k.estado) + '</span>' : '') + '</div>';
+          }).join('') +
+          '<div class="aj-cu-horas" style="height:' + alto + 'px">' + horas + '</div>' + cs.map(function (k) { return reparte ? columna(k, R, alto) : columnaAlq(k, alto); }).join('') +
+          '</div></div>' +
+          (reparte ? '<p class="aj-cu-ley"><span class="aj-cu-alq">Alquilado</span><span class="aj-cu-no">Sin alquilar</span><span class="aj-cu-choque">⚠ Dos partidos a la vez</span><span class="aj-cu-fuera">Fuera de lo alquilado</span></p>' +
+            '<p class="u-nota">Un campo sin franjas ese día sale sin fondo: no se sabe qué está alquilado.</p>' + bandeja(d, per) :
+            (puedeAlq ? '<p><button type="button" class="u-btn" data-alq-nueva>Añadir una franja el ' + texto(S.dia.toLowerCase()) + '</button></p>' : ''));
+        el.innerHTML = html;
+        oir();
+      }
+      /** Las alertas del día, arriba del cuadrante: cada una se toca para ir a lo que la causa. */
+      function avisos(as) {
+        if (!as.length) return '<p class="aj-cu-ok">✓ Este día cuadra: ningún partido a la vez, todos dentro de lo alquilado y cada liga con sus partidos.</p>';
+        var campo = function (k) { return texto((k.inst ? k.inst + ' · ' : '') + k.nombre); }, liga = function (id) { return texto(A.nombre('LIGAS', id)); };
+        var graves = as.filter(function (a) { return a.tipo !== 'sinUsar'; }), leves = as.filter(function (a) { return a.tipo === 'sinUsar'; });
+        var li = function (a) {
+          if (a.tipo === 'choque') return '<li><button type="button" class="u-btn u-btn-texto" data-hueco="' + texto(a.huecos[0].ID) + '">Dos partidos a la vez</button> en ' + campo(a.campo) + ' a las ' + hhmm(a.a) + ': ' +
+            a.huecos.map(function (h) { return liga(h.ID_LIGA); }).join(' y ') + '.</li>';
+          if (a.tipo === 'fuera') return '<li><button type="button" class="u-btn u-btn-texto" data-hueco="' + texto(a.hueco.ID) + '">Fuera de lo alquilado</button>: ' + liga(a.hueco.ID_LIGA) + ' en ' + campo(a.campo) + ' a las ' + hhmm(a.a) + '.</li>';
+          if (a.tipo === 'faltan') return '<li><button type="button" class="u-btn u-btn-texto" data-liga-ficha="' + texto(a.liga.ID) + '">' + liga(a.liga.ID) + '</button>: ' + (a.n === 1 ? 'falta 1 partido' : 'faltan ' + a.n + ' partidos') + ' por meter.</li>';
+          if (a.tipo === 'sobran') return '<li><button type="button" class="u-btn u-btn-texto" data-liga-ficha="' + texto(a.liga.ID) + '">' + liga(a.liga.ID) + '</button>: ' + (a.n === 1 ? 'sobra 1 sitio' : 'sobran ' + a.n + ' sitios') + ' (tiene más horarios que partidos).</li>';
+          return '<li>Alquilado sin usar: ' + campo(a.campo) + ', ' + a.libres.length + (a.libres.length === 1 ? ' sitio' : ' sitios') + ' (' + a.libres.map(function (r) { return hhmm(r[0]); }).join(', ') + ').</li>';
+        };
+        return (graves.length ? '<section class="aj-cu-alertas" role="alert"><h3 class="n-grupo">⚠ Revisa <span class="u-cifra">' + graves.length + '</span></h3><ul>' + graves.map(li).join('') + '</ul></section>' : '') +
+          (leves.length ? '<section class="aj-cu-alertas aj-cu-leve"><h3 class="n-grupo">Campos alquilados de más <span class="u-cifra">' + leves.length + '</span></h3><ul>' + leves.map(li).join('') + '</ul></section>' : '');
+      }
+      /** Huecos alquilados del día frente a los partidos que necesitan sus ligas. */
+      function resumen(q) {
+        var pl = function (n, a, b) { return n + ' ' + (n === 1 ? a : b); };
+        var txt = pl(q.huecos, 'hueco alquilado', 'huecos alquilados') + ' en ' + pl(q.campos, 'campo', 'campos') + '. Las ligas de este día necesitan ' +
+          pl(q.partidos, 'partido', 'partidos') + ' por semana' + (q.sinEquipos ? ' (y ' + pl(q.sinEquipos, 'liga todavía sin equipos', 'ligas todavía sin equipos') + ')' : '') + '.';
+        if (q.huecos < q.partidos) return '<section class="aj-cu-alertas" role="alert"><h3 class="n-grupo">⚠ Faltan ' + pl(q.partidos - q.huecos, 'hueco', 'huecos') + ': alquila más</h3><p>' + texto(txt) + '</p></section>';
+        if (q.huecos > q.partidos) return '<section class="aj-cu-alertas aj-cu-leve"><h3 class="n-grupo">Sobran ' + pl(q.huecos - q.partidos, 'hueco', 'huecos') + ' (alquilados de más)</h3><p>' + texto(txt) + '</p></section>';
+        return '<p class="aj-cu-ok">✓ ' + texto(txt) + ' Justo.</p>';
+      }
+      /** Una columna de la vista Lo alquilado: lo alquilado de fondo y sus huecos, vacíos. */
+      function columnaAlq(k, alto) {
+        var x = c.de(k.id, S.dia), h = '';
+        x.franjas.forEach(function (r) { h += '<div class="aj-cu-alq aj-cu-fr" style="top:' + y(r[0]) + 'px;height:' + (y(r[1]) - y(r[0])) + 'px"></div>'; });
+        x.trozos.forEach(function (t) {
+          var dentro = hhmm(t.a) + (t.suelto ? '–' + hhmm(t.b) + ' · suelto' : '');
+          h += '<button type="button" class="aj-cu-hueco' + (t.suelto ? ' aj-cu-suelto' : '') + '"' + (puedeAlq ? ' data-alq="' + texto(t.f.ID) + '"' : ' disabled') +
+            ' style="top:' + (y(t.a) + 2) + 'px;height:' + (y(t.b) - y(t.a) - 4) + 'px"' + (t.suelto ? ' title="No llega a un partido entero"' : '') + '>' + dentro + '</button>';
+        });
+        return '<div class="aj-cu-col' + (x.franjas.length ? ' aj-cu-no' : '') + '" data-col="' + texto(k.id) + '" style="height:' + alto + 'px">' + h + '</div>';
+      }
+      function columna(k, R, alto) {
+        var x = c.de(k.id, S.dia), h = '';
+        x.franjas.forEach(function (r) { h += '<div class="aj-cu-alq aj-cu-fr" style="top:' + y(r[0]) + 'px;height:' + (y(r[1]) - y(r[0])) + 'px"></div>'; });
+        if (puede) x.libres.forEach(function (r) {
+          h += '<button type="button" class="aj-cu-libre" data-nuevo="' + texto(k.id) + '|' + hhmm(r[0]) + '" style="top:' + (y(r[0]) + 2) + 'px;height:' + (y(r[1]) - y(r[0]) - 4) + 'px">' + hhmm(r[0]) + ' · libre</button>';
+        });
+        x.partidos.forEach(function (p) {
+          var aviso = p.choque ? ' aj-cu-choque' : p.fuera ? ' aj-cu-fuera' : '', w = 100 / p.carriles;
+          var mueve = puede && !p.h._nueva;
+          h += '<button type="button" class="aj-cu-liga' + aviso + '" data-hueco="' + texto(p.h.ID) + '"' + (mueve ? ' data-arr="hueco"' : '') +
+            ' style="top:' + (y(p.a) + 1) + 'px;height:' + (y(p.b) - y(p.a) - 2) + 'px;left:calc(' + (p.carril * w) + '% + 2px);width:calc(' + w + '% - 4px)"' +
+            (p.choque ? ' title="Dos partidos a la vez en este campo"' : p.fuera ? ' title="Fuera de lo alquilado"' : '') + '>' +
+            '<span class="aj-cu-hora">' + hhmm(p.a) + '–' + hhmm(p.b) + '</span>' + (p.choque ? '⚠ ' : '') + texto(A.nombre('LIGAS', p.h.ID_LIGA)) +
+            (p.h.ID_ARBITRO ? '<small>' + texto(A.nombre('STAFF', p.h.ID_ARBITRO)) + '</small>' : '') + '</button>';
+        });
+        return '<div class="aj-cu-col' + (x.franjas.length ? ' aj-cu-no' : '') + '" data-col="' + texto(k.id) + '" style="height:' + alto + 'px">' + h + '</div>';
+      }
+      function bandeja(d, per) {
+        var rs = reparto(d, per, S.dia);
+        if (!rs.length) return '';
+        return '<section class="aj-cu-bandeja" data-bandeja><h3 class="n-grupo">Partidos por meter</h3>' +
+          '<p class="u-nota">Cada semana, una liga juega la mitad de sus equipos en partidos (con 9 equipos, 4: uno descansa).' + (puede ? ' Arrastra un partido al cuadrante para ponerlo, o uno del cuadrante aquí para quitarlo.' : '') + '</p>' +
+          rs.map(function (r) {
+            var l = r.l, nom = texto(A.nombre('LIGAS', l.ID)), fichas = '';
+            if (puede) {
+              for (var i = 0; i < Math.min(r.faltan, 12); i++) fichas += '<button type="button" class="aj-cu-ficha" data-arr="liga" data-liga="' + texto(l.ID) + '">' + nom + '</button>';
+              if (!r.faltan) fichas += '<button type="button" class="aj-cu-ficha aj-cu-mas" data-arr="liga" data-liga="' + texto(l.ID) + '" title="Arrástralo para poner uno más">+ uno más</button>';
+            }
+            var estado = r.partidos === null ? 'sin equipos todavía' : r.equipos + (r.equipos === 1 ? ' equipo' : ' equipos') + ' · ' + r.partidos + (r.partidos === 1 ? ' partido' : ' partidos');
+            var cuenta = r.partidos === null ? r.puestos + ' puestos' : r.faltan ? '<strong>faltan ' + r.faltan + '</strong>' :
+              r.sobran ? '<span class="aj-cu-sobra">sobran ' + r.sobran + (r.sobran === 1 ? ' sitio' : ' sitios') + '</span>' : '✓ todos puestos';
+            return '<div class="aj-cu-rep"><div class="aj-cu-rep-n"><button type="button" class="u-btn u-btn-texto" data-liga-ficha="' + texto(l.ID) + '">' + nom + '</button>' +
+              '<small>' + texto(estado) + ' · ' + cuenta + '</small></div><div class="aj-cu-fichas">' + fichas + '</div></div>';
+          }).join('') + '</section>';
+      }
+      function oir() {
+        var sp = el.querySelector('#cu-per');
+        if (sp) sp.onchange = function () { A.ponerPeriodo(sp.value); pintar(); };
+        var st = el.querySelector('#cu-todos');
+        if (st) st.onchange = function () { S.todos = st.checked; pintar(); };
+      }
+
+      /* ---------- arrastrar (con el ratón o el dedo) ---------- */
+
+      function abajo(e) {
+        if (e.button !== 0 || !puede || !c) return;
+        var b = e.target.closest('[data-arr]');
+        if (!b || !el.contains(b)) return;
+        var r = b.getBoundingClientRect(), es = b.getAttribute('data-arr') === 'hueco';
+        var h = es ? T.fila('HUECOS', b.getAttribute('data-hueco')) : { ID_LIGA: b.getAttribute('data-liga') };
+        if (!h) return;
+        arr = { b: b, h: h, es: es, x0: e.clientX, y0: e.clientY, dy: es ? e.clientY - r.top : 8, dura: Number(dura(h)) || 45, activo: false };
+      }
+      function mover(e) {
+        if (!arr) return;
+        if (!el.isConnected) { soltar(null); return; }
+        if (!arr.activo) {
+          if (Math.abs(e.clientX - arr.x0) + Math.abs(e.clientY - arr.y0) < 6) return;
+          arr.activo = true;
+          arr.f = document.createElement('div');
+          arr.f.className = 'aj-cu-fantasma';
+          arr.f.style.height = Math.round(arr.dura * PX) + 'px';
+          arr.f.textContent = A.nombre('LIGAS', arr.h.ID_LIGA);
+          el.appendChild(arr.f);
+          arr.b.classList.add('aj-cu-cogido');
+          document.body.classList.add('aj-cu-arrastrando');
+        }
+        e.preventDefault();
+        arr.f.style.left = (e.clientX - 20) + 'px';
+        arr.f.style.top = (e.clientY - arr.dy) + 'px';
+        var bajo = document.elementFromPoint(e.clientX, e.clientY), col = bajo && bajo.closest('[data-col]'), caja = bajo && bajo.closest('[data-bandeja]');
+        marca(null);
+        arr.a = null;
+        if (col && el.contains(col)) {
+          var R = c.rango[S.dia], top = col.getBoundingClientRect().top;
+          var m = R[0] + Math.round((e.clientY - arr.dy - top) / PX / IMAN) * IMAN;
+          m = Math.max(R[0], Math.min(m, R[1] - arr.dura));
+          var campo = col.getAttribute('data-col'), x = c.de(campo, S.dia), tr = [m, m + arr.dura];
+          var mal = x.partidos.filter(function (p) { return p.h !== arr.h && pisan(tr, [p.a, p.b]); });
+          var fuera = x.franjas.length > 0 && !x.franjas.some(function (r) { return m >= r[0] && m + arr.dura <= r[1]; });
+          arr.a = { campo: campo, m: m, mal: mal };
+          marca(col, m, mal.length ? 'mal' : fuera ? 'fuera' : 'bien',
+            hhmm(m) + '–' + hhmm(m + arr.dura) + (mal.length ? ' · se pisa con ' + A.nombre('LIGAS', mal[0].h.ID_LIGA) : fuera ? ' · fuera de lo alquilado' : ''));
+        } else if (caja && el.contains(caja) && arr.es) {
+          arr.a = { quitar: true };
+          caja.classList.add('aj-cu-quitar');
+        }
+      }
+      function marca(col, m, tipo, t) {
+        var v = el.querySelector('.aj-cu-marca');
+        if (v) v.parentNode.removeChild(v);
+        var q = el.querySelector('.aj-cu-quitar');
+        if (q) q.classList.remove('aj-cu-quitar');
+        if (!col) return;
+        v = document.createElement('div');
+        v.className = 'aj-cu-marca aj-cu-marca-' + tipo;
+        v.style.top = y(m) + 'px'; v.style.height = Math.round(arr.dura * PX) + 'px';
+        v.textContent = t;
+        col.appendChild(v);
+      }
+      function soltar(e) {
+        if (!arr) return;
+        var a = arr;
+        arr = null;
+        document.body.classList.remove('aj-cu-arrastrando');
+        if (!a.activo) return;
+        sinClic = true; setTimeout(function () { sinClic = false; }, 0);
+        if (a.f && a.f.parentNode) a.f.parentNode.removeChild(a.f);
+        a.b.classList.remove('aj-cu-cogido');
+        marca(null);
+        var fin = a.a;
+        if (!e || !fin) { pintar(); return; }
+        var mal = function (err) { ctx.aviso(err && err.message ? err.message : 'No se ha guardado.'); pintar(); };
+        if (fin.quitar) { A.quitar('HUECOS', a.h.ID).then(function () { ctx.aviso('Quitado del cuadrante.'); }, mal); pintar(); return; }
+        if (fin.mal.length) { ctx.aviso('Ahí se pisa con ' + A.nombre('LIGAS', fin.mal[0].h.ID_LIGA) + ' (' + hhmm(fin.mal[0].a) + '). Prueba en otro sitio.'); pintar(); return; }
+        var hora = hhmm(fin.m);
+        if (a.es) {
+          if (a.h.ID_CAMPO === fin.campo && a.h.HORA === hora) { pintar(); return; }
+          A.cambiar('HUECOS', a.h.ID, { ID_CAMPO: fin.campo, HORA: hora }).then(null, mal);
+        } else {
+          A.crear('HUECOS', { ID_LIGA: a.h.ID_LIGA, DIA_SEMANA: S.dia, HORA: hora, ID_CAMPO: fin.campo }).then(null, mal);
+        }
+        pintar();
+      }
+      function tecla(e) { if (e.key === 'Escape' && arr) { e.stopPropagation(); soltar(null); } }
+      el.addEventListener('pointerdown', abajo);
+      document.addEventListener('pointermove', mover, { passive: false });
+      document.addEventListener('pointerup', soltar);
+      function cancelar() { soltar(null); }
+      document.addEventListener('pointercancel', cancelar);
+      document.addEventListener('keydown', tecla, true);
+      this.cerrar = function () {
+        document.removeEventListener('pointermove', mover);
+        document.removeEventListener('pointerup', soltar);
+        document.removeEventListener('pointercancel', cancelar);
+        document.removeEventListener('keydown', tecla, true);
+      };
+
+      el.addEventListener('click', function (e) {
+        if (sinClic) { e.preventDefault(); return; }
+        var b = e.target.closest('[data-dia], [data-hueco], [data-nuevo], [data-campo], [data-liga-ficha], [data-alq], [data-alq-nueva]');
+        if (!b) return;
+        if (b.hasAttribute('data-dia')) { S.dia = b.getAttribute('data-dia'); guardado('aj_cu_dia', S.dia); pintar(); return; }
+        if (b.hasAttribute('data-hueco')) { A.ficha('HUECOS', b.getAttribute('data-hueco')); return; }
+        if (b.hasAttribute('data-campo')) { A.ficha('CAMPOS', b.getAttribute('data-campo')); return; }
+        if (b.hasAttribute('data-liga-ficha')) { A.ficha('LIGAS', b.getAttribute('data-liga-ficha')); return; }
+        if (b.hasAttribute('data-alq')) { A.ficha('DISPONIBILIDAD_CAMPOS', b.getAttribute('data-alq')); return; }
+        if (b.hasAttribute('data-alq-nueva')) { A.nueva('DISPONIBILIDAD_CAMPOS', { DIA_SEMANA: S.dia }); return; }
+        var p = b.getAttribute('data-nuevo').split('|');
+        A.nueva('HUECOS', { ID_CAMPO: p[0], DIA_SEMANA: S.dia, HORA: p[1] });
+      });
+      ctx.alCambiar(function (t) { if (TABLAS.indexOf(t) >= 0) pintar(); });
+      T.leer(TABLAS.concat(['STAFF'])).then(pintar, pintar);
+      pintar();
+    }
+  });
+})();

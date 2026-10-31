@@ -531,6 +531,125 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .eco-sw button[aria-pressed=true][data-tipo=Gasto] { color: var(--color-error); }
 .u .u-campo input.eco-imp { font-size: 22px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
 .u .eco-opc { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--color-suave); }
+
+/* T0292 · Ajustes: las tablas de cada bloque y las acciones, como botones grandes; las hijas dentro de la ficha. */
+.u .aj-bloque { margin: 0 0 var(--e4); }
+.u .aj-lista { display: grid; gap: var(--e2); grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin: 0 0 var(--e3); }
+.u .aj-tabla { display: flex; flex-direction: column; align-items: flex-start; gap: var(--e1); min-height: 56px; padding: var(--e3) var(--e4);
+  border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto); font: inherit; text-align: left; cursor: pointer; }
+.u .aj-tabla:hover { background: var(--color-bloque); }
+.u .aj-tabla:focus-visible { outline: 3px solid var(--color-principal-oscuro); outline-offset: 2px; }
+.u .aj-tabla strong { font-size: 15px; }
+.u .aj-tabla .u-cifra { font-weight: 400; color: var(--color-suave); }
+.u .aj-tabla small { color: var(--color-suave); font-size: 13px; }
+.u .aj-accion { border-style: dashed; border-color: var(--color-borde-campo); }
+.u .aj-hija { margin: var(--e4) 0; }
+.u .aj-color { display: inline-block; width: 14px; height: 14px; margin-right: 6px; vertical-align: -2px; border: 1px solid var(--color-borde-campo); border-radius: 50%; }
+.u .aj-hija > .u-btn { margin-top: var(--e2); }
+/* T0292 · Cuadrante de campos (vista de Ajustes de Konamigas): el tiempo a escala hacia abajo, lo alquilado de fondo, cada
+   partido encima con lo que dura su liga, los choques en rojo; se arrastran, y desde la caja de «Partidos por meter». */
+.u .aj-cu-todos { margin: 0 0 var(--e2); }
+.u .aj-cu-alertas { margin: 0 0 var(--e3); padding: var(--e2) var(--e3); border-left: 4px solid var(--color-error); border-radius: var(--radio-peq);
+  background: color-mix(in srgb, var(--color-error) 8%, var(--color-superficie)); }
+.u .aj-cu-alertas.aj-cu-leve { border-left-color: var(--estado-pr); background: color-mix(in srgb, var(--estado-pr) 8%, var(--color-superficie)); }
+.u .aj-cu-alertas .n-grupo { margin: 0; font-size: 15px; }
+.u .aj-cu-alertas ul { margin: var(--e1) 0 0; padding-left: var(--e4); font-size: 14px; }
+.u .aj-cu-alertas .u-btn-texto { min-height: 0; padding: 0; font-weight: 700; }
+.u .aj-cu-ok { margin: 0 0 var(--e3); color: var(--color-bien); font-weight: 700; }
+.u .aj-cu-caja { overflow-x: auto; border: 1px solid var(--color-linea); border-radius: var(--radio); }
+.u .aj-cu { display: grid; column-gap: 1px; background: var(--color-linea); }
+.u .aj-cu > * { background: var(--color-superficie); }
+.u .aj-cu-cab { position: sticky; top: 0; z-index: 2; padding: var(--e2); font-size: 14px; }
+.u .aj-cu-cab .u-btn-texto { min-height: 0; padding: 0; font-weight: 700; text-align: left; }
+.u .aj-cu-horas { position: relative; }
+.u .aj-cu-horas span { position: absolute; right: 6px; transform: translateY(-50%); font-size: 12px; color: var(--color-suave); }
+.u .aj-cu-horas span:first-child { transform: none; }
+.u .aj-cu-horas span:last-child { transform: translateY(-100%); }
+.u .aj-cu-horas .aj-cu-en { font-weight: 700; color: var(--color-texto); }
+.u .aj-cu-col { position: relative; background-image: repeating-linear-gradient(to bottom, var(--color-linea) 0 1px, transparent 1px 24px); }
+.u .aj-cu-fr { position: absolute; left: 0; right: 0; }
+.u .aj-cu-alq { background-color: color-mix(in srgb, var(--color-bien) 18%, var(--color-superficie)); }
+.u .aj-cu-no { background-color: color-mix(in srgb, var(--color-texto) 7%, var(--color-superficie)); }
+.u .aj-cu-liga { position: absolute; z-index: 1; overflow: hidden; padding: 2px var(--e2); border: 0; border-radius: var(--radio-peq); text-align: left; line-height: 1.25;
+  background: color-mix(in srgb, var(--color-principal) 26%, var(--color-superficie)); box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+  color: var(--color-texto); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; touch-action: none; }
+.u .aj-cu-liga[data-arr] { cursor: grab; }
+.u .aj-cu-liga small { display: block; font-weight: 400; color: var(--color-suave); }
+.u .aj-cu-hora { display: block; font-size: 11px; font-weight: 400; color: var(--color-suave); }
+.u .aj-cu-choque { background: color-mix(in srgb, var(--color-error) 20%, var(--color-superficie)); outline: 2px solid var(--color-error); }
+.u .aj-cu-fuera { outline: 2px dashed var(--estado-pr); outline-offset: -2px; }
+.u .aj-cu-cogido { opacity: .35; }
+.u .aj-cu-libre { position: absolute; left: 2px; right: 2px; border: 1px dashed var(--color-borde-campo); border-radius: var(--radio-peq); background: transparent;
+  color: var(--color-suave); font: inherit; font-size: 12px; cursor: pointer; }
+.u .aj-cu-hueco { position: absolute; left: 4px; right: 4px; border: 1px solid color-mix(in srgb, var(--color-bien) 55%, var(--color-superficie)); border-radius: var(--radio-peq);
+  background: var(--color-superficie); color: var(--color-texto); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.u .aj-cu-hueco:hover { border-color: var(--color-principal-oscuro); }
+.u .aj-cu-hueco:disabled { cursor: default; }
+.u .aj-cu-suelto { border-style: dashed; background: transparent; color: var(--color-suave); font-weight: 400; font-size: 12px; }
+.u .aj-cu-alertas p { margin: var(--e1) 0 0; font-size: 14px; }
+.u .aj-cu-libre:hover { border-color: var(--color-principal-oscuro); color: var(--color-texto); }
+.u .aj-cu-marca { position: absolute; z-index: 3; left: 2px; right: 2px; padding: 2px var(--e2); border: 2px solid var(--color-bien); border-radius: var(--radio-peq);
+  background: color-mix(in srgb, var(--color-bien) 25%, transparent); font-size: 12px; font-weight: 700; pointer-events: none; }
+.u .aj-cu-marca-fuera { border-color: var(--estado-pr); border-style: dashed; background: color-mix(in srgb, var(--estado-pr) 18%, transparent); }
+.u .aj-cu-marca-mal { border-color: var(--color-error); background: color-mix(in srgb, var(--color-error) 22%, transparent); }
+.u .aj-cu-fantasma { position: fixed; z-index: 50; width: 160px; padding: 2px var(--e2); border-radius: var(--radio-peq); opacity: .85; pointer-events: none;
+  background: color-mix(in srgb, var(--color-principal) 45%, var(--color-superficie)); box-shadow: 0 6px 16px rgb(0 0 0 / 25%); font-size: 13px; font-weight: 700; }
+body.aj-cu-arrastrando { cursor: grabbing; user-select: none; -webkit-user-select: none; }
+.u .aj-cu-ley { display: flex; flex-wrap: wrap; gap: var(--e2); margin: var(--e3) 0 var(--e1); font-size: 13px; }
+.u .aj-cu-ley span { padding: 2px var(--e2); border-radius: var(--radio-peq); }
+.u .aj-cu-bandeja { margin: var(--e4) 0 0; padding: var(--e3); border: 2px dashed var(--color-linea); border-radius: var(--radio); }
+.u .aj-cu-bandeja.aj-cu-quitar { border-color: var(--color-error); background: color-mix(in srgb, var(--color-error) 8%, var(--color-superficie)); }
+.u .aj-cu-rep { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e3); padding: var(--e2) 0; border-top: 1px solid var(--color-linea); }
+.u .aj-cu-rep-n { flex: 0 0 240px; display: flex; flex-direction: column; }
+.u .aj-cu-rep-n .u-btn-texto { align-self: flex-start; min-height: 0; padding: 0; font-weight: 700; text-align: left; }
+.u .aj-cu-rep-n small { color: var(--color-suave); font-size: 13px; }
+.u .aj-cu-sobra { color: var(--estado-pr); font-weight: 700; }
+.u .aj-cu-fichas { display: flex; flex-wrap: wrap; gap: var(--e1); }
+.u .aj-cu-ficha { padding: var(--e1) var(--e2); border: 0; border-radius: var(--radio-peq); background: color-mix(in srgb, var(--color-principal) 26%, var(--color-superficie));
+  color: var(--color-texto); font: inherit; font-size: 13px; font-weight: 700; cursor: grab; touch-action: none; }
+.u .aj-cu-mas { background: transparent; border: 1px dashed var(--color-borde-campo); font-weight: 400; color: var(--color-suave); }
+@media (max-width: 600px) { .u .aj-cu-rep-n { flex-basis: 100%; } }
+/* T0292 · Vistas de las tablas de Ajustes de Konamigas: calendario, esquema de competiciones y semana de ligas. */
+.u .aj-modos { margin: 0 0 var(--e3); }
+.u .aj-cal { display: grid; gap: var(--e4); grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+.u .aj-cal-t { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.u .aj-cal-t th { font-size: 12px; color: var(--color-suave); font-weight: 600; padding: 2px 0; }
+.u .aj-cal-t td { padding: 1px; }
+.u .aj-cal-d { position: relative; display: block; width: 100%; aspect-ratio: 1; border: 1px solid transparent; border-radius: var(--radio-peq);
+  background: transparent; color: var(--color-texto); font: inherit; font-size: 13px; cursor: pointer; }
+.u .aj-cal-d:hover { border-color: var(--color-linea); }
+.u .aj-cal-d:focus-visible { outline: 3px solid var(--color-principal-oscuro); outline-offset: 1px; }
+.u .aj-cal-p { position: absolute; left: 50%; bottom: 3px; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: var(--color-principal); }
+.u .aj-cal-ley .aj-cal-p { position: static; display: inline-block; margin: 0 2px 1px 0; }
+.u .aj-cal-fes { background: color-mix(in srgb, var(--color-error) 22%, var(--color-superficie)); font-weight: 700; }
+.u .aj-cal-des { background: color-mix(in srgb, var(--estado-pr) 22%, var(--color-superficie)); font-weight: 700; }
+.u .aj-cal-ley { display: flex; flex-wrap: wrap; gap: var(--e2); margin: 0 0 var(--e1); font-size: 13px; }
+.u .aj-cal-ley span { padding: 2px var(--e2); border-radius: var(--radio-peq); }
+.u .aj-cal-perdidas ul { margin: 0 0 var(--e3); padding-left: var(--e4); font-size: 14px; }
+.u .aj-cal-perdidas .u-btn-texto { min-height: 0; padding: 0; }
+.u .aj-or { display: flex; flex-direction: column; gap: var(--e4); overflow-x: auto; padding-bottom: var(--e2); }
+.u .aj-or-fila { padding: 0 0 var(--e4); border-bottom: 1px solid var(--color-linea); }
+.u .aj-or-rama { display: flex; align-items: center; }
+.u .aj-or-rama > .aj-or-c, .u .aj-or-paso > .aj-or-c, .u .aj-or-sueltas .aj-or-c { flex: 0 0 220px; width: 220px; }
+.u .aj-or-hijas { display: flex; flex-direction: column; gap: var(--e3); }
+.u .aj-or-paso { display: flex; align-items: center; }
+.u .aj-or-flecha { position: relative; flex: 0 0 130px; height: 36px; margin: 0 var(--e1); border: 0; background: none; cursor: pointer; font: inherit; }
+.u .aj-or-flecha::before { content: ''; position: absolute; left: 0; right: 10px; top: 50%; border-top: 2px solid var(--color-principal-oscuro); }
+.u .aj-or-flecha::after { content: ''; position: absolute; right: 0; top: calc(50% - 6px); border: 6px solid transparent; border-left: 10px solid var(--color-principal-oscuro); border-right: 0; }
+.u .aj-or-flecha span { position: relative; z-index: 1; padding: 1px var(--e2); border-radius: var(--radio-peq); background: color-mix(in srgb, var(--color-principal) 30%, var(--color-superficie));
+  font-size: 13px; font-weight: 700; color: var(--color-texto); }
+.u .aj-or-flecha:hover span { background: var(--color-principal); }
+.u .aj-or-sueltas { display: flex; flex-wrap: wrap; gap: var(--e3); }
+.u .aj-or-c, .u .aj-se-liga { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: var(--e2) var(--e3); border: 1px solid var(--color-linea); border-radius: var(--radio);
+  background: var(--color-superficie); color: var(--color-texto); font: inherit; text-align: left; cursor: pointer; }
+.u .aj-or-c:hover, .u .aj-se-liga:hover { background: var(--color-bloque); }
+.u .aj-or-c small, .u .aj-se-liga small { color: var(--color-suave); font-size: 13px; }
+.u .aj-or-nota { font-style: italic; }
+.u .aj-se { display: grid; gap: var(--e3); grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); align-items: start; }
+.u .aj-se-dia .aj-se-liga { margin: 0 0 var(--e2); }
+.u .aj-se-falta { color: var(--color-error); }
+.u .aj-notas { display: block; max-width: 60ch; margin-top: 2px; white-space: normal; }
+.u .aj-volver { display: inline-flex; width: auto; justify-content: flex-start; min-height: 0; padding: 0; margin: 0 0 var(--e2); }
 /* Presupuesto de una categoría: la recomendación en su bloque, con su botón; importes alineados a la derecha */
 .u .eco-rec { display: flex; flex-direction: column; align-items: flex-start; gap: var(--e2); }
 .u .eco-rec .u-nota { margin: 0; }
