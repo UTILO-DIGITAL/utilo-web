@@ -404,7 +404,10 @@
     document.title = s.titulo + ' · ' + (C.nombreApp || cred.negocio || '');
     if (push) history.pushState({ s: s.id }, '', href && /^\?s=/.test(href) ? href : '?s=' + s.id.toLowerCase());
     window.scrollTo(0, 0); document.body.scrollTop = 0;
-    var el = $('n-sec');
+    // T0292: cada sección recibe un <main> nuevo, sin los oyentes que le pusieron las de antes (si no, un clic en otra
+    // sección también lo atendía la anterior, y volver a una le duplicaba los suyos).
+    var viejo = $('n-sec'), el = viejo.cloneNode(false);
+    viejo.parentNode.replaceChild(el, viejo);
     if (s.propia) { el.innerHTML = htmlPerfil(); return; }
     var t = setTimeout(function () { if (actual === s.id && !el.childNodes.length) el.innerHTML = '<div class="kz-centro" role="status"><div class="u-carga"></div></div>'; }, 150);
     cargar(s).then(function (def) {

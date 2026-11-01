@@ -1678,7 +1678,8 @@
       porColor[x.ID_COLOR].push(x); total += Number(x.CANTIDAD) || 0;
     });
     orden.sort(function (a, b) { return nombreColor(a) < nombreColor(b) ? -1 : 1; });
-    var t = ['Pedido ' + p.ID + ' · Konamigas', 'Modelo: ' + nombreModelo(p.ID_MODELO), p.ID_PROVEEDOR ? 'Proveedor: ' + nombreProveedor(p.ID_PROVEEDOR) : '',
+    var mod = S.T.fila('MODELOS', p.ID_MODELO) || {};
+    var t = ['Pedido ' + p.ID + ' · Konamigas', 'Modelo: ' + nombreModelo(p.ID_MODELO), mod.DISENO_URL ? 'Diseño (logos y estampados): ' + mod.DISENO_URL : '', p.ID_PROVEEDOR ? 'Proveedor: ' + nombreProveedor(p.ID_PROVEEDOR) : '',
       p.FECHA_PEDIDO ? 'Fecha del pedido: ' + fecha(p.FECHA_PEDIDO) : '', p.FECHA_ESTIMADA ? 'Lo necesitamos hacia el: ' + fecha(p.FECHA_ESTIMADA) : ''].filter(String);
     orden.forEach(function (col) {
       var n = porColor[col].reduce(function (s, x) { return s + (Number(x.CANTIDAD) || 0); }, 0), cod = codigoColor(col, p.ID_PROVEEDOR, p.ID_MODELO);
@@ -1779,6 +1780,8 @@
       fila('Contacto', texto([con.persona, con.tel, con.correo].filter(Boolean).join(' · '))) +
       fila('Fecha del pedido', texto(fecha(p.FECHA_PEDIDO))) + fila('Lo necesitamos hacia el', texto(fecha(p.FECHA_ESTIMADA))) +
       fila('Temporada', texto(temp)) + fila('Modelo', texto([mod.NOMBRE, mod.PRENDA].filter(Boolean).join(' · '))) +
+      // T0292: el diseño del modelo (MODELOS · DISENO_URL, el PDF con los logos y estampados), para el proveedor.
+      fila('Diseño (logos y estampados)', /^https?:\/\//.test(String(mod.DISENO_URL || '')) ? '<a href="' + texto(mod.DISENO_URL) + '">' + texto(mod.DISENO_URL) + '</a>' : '') +
       fila('Total camisetas', texto(total + ' (' + plural(cols.length, 'color', 'colores') + ')')) +
       fila('Importe del pedido', importe ? texto(eur(importe) + ' sin IVA' + (sinPrecio ? ' (sin precio: ' + sinPrecio + ' camisetas)' : '')) : '') +
       fila('Estado', texto(paso)) + fila('Notas', texto(p.NOTAS || '')) + '</table>' +
