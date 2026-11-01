@@ -1165,11 +1165,15 @@
         var e = ix.eq[String(id || '')];
         if (!e) return;
         var ss = sancionesDe(T.filas('SANCIONES'), { equipo: e.ID });
+        // Como en la clasificación (cuenta el anulado por culpa de un equipo y los aplazados por jugar); en una copa, sus partidos.
+        var nombres = {}; d.eq.forEach(function (x) { nombres[x.ID] = x.NOMBRE_EQUIPO; });
+        var l = ix.liga[e.ID_LIGA], c = l && ix.comp[l.ID_COMPETICION], copa = !!c && lista(cfg.SIN_CLASIFICACION).indexOf(String(c.TIPO || '')) >= 0;
+        var fe = copa ? null : clasificacion(partidosLiga(e.ID_LIGA), equiposLiga(e.ID_LIGA), cfg.PUNTOS, nombres, nAnulado()).filter(function (x) { return x.id === String(e.ID); })[0];
         var ps = d.par.filter(function (p) { return p.ID_INSCRIPCION_LOCAL === e.ID || p.ID_INSCRIPCION_VISITANTE === e.ID; });
-        var jugados = ps.filter(conResultado).length, quedan = ps.filter(function (p) { return p.ESTADO === 'Programado'; }).length;
+        var jugados = fe ? fe.pj : ps.filter(conResultado).length, quedan = fe ? fe.jugar : ps.filter(function (p) { return p.ESTADO === 'Programado'; }).length;
         var html = '<h2 id="lg-vt">' + texto(equipo(e.ID)) + '</h2>' +
           '<p class="u-nota">' + texto([ligaCompleta(e.ID_LIGA), nomColor(e.ID) ? 'Color ' + nomColor(e.ID).toLowerCase() : '', e.ESTADO === 'Baja' ? 'De baja' : ''].filter(String).join(' · ')) + '</p>' +
-          '<p>' + jugados + (jugados === 1 ? ' partido jugado' : ' partidos jugados') + (quedan ? ' y ' + quedan + ' por jugar' : '') + '.</p>' +
+          '<p>' + (fe ? fe.pos + '.º con ' + fe.pts + (fe.pts === 1 ? ' punto' : ' puntos') + ' · ' : '') + jugados + (jugados === 1 ? ' partido jugado' : ' partidos jugados') + (quedan ? ' y ' + quedan + ' por jugar' : '') + '.</p>' +
           '<h3 class="lg-sub">Sanciones</h3>' + (ss.length ? htmlSanciones(ss, 'equipo') : '<p class="u-vacio">No tiene sanciones.</p>') +
           '<div class="n-botones">' + (sanciona ? '<button type="button" class="u-btn u-btn-accion" id="lg-san-nueva">Apuntar una sanción</button>' : '') +
           '<button type="button" class="u-btn' + (sanciona ? ' u-btn-texto' : '') + '" data-cerrar>Cerrar</button></div>';
@@ -1766,7 +1770,7 @@
             T.actualizar('PARTIDOS', p.ID, pantalla, { fn: 'ligasPartido', args: [p.ID, c] }).then(function (r) {
               if (r && r.quitados) T.refrescar(['GOLES']).catch(function () {});
               if (r && r.sanciones) T.refrescar(['SANCIONES']).catch(function () {}); // T0297: el No presentado del anulado
-              if (ctx.abierta()) ctx.aviso(r && r.sanciones ? 'Partido guardado. Su sanción de no presentado está al día.' : 'Partido guardado.');
+              if (ctx.abierta()) ctx.aviso(r && r.aviso ? r.aviso : r && r.sanciones ? 'Partido guardado. Su sanción de no presentado está al día.' : 'Partido guardado.');
             }, function () {});
           };
         });

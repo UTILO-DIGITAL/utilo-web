@@ -435,6 +435,9 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .u-tabla td.u-tabla-t .u-nota { font-weight: 400; }
 /* Una tabla que no cabe en el móvil se desplaza en su caja, nunca la página. Columnas solo para pantallas anchas. */
 .u .u-tabla-caja { max-width: 100%; overflow-x: auto; margin: 0 0 var(--e2); }
+/* T0297: la caja hace scroll de lado, así que la cabecera fija se queda dentro de ella: con la franja de «Ver como» (--tope)
+ * bajaba su alto dentro de la caja y tapaba la primera fila. */
+.u .u-tabla-caja { --tope: 0px; }
 .u .u-tabla-caja > .u-tabla { margin: 0; }
 @media (max-width: 639px) { .u .u-solo-ancho { display: none; } }
 @media (min-width: 640px) { .u .u-solo-movil { display: none; } }
