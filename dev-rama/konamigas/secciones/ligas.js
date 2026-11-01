@@ -425,6 +425,17 @@
   }
 
   /**
+   * T0297 · Las sanciones de un partido (o.partido) o de un equipo (o.equipo, su inscripción), de la más nueva a la más
+   * vieja (por FECHA y, el mismo día, por ID).
+   */
+  function sancionesDe(sans, o) {
+    o = o || {};
+    return (sans || []).filter(function (s) {
+      return (!o.partido || String(s.ID_PARTIDO || '') === String(o.partido)) && (!o.equipo || String(s.ID_INSCRIPCION_EQUIPO || '') === String(o.equipo));
+    }).sort(function (a, b) { return orden(String(b.FECHA || ''), String(a.FECHA || '')) || orden(String(b.ID), String(a.ID)); });
+  }
+
+  /**
    * T0274 · Cómo está la copia de los pagos y las tarifas del staff (ligasPagosStaff del motor): { ultima, noche, error } →
    * las frases para Socio. ahora: 'aaaa-mm-ddThh:mm' (para ver si la copia de la noche lleva días sin hacerse).
    * { ultima: texto, nocheMal: texto o '', error: texto o '', avisos: [texto], mas: n }.
@@ -449,12 +460,14 @@
     textoAviso: textoAviso, fechaLarga: fechaLarga, recuperacionDe: recuperacionDe, aplazadosPendientes: aplazadosPendientes, huecosLibres: huecosLibres,
     planRecuperar: planRecuperar, diasRecuperar: diasRecuperar, repetidos: repetidos, resultadoAnulado: resultadoAnulado, diasDeJuego: diasDeJuego,
     diaInicial: diaInicial, resumenDia: resumenDia, rankingPersonas: rankingPersonas, resumenGoles: resumenGoles, estadisticasJugadora: estadisticasJugadora,
-    choqueCalendario: choqueCalendario };
+    choqueCalendario: choqueCalendario, sancionesDe: sancionesDe };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
 
-  var TABLAS = ['TEMPORADAS', 'COMPETICIONES', 'LIGAS', 'PARTIDOS', 'GOLES', 'CAMPOS', 'INSTALACIONES', 'CALENDARIO', 'INSCRIPCIONES_EQUIPOS', 'HUECOS'];
+  var TABLAS = ['TEMPORADAS', 'COMPETICIONES', 'LIGAS', 'PARTIDOS', 'GOLES', 'CAMPOS', 'INSTALACIONES', 'CALENDARIO', 'INSCRIPCIONES_EQUIPOS', 'HUECOS', 'SANCIONES'];
+  // T0297 · Los tipos de SANCIONES · TIPO (su YAML). El motor comprueba lo que se guarda.
+  var TIPOS_SANCION = ['No presentado', 'Retraso', 'Alineación indebida', 'Conducta', 'Otro'];
   var PESTANAS = { PARTIDOS: 'Partidos', CLASIFICACION: 'Clasificación', GOLEADORAS: 'Goleadoras' };
   var ANTES = { JORNADAS: 'PARTIDOS', CALENDARIO: 'PARTIDOS' }; // las pestañas de antes de T0255 (jornadas y calendario, juntas)
   var ESTADOS = { Programado: 'ni', Jugado: 'co', Aplazado: 'pr', Suspendido: 'pr', Anulado: 'bl', Libre: 'x' };
@@ -491,6 +504,7 @@
       var nomG = guardadoJson(KNOM); if (nomG) Object.keys(nomG).forEach(function (k) { if (!NOM[k]) NOM[k] = nomG[k]; });
       var quien = { admin: !!ctx.admin, perfil: ctx.perfil, actaTodas: lista(cfg.ACTA_TODAS), yo: staff.yo };
       var programa = !!ctx.admin || lista(cfg.PROGRAMAR).indexOf(ctx.perfil) >= 0;
+      var sanciona = !!ctx.admin || lista(cfg.SANCIONAR).indexOf(ctx.perfil) >= 0; // T0297: apunta, cambia y quita sanciones
       // comp: la competición elegida ('*' = todas, solo en Partidos); fecha: el día de juego abierto en Partidos; golAmbito:
       // las goleadoras de la liga o de toda la competición; q: lo que se busca en Goleadoras.
       var S = { tab: pest.indexOf(guardado(CLAVE + 'tab')) >= 0 ? guardado(CLAVE + 'tab') : '', temp: guardado(CLAVE + 'temp'), comp: guardado(CLAVE + 'comp'),
@@ -555,7 +569,8 @@
       var d, ix, temp, ligas, comps, actual, todas;
       function preparar() {
         d = { temp: T.filas('TEMPORADAS'), comp: T.filas('COMPETICIONES'), ligas: T.filas('LIGAS'), par: T.filas('PARTIDOS'), gol: T.filas('GOLES'),
-          cam: T.filas('CAMPOS'), ins: T.filas('INSTALACIONES'), cal: T.filas('CALENDARIO'), eq: T.filas('INSCRIPCIONES_EQUIPOS'), hue: T.filas('HUECOS') };
+          cam: T.filas('CAMPOS'), ins: T.filas('INSTALACIONES'), cal: T.filas('CALENDARIO'), eq: T.filas('INSCRIPCIONES_EQUIPOS'), hue: T.filas('HUECOS'),
+          san: T.filas('SANCIONES') || [] };
         ix = { comp: indice(d.comp), liga: indice(d.ligas), cam: indice(d.cam), ins: indice(d.ins), cal: indice(d.cal, 'FECHA'), eq: indice(d.eq),
           staff: indice(staff.staff) };
         var ts = temporadas(d.temp);
@@ -812,14 +827,16 @@
           '<th class="num" title="Ganados">G</th><th class="num" title="Empatados">E</th><th class="num" title="Perdidos">P</th>' +
           '<th class="num u-solo-ancho" title="Goles a favor">GF</th><th class="num u-solo-ancho" title="Goles en contra">GC</th><th class="num" title="Diferencia de goles">DG</th><th class="num">Pts</th></tr></thead><tbody>' +
           cl.map(function (e) {
-            return '<tr><td class="num">' + e.pos + '</td><td class="u-tabla-t"><span class="lg-eqt">' + punto(e.id) + texto(equipo(e.id)) + '</span>' +
+            var nSan = sancionesDe(d.san, { equipo: e.id }).length;
+            return '<tr><td class="num">' + e.pos + '</td><td class="u-tabla-t"><button type="button" class="lg-eqf" data-eqf="' + texto(e.id) + '"><span class="lg-eqt">' + punto(e.id) + texto(equipo(e.id)) + '</span></button>' +
+              (nSan ? '<div class="u-nota lg-san-nota">' + nSan + (nSan === 1 ? ' sanción' : ' sanciones') + '</div>' : '') +
               (e.jugar ? '<div class="u-nota u-solo-ancho">' + e.jugar + ' por jugar</div>' : '') + '</td>' +
               '<td class="num">' + e.pj + '</td><td class="num">' + e.pg + '</td><td class="num">' + e.pe + '</td><td class="num">' + e.pp + '</td>' +
               '<td class="num u-solo-ancho">' + e.gf + '</td><td class="num u-solo-ancho">' + e.gc + '</td><td class="num">' + (e.dg > 0 ? '+' : '') + e.dg + '</td><td class="num"><b>' + e.pts + '</b></td></tr>';
           }).join('') + '</tbody></table></div>' +
           '<p class="u-nota">' + jugados + (jugados === 1 ? ' partido jugado' : ' partidos jugados') + '. ' + (isFinite(num(P.GANAR)) ? num(P.GANAR) : 3) + ' puntos por ganar y ' +
           (isFinite(num(P.EMPATAR)) ? num(P.EMPATAR) : 1) + ' por empatar; a igualdad de puntos, mejor diferencia de goles y después más goles a favor.' +
-          (nAn > 0 ? ' Un partido anulado cuenta como 0-' + nAn + ' para el equipo que lo provoca.' : '') + '</p>';
+          (nAn > 0 ? ' Un partido anulado cuenta como 0-' + nAn + ' para el equipo que lo provoca.' : '') + ' Toca un equipo para ver sus sanciones.</p>';
         return h;
       }
       function nomJugadora(eq, id) {
@@ -987,7 +1004,9 @@
       /* ---------- ventanas ---------- */
 
       var antesDeCerrar = null;
+      var fichaAbierta = ''; // T0297: la ficha que se ve ('P:' partido, 'E:' equipo), para volver a pintarla cuando el motor confirma
       function ventana(html, alAbrir) {
+        fichaAbierta = '';
         vent.innerHTML = html;
         vent.onclick = vent.oninput = vent.onchange = null;
         velo.classList.add('abierto');
@@ -997,7 +1016,7 @@
       }
       function cerrar(forzar) {
         if (!forzar && antesDeCerrar && !antesDeCerrar()) return;
-        antesDeCerrar = null;
+        antesDeCerrar = null; fichaAbierta = '';
         var abierta = velo.classList.contains('abierto');
         velo.classList.remove('abierto'); vent.innerHTML = ''; vent.onclick = vent.oninput = vent.onchange = null;
         if (abierta && ctx.abierta()) pintar(); // lo que haya cambiado mientras estaba abierta
@@ -1018,7 +1037,7 @@
         var gs = golesEquipo(golesDe(p.ID), eq);
         return '<div class="lg-mlado"' + (colorEq(eq) ? ' style="--c:' + texto(colorEq(eq)) + '"' : '') + '>' +
           '<span class="lg-mcolor' + (colorEq(eq) ? '' : ' lg-color-no') + '" aria-hidden="true"></span>' +
-          '<b>' + texto(equipo(eq)) + '</b><small>' + texto(que + (nomColor(eq) ? ' · ' + nomColor(eq) : '')) + '</small>' +
+          '<button type="button" class="lg-eqf" data-eqf="' + texto(eq) + '">' + texto(equipo(eq)) + '</button><small>' + texto(que + (nomColor(eq) ? ' · ' + nomColor(eq) : '')) + '</small>' +
           (gs.length ? '<ul class="lg-mgoles">' + gs.map(function (g) {
             return '<li' + (g.tipo !== 'jugadora' ? ' class="lg-gol-otro"' : '') + '>' + (g.tipo === 'jugadora' ? '<span class="lg-dorsal u-cifra" data-dorsal="' + texto(g.jugadora) + '" data-eq="' + texto(eq) + '">' + texto(dorsal(eq, g.jugadora)) + '</span>' +
               '<span data-jugadora="' + texto(g.jugadora) + '" data-eq="' + texto(eq) + '">' + texto(nomJugadora(eq, g.jugadora)) + '</span>'
@@ -1052,13 +1071,21 @@
           fila('Motivo', texto(p.MOTIVO)) +
           fila('Anulado por', texto(p.ANULADO_POR ? equipo(p.ANULADO_POR) : '')) +
           fila('Notas', texto(p.NOTAS)) + '</dl>';
+        var sp = sancionesDe(T.filas('SANCIONES'), { partido: p.ID }), sanNueva = sanciona && !p._nueva && !!(L || V);
+        if (sp.length) html += '<h3 class="lg-sub">' + (sp.length === 1 ? 'Sanción' : 'Sanciones') + '</h3>' + htmlSanciones(sp, 'partido');
         var mover = programa && !p._nueva && p.ESTADO === 'Programado' && String(p.FECHA || '') >= hoy();
         html += '<div class="n-botones">' + (acta ? '<button type="button" class="u-btn u-btn-accion" id="lg-acta">' + (p.ESTADO === 'Jugado' ? 'Cambiar el acta' : 'Cerrar el acta') + '</button>' : '') +
           (mover ? '<button type="button" class="u-btn" id="lg-mover">Mover dentro del día</button>' : '') +
           (programa && p.ESTADO === 'Aplazado' && !recuperacionDe(d.par, p.ID) ? '<button type="button" class="u-btn" id="lg-recuperar">Recuperar en un hueco libre</button>' : '') +
           (programa && !p._nueva ? '<button type="button" class="u-btn" id="lg-prog">Árbitro y estado</button>' : '') +
-          '<button type="button" class="u-btn' + (acta || programa ? ' u-btn-texto' : '') + '" data-cerrar>Cerrar</button></div>';
+          (sanNueva ? '<button type="button" class="u-btn" id="lg-san-nueva">Apuntar una sanción</button>' : '') +
+          '<button type="button" class="u-btn' + (acta || programa || sanNueva ? ' u-btn-texto' : '') + '" data-cerrar>Cerrar</button></div>';
         ventana(html, function () {
+          fichaAbierta = 'P:' + p.ID;
+          var volver = function () { ficha(p.ID); };
+          vent.onclick = clicFicha(volver);
+          var sn = vent.querySelector('#lg-san-nueva');
+          if (sn) sn.onclick = function () { formSancion(null, { partido: p.ID }, volver); };
           var a = vent.querySelector('#lg-acta'), b = vent.querySelector('#lg-prog'), m = vent.querySelector('#lg-mover');
           if (a) a.onclick = function () { formActa(p); };
           if (b) b.onclick = function () { formPartido(p); };
@@ -1070,6 +1097,130 @@
             [].forEach.call(vent.querySelectorAll('.lg-mgoles [data-jugadora]'), function (x) { x.textContent = nomJugadora(x.getAttribute('data-eq'), x.getAttribute('data-jugadora')); });
             [].forEach.call(vent.querySelectorAll('.lg-mgoles [data-dorsal]'), function (x) { x.textContent = dorsal(x.getAttribute('data-eq'), x.getAttribute('data-dorsal')); });
           }, function () {});
+        });
+      }
+
+      /* ---------- sanciones (T0297) ---------- */
+
+      /**
+       * Lista de sanciones. En la ficha del partido (que = 'partido') dice el equipo; en la del equipo, el partido. Quien
+       * sanciona (SANCIONAR) la toca para cambiarla o quitarla; los demás, en la ficha del equipo, abren su partido.
+       */
+      function htmlSanciones(ss, que) {
+        return '<ul class="lg-san">' + ss.map(function (s) {
+          var p = s.ID_PARTIDO ? T.fila('PARTIDOS', s.ID_PARTIDO) : null;
+          var de = [que === 'partido' ? equipo(s.ID_INSCRIPCION_EQUIPO) : p ? 'Jornada ' + p.JORNADA + ' · ' + titulo(p) : 'Sin partido', s.FECHA ? fecha(s.FECHA) : ''].filter(String).join(' · ');
+          var dentro = '<span class="lg-san-tipo">' + texto(s.TIPO || 'Sanción') + '</span><span class="lg-san-txt"><b>' + texto(s.MOTIVO) + '</b><small>' + texto(de) + '</small></span>';
+          var attr = s._nueva ? '' : sanciona ? ' data-san="' + texto(s.ID) + '"' : que === 'equipo' && p ? ' data-p="' + texto(p.ID) + '"' : '';
+          return '<li>' + (attr ? '<button type="button" class="lg-san-i lg-san-b"' + attr + '>' + dentro + '</button>' : '<div class="lg-san-i">' + dentro + '</div>') + '</li>';
+        }).join('') + '</ul>';
+      }
+
+      /** Clics dentro de una ficha: un equipo abre la suya, un partido la suya y una sanción, su formulario (y luego vuelve). */
+      function clicFicha(volver) {
+        return function (e) {
+          var b = e.target.closest('[data-san]');
+          if (b) { var s = T.fila('SANCIONES', b.getAttribute('data-san')); if (s) formSancion(s, null, volver); return; }
+          b = e.target.closest('[data-eqf]'); if (b) { fichaEquipo(b.getAttribute('data-eqf')); return; }
+          b = e.target.closest('[data-p]'); if (b) ficha(b.getAttribute('data-p'));
+        };
+      }
+
+      /** Ficha de un equipo (su inscripción en una liga): su liga, cómo va y sus sanciones; quien sanciona apunta una nueva. */
+      function fichaEquipo(id) {
+        var e = ix.eq[String(id || '')];
+        if (!e) return;
+        var ss = sancionesDe(T.filas('SANCIONES'), { equipo: e.ID });
+        var ps = d.par.filter(function (p) { return p.ID_INSCRIPCION_LOCAL === e.ID || p.ID_INSCRIPCION_VISITANTE === e.ID; });
+        var jugados = ps.filter(conResultado).length, quedan = ps.filter(function (p) { return p.ESTADO === 'Programado'; }).length;
+        var html = '<h2 id="lg-vt">' + texto(equipo(e.ID)) + '</h2>' +
+          '<p class="u-nota">' + texto([ligaCompleta(e.ID_LIGA), nomColor(e.ID) ? 'Color ' + nomColor(e.ID).toLowerCase() : '', e.ESTADO === 'Baja' ? 'De baja' : ''].filter(String).join(' · ')) + '</p>' +
+          '<p>' + jugados + (jugados === 1 ? ' partido jugado' : ' partidos jugados') + (quedan ? ' y ' + quedan + ' por jugar' : '') + '.</p>' +
+          '<h3 class="lg-sub">Sanciones</h3>' + (ss.length ? htmlSanciones(ss, 'equipo') : '<p class="u-vacio">No tiene sanciones.</p>') +
+          '<div class="n-botones">' + (sanciona ? '<button type="button" class="u-btn u-btn-accion" id="lg-san-nueva">Apuntar una sanción</button>' : '') +
+          '<button type="button" class="u-btn' + (sanciona ? ' u-btn-texto' : '') + '" data-cerrar>Cerrar</button></div>';
+        ventana(html, function () {
+          fichaAbierta = 'E:' + e.ID;
+          var volver = function () { fichaEquipo(e.ID); };
+          vent.onclick = clicFicha(volver);
+          var sn = vent.querySelector('#lg-san-nueva');
+          if (sn) sn.onclick = function () { formSancion(null, { equipo: e.ID }, volver); };
+        });
+      }
+
+      /**
+       * Apuntar (s = null) o cambiar una sanción. Desde un partido (base.partido) se elige el equipo entre sus dos (si lo
+       * anuló uno y aún no tiene su No presentado, ese y No presentado, con el motivo del partido); desde un equipo (base.equipo) o al cambiarla, el equipo
+       * queda y se elige su partido (o ninguno). La fecha es la del partido mientras no se cambie. ligasSancion la escribe;
+       * al acabar se vuelve a la ficha de la que se venía (volver).
+       */
+      function formSancion(s, base, volver) {
+        base = base || {};
+        var pFijo = !s && base.partido ? T.fila('PARTIDOS', base.partido) : null;
+        var idEq = s ? String(s.ID_INSCRIPCION_EQUIPO || '') : base.equipo || '', idP = s ? String(s.ID_PARTIDO || '') : pFijo ? pFijo.ID : '';
+        var anulo = pFijo && pFijo.ESTADO === 'Anulado' && pFijo.ANULADO_POR ? pFijo.ANULADO_POR : '';
+        // …si aún no tiene su No presentado en ese partido.
+        if (anulo && sancionesDe(T.filas('SANCIONES'), { partido: pFijo.ID, equipo: anulo }).some(function (x) { return x.TIPO === 'No presentado'; })) anulo = '';
+        if (pFijo) idEq = anulo;
+        var tipo = s ? s.TIPO : anulo ? 'No presentado' : '', motivo = s ? s.MOTIVO : anulo ? pFijo.MOTIVO || '' : '';
+        var fechaDe = function (id) { var p = id && T.fila('PARTIDOS', id); return (p && p.FECHA) || hoy(); };
+        var fechaIni = s && s.FECHA ? s.FECHA : fechaDe(idP);
+        var suyos = d.par.filter(function (p) { return !p._nueva && (p.ID_INSCRIPCION_LOCAL === idEq || p.ID_INSCRIPCION_VISITANTE === idEq); })
+          .sort(function (a, b) { return orden(cuando(b), cuando(a)); });
+        if (idP && !suyos.some(function (p) { return p.ID === idP; }) && T.fila('PARTIDOS', idP)) suyos.unshift(T.fila('PARTIDOS', idP));
+        var nomP = function (p) { return (p.FECHA ? fecha(p.FECHA) + ' · ' : '') + 'J' + p.JORNADA + ' · ' + titulo(p) + (p.ESTADO !== 'Jugado' && p.ESTADO !== 'Programado' ? ' (' + String(p.ESTADO).toLowerCase() + ')' : ''); };
+        var html = '<h2 id="lg-vt">' + (s ? 'Cambiar la sanción' : 'Apuntar una sanción') + '</h2>' +
+          '<p class="u-nota">' + texto(pFijo ? titulo(pFijo) + ' · Jornada ' + pFijo.JORNADA + (pFijo.FECHA ? ' · ' + fecha(pFijo.FECHA) : '') : equipo(idEq) + ' · ' + ligaCompleta((ix.eq[idEq] || {}).ID_LIGA)) + '</p>' +
+          '<div class="u-campos">' +
+          (pFijo ? campoF('Equipo sancionado', '<select id="lg-s-eq">' + opciones([pFijo.ID_INSCRIPCION_LOCAL, pFijo.ID_INSCRIPCION_VISITANTE].filter(Boolean).map(function (x) { return [x, equipo(x)]; }), idEq, 'Elige el equipo') + '</select>')
+            : campoF('Partido', '<select id="lg-s-par">' + opciones(suyos.map(function (p) { return [p.ID, nomP(p)]; }), idP, 'Sin partido') + '</select>', 'u-ancho')) +
+          campoF('Tipo', '<select id="lg-s-tipo">' + opciones(TIPOS_SANCION.concat(tipo && TIPOS_SANCION.indexOf(tipo) < 0 ? [tipo] : []).map(function (x) { return [x, x]; }), tipo, 'Elige el tipo') + '</select>') +
+          campoF('Fecha', '<input type="date" id="lg-s-fecha" value="' + texto(fechaIni) + '">') +
+          campoF('Motivo', '<textarea id="lg-s-motivo" rows="2" maxlength="300">' + texto(motivo) + '</textarea>', 'u-ancho') + '</div>' +
+          '<p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="lg-guardar">' + (s ? 'Guardar cambios' : 'Apuntar la sanción') + '</button>' +
+          (s ? '<button type="button" class="u-btn" id="lg-s-quitar">Quitar la sanción</button>' : '') +
+          '<button type="button" class="u-btn u-btn-texto" id="lg-s-volver">Volver</button></div>';
+        ventana(html, function () {
+          // La fecha sigue a la del partido elegido mientras no se toque a mano.
+          var fechaMano = !!(s && s.FECHA && s.FECHA !== fechaDe(idP));
+          vent.oninput = function (e) { if (e.target.id === 'lg-s-fecha') fechaMano = true; };
+          vent.onchange = function (e) { if (e.target.id === 'lg-s-par' && !fechaMano) vent.querySelector('#lg-s-fecha').value = fechaDe(e.target.value); };
+          vent.querySelector('#lg-s-volver').onclick = volver;
+          var trasMotor = function () { if (fichaAbierta === volver.clave) volver(); };
+          vent.querySelector('#lg-guardar').onclick = function () {
+            var v = { ID_PARTIDO: pFijo ? pFijo.ID : val('lg-s-par'), ID_INSCRIPCION_EQUIPO: pFijo ? val('lg-s-eq') : idEq, TIPO: val('lg-s-tipo'), MOTIVO: val('lg-s-motivo'), FECHA: val('lg-s-fecha') };
+            var mal = [];
+            if (!v.ID_INSCRIPCION_EQUIPO) mal.push('Elige el equipo sancionado.');
+            if (!v.TIPO) mal.push('Elige el tipo de sanción.');
+            if (!v.MOTIVO) mal.push('Di el motivo.');
+            if (!v.FECHA) mal.push('Pon la fecha.');
+            verError(mal);
+            if (mal.length) return;
+            var hecho;
+            if (s) {
+              var c = {};
+              Object.keys(v).forEach(function (k) { if (String(s[k] == null ? '' : s[k]) !== v[k]) c[k] = v[k]; });
+              if (!Object.keys(c).length) { volver(); return; }
+              hecho = T.actualizar('SANCIONES', s.ID, c, { fn: 'ligasSancion', args: [s.ID, c] });
+            } else hecho = T.crear('SANCIONES', v, { fn: 'ligasSancion', args: ['', v] });
+            volver();
+            volver.clave = fichaAbierta;
+            hecho.then(function () { if (ctx.abierta()) { ctx.aviso(s ? 'Sanción cambiada.' : 'Sanción apuntada.'); trasMotor(); } }, function () { trasMotor(); });
+          };
+          var q = vent.querySelector('#lg-s-quitar');
+          if (q) q.onclick = function () {
+            if (!q.getAttribute('data-ok')) { q.setAttribute('data-ok', '1'); q.textContent = 'Se quita del todo: pulsa otra vez'; return; }
+            q.disabled = true; q.textContent = 'Quitando…';
+            ctx.llamar('ligasSancionQuitar', [s.ID]).then(function () { return T.refrescar(['SANCIONES']); }).then(function () {
+              if (!ctx.abierta()) return;
+              ctx.aviso('Sanción quitada.');
+              if (vent.contains(q)) volver();
+            }, function (err) {
+              if (!ctx.abierta()) return;
+              if (vent.contains(q)) { q.disabled = false; q.removeAttribute('data-ok'); q.textContent = 'Quitar la sanción'; verError([String(err.message).replace(/^\w+:\s*/, '')]); }
+              else ctx.aviso('No se ha quitado la sanción: ' + String(err.message).replace(/^\w+:\s*/, ''));
+            });
+          };
         });
       }
 
@@ -1506,6 +1657,7 @@
         b = t.closest('[data-fecha]'); if (b) { S.fecha = b.getAttribute('data-fecha'); pintar(); return; }
         b = t.closest('[data-dias]');
         if (b) { var tira = cont.querySelector('.lg-dias-tira'), una = tira && tira.firstElementChild; if (una) tira.scrollBy({ left: Number(b.getAttribute('data-dias')) * 3 * (una.offsetWidth + 8), behavior: 'smooth' }); return; }
+        b = t.closest('[data-eqf]'); if (b) { fichaEquipo(b.getAttribute('data-eqf')); return; }
         b = t.closest('[data-jug]'); if (b) { fichaJugadora(b.getAttribute('data-jug'), b.getAttribute('data-ij')); return; }
         b = t.closest('[data-golamb]'); if (b) { S.golAmbito = b.getAttribute('data-golamb'); guardado(CLAVE + 'golamb', S.golAmbito); pintar(); return; }
         b = t.closest('[data-accion="jornadas"]'); if (b) { formJornadas(); return; }

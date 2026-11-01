@@ -1072,7 +1072,7 @@ body.aj-cu-arrastrando { cursor: grabbing; user-select: none; -webkit-user-selec
 .u .lg-mlado:last-child { text-align: right; align-items: flex-end; }
 .u .lg-mcolor { display: block; width: 100%; height: 8px; border-radius: var(--radio-peq); background: var(--c); border: 1px solid var(--color-borde-campo); margin-bottom: var(--e2); }
 .u .lg-mcolor.lg-color-no { background: transparent; border-style: dashed; }
-.u .lg-mlado > b { font: var(--peso-titulos) 17px/1.2 var(--fuente-titulos); overflow-wrap: anywhere; }
+.u .lg-mlado > b, .u .lg-mlado > .lg-eqf { font: var(--peso-titulos) 17px/1.2 var(--fuente-titulos); overflow-wrap: anywhere; }
 .u .lg-mlado > small { font-size: 12px; color: var(--color-suave); }
 .u .lg-mcentro { display: flex; flex-direction: column; align-items: center; gap: var(--e2); padding-top: var(--e4); }
 .u .lg-mcentro > b { font: var(--peso-titulos) 34px/1 var(--fuente-titulos); color: var(--color-principal-oscuro); white-space: nowrap; }
@@ -1084,7 +1084,19 @@ body.aj-cu-arrastrando { cursor: grabbing; user-select: none; -webkit-user-selec
 .u .lg-dorsal { flex: none; min-width: 1.9em; padding: 0 var(--e1); border-radius: var(--radio-peq); background: var(--color-bloque); text-align: center; font-weight: 700; font-size: 12px; line-height: 1.6; }
 .u .lg-veces { flex: none; font-weight: 700; }
 .u .lg-gol-otro { color: var(--color-suave); }
-@media (max-width: 639px) { .u .lg-mcentro > b { font-size: 28px; } .u .lg-mlado > b { font-size: 15px; } .u .lg-marcador { gap: var(--e2); } }
+@media (max-width: 639px) { .u .lg-mcentro > b { font-size: 28px; } .u .lg-mlado > b, .u .lg-mlado > .lg-eqf { font-size: 15px; } .u .lg-marcador { gap: var(--e2); } }
+/* T0297 · Sanciones: el equipo abre su ficha (marcador y clasificación); cada sanción, su tipo, su motivo y de qué partido o equipo es. */
+.u .lg-eqf { min-width: 0; min-height: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; cursor: pointer; }
+.u .lg-eqf:hover, .u .lg-eqf:hover .lg-eqt { text-decoration: underline; }
+.u .lg-san { list-style: none; margin: 0 0 var(--e3); padding: 0; display: grid; gap: var(--e2); }
+.u .lg-san-i { display: flex; align-items: flex-start; gap: var(--e2); width: 100%; padding: var(--e2) var(--e3); border-radius: var(--radio);
+  background: color-mix(in srgb, var(--estado-bl) 8%, var(--color-superficie)); }
+.u .lg-san-b { min-height: 0; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.u .lg-san-b:hover b { text-decoration: underline; }
+.u .lg-san-tipo { flex: none; padding: 1px var(--e2); border-radius: var(--radio-peq); background: var(--color-superficie); color: var(--estado-bl); font: 700 12px/1.6 var(--fuente-texto); }
+.u .lg-san-txt { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.u .lg-san-txt small { font-size: 12px; color: var(--color-suave); }
+.u .lg-san-nota { color: var(--estado-bl); font-weight: 700; }
 .u .lg-datos { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: var(--e2) var(--e4); }
 .u .lg-datos dt { font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; }
 .u .lg-datos dd { margin: 0; overflow-wrap: anywhere; }
@@ -1357,6 +1369,11 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
 .u .gs5 .gs-df span:last-child { text-align: right; font-weight: 600; word-break: break-word; }
 .u .gs5 .gs-dtx { margin-top: var(--e3); font-size: 14px; }
 .u .gs5 .gs-dtx p { margin: var(--e1) 0 0; white-space: pre-wrap; }
+/* T0300: el historial de interacciones de un equipo (cada una se abre para ver el mensaje entero). */
+.u .gs5 .gs-inter { display: grid; gap: var(--e1); }
+.u .gs5 .gs-inter-i { border: 1px solid var(--borde, #d7d9e6); border-radius: 8px; padding: var(--e2) var(--e3); font-size: 14px; }
+.u .gs5 .gs-inter-i summary { cursor: pointer; }
+.u .gs5 .gs-inter-i p { margin: var(--e2) 0 0; white-space: pre-wrap; }
 .u .gs5 .gs-hoja .gs-lista { margin-top: var(--e1); }
 .u .gs5 .gs-hoja .gs-item { padding: var(--e2) 0; min-height: 44px; }
 .u .gs5 .gs-hoja .gs-item.gs-err { padding-left: var(--e3); padding-right: var(--e3); }

@@ -249,7 +249,8 @@
     var out = [];
     if (ie.ESTADO === 'Baja') return out;
     var conf = ie.ESTADO === 'Confirmada';
-    if (ie.ESTADO === 'Solicitada') out.push({ id: 'solicitada', k: 'solicitada', t: 'Sin confirmar' });
+    // T0300: al llegar se le pide la señal (MENSAJE_INICIAL_ENVIADO); al pagarla, se confirma solo (GESTION5_SENAL.gs).
+    if (ie.ESTADO === 'Solicitada') out.push({ id: 'solicitada', k: 'solicitada', t: ie.MENSAJE_INICIAL_ENVIADO === true ? 'Esperando la señal' : 'Pedir la señal' });
     if (conf && !ie.ID_LIGA) out.push({ id: 'liga', k: 'liga', t: 'Sin liga' });
     if (conf && ie.MENSAJE_INICIAL_ENVIADO !== true) out.push({ id: 'mensaje', k: 'seguimiento', t: 'Sin mensaje inicial' });
     if (conf && ie.GRUPO_CREADO !== true) out.push({ id: 'grupo', k: 'seguimiento', t: 'Sin grupo de WhatsApp' });
@@ -377,7 +378,32 @@
     return mal;
   }
 
-  var CALC = { cts: cts, eur: eur, edad: edad, fecha: fecha, ids: ids, norm: norm, temporadas: temporadas, temporadaActual: temporadaActual,
+  /**
+   * T0300 · El mensaje para pedir la paga y señal: la plantilla (config MENSAJE_SENAL) con sus huecos rellenos. x: { EQUIPO,
+   * SENAL (en céntimos), CAPITANA (su nombre), GESTOR, TELEFONO_GESTOR, FECHA_LIMITE (aaaa-mm-dd), DISPONIBILIDAD, FORMULARIO }. Un hueco sin dato
+   * se queda vacío; uno que no existe, tal cual.
+   */
+  /** T0300 · El nombre como se escribe a una amiga, alargando su última vocal: «Marta» → «Martaaa», «Carmen» → «Carmeeen». */
+  function alargar(nombre) {
+    var n = txt(nombre).split(/\s+/)[0] || '', m = /[aeiouáéíóú](?=[^aeiouáéíóú]*$)/i.exec(n);
+    return m ? n.slice(0, m.index + 1) + m[0] + m[0] + n.slice(m.index + 1) : n;
+  }
+  function mensajeSenal(plantilla, x) {
+    var v = { CAPITANA: alargar(x.CAPITANA), EQUIPO: txt(x.EQUIPO), SENAL: x.SENAL ? eur(x.SENAL).replace(/,00 €$/, ' €').replace(/ €$/, '€') : '', GESTOR: txt(x.GESTOR),
+      TELEFONO_GESTOR: txt(x.TELEFONO_GESTOR), FECHA_LIMITE: fecha(x.FECHA_LIMITE), DISPONIBILIDAD: txt(x.DISPONIBILIDAD), FORMULARIO: txt(x.FORMULARIO) };
+    // Sin capitana, «Holaaa {CAPITANA}!» queda «Holaaa!» (sin el espacio de delante).
+    return String(plantilla || '').replace(/ ?\{([A-Z_]+)\}/g, function (m, k) { return !(k in v) ? m : v[k] ? m.replace(/\{.*\}/, v[k]) : k === 'CAPITANA' ? '' : m.replace(/\{.*\}/, ''); });
+  }
+
+  /** T0300 · Las interacciones de una inscripción, de la más nueva a la más vieja. */
+  function interaccionesDe(lista, idIe) {
+    return (lista || []).filter(function (x) { return String(x.ID_INSCRIPCION_EQUIPO) === String(idIe); })
+      .sort(function (a, b) { var x = String(a.FECHA || ''), y = String(b.FECHA || ''); return x < y ? 1 : x > y ? -1 : String(a.ID) < String(b.ID) ? 1 : -1; });
+  }
+  /** 'aaaa-mm-ddThh:mm' → 'dd/mm/aaaa hh:mm' (sin hora, solo la fecha). */
+  function fechaHora(s) { var m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(String(s || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] + (m[4] ? ' ' + m[4] + ':' + m[5] : '') : String(s || ''); }
+
+  var CALC = { alargar: alargar, interaccionesDe: interaccionesDe, fechaHora: fechaHora, mensajeSenal: mensajeSenal, cts: cts, eur: eur, edad: edad, fecha: fecha, ids: ids, norm: norm, temporadas: temporadas, temporadaActual: temporadaActual,
     compsDe: compsDe, iesDe: iesDe, cuenta: cuenta, plantilla: plantilla, pago: pago, camisetasDe: camisetasDe, contexto: contexto, avisosEquipo: avisosEquipo,
     avisosJugadora: avisosJugadora, buscarJugadoras: buscarJugadoras, problemasJugadora: problemasJugadora, nombreJug: nombreJug,
     avisosResueltos: avisosResueltos, esAviso: esAviso, ijsValidas: ijsValidas,
@@ -393,7 +419,8 @@
 
   var BASE = ['TEMPORADAS', 'COMPETICIONES', 'LIGAS', 'EQUIPOS', 'INSCRIPCIONES_EQUIPOS', 'JUGADORAS', 'STAFF', 'COLORES', 'FOTOS', 'REVISIONES'];
   // T0287: CAMISETAS, PACKS y MODELOS_COMPETICION, para sumar las personalizadas a lo que debe cada equipo.
-  var ECO = ['TARIFAS', 'DESCUENTOS', 'MOVIMIENTOS', 'CAMISETAS', 'PACKS', 'MODELOS_COMPETICION'];
+  // T0300: CUENTAS y CATEGORIAS, para apuntar la señal en la caja del gestor que la cobra.
+  var ECO = ['TARIFAS', 'DESCUENTOS', 'MOVIMIENTOS', 'CAMISETAS', 'PACKS', 'MODELOS_COMPETICION', 'CUENTAS', 'CATEGORIAS'];
   var IJ = 'INSCRIPCIONES_JUGADORAS';
   // Las fotos van en la ficha de cada jugadora y las sin vincular se asignan desde el Resumen: FOTOS en PESTANAS se ignora.
   var PESTANAS = { RESUMEN: 'Resumen', EQUIPOS: 'Equipos', JUGADORAS: 'Jugadoras', REVISIONES: 'Revisiones' };
@@ -494,7 +521,8 @@
           tem: T.filas('TEMPORADAS'), com: T.filas('COMPETICIONES'), lig: T.filas('LIGAS'), eqs: T.filas('EQUIPOS'), ie: T.filas('INSCRIPCIONES_EQUIPOS'),
           ij: T.filas(IJ), jug: T.filas('JUGADORAS'), stf: T.filas('STAFF'), col: T.filas('COLORES'), fot: T.filas('FOTOS'), rev: T.filas('REVISIONES'),
           tar: PAGOS ? T.filas('TARIFAS') : [], des: PAGOS ? T.filas('DESCUENTOS') : [], mov: PAGOS ? T.filas('MOVIMIENTOS') : [],
-          cam: PAGOS ? T.filas('CAMISETAS') : [], pck: PAGOS ? T.filas('PACKS') : [], mco: PAGOS ? T.filas('MODELOS_COMPETICION') : []
+          cam: PAGOS ? T.filas('CAMISETAS') : [], pck: PAGOS ? T.filas('PACKS') : [], mco: PAGOS ? T.filas('MODELOS_COMPETICION') : [],
+          cue: PAGOS ? T.filas('CUENTAS') : [], cat: PAGOS ? T.filas('CATEGORIAS') : []
         };
       }
       var d, tem, ix, ies, cx, memo, porIe;
@@ -559,9 +587,12 @@
        * todos los cobros de la inscripción); si ha movido algo, se vuelve a leer MOVIMIENTOS. Si falla, no se dice nada.
        */
       function repartir() {
-        if (!PAGOS || !txt(cfg.CAMISETAS)) return;
+        if (!PAGOS) return;
         ctx.llamar('gestion5Repartir', [{ hacer: true, auto: true }]).then(function (r) {
-          if (r && (r.MOVIMIENTOS.length || r.borrados.length)) return T.refrescar(['MOVIMIENTOS'], true);
+          var t = [];
+          if (r && (r.MOVIMIENTOS.length || r.borrados.length)) t.push('MOVIMIENTOS');
+          if (r && r.INSCRIPCIONES_EQUIPOS && r.INSCRIPCIONES_EQUIPOS.length) t.push('INSCRIPCIONES_EQUIPOS'); // T0300: confirmados por la señal
+          if (t.length) return T.refrescar(t, true);
         }).then(null, function () {});
       }
       /** ↻: vuelve a leer del Excel las tablas y la parte de la temporada. */
@@ -774,10 +805,16 @@
           var n = '<b>' + punto(ie.ID_COLOR) + texto(nomIe(ie.ID)) + '</b>', cap = ix.jug[ie.ID_CAPITANA], waCap = cap ? aWa(cap.TELEFONO, 'Escribir a la capitana') : '';
           var lig = ix.lig[String(ie.ID_LIGA || '')];
           if (a.id === 'solicitada') {
-            c.titulo = n + ' · Inscripción sin confirmar';
-            c.texto = texto(nomIe(ie.ID)) + ' pidió inscribirse el ' + texto(fecha(ie.FECHA_INSCRIPCION)) + ' y aún no está confirmado. Mientras no se confirme, no cuenta como equipo de la temporada.';
-            c.datos = texto([nomComp(ie.ID_COMPETICION), cap ? 'capitana ' + nombreJug(cap) + (cap.TELEFONO ? ' (' + cap.TELEFONO + ')' : '') : 'sin capitana'].join(' · '));
-            c.sol = btnSol('confirmar', 'Confirmar inscripción') + btnSol('baja-eq', 'Dar de baja', ' data-pide') + waCap;
+            var pedida = ie.MENSAJE_INICIAL_ENVIADO === true, sen = senalDe(ie), res = staff(ie.ID_RESPONSABLE);
+            c.titulo = n + ' · ' + (pedida ? 'Esperando la señal' : 'Pedir la señal');
+            c.texto = pedida ? 'Se le ha pedido la paga y señal' + (sen ? ' (' + texto(eurC(sen)) + ')' : '') + (res ? ' a ' + texto(txt(res.APODO || res.NOMBRE)) : '') +
+                '. En cuanto se apunte en Economía el cobro que la cubre (referencia «Inscripción» · ' + texto(ie.ID) + '), se confirma solo.'
+              : texto(nomIe(ie.ID)) + ' pidió inscribirse el ' + texto(fecha(ie.FECHA_INSCRIPCION)) + '. Pídele la paga y señal: hasta que la pague, no cuenta como equipo de la temporada.';
+            c.datos = texto([nomComp(ie.ID_COMPETICION), cap ? 'capitana ' + nombreJug(cap) + (cap.TELEFONO ? ' (' + cap.TELEFONO + ')' : '') : 'sin capitana',
+              ie.DISPONIBILIDAD ? 'puede: ' + txt(ie.DISPONIBILIDAD) : ''].filter(Boolean).join(' · '));
+            c.sol = '<button type="button" class="' + (pedida ? 'gs-b2' : 'gs-b1') + '" data-accion="senal" data-id="' + texto(ie.ID) + '">' + (pedida ? 'Volver a pedir la señal' : 'Pedir la señal') + '</button>' +
+              (PAGOS ? '<button type="button" class="' + (pedida ? 'gs-b1' : 'gs-b2') + '" data-accion="cobro-senal" data-id="' + texto(ie.ID) + '">Apuntar la señal</button>' : '') +
+              btnSol('confirmar', 'Confirmar sin señal') + btnSol('baja-eq', 'Dar de baja', ' data-pide') + waCap;
           } else if (a.id === 'liga') {
             c.titulo = n + ' · Sin liga';
             c.texto = 'Está confirmado pero no tiene liga: sin liga no entra en el calendario.';
@@ -1484,6 +1521,184 @@
       }
       var NIVELES = ['1', '2', '3', '4', '5'].map(function (n) { return [n, n + (n === '1' ? ' (el más bajo)' : n === '5' ? ' (el más alto)' : '')]; });
 
+      /* ---------- interacciones (T0300): lo que se habla con cada equipo, en INTERACCIONES ---------- */
+
+      /** 'aaaa-mm-ddThh:mm' de ahora (fecha_hora de la capa de tablas). */
+      function ahoraIso() { var f = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; }; return hoy() + 'T' + p(f.getHours()) + ':' + p(f.getMinutes()); }
+      /** Apunta una interacción con el equipo (se ve al momento en su ficha; el Excel, por detrás). */
+      function apuntar(ie, x) {
+        return T.crear('INTERACCIONES', { ID_INSCRIPCION_EQUIPO: ie.ID, FECHA: ahoraIso(), TIPO: x.TIPO, CANAL: x.CANAL || '', TEXTO: x.TEXTO || '', PERSONA: ctx.autor || ctx.persona || '' });
+      }
+      /** El historial de un equipo, del más nuevo al más viejo; cada uno se abre para ver el mensaje entero. */
+      function htmlInteracciones(ie) {
+        if (S.inter !== 'ok') return '<p class="gs-nota">' + (S.inter ? 'No se puede leer el historial: ' + texto(S.inter) : 'Cargando el historial…') + '</p>';
+        var xs = interaccionesDe(T.filas('INTERACCIONES'), ie.ID);
+        return xs.length ? '<div class="gs-inter">' + xs.map(function (x) {
+          return '<details class="gs-inter-i"><summary><b>' + texto(txt(x.TIPO)) + '</b> · ' + texto(fechaHora(x.FECHA)) + (txt(x.CANAL) ? ' · ' + texto(x.CANAL) : '') +
+            (txt(x.PERSONA) ? ' · ' + texto(x.PERSONA) : '') + ' ' + guardando(x) + '</summary>' +
+            (txt(x.TEXTO) ? '<p>' + texto(x.TEXTO) + '</p>' : '<p class="gs-opc">Sin texto.</p>') + '</details>';
+        }).join('') + '</div>' : '<p class="gs-nota">Todavía no hay nada apuntado.</p>';
+      }
+      /** En la ficha: el historial y «Apuntar» (una llamada, un correo, una nota…) sin cerrar la ficha. */
+      function bloqueInteracciones(ie) {
+        return '<div class="gs-sec">Interacciones</div><div id="gs-inter">' + htmlInteracciones(ie) + '</div>' +
+          '<div class="gs-acc gs-inscribir"><button type="button" class="gs-b2" id="gs-apuntar">Apuntar</button></div>' +
+          '<div id="gs-apuntar-f" hidden><div class="gs-dos">' +
+          campo({ id: 'ap-TIPO', t: 'select', et: 'Qué', v: 'Llamada', opts: [['Llamada', 'Llamada'], ['Mensaje', 'Mensaje'], ['Correo', 'Correo'], ['Nota', 'Nota']] }) +
+          campo({ id: 'ap-CANAL', t: 'select', et: 'Por dónde', v: 'Teléfono', opts: [['Teléfono', 'Teléfono'], ['WhatsApp', 'WhatsApp'], ['Correo', 'Correo'], ['En persona', 'En persona'], ['Otro', 'Otro']], vacio: '—' }) + '</div>' +
+          campo({ id: 'ap-TEXTO', t: 'area', et: 'Qué se habló' }) +
+          '<div class="gs-acc"><button type="button" class="gs-b2" id="gs-apuntar-no">Cancelar</button><button type="button" class="gs-b1" id="gs-apuntar-ok">Apuntar</button></div></div>';
+      }
+      function montarInteracciones(ie) {
+        var f = vent.querySelector('#gs-apuntar-f'), b = vent.querySelector('#gs-apuntar');
+        if (!f) return;
+        b.addEventListener('click', function () { f.hidden = false; b.hidden = true; vent.querySelector('#ap-TEXTO').focus(); });
+        vent.querySelector('#gs-apuntar-no').addEventListener('click', function () { f.hidden = true; b.hidden = false; });
+        vent.querySelector('#gs-apuntar-ok').addEventListener('click', function () {
+          var t = val('ap-TEXTO');
+          if (!t) { vent.querySelector('#ap-TEXTO').focus(); return; }
+          var p = apuntar(ie, { TIPO: val('ap-TIPO'), CANAL: val('ap-CANAL'), TEXTO: t });
+          vent.querySelector('#ap-TEXTO').value = ''; f.hidden = true; b.hidden = false;
+          vent.querySelector('#gs-inter').innerHTML = htmlInteracciones(ie);
+          p.then(function () { var c = vent && vent.querySelector('#gs-inter'); if (c) c.innerHTML = htmlInteracciones(ie); }, function () {});
+        });
+      }
+      function leerInteracciones() {
+        // Aparte de lo demás: si el Excel aún no tiene la pestaña, Gestión funciona igual y el historial lo dice.
+        T.leer(['INTERACCIONES']).then(function () { S.inter = 'ok'; }, function (e) { S.inter = String((e && e.message) || e).replace(/^\w+:\s*/, ''); })
+          .then(function () { var c = vent && vent.querySelector('#gs-inter'), ie = c && ix.ie[vent.getAttribute('data-ficha') || '']; if (c && ie) c.innerHTML = htmlInteracciones(ie); });
+      }
+
+      /* ---------- pedir la paga y señal (T0300): al llegar la inscripción; al pagarla se confirma sola ---------- */
+
+      /** La señal de la competición del equipo, en céntimos (COMPETICIONES · SENAL), o 0. */
+      function senalDe(ie) { var c = ix.com[String(ie.ID_COMPETICION || '')]; return c ? cts(c.SENAL) : 0; }
+      /**
+       * Ventana «Pedir la señal»: el gestor que la cobra (se guarda como Responsable), la fecha límite (7 días) y el mensaje de
+       * la config MENSAJE_SENAL, que se puede retocar. «Enviar por WhatsApp» lo abre para la capitana y lo apunta como enviado.
+       */
+      function ventanaSenal(ie) {
+        var cap = ix.jug[ie.ID_CAPITANA], sen = senalDe(ie), editado = false;
+        var html = '<p class="gs-nota gs-sub">' + texto([nomComp(ie.ID_COMPETICION), cap ? 'capitana ' + nombreJug(cap) : 'sin capitana', ie.DISPONIBILIDAD ? 'puede: ' + txt(ie.DISPONIBILIDAD) : ''].filter(Boolean).join(' · ')) + '</p>' +
+          (sen ? '' : '<p class="gs-tj-err">Su competición no tiene señal (Ajustes › Competiciones · Señal): el mensaje sale sin importe y no se confirmará solo.</p>') +
+          '<div class="gs-dos">' +
+          campo({ id: 'sn-gestor', t: 'select', et: 'Gestor que cobra la señal', v: ie.ID_RESPONSABLE, opts: gestores(), vacio: 'Elige el gestor' }) +
+          campo({ id: 'sn-fecha', t: 'fecha', et: 'Fecha límite', v: masDias(7) }) + '</div>' +
+          campo({ id: 'sn-msg', t: 'area', et: 'Mensaje', nota: cap && wa(cap.TELEFONO) ? 'Se abre WhatsApp con la capitana (' + texto(cap.TELEFONO) + ').' : 'Sin teléfono de la capitana: WhatsApp te deja elegir a quién enviarlo.' }) +
+          '<p class="gs-nota" id="sn-editado" hidden>Has cambiado el mensaje a mano: ya no se rellena solo. <button type="button" class="gs-enl" id="sn-rehacer">Volver a rellenarlo</button></p>' +
+          '<p class="gs-nota">Si WhatsApp no va: «Copiar mensaje», envíalo por donde quieras y después «Marcar como enviado». Queda en su historial (Interacciones).</p>' +
+          '<div class="gs-error" id="gs-err" role="alert" hidden></div><div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-cerrar>Cancelar</button>' +
+          '<button type="button" class="gs-b2" id="sn-copiar">Copiar mensaje</button><button type="button" class="gs-b2" id="sn-hecho">Marcar como enviado</button>' +
+          '<a class="gs-b1" id="sn-ok" href="#" target="_blank" rel="noopener">Enviar por WhatsApp</a></div>';
+        ventana(punto(ie.ID_COLOR) + 'Pedir la señal · ' + texto(nomIe(ie.ID)), html, function () {
+          var msg = vent.querySelector('#sn-msg'), ok = vent.querySelector('#sn-ok');
+          msg.rows = esMovil() ? 14 : 12; // el mensaje casi entero a la vista (campo pone 2)
+          function texto0() {
+            var g = staff(val('sn-gestor'));
+            return mensajeSenal(cfg.MENSAJE_SENAL, { CAPITANA: cap ? cap.NOMBRE : '', EQUIPO: nomIe(ie.ID), SENAL: sen, GESTOR: g ? txt(g.APODO || g.NOMBRE) : '', TELEFONO_GESTOR: g ? txt(g.TELEFONO) : '',
+              FECHA_LIMITE: val('sn-fecha'), DISPONIBILIDAD: ie.DISPONIBILIDAD, FORMULARIO: cfg.FORMULARIO_JUGADORAS });
+          }
+          function enlace() {
+            var t = msg.value, u = cap ? wa(cap.TELEFONO, t) : '';
+            ok.href = u || 'https://wa.me/?text=' + encodeURIComponent(t);
+            if (/^whatsapp:/.test(ok.href)) ok.removeAttribute('target'); else ok.setAttribute('target', '_blank');
+          }
+          function rehacer() { if (!editado) msg.value = texto0(); enlace(); }
+          /** El error, a la vista; se quita en cuanto se cambia algo. */
+          function error(mal) { verError(mal); var e = vent.querySelector('#gs-err'); if (mal.length) e.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+          msg.addEventListener('input', function () { editado = true; vent.querySelector('#sn-editado').hidden = false; enlace(); });
+          vent.querySelector('#sn-rehacer').addEventListener('click', function () { editado = false; vent.querySelector('#sn-editado').hidden = true; rehacer(); });
+          vent.querySelector('#sn-gestor').addEventListener('change', function () { error([]); rehacer(); });
+          vent.querySelector('#sn-fecha').addEventListener('change', function () { error([]); rehacer(); });
+          rehacer();
+          /** Lo que impide enviar: sin gestor (o sin su teléfono), sin fecha, o un mensaje retocado que no lleva el teléfono del gestor elegido. */
+          function problemas() {
+            var g = staff(val('sn-gestor')), mal = [];
+            if (!g) mal.push('Elige el gestor que cobra la señal.');
+            else if (!txt(g.TELEFONO)) mal.push(txt(g.APODO || g.NOMBRE) + ' no tiene teléfono en STAFF: el equipo no sabría a qué número hacer el Bizum.');
+            else if (msg.value.replace(/\D/g, '').indexOf(txt(g.TELEFONO).replace(/\D/g, '')) < 0)
+              mal.push('El mensaje no lleva el teléfono de ' + txt(g.APODO || g.NOMBRE) + ' (' + txt(g.TELEFONO) + '): corrígelo o pulsa «Volver a rellenarlo».');
+            if (!val('sn-fecha')) mal.push('Pon la fecha límite.');
+            return mal;
+          }
+          /** Apunta el mensaje como enviado (canal: WhatsApp o Copiado): el equipo y su historial. Devuelve si vale. */
+          function enviado(canal) {
+            var mal = problemas();
+            if (mal.length) { error(mal); return false; }
+            var g = staff(val('sn-gestor')), c = { MENSAJE_INICIAL_ENVIADO: true }, t = msg.value;
+            if (String(ie.ID_RESPONSABLE || '') !== String(g.ID)) c.ID_RESPONSABLE = g.ID;
+            setTimeout(function () {
+              cerrar();
+              Promise.all([escribirIe(ie, c), apuntar(ie, { TIPO: 'Pedir la señal', CANAL: canal, TEXTO: t })])
+                .then(function () { if (ctx.abierta()) ctx.aviso('Señal pedida a ' + nomIe(ie.ID) + ': se confirmará al apuntar su cobro.'); }, function () {});
+            }, 0);
+            return true;
+          }
+          ok.addEventListener('click', function (e) {
+            enlace(); // el enlace sale con el mensaje tal cual está
+            if (!enviado('WhatsApp')) e.preventDefault();
+          });
+          vent.querySelector('#sn-hecho').addEventListener('click', function () { enviado('Copiado'); });
+          vent.querySelector('#sn-copiar').addEventListener('click', function () {
+            var mal = problemas();
+            if (mal.length) return error(mal);
+            error([]);
+            var b = this, bien = function () { b.textContent = 'Copiado ✓'; setTimeout(function () { if (b.isConnected) b.textContent = 'Copiar mensaje'; }, 2000); };
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(msg.value).then(bien, function () { msg.select(); document.execCommand('copy'); bien(); });
+            else { msg.select(); document.execCommand('copy'); bien(); }
+          });
+        });
+      }
+
+      /** La cuenta donde entra la señal: la caja del gestor que la cobra («Caja · Lucía», T0272) o, si no tiene, el banco. */
+      function cuentaDe(idGestor) {
+        var g = staff(idGestor), n = g ? norm('Caja · ' + txt(g.APODO || g.NOMBRE)) : '';
+        var c = n ? d.cue.filter(function (x) { return norm(txt(x.NOMBRE)) === n; })[0] : null;
+        return c || d.cue.filter(function (x) { return x.TIPO === 'Banco'; })[0] || d.cue[0] || null;
+      }
+      /**
+       * «Apuntar la señal»: el cobro en Economía, con la referencia de la inscripción, en la categoría de inscripciones
+       * (config CATEGORIA_SENAL) y en la caja del gestor que la cobró. Al apuntarlo, el motor confirma el equipo si llega a
+       * la señal (GESTION5_SENAL.gs) y la ficha se refresca.
+       */
+      function ventanaCobroSenal(ie) {
+        var sen = senalDe(ie), p = pagoDe(ie), ya = p ? p.cobrado : 0, falta = Math.max(0, sen - ya), cue = cuentaDe(ie.ID_RESPONSABLE);
+        var cat = d.cat.filter(function (x) { return norm(txt(x.NOMBRE)) === norm(txt(cfg.CATEGORIA_SENAL)) && x.TIPO === 'Ingreso'; })[0];
+        var c = ix.com[String(ie.ID_COMPETICION || '')] || {};
+        var html = '<p class="gs-nota gs-sub">' + texto([nomComp(ie.ID_COMPETICION), sen ? 'señal ' + eurC(sen) : 'sin señal', ya ? 'ya cobrado ' + eurC(ya) : ''].filter(Boolean).join(' · ')) + '</p>' +
+          (cat ? '' : '<p class="gs-tj-err">No encuentro la categoría «' + texto(txt(cfg.CATEGORIA_SENAL)) + '» en Economía (config CATEGORIA_SENAL).</p>') +
+          '<div class="gs-dos">' +
+          campo({ id: 'cs-importe', t: 'texto', et: 'Importe (€)', v: falta ? String(falta / 100).replace('.', ',') : '', attrs: ' inputmode="decimal"' }) +
+          campo({ id: 'cs-fecha', t: 'fecha', et: 'Fecha del cobro', v: hoy() }) +
+          campo({ id: 'cs-cuenta', t: 'select', et: 'Dónde ha entrado', v: cue ? cue.ID : '', opts: d.cue.filter(function (x) { return x.TIPO !== 'Socio'; }).map(function (x) { return [x.ID, txt(x.NOMBRE)]; }), vacio: 'Elige la cuenta' }) + '</div>' +
+          campo({ id: 'cs-notas', t: 'texto', et: 'Notas', v: '' }) +
+          '<p class="gs-nota">Se apunta en Economía como ingreso de «' + texto(txt(cfg.CATEGORIA_SENAL)) + '» con la referencia «Inscripción» · ' + texto(ie.ID) + '. Si llega a la señal, el equipo pasa a Confirmada.</p>' +
+          '<div class="gs-error" id="gs-err" role="alert" hidden></div><div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-cerrar>Cancelar</button>' +
+          '<button type="button" class="gs-b1" id="cs-ok">Apuntar el cobro</button></div>';
+        ventana(punto(ie.ID_COLOR) + 'Apuntar la señal · ' + texto(nomIe(ie.ID)), html, function () {
+          vent.querySelector('#cs-ok').addEventListener('click', function () {
+            var imp = cts(val('cs-importe')), mal = [];
+            if (!(imp > 0)) mal.push('Pon el importe cobrado.');
+            if (!val('cs-fecha')) mal.push('Pon la fecha del cobro.');
+            if (!val('cs-cuenta')) mal.push('Elige dónde ha entrado.');
+            if (!cat) mal.push('Falta la categoría de inscripciones en Economía.');
+            if (mal.length) { verError(mal); vent.querySelector('#gs-err').scrollIntoView({ block: 'nearest' }); return; }
+            var m = { FECHA: val('cs-fecha'), TIPO: 'Ingreso', CONCEPTO: 'Paga y señal ' + nomIe(ie.ID), ID_CATEGORIA: cat.ID, BASE: imp / 100, TIPO_IVA: '0%', ID_CUENTA: val('cs-cuenta'),
+              ID_TEMPORADA: c.ID_TEMPORADA || (tem && tem.ID) || '', ID_COMPETICION: ie.ID_COMPETICION, ID_LIGA: ie.ID_LIGA || '', REF_TIPO: 'Inscripción', REF_ID: ie.ID, NOTAS: val('cs-notas') };
+            var idIe = ie.ID;
+            cerrar();
+            T.crear('MOVIMIENTOS', m).then(function () {
+              // El motor la ha confirmado si llega a la señal: se trae la inscripción como haya quedado.
+              return T.refrescar(['INSCRIPCIONES_EQUIPOS'], true);
+            }).then(function () {
+              if (!ctx.abierta()) return;
+              var x = ix.ie[idIe];
+              ctx.aviso('Cobro de ' + eurC(imp) + ' apuntado' + (x && x.ESTADO === 'Confirmada' ? ': ' + nomIe(idIe) + ' queda confirmado.' : '.'));
+            }, function () {});
+          });
+        });
+      }
+
       /** Ficha de la inscripción de un equipo: liga y organización, seguimiento, pagos, plantilla, el equipo y la inscripción. */
       function fichaEquipo(ie) {
         var e = ix.eqs[ie.ID_EQUIPO] || {}, pl = plantilla(d, ie.ID), av = avisosEquipo(d, ie, cx), p = pagoDe(ie);
@@ -1516,7 +1731,8 @@
           campo({ id: 'e-MENSAJE_INICIAL_ENVIADO', t: 'si', et: 'Mensaje inicial enviado (M.I)', v: ie.MENSAJE_INICIAL_ENVIADO }) +
           campo({ id: 'e-GRUPO_CREADO', t: 'si', et: 'Grupo de WhatsApp creado (Gr C/TS)', v: ie.GRUPO_CREADO }) +
           campo({ id: 'e-EN_XPORTY', t: 'si', et: 'Dado de alta en Xporty', v: ie.EN_XPORTY }) + '</div>' +
-          campo({ id: 'e-NOTAS', t: 'area', et: 'Notas internas', v: ie.NOTAS });
+          campo({ id: 'e-NOTAS', t: 'area', et: 'Notas internas', v: ie.NOTAS }) +
+          bloqueInteracciones(ie);
         if (p && p.baja && !p.incluida) {
           html += '<div class="gs-sec">Pagos</div><div class="gs-dl">' +
             fila('Cobrado', eurC(p.cobrado) + (p.cobros ? ' (' + plural(p.cobros, 'movimiento', 'movimientos') + ')' : '')) +
@@ -1564,6 +1780,7 @@
         var gIe = { f: ie, pre: 'e-', ks: ['ID_LIGA', 'NIVEL', 'ID_RESPONSABLE', 'ID_COLOR', 'NOMBRE_EQUIPO', 'ESTADO', 'MENSAJE_INICIAL_ENVIADO', 'GRUPO_CREADO', 'EN_XPORTY', 'NOTAS', 'ID_CAPITANA'] };
         var gEq = { f: e, pre: 'q-', ks: e.ID ? ['NOMBRE', 'TIPO', 'NOTAS'] : [] };
         ventana(punto(ie.ID_COLOR) + texto(nomIe(ie.ID)), html, function () {
+          vent.setAttribute('data-ficha', ie.ID); montarInteracciones(ie);
           var sc = vent.querySelector('#e-ID_COLOR'), pre = vent.querySelector('#gs-colpre');
           sc.addEventListener('change', function () { pre.style.background = hexDe(sc.value) || 'transparent'; });
           guardable('e-guardar', [gIe, gEq], {
@@ -1939,6 +2156,8 @@
         if ((b = t.closest('[data-accion]'))) {
           var ac = b.getAttribute('data-accion');
           if (ac === 'vermas') { S.ju.n += VER; repintarLista(); }
+          else if (ac === 'senal') { var is = ix.ie[b.getAttribute('data-id')]; if (is) ventanaSenal(is); }
+          else if (ac === 'cobro-senal') { var ic = ix.ie[b.getAttribute('data-id')]; if (ic) ventanaCobroSenal(ic); }
           return;
         }
         if (t.closest('#gs-re')) { releer(); return; }
@@ -2030,6 +2249,7 @@
       ctx.alCambiar(function (t) { if (tablas.indexOf(t) >= 0 || t === IJ) { if (t === 'INSCRIPCIONES_EQUIPOS') S.leyendo = ''; pintar(); } });
       // Lo guardado en el dispositivo se pinta al momento (sin pantalla de carga) y se refresca por detrás.
       // local: lo que falta se pide al motor, pero lo que ya está no se refresca solo: lo refresca refrescar, para saber la hora.
+      leerInteracciones();
       T.leer(tablas, { local: true }).then(function () {
         S.leido = true; pintar();
         T.refrescar(tablas).then(function () { S.hora = ahora(); ponerHora(); repartir(); }, function () {});
