@@ -436,6 +436,26 @@
   }
 
   /**
+   * T0297 · Las multas que debe un equipo antes de jugar un partido: las de sus sanciones con IMPORTE y sin FECHA_PAGO, de ese
+   * día o de antes y de otro partido. { total, n }.
+   */
+  function multasPendientes(sans, ie, p) {
+    var ss = (sans || []).filter(function (s) {
+      return String(s.ID_INSCRIPCION_EQUIPO || '') === String(ie) && num(s.IMPORTE) > 0 && !s.FECHA_PAGO && (!p || (String(s.ID_PARTIDO || '') !== String(p.ID) && String(s.FECHA || '') <= String(p.FECHA || '')));
+    });
+    return { total: Math.round(ss.reduce(function (t, s) { return t + num(s.IMPORTE); }, 0) * 100) / 100, n: ss.length };
+  }
+  /** El dinero de una sanción en una línea: «Multa de 60 €: la debe» / «pagada el 12/10/2026» y lo que se le debe al rival. */
+  function dineroSancion(s, nomRival) {
+    var m = num(s.IMPORTE), r = num(s.COMPENSACION);
+    if (!(m > 0)) return '';
+    var t = 'Multa de ' + euros(m) + ': ' + (s.FECHA_PAGO ? 'pagada el ' + fecha(s.FECHA_PAGO) : 'la debe');
+    if (s.FECHA_PAGO && r > 0) t += s.FECHA_COMPENSACION ? ' · ' + euros(r) + ' dados a ' + (nomRival || 'el rival') + ' el ' + fecha(s.FECHA_COMPENSACION) : ' · debemos ' + euros(r) + ' a ' + (nomRival || 'el rival');
+    return t;
+  }
+  function euros(n) { n = Math.round(num(n) * 100) / 100; return (n % 1 ? n.toFixed(2).replace('.', ',') : String(n)) + ' €'; }
+
+  /**
    * T0274 · Cómo está la copia de los pagos y las tarifas del staff (ligasPagosStaff del motor): { ultima, noche, error } →
    * las frases para Socio. ahora: 'aaaa-mm-ddThh:mm' (para ver si la copia de la noche lleva días sin hacerse).
    * { ultima: texto, nocheMal: texto o '', error: texto o '', avisos: [texto], mas: n }.
@@ -460,7 +480,7 @@
     textoAviso: textoAviso, fechaLarga: fechaLarga, recuperacionDe: recuperacionDe, aplazadosPendientes: aplazadosPendientes, huecosLibres: huecosLibres,
     planRecuperar: planRecuperar, diasRecuperar: diasRecuperar, repetidos: repetidos, resultadoAnulado: resultadoAnulado, diasDeJuego: diasDeJuego,
     diaInicial: diaInicial, resumenDia: resumenDia, rankingPersonas: rankingPersonas, resumenGoles: resumenGoles, estadisticasJugadora: estadisticasJugadora,
-    choqueCalendario: choqueCalendario, sancionesDe: sancionesDe };
+    choqueCalendario: choqueCalendario, sancionesDe: sancionesDe, multasPendientes: multasPendientes, dineroSancion: dineroSancion, euros: euros };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -704,12 +724,22 @@
         var debajo = [conLiga ? '<span class="lg-pliga">' + texto(ligaCompleta(p.ID_LIGA) + ' · J' + p.JORNADA) + '</span>' : '',
           p._pendiente || p._nueva ? '<span class="u-chip">Guardando</span>' : '',
           roto ? '<span class="lg-pav lg-av-no">En PARTIDOS falta el ' + (p.ID_INSCRIPCION_LOCAL ? 'visitante' : 'local') + ' (' + texto(p.ID) + '): no cuenta en la clasificación</span>' : '',
-          av ? '<span class="lg-pav ' + av.clase + '">' + texto(av.texto) + (p.MOTIVO && CON_MOTIVO.indexOf(p.ESTADO) >= 0 ? ' · ' + texto(p.MOTIVO) : '') + '</span>' : ''].join('');
+          av ? '<span class="lg-pav ' + av.clase + '">' + texto(av.texto) + (p.MOTIVO && CON_MOTIVO.indexOf(p.ESTADO) >= 0 ? ' · ' + texto(p.MOTIVO) : '') + '</span>' : '',
+          avisoMultas(p).map(function (t) { return '<span class="lg-pav lg-av-no">' + texto(t) + '</span>'; }).join('')].join('');
         return '<button type="button" class="lg-p' + (esMio(p) ? ' lg-mio' : '') + (CON_MOTIVO.indexOf(p.ESTADO) >= 0 ? ' lg-p-fuera' : '') + '" data-p="' + texto(p.ID) + '"' +
           ' aria-label="' + texto(titulo(p) + ', ' + (p.HORA || '') + ', ' + campo(p.ID_CAMPO) + (res ? ', ' + gl + ' a ' + gv : '')) + '">' + info +
           (libre ? '<span class="lg-pl"></span><span class="lg-pc lg-pvs">' + texto(equipo(p.ID_INSCRIPCION_LOCAL || p.ID_INSCRIPCION_VISITANTE) || 'Campo libre') + '</span><span class="lg-pv"></span>'
             : eq(p.ID_INSCRIPCION_LOCAL, 'l', res && gl > gv) + '<span class="lg-pc' + (res ? '' : ' lg-pvs') + (an ? ' lg-pc-an' : '') + '">' + (res ? '<b class="u-cifra">' + gl + '<span>–</span>' + gv + '</b>' : 'vs') + '</span>' + eq(p.ID_INSCRIPCION_VISITANTE, 'v', res && gv > gl)) +
           (debajo ? '<span class="lg-pa">' + debajo + '</span>' : '') + '</button>';
+      }
+      /** T0297 · En un partido por jugar, cada equipo que debe una multa: «PESCADORAS FC debe 60 € de una sanción». */
+      function avisoMultas(p) {
+        if (p.ESTADO !== 'Programado') return [];
+        var sans = T.filas('SANCIONES');
+        return [p.ID_INSCRIPCION_LOCAL, p.ID_INSCRIPCION_VISITANTE].filter(Boolean).map(function (ie) {
+          var m = multasPendientes(sans, ie, p);
+          return m.total ? equipo(ie) + ' debe ' + euros(m.total) + (m.n === 1 ? ' de una sanción' : ' de ' + m.n + ' sanciones') + ': tiene que pagarla antes de jugar' : '';
+        }).filter(String);
       }
       /** Festivo o descanso de un día (tabla CALENDARIO), o ''. */
       function especial(f) { var c = ix.cal[f]; return c && (c.FESTIVO || c.DESCANSO) ? (c.FESTIVO ? 'Festivo' : 'Descanso') + (c.MOTIVO ? ': ' + c.MOTIVO : '') : ''; }
@@ -1062,6 +1092,7 @@
               : '<b class="lg-mhora u-cifra">' + texto(p.HORA || '--:--') + '</b>') + chipEstado(p) + '</div>' +
             ladoMarcador(p, V, L, 'Visitante') + '</div>' : '') +
           (avisoPartido(p) ? '<p class="lg-pav lg-pav-ficha ' + avisoPartido(p).clase + '">' + texto(avisoPartido(p).texto) + '</p>' : '') +
+          avisoMultas(p).map(function (t) { return '<p class="lg-pav lg-pav-ficha lg-av-no" role="alert">' + texto(t) + '</p>'; }).join('') +
           (res && !gs.length ? '<p class="u-nota">El acta no dice quién marcó.</p>' : '') +
           '<dl class="lg-datos">' +
           fila('Cuándo', texto(p.FECHA ? fechaDia(p.FECHA) + ' · ' + fecha(p.FECHA) + (p.HORA ? ' a las ' + p.HORA : '') : 'Sin fecha')) +
@@ -1110,7 +1141,10 @@
         return '<ul class="lg-san">' + ss.map(function (s) {
           var p = s.ID_PARTIDO ? T.fila('PARTIDOS', s.ID_PARTIDO) : null;
           var de = [que === 'partido' ? equipo(s.ID_INSCRIPCION_EQUIPO) : p ? 'Jornada ' + p.JORNADA + ' · ' + titulo(p) : 'Sin partido', s.FECHA ? fecha(s.FECHA) : ''].filter(String).join(' · ');
-          var dentro = '<span class="lg-san-tipo">' + texto(s.TIPO || 'Sanción') + '</span><span class="lg-san-txt"><b>' + texto(s.MOTIVO) + '</b><small>' + texto(de) + '</small></span>';
+          var rival = p ? (String(p.ID_INSCRIPCION_LOCAL) === String(s.ID_INSCRIPCION_EQUIPO) ? p.ID_INSCRIPCION_VISITANTE : p.ID_INSCRIPCION_LOCAL) : '';
+          var din = dineroSancion(s, rival ? equipo(rival) : '');
+          var dentro = '<span class="lg-san-tipo">' + texto(s.TIPO || 'Sanción') + '</span><span class="lg-san-txt"><b>' + texto(s.MOTIVO) + '</b><small>' + texto(de) + '</small>' +
+            (din ? '<small class="lg-san-din' + (!s.FECHA_PAGO || (num(s.COMPENSACION) > 0 && !s.FECHA_COMPENSACION) ? ' lg-san-debe' : '') + '">' + texto(din) + '</small>' : '') + '</span>';
           var attr = s._nueva ? '' : sanciona ? ' data-san="' + texto(s.ID) + '"' : que === 'equipo' && p ? ' data-p="' + texto(p.ID) + '"' : '';
           return '<li>' + (attr ? '<button type="button" class="lg-san-i lg-san-b"' + attr + '>' + dentro + '</button>' : '<div class="lg-san-i">' + dentro + '</div>') + '</li>';
         }).join('') + '</ul>';
@@ -1153,6 +1187,8 @@
        * anuló uno y aún no tiene su No presentado, ese y No presentado, con el motivo del partido); desde un equipo (base.equipo) o al cambiarla, el equipo
        * queda y se elige su partido (o ninguno). La fecha es la del partido mientras no se cambie. ligasSancion la escribe;
        * al acabar se vuelve a la ficha de la que se venía (volver).
+       * La multa, lo del rival y lo del árbitro se proponen con el tipo (SANCION_MULTAS) mientras no se toquen; lo pagado no se
+       * cambia. Al cambiarla, debajo, cobrar la multa y pagar al rival (formPago) o deshacerlo.
        */
       function formSancion(s, base, volver) {
         base = base || {};
@@ -1169,6 +1205,11 @@
           .sort(function (a, b) { return orden(cuando(b), cuando(a)); });
         if (idP && !suyos.some(function (p) { return p.ID === idP; }) && T.fila('PARTIDOS', idP)) suyos.unshift(T.fila('PARTIDOS', idP));
         var nomP = function (p) { return (p.FECHA ? fecha(p.FECHA) + ' · ' : '') + 'J' + p.JORNADA + ' · ' + titulo(p) + (p.ESTADO !== 'Jugado' && p.ESTADO !== 'Programado' ? ' (' + String(p.ESTADO).toLowerCase() + ')' : ''); };
+        var ini = s ? { IMPORTE: s.IMPORTE, COMPENSACION: s.COMPENSACION, PARA_ARBITRO: s.PARA_ARBITRO } : multaDe(tipo);
+        var importe = function (k, fijo) {
+          var v = ini[k] === '' || ini[k] == null ? '' : String(ini[k]).replace('.', ',');
+          return '<input type="text" inputmode="decimal" id="lg-s-' + k + '" value="' + texto(v) + '" placeholder="0"' + (fijo ? ' disabled' : '') + '>';
+        };
         var html = '<h2 id="lg-vt">' + (s ? 'Cambiar la sanción' : 'Apuntar una sanción') + '</h2>' +
           '<p class="u-nota">' + texto(pFijo ? titulo(pFijo) + ' · Jornada ' + pFijo.JORNADA + (pFijo.FECHA ? ' · ' + fecha(pFijo.FECHA) : '') : equipo(idEq) + ' · ' + ligaCompleta((ix.eq[idEq] || {}).ID_LIGA)) + '</p>' +
           '<div class="u-campos">' +
@@ -1176,20 +1217,42 @@
             : campoF('Partido', '<select id="lg-s-par">' + opciones(suyos.map(function (p) { return [p.ID, nomP(p)]; }), idP, 'Sin partido') + '</select>', 'u-ancho')) +
           campoF('Tipo', '<select id="lg-s-tipo">' + opciones(TIPOS_SANCION.concat(tipo && TIPOS_SANCION.indexOf(tipo) < 0 ? [tipo] : []).map(function (x) { return [x, x]; }), tipo, 'Elige el tipo') + '</select>') +
           campoF('Fecha', '<input type="date" id="lg-s-fecha" value="' + texto(fechaIni) + '">') +
-          campoF('Motivo', '<textarea id="lg-s-motivo" rows="2" maxlength="300">' + texto(motivo) + '</textarea>', 'u-ancho') + '</div>' +
+          campoF('Motivo', '<textarea id="lg-s-motivo" rows="2" maxlength="300">' + texto(motivo) + '</textarea>', 'u-ancho') +
+          campoF('Multa (€)', importe('IMPORTE', s && s.FECHA_PAGO)) + campoF('Para el rival (€)', importe('COMPENSACION', s && s.FECHA_COMPENSACION)) +
+          campoF('Para el árbitro (€)', importe('PARA_ARBITRO', s && s.FECHA_PAGO)) + '</div>' +
+          '<p class="u-nota">De la multa, lo que se da al equipo rival y lo que gana el árbitro del partido (suma a sus cobros cuando el equipo la paga).' +
+          (s && (s.FECHA_PAGO || s.FECHA_COMPENSACION) ? ' Lo pagado no se cambia: deshaz antes el pago.' : '') + '</p>' +
+          (s && !s._nueva ? htmlPagos(s) : '') +
           '<p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="lg-guardar">' + (s ? 'Guardar cambios' : 'Apuntar la sanción') + '</button>' +
-          (s ? '<button type="button" class="u-btn" id="lg-s-quitar">Quitar la sanción</button>' : '') +
+          (s && !s.FECHA_PAGO && !s.FECHA_COMPENSACION ? '<button type="button" class="u-btn" id="lg-s-quitar">Quitar la sanción</button>' : '') +
           '<button type="button" class="u-btn u-btn-texto" id="lg-s-volver">Volver</button></div>';
         ventana(html, function () {
           // La fecha sigue a la del partido elegido mientras no se toque a mano.
           var fechaMano = !!(s && s.FECHA && s.FECHA !== fechaDe(idP));
-          vent.oninput = function (e) { if (e.target.id === 'lg-s-fecha') fechaMano = true; };
-          vent.onchange = function (e) { if (e.target.id === 'lg-s-par' && !fechaMano) vent.querySelector('#lg-s-fecha').value = fechaDe(e.target.value); };
+          if (s) fichaAbierta = 'S:' + s.ID; // para volver aquí después de cobrar o pagar
+          // Los importes siguen al tipo mientras no se toquen (al apuntarla).
+          var importesMano = !!s;
+          vent.oninput = function (e) { if (e.target.id === 'lg-s-fecha') fechaMano = true; if (/^lg-s-(IMPORTE|COMPENSACION|PARA_ARBITRO)$/.test(e.target.id)) importesMano = true; };
+          vent.onchange = function (e) {
+            if (e.target.id === 'lg-s-par' && !fechaMano) vent.querySelector('#lg-s-fecha').value = fechaDe(e.target.value);
+            if (e.target.id === 'lg-s-tipo' && !importesMano) { var m = multaDe(e.target.value); IMPORTES.forEach(function (k) { vent.querySelector('#lg-s-' + k).value = m[k] === '' ? '' : String(m[k]).replace('.', ','); }); }
+          };
+          vent.onclick = function (e) {
+            var b = e.target.closest('[data-pago]'); if (b) { formPago(s, b.getAttribute('data-pago'), function () { formSancion(T.fila('SANCIONES', s.ID) || s, null, volver); }); return; }
+            b = e.target.closest('[data-despagar]'); if (b) despagar(s, b.getAttribute('data-despagar'), b, volver);
+          };
           vent.querySelector('#lg-s-volver').onclick = volver;
           var trasMotor = function () { if (fichaAbierta === volver.clave) volver(); };
           vent.querySelector('#lg-guardar').onclick = function () {
             var v = { ID_PARTIDO: pFijo ? pFijo.ID : val('lg-s-par'), ID_INSCRIPCION_EQUIPO: pFijo ? val('lg-s-eq') : idEq, TIPO: val('lg-s-tipo'), MOTIVO: val('lg-s-motivo'), FECHA: val('lg-s-fecha') };
             var mal = [];
+            IMPORTES.forEach(function (k) {
+              var x = val('lg-s-' + k).replace(/\s*€$/, '').replace(',', '.');
+              if (x !== '' && !(Number(x) >= 0)) mal.push('Pon los importes en euros (por ejemplo, 60).');
+              else v[k] = x === '' ? '' : Math.round(Number(x) * 100) / 100;
+            });
+            if ((num(v.COMPENSACION) > 0 || num(v.PARA_ARBITRO) > 0) && !v.ID_PARTIDO) mal.push('Lo del rival y lo del árbitro son de un partido: elige el partido o déjalos vacíos.');
+            if ((num(v.COMPENSACION) || 0) + (num(v.PARA_ARBITRO) || 0) > (num(v.IMPORTE) || 0)) mal.push('Lo del rival y lo del árbitro no pueden pasar de la multa.');
             if (!v.ID_INSCRIPCION_EQUIPO) mal.push('Elige el equipo sancionado.');
             if (!v.TIPO) mal.push('Elige el tipo de sanción.');
             if (!v.MOTIVO) mal.push('Di el motivo.');
@@ -1199,7 +1262,7 @@
             var hecho;
             if (s) {
               var c = {};
-              Object.keys(v).forEach(function (k) { if (String(s[k] == null ? '' : s[k]) !== v[k]) c[k] = v[k]; });
+              Object.keys(v).forEach(function (k) { if (String(s[k] == null ? '' : s[k]) !== String(v[k])) c[k] = v[k]; });
               if (!Object.keys(c).length) { volver(); return; }
               hecho = T.actualizar('SANCIONES', s.ID, c, { fn: 'ligasSancion', args: [s.ID, c] });
             } else hecho = T.crear('SANCIONES', v, { fn: 'ligasSancion', args: ['', v] });
@@ -1222,6 +1285,77 @@
             });
           };
         });
+      }
+
+      var IMPORTES = ['IMPORTE', 'COMPENSACION', 'PARA_ARBITRO'];
+      /** La multa que se propone para un tipo (SANCION_MULTAS): { IMPORTE, COMPENSACION, PARA_ARBITRO }, vacía si no tiene. */
+      function multaDe(tipo) {
+        var m = (cfg.SANCION_MULTAS || {})[tipo];
+        return m ? { IMPORTE: m.MULTA === undefined ? '' : m.MULTA, COMPENSACION: m.RIVAL === undefined ? '' : m.RIVAL, PARA_ARBITRO: m.ARBITRO === undefined ? '' : m.ARBITRO }
+          : { IMPORTE: '', COMPENSACION: '', PARA_ARBITRO: '' };
+      }
+      /** El dinero de una sanción ya apuntada: si la multa está cobrada y lo del rival pagado, con sus botones. */
+      function htmlPagos(s) {
+        var m = num(s.IMPORTE), r = num(s.COMPENSACION), p = s.ID_PARTIDO ? T.fila('PARTIDOS', s.ID_PARTIDO) : null;
+        if (!(m > 0)) return '';
+        var rival = p ? equipo(String(p.ID_INSCRIPCION_LOCAL) === String(s.ID_INSCRIPCION_EQUIPO) ? p.ID_INSCRIPCION_VISITANTE : p.ID_INSCRIPCION_LOCAL) : '';
+        var linea = function (txt, debe, boton) { return '<li' + (debe ? ' class="lg-san-debe"' : '') + '><span>' + texto(txt) + '</span>' + boton + '</li>'; };
+        var h = linea('Multa de ' + euros(m) + (s.FECHA_PAGO ? ': pagada el ' + fecha(s.FECHA_PAGO) : ': la debe ' + equipo(s.ID_INSCRIPCION_EQUIPO)), !s.FECHA_PAGO,
+          s.FECHA_PAGO ? (s.FECHA_COMPENSACION ? '' : '<button type="button" class="u-btn u-btn-texto" data-despagar="multa">Deshacer el pago</button>')
+            : '<button type="button" class="u-btn" data-pago="multa">La ha pagado</button>');
+        if (r > 0 && s.FECHA_PAGO) h += linea(euros(r) + ' para ' + (rival || 'el rival') + (s.FECHA_COMPENSACION ? ': dados el ' + fecha(s.FECHA_COMPENSACION) : ': se los debemos'), !s.FECHA_COMPENSACION,
+          s.FECHA_COMPENSACION ? '<button type="button" class="u-btn u-btn-texto" data-despagar="rival">Deshacer el pago</button>' : '<button type="button" class="u-btn" data-pago="rival">Ya se los hemos dado</button>');
+        if (num(s.PARA_ARBITRO) > 0 && p && (p.ID_ARBITRO_REAL || p.ID_ARBITRO)) h += linea(euros(s.PARA_ARBITRO) + ' para ' + persona(p.ID_ARBITRO_REAL || p.ID_ARBITRO) + ', el árbitro: ' +
+          (s.FECHA_PAGO ? 'en sus cobros, con su arbitraje' : 'cuando se pague la multa'), false, '');
+        return '<h3 class="lg-sub">Dinero</h3><ul class="lg-san-pagos">' + h + '</ul>';
+      }
+      var cuentasSan = null; // las cuentas de Economía (ligasSancionCuentas), mientras la página está abierta
+      /**
+       * Cobrar la multa (que = 'multa') o pagar al rival (que = 'rival'): el día y la cuenta (por defecto, la caja de quien lo
+       * apunta o el banco). ligasSancionPagar apunta su movimiento en Economía; luego se vuelve a la sanción (volver).
+       */
+      function formPago(s, que, volver) {
+        var multa = que === 'multa', imp = multa ? s.IMPORTE : s.COMPENSACION;
+        var html = '<h2 id="lg-vt">' + (multa ? 'Cobrar la multa' : 'Pagar al rival') + '</h2>' +
+          '<p class="u-nota">' + texto(euros(imp) + (multa ? ' de ' + equipo(s.ID_INSCRIPCION_EQUIPO) + '. Se apunta como ingreso en Economía.' : '. Se apunta como gasto en Economía.')) + '</p>' +
+          '<div class="u-campos">' + campoF('Día', '<input type="date" id="lg-pg-fecha" value="' + hoy() + '" max="' + hoy() + '">') +
+          campoF(multa ? 'Dónde entra el dinero' : 'De dónde sale el dinero', '<select id="lg-pg-cuenta"><option value="">Cargando…</option></select>') + '</div>' +
+          '<p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="lg-pg-ok" disabled>' + (multa ? 'Apuntar el cobro' : 'Apuntar el pago') + '</button>' +
+          '<button type="button" class="u-btn u-btn-texto" id="lg-pg-volver">Volver</button></div>';
+        ventana(html, function () {
+          var sel = vent.querySelector('#lg-pg-cuenta'), ok = vent.querySelector('#lg-pg-ok');
+          vent.querySelector('#lg-pg-volver').onclick = volver;
+          (cuentasSan ? Promise.resolve(cuentasSan) : ctx.llamar('ligasSancionCuentas')).then(function (r) {
+            cuentasSan = r;
+            if (!vent.contains(sel)) return;
+            sel.innerHTML = opciones((r.cuentas || []).map(function (x) { return [x.ID, x.NOMBRE]; }), r.defecto, 'Elige la cuenta');
+            ok.disabled = false;
+          }, function (e) { if (vent.contains(sel)) { sel.innerHTML = '<option value="">—</option>'; verError(['No se han podido leer las cuentas: ' + String(e.message).replace(/^\w+:\s*/, '')]); } });
+          ok.onclick = function () {
+            var f = val('lg-pg-fecha'), c = val('lg-pg-cuenta'), mal = [];
+            if (!f) mal.push('Pon el día.'); else if (f > hoy()) mal.push('El día no puede ser de mañana en adelante.');
+            if (!c) mal.push(multa ? 'Di dónde entra el dinero.' : 'Di de dónde sale el dinero.');
+            verError(mal);
+            if (mal.length) return;
+            var cambio = multa ? { FECHA_PAGO: f } : { FECHA_COMPENSACION: f };
+            var hecho = T.actualizar('SANCIONES', s.ID, cambio, { fn: 'ligasSancionPagar', args: [s.ID, que, { fecha: f, cuenta: c }] });
+            volver();
+            var clave = fichaAbierta;
+            hecho.then(function (r) {
+              if (!ctx.abierta()) return;
+              ctx.aviso((multa ? 'Multa cobrada y apuntada en Economía.' : 'Pago al rival apuntado en Economía.') + (r && r.avisos && r.avisos.length ? ' ' + r.avisos.join(' ') : ''));
+              if (fichaAbierta === clave) volver();
+            }, function () { if (fichaAbierta === clave) volver(); });
+          };
+        });
+      }
+      /** Deshacer un cobro o un pago (dos toques): quita su movimiento de Economía (ligasSancionDespagar). */
+      function despagar(s, que, b, volver) {
+        if (!b.getAttribute('data-ok')) { b.setAttribute('data-ok', '1'); b.textContent = 'Se quita de Economía: pulsa otra vez'; return; }
+        var hecho = T.actualizar('SANCIONES', s.ID, que === 'multa' ? { FECHA_PAGO: '' } : { FECHA_COMPENSACION: '' }, { fn: 'ligasSancionDespagar', args: [s.ID, que] });
+        var otra = function () { formSancion(T.fila('SANCIONES', s.ID) || s, null, volver); };
+        otra();
+        hecho.then(function () { if (ctx.abierta()) ctx.aviso('Pago deshecho.'); }, function () {});
       }
 
       /**
@@ -1631,7 +1765,8 @@
             cerrar(true);
             T.actualizar('PARTIDOS', p.ID, pantalla, { fn: 'ligasPartido', args: [p.ID, c] }).then(function (r) {
               if (r && r.quitados) T.refrescar(['GOLES']).catch(function () {});
-              if (ctx.abierta()) ctx.aviso('Partido guardado.');
+              if (r && r.sanciones) T.refrescar(['SANCIONES']).catch(function () {}); // T0297: el No presentado del anulado
+              if (ctx.abierta()) ctx.aviso(r && r.sanciones ? 'Partido guardado. Su sanción de no presentado está al día.' : 'Partido guardado.');
             }, function () {});
           };
         });

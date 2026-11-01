@@ -1097,6 +1097,11 @@ body.aj-cu-arrastrando { cursor: grabbing; user-select: none; -webkit-user-selec
 .u .lg-san-txt { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
 .u .lg-san-txt small { font-size: 12px; color: var(--color-suave); }
 .u .lg-san-nota { color: var(--estado-bl); font-weight: 700; }
+.u .lg-san-din { color: var(--color-texto); }
+.u .lg-san-txt .lg-san-debe, .u .lg-san-pagos .lg-san-debe span { color: var(--estado-bl); font-weight: 700; }
+.u .lg-san-pagos { list-style: none; margin: 0 0 var(--e3); padding: 0; display: grid; gap: var(--e2); }
+.u .lg-san-pagos li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e3);
+  padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-bloque); }
 .u .lg-datos { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: var(--e2) var(--e4); }
 .u .lg-datos dt { font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; }
 .u .lg-datos dd { margin: 0; overflow-wrap: anywhere; }
