@@ -15,7 +15,9 @@
  *            historial (LOG) y la baja: desactivar (ACTIVO o un ESTADO de baja, que se puede deshacer) o borrar, que solo
  *            se ofrece si ninguna fila de las tablas cargadas la usa (el motor lo vuelve a mirar en todas).
  *   Acción   el JS del cliente (ACCIONES), que se registra con UN.ajustes('ID', { abrir(el, ctx), cerrar() }) y
- *            recibe el ctx de la sección más volver() y raiz (la carpeta de la web).
+ *            recibe el ctx de la sección más volver() y raiz (la carpeta de la web). Con una acción «inicio» (T0294),
+ *            el inicio tiene dos pestañas: esa acción, que se abre al entrar (el camino para preparar la temporada),
+ *            y «Todas las tablas».
  * Quien está en SOLO_LEER lo ve todo sin botones de cambiar (el motor tampoco le deja: soloLeer en los permisos).
  * Personalización y claves de cada tabla: docs/SECCION_AJUSTES.md.
  */
@@ -28,7 +30,7 @@
   var PALABRAS = { competicion: 'competición', competiciones: 'competiciones', dia: 'día', abreviacion: 'abreviación', descripcion: 'descripción',
     ubicacion: 'ubicación', telefono: 'teléfono', numero: 'número', num: 'nº', codigo: 'código', instalacion: 'instalación', area: 'área',
     epica: 'épica', epicas: 'épicas', categoria: 'categoría', categorias: 'categorías', direccion: 'dirección', arbitro: 'árbitro',
-    gestion: 'gestión', catalogo: 'catálogo', que: 'qué', url: 'URL', iva: 'IVA', hex: 'HEX', id: 'ID', email: 'email' };
+    gestion: 'gestión', catalogo: 'catálogo', senal: 'señal', que: 'qué', url: 'URL', iva: 'IVA', hex: 'HEX', id: 'ID', email: 'email' };
   /** «ID_TEMPORADA» → «Temporada»; «DIA_SEMANA» → «Día semana»; «CATEGORIAS» → «Categorías». */
   function titulo(n) {
     if (n === 'ID') return 'Código'; // la clave que se escribe a mano (las épicas: LIG, COP…); con prefijo ni se ve
@@ -238,6 +240,21 @@
     return out;
   }
 
+  /**
+   * T0294 · Lo que usa una fila, en palabras (Javi: «se usa en Inscripciones equipos» no se entiende). us: [{ tabla, n }]
+   * (de ajustesUsos), cosas: { TABLA: [singular, plural, dónde se cambia] } (COSAS de la configuración), nombre(tabla): su
+   * título. «1 equipo apuntado (en Gestión) y 3 partidos (en Ligas)»; sin nombre, «2 filas de Tarifas».
+   */
+  function usosTexto(us, cosas, nombre) {
+    var n = {}, orden = [];
+    (us || []).forEach(function (u) { if (!(u.tabla in n)) { n[u.tabla] = 0; orden.push(u.tabla); } n[u.tabla] += Number(u.n) || 0; });
+    var xs = orden.map(function (t) {
+      var c = (cosas || {})[t], k = n[t];
+      return (c && c.length ? k + ' ' + (k === 1 ? c[0] : c[1] || c[0]) : k + (k === 1 ? ' fila de ' : ' filas de ') + nombre(t)) + (c && c[2] ? ' (' + c[2] + ')' : '');
+    });
+    return xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' y ' + xs[xs.length - 1];
+  }
+
   /** Filas de la lista de una tabla: por periodo, por texto (en las columnas que se ven) y sin las dadas de baja si no se piden. */
   function filtrar(filas, o) {
     var q = norm(o.q);
@@ -250,7 +267,7 @@
   }
 
   var CALC = { seTocan: seTocan, aLaVez: aLaVez, muestra: muestra, titulo: titulo, tituloTabla: tituloTabla, etiqueta: etiqueta, deBaja: deBaja, apagada: apagada, periodoDe: periodoDe, periodos: periodos, periodoActual: periodoActual,
-    verValor: verValor, leerValor: leerValor, problemas: problemas, minutos: minutos, choques: choques, notasDe: notasDe, cambios: cambios, usos: usos, filtrar: filtrar };
+    verValor: verValor, leerValor: leerValor, usosTexto: usosTexto, problemas: problemas, minutos: minutos, choques: choques, notasDe: notasDe, cambios: cambios, usos: usos, filtrar: filtrar };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -320,7 +337,9 @@
           n = e.columnas.filter(function (c) { return c.tipo === 'ref' && E[c.ref] && c.ref !== sin && !vacio(f[c.n]); }).slice(0, 2)
             .map(function (c) { return nombreFila(c.ref, fila(c.ref, f[c.n]), (hondo || 0) + 1) || f[c.n]; }).join(' · ');
         }
-        return String(vacio(n) ? f[e.clave] : n);
+        // T0294: la que se nombra por su clave y es una fecha (un día de CALENDARIO), como fecha: 07/01/2027.
+        var ck = vacio(n) ? colDe(e, e.clave) : null;
+        return ck && ck.tipo === 'fecha' ? verValor(ck, f[e.clave]) : String(vacio(n) ? f[e.clave] : n);
       }
       function nombreRef(t, id) { var f = fila(t, id); return f ? nombreFila(t, f) : String(id); }
       /** La tabla de la vista guardada: «b.t» (bloque y tabla), «A:ID» (una acción) o '' (inicio). */
@@ -351,9 +370,13 @@
           if (abiertaAccion !== 'V:' + spec.tabla + ':' + modo) pintarVista(spec, vv);
           return;
         }
-        cerrarAccion();
-        if (spec) pintarTabla(spec); else pintarInicio();
+        if (spec) { cerrarAccion(); pintarTabla(spec); return; }
+        // T0294: la acción de arriba del inicio (inicio) sigue abierta mientras se repintan los bloques.
+        if (abiertaAccion && abiertaAccion !== claveInicio()) cerrarAccion();
+        pintarInicio();
       }
+      function accionInicio() { return A.filter(function (x) { return x.inicio; })[0] || null; }
+      function claveInicio() { var a = accionInicio(); return a ? 'I:' + a.id : ''; }
       /** La vista elegida de una tabla (la última que se usó; si no, la primera) o 'LISTA'. */
       function modoDe(spec) {
         if (!spec.vistas || !spec.vistas.length) return 'LISTA';
@@ -378,10 +401,8 @@
           cont.innerHTML = '<p class="u-vacio">Todavía no hay nada que configurar aquí. Quien administra la app dice qué tablas entran en Ajustes (config.json · nucleo.secciones.ajustes).</p>';
           return;
         }
-        var sueltas = A.filter(function (a) { return !a.bloque; });
-        cont.innerHTML = (cfg.AYUDA ? '<p class="u-nota n-ayuda">' + texto(cfg.AYUDA) + '</p>' : '') +
-          (!puede ? '<p class="u-aviso">Puedes mirarlo todo, pero no cambiar nada.</p>' : '') +
-          (sueltas.length ? '<div class="aj-lista">' + sueltas.map(botonAccion).join('') + '</div>' : '') +
+        var sueltas = A.filter(function (a) { return !a.bloque && !a.inicio; }), arriba = accionInicio();
+        var bloques = (sueltas.length ? '<div class="aj-lista">' + sueltas.map(botonAccion).join('') + '</div>' : '') +
           B.map(function (b, i) {
             var acc = A.filter(function (a) { return a.bloque === b.titulo; });
             return '<section class="aj-bloque"><h2 class="n-grupo">' + texto(b.titulo) + '</h2>' + (b.texto ? '<p class="u-nota">' + texto(b.texto) + '</p>' : '') +
@@ -391,6 +412,18 @@
                   (t.texto ? '<small>' + texto(t.texto) + '</small>' : '') + '</button>';
               }).join('') + acc.map(botonAccion).join('') + '</div></section>';
           }).join('');
+        // T0294 (Javi): con una acción de inicio (el camino de la temporada), dos pestañas: la acción, que se abre al
+        // entrar, y «Todas las tablas». Se recuerda la última. Si la acción ya está abierta, se repinta ella sola.
+        var pest = arriba && guardado(CLAVE + 'inicio') !== 'TABLAS' ? 'ACCION' : 'TABLAS';
+        if (pest === 'ACCION' && abiertaAccion === claveInicio() && cont.querySelector('#aj-accion.aj-inicio')) return;
+        if (pest === 'TABLAS' && abiertaAccion) cerrarAccion();
+        cont.innerHTML = (arriba ? '<div class="u-pestanas aj-modos" role="tablist">' + [['ACCION', arriba.titulo], ['TABLAS', 'Todas las tablas']].map(function (x) {
+            return '<button type="button" role="tab" data-inicio="' + x[0] + '" aria-selected="' + (x[0] === pest) + '">' + texto(x[1]) + '</button>';
+          }).join('') + '</div>' : '') +
+          (!puede ? '<p class="u-aviso">Puedes mirarlo todo, pero no cambiar nada.</p>' : '') +
+          (pest === 'ACCION' ? '<div id="aj-accion" class="aj-inicio"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div>' :
+            (cfg.AYUDA ? '<p class="u-nota n-ayuda">' + texto(cfg.AYUDA) + '</p>' : '') + bloques);
+        if (pest === 'ACCION') abrirJs(arriba, claveInicio(), {});
       }
 
       function textosFila(t, spec, f) {
@@ -503,8 +536,11 @@
        */
       function paraAccion() {
         return {
+          // T0294: abrir otra acción del cliente (del camino de la temporada, el calendario).
+          abrir: function (id) { if (!A.some(function (x) { return x.id === id; })) return false; vista('A:' + id); return true; },
           ficha: function (t, id) { var sp = specDeTabla(t); if (!sp) return false; pila = []; ficha(sp, String(id)); return true; },
-          nueva: function (t, valores) { var sp = specDeTabla(t); if (!sp || !sp.crear || !puede) return false; pila = []; ficha(sp, '', null, valores || {}); return true; },
+          // T0294: desde una acción (el asistente), al añadir se cierra: lo que sigue lo dice la acción.
+          nueva: function (t, valores) { var sp = specDeTabla(t); if (!sp || !sp.crear || !puede) return false; pila = []; ficha(sp, '', null, valores || {}, { accion: true }); return true; },
           puede: function (t) { var sp = specDeTabla(t); return !!(sp && sp.crear && puede); },
           periodo: function () { return S.per && S.per !== '-' ? S.per : (perAhora ? perAhora.id : ''); },
           ponerPeriodo: function (p) { S.per = p; guardado(CLAVE + 'per', p); },
@@ -533,8 +569,7 @@
             var sp = specDeTabla(t);
             if (!sp || !puede || !sp.baja || !sp.baja.borrar) return Promise.reject(new Error('No se puede quitar.'));
             return ctx.llamar('ajustesUsos', [t, String(id)]).then(function (r) {
-              if (r && r.length) throw new Error('No se puede quitar: se usa en ' + r.map(function (u) { var x = specDeTabla(u.tabla); return x ? tituloTabla(x) : titulo(u.tabla); })
-                .filter(function (x, i, a) { return a.indexOf(x) === i; }).join(', ') + '.');
+              if (r && r.length) throw new Error('No se puede quitar porque tiene ' + usosTexto(r, cfg.COSAS, nombreTabla) + '. Si de verdad sobra, quita antes eso.');
               return T.borrar(t, id);
             });
           }
@@ -559,7 +594,7 @@
       }
       function cerrar() { pila = []; velo.classList.remove('abierto'); vent.innerHTML = ''; }
       /** Cierra la ficha de arriba y vuelve a la de debajo (la madre), si la hay. */
-      function atras() { pila.pop(); var x = pila.pop(); if (x) ficha(x.spec, x.id, x.madre, x.pre); else cerrar(); }
+      function atras() { pila.pop(); var x = pila.pop(); if (x) ficha(x.spec, x.id, x.madre, x.pre, x.op); else cerrar(); }
       function confirmar(b, t, f) { if (b.getAttribute('data-ok')) { f(); return; } b.setAttribute('data-ok', '1'); b.textContent = t; }
       function verError(mal) { var e = vent.querySelector('.u-error'); e.textContent = mal.join(' '); e.hidden = !mal.length; }
       function dato(et, v) { return '<div class="eco-df"><span>' + texto(et) + '</span><span>' + (v === '' ? '—' : /^https?:\/\//.test(String(v)) ? '<a href="' + texto(v) + '" target="_blank" rel="noopener">Abrir ↗</a>' : muestra(v) + texto(v)) + '</span></div>'; }
@@ -569,7 +604,9 @@
         var id = 'aj-c-' + c.n, et = texto(etiqueta(spec, c.n)) + (c.ob ? '' : ' <span class="eco-opc">(opcional)</span>');
         var ancho = c.tipo === 'texto' && LARGO.test(c.n);
         var html;
-        if (c.n === E[t].clave) html = '<input type="text" id="' + id + '" value="' + texto(v) + '" maxlength="40" placeholder="' + texto(c.d || '') + '">';
+        // T0294: una clave que es una fecha (CALENDARIO: el día) se elige en el calendario; las demás, texto (sin la descripción del YAML de ejemplo).
+        if (c.n === E[t].clave && c.tipo === 'fecha') html = '<input type="date" id="' + id + '" value="' + texto(v) + '">';
+        else if (c.n === E[t].clave) html = '<input type="text" id="' + id + '" value="' + texto(v) + '" maxlength="40">';
         else if (c.tipo === 'booleano') return '<label class="u-check"><input type="checkbox" id="' + id + '"' + (v === true ? ' checked' : '') + '> ' + texto(etiqueta(spec, c.n)) + '</label>';
         else if (c.tipo === 'lista') html = '<select id="' + id + '">' + opciones((c.valores || []).map(function (x) { return [x, x]; }), v, c.ob ? 'Elige' : 'Sin elegir') + '</select>';
         else if (c.tipo === 'ref') html = '<select id="' + id + '">' + opcRef(c, v) + '</select>';
@@ -612,10 +649,11 @@
        * Ficha de una fila (id) o de una nueva (id ''). madre: { spec, id } si es una hija (su «por» apunta a ella).
        * Lo que se edita va en campos; lo demás que se ve, de solo lectura; debajo, sus hijas y el historial.
        */
-      function ficha(spec, id, madre, pre) {
+      function ficha(spec, id, madre, pre, op) {
         var t = spec.tabla, e = E[t], f = id ? fila(t, id) : null;
         if (id && !f) { var x = pila.pop(); if (x) ficha(x.spec, x.id, x.madre); else cerrar(); return; } // la han borrado mientras
-        pila.push({ spec: spec, id: id, madre: madre, pre: pre });
+        op = op || {};
+        pila.push({ spec: spec, id: id, madre: madre, pre: pre, op: op });
         var nueva = !f, v = f || Object.assign({}, pre || {});
         if (nueva) {
           if (madre) v[spec.por] = madre.id;
@@ -626,6 +664,8 @@
         var baja = !nueva && deBaja(spec, f);
         var edita = puede && (nueva || spec.editar.length > 0);
         var cols = e.columnas.filter(function (c) {
+          // T0294: el ID que pone el motor (con prefijo, CTP0049) es interno: no sale en la ficha.
+          if (c.n === e.clave && e.prefijo) return false;
           return c.tipo !== 'log' && c.n !== spec.por && (spec.ver.indexOf(c.n) >= 0 || spec.editar.indexOf(c.n) >= 0 || c.n === spec.nombre);
         });
         var es = function (c) { return edita && spec.editar.indexOf(c.n) >= 0 && !(c.n === e.clave && !nueva); };
@@ -636,6 +676,9 @@
         var html = (ant ? '<button type="button" class="u-btn u-btn-texto aj-volver" data-atras>‹ ' + texto(nomAnt) + '</button>' : '') +
           '<h2 id="aj-vt">' + (nueva ? 'Añadir · ' + texto(tituloTabla(spec)) : texto(nombreFila(t, f))) + '</h2>' +
           (madre && pila.length < 2 ? '<p class="u-nota">' + texto(tituloTabla(spec)) + ' de ' + texto(nomMadre) + '</p>' : '') +
+          // T0294 (Javi): recién añadida, se queda abierta para añadir sus hijas; que se vea que ya está guardada.
+          (op.recien && !nueva ? '<p class="aj-recien" role="status">✓ Guardada en el Excel. Ahora puedes añadir ' + texto((spec.hijas || []).map(function (h) { return tituloTabla(h).toLowerCase(); })
+            .reduce(function (a, x, i, l) { return a + (i ? (i === l.length - 1 ? ' y ' : ', ') : '') + x; }, '')) + ', o cerrarla.</p>' : '') +
           (baja ? '<p><span class="u-chip">De baja</span></p>' : '') +
           (f && f._pendiente ? '<p class="u-nota">Guardando en el Excel…</p>' : '') +
           '<div class="u-campos">' + cols.filter(es).map(function (c) { return entrada(t, spec, c, v[c.n], nueva); }).join('') + '</div>' +
@@ -740,6 +783,8 @@
         var p = regla.minutos.split('.'), c = colDe(E[t], p[0]);
         return function (x) { var r = c && fila(c.ref, x[p[0]]); return r ? r[p[1]] : ''; };
       }
+      /** El título de una tabla para los avisos: el de Ajustes si está, o el de su nombre. */
+      function nombreTabla(t) { var sp = specDeTabla(t); return sp ? tituloTabla(sp) : titulo(t); }
       /** La tabla de un bloque (no una hija) para abrir una fila de esa tabla, o null si no está en Ajustes. */
       function specDeTabla(t) {
         for (var i = 0; i < B.length; i++) for (var j = 0; j < B[i].tablas.length; j++) if (B[i].tablas[j].tabla === t) return B[i].tablas[j];
@@ -761,12 +806,8 @@
           // Sin respuesta del motor (sin conexión), vale lo cargado: el motor lo vuelve a mirar al borrar.
           var lista = remoto === null ? us.map(function (u) { return { tabla: u.tabla, n: u.filas.length }; }) : remoto || [];
           if (bb) bb.hidden = !(remoto !== undefined && !lista.length);
-          // Corto: si tiene hijas, «tiene competiciones»; si no, la primera tabla que la usa y cuántas más.
-          var ts = lista.map(function (u) { return u.tabla; }).filter(function (x, i, a) { return a.indexOf(x) === i; });
-          var hs = (spec.hijas || []).filter(function (h) { return ts.indexOf(h.tabla) >= 0; }).map(function (h) { return tituloTabla(h).toLowerCase(); });
-          var nom = function (x) { var sp = specDeTabla(x); return sp ? tituloTabla(sp) : titulo(x); };
-          caja.innerHTML = !ts.length ? '' : '<p class="u-nota">No se puede borrar: ' + texto(hs.length ? 'tiene ' + hs.join(' y ') + '.' :
-            'se usa en ' + nom(ts[0]) + (ts.length > 1 ? ' y ' + (ts.length - 1) + (ts.length > 2 ? ' tablas más.' : ' tabla más.') : '.')) + '</p>';
+          // T0294: en palabras y con cuántas («tiene 1 equipo apuntado y 3 partidos»), con lo que hay que hacer.
+          caja.innerHTML = !lista.length ? '' : '<p class="u-nota">' + texto('No se puede borrar porque tiene ' + usosTexto(lista, cfg.COSAS, nombreTabla) + '. Si de verdad sobra, quita antes eso.') + '</p>';
         }
         var g = usosRemotos[k];
         if (g && Date.now() - g.t < 60000) { pintar(g.r); return; }
@@ -821,13 +862,14 @@
           T.actualizar(t, f[e.clave], c).then(function () { if (ctx.abierta()) ctx.aviso('Guardado en el Excel.'); }, function () {});
           return;
         }
-        var conHijas = spec.hijas && spec.hijas.length;
+        var conHijas = spec.hijas && spec.hijas.length, top = pila[pila.length - 1], desdeAccion = !!(top && top.op && top.op.accion);
         atras();
         T.crear(t, v).then(function (r) {
           if (!ctx.abierta()) return;
           ctx.aviso('Añadida en el Excel.');
           // Con hijas, se abre su ficha para seguir con ellas (si no se ha abierto otra cosa mientras).
-          if (conHijas && r && r.id && !velo.classList.contains('abierto')) { pila = []; ficha(spec, r.id, madre); }
+          // Desde una acción (el asistente), no: se cierra y la acción dice lo que sigue (T0294).
+          if (conHijas && !desdeAccion && r && r.id && !velo.classList.contains('abierto')) { pila = []; ficha(spec, r.id, madre, null, { recien: true }); }
         }, function () {});
       }
 
@@ -835,10 +877,11 @@
 
       el.addEventListener('click', function (ev) {
         if (ev.target.closest('[data-enlace]')) return; // un enlace de la lista (un archivo) se abre, sin abrir la ficha
-        var x = ev.target.closest('[data-vista], [data-modo], [data-accion], [data-nueva], [data-fila], [data-hija-nueva], [data-atras], [data-cerrar]');
+        var x = ev.target.closest('[data-inicio], [data-vista], [data-modo], [data-accion], [data-nueva], [data-fila], [data-hija-nueva], [data-atras], [data-cerrar]');
         if (!x || !el.contains(x)) return;
         if (x.hasAttribute('data-cerrar')) { cerrar(); return; }
         if (x.hasAttribute('data-atras')) { atras(); return; }
+        if (x.hasAttribute('data-inicio')) { guardado(CLAVE + 'inicio', x.getAttribute('data-inicio')); pintar(); window.scrollTo(0, 0); return; }
         if (x.hasAttribute('data-vista')) { vista(x.getAttribute('data-vista')); return; }
         if (x.hasAttribute('data-modo')) { var sm = specDe(S.vista); if (sm) { guardado(CLAVE + 'modo_' + sm.tabla, x.getAttribute('data-modo')); pintar(); } return; }
         if (x.hasAttribute('data-accion')) { vista('A:' + x.getAttribute('data-accion')); return; }

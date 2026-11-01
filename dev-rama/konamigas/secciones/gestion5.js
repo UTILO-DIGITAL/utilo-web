@@ -463,6 +463,16 @@
       var S = { tab: pest.indexOf(guardado(CLAVE + 'tab')) >= 0 ? guardado(CLAVE + 'tab') : pest[0], tem: guardado(CLAVE + 'tem'), comp: '', liga: '', dia: '',
         filAb: false, eq: { filtro: 'inscritos', q: '' }, ju: { filtro: 'activas', q: '', equipo: '', n: VER }, rv: { todas: false },
         leido: false, ijTem: '', leyendo: '', hora: '' };
+      // T0294: un enlace de otra sección (Ajustes › Preparar la temporada: «Ver sus equipos en Gestión») abre los equipos de
+      // una temporada y una competición, y con filtro, solo esos: ?s=gestion&tem=TEM-2026&comp=COM0005&filtro=solicitadas. Si la competición no es de esa temporada,
+      // se queda sin filtro de competición.
+      try {
+        var q = new URLSearchParams(location.search);
+        if (q.get('tem')) { S.tem = q.get('tem'); guardado(CLAVE + 'tem', S.tem); }
+        if (q.get('comp')) S.comp = q.get('comp');
+        if (q.get('filtro')) S.eq.filtro = q.get('filtro'); // los equipos sin confirmar (solicitadas), sin liga…; uno que no existe, inscritos
+        if ((q.get('tem') || q.get('comp')) && pest.indexOf('EQUIPOS') >= 0) S.tab = 'EQUIPOS';
+      } catch (e) {}
 
       el.innerHTML = '<div class="gs gs5">' +
         '<header class="gs-cab"><p><span class="gs-pint" id="gs-pint" hidden></span><span id="gs-hora">Datos guardados en este dispositivo</span>' +

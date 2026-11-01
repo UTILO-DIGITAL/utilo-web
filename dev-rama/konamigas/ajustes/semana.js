@@ -13,10 +13,23 @@
 
   var DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
+  function minutos(h) { var m = /^(\d\d):(\d\d)$/.exec(String(h == null ? '' : h)); return m ? Number(m[1]) * 60 + Number(m[2]) : null; }
+  function entero(v) { var n = Number(v); return isFinite(n) && n > 0 && Math.floor(n) === n ? n : 0; }
+  /** T0294 · Cuántos equipos caben con h horarios y p partidos por equipo, a una o dos vueltas (como Preparar la temporada). */
+  function ideal(h, p) {
+    h = entero(h); p = entero(p);
+    if (!h || !p) return null;
+    for (var v = 1; v <= 2; v++) { if (p % v) continue; var n = p / v + 1; if (Math.floor(n / 2) <= h) return { equipos: n, vueltas: v, jornadas: v * (n % 2 ? n : n - 1) }; }
+    return null;
+  }
+
   /**
    * Cómo está una liga para empezar: { equipos (inscritos sin las bajas), confirmados, partidos (los de cada semana: la
    * mitad de los confirmados), horarios, campos: [{ id, estado }] (los de sus horarios y cómo están esa temporada),
-   * faltan: ['gestor' | 'equipos' | 'horarios' | 'campos'], parada (sin equipos ni horarios: no está en marcha) }.
+   * faltan: ['gestor' | 'equipos' | 'horarios' | 'campos' | 'caben' | 'jornadas' | 'alquiler'], parada (sin equipos ni
+   * horarios: no está en marcha), ideal (con los partidos por equipo de su competición) y fuera (horarios fuera de lo
+   * alquilado) }. T0294 (Javi): lo de una temporada en marcha (más equipos de los que caben, jornadas que no coinciden y
+   * horarios fuera de lo alquilado) se ve aquí y no en Preparar la temporada.
    */
   function estadoLiga(l, d, per) {
     var ins = (d.inscripciones || []).filter(function (i) { return i.ID_LIGA === l.ID && i.ESTADO !== 'Baja'; });
@@ -30,7 +43,21 @@
     if (conf < 2) faltan.push('equipos');
     if (!hs.length || hs.length < partidos) faltan.push('horarios');
     if (campos.some(function (c) { return c.estado !== 'Contratado'; })) faltan.push('campos');
-    return { equipos: ins.length, confirmados: conf, partidos: partidos, horarios: hs.length, campos: campos, faltan: faltan, parada: !ins.length && !hs.length };
+    var comp = (d.comps || []).filter(function (c) { return String(c.ID) === String(l.ID_COMPETICION); })[0] || {};
+    var id = ideal(hs.length, comp.PARTIDOS_EQUIPO), nj = entero(l.NUM_JORNADAS);
+    if (id && conf > id.equipos) faltan.push('caben');
+    if (id && nj && nj !== id.jornadas) faltan.push('jornadas');
+    // Horarios fuera de lo alquilado: en un campo contratado con franjas ese día, sin caber en ninguna.
+    var ctpId = {}; (d.ctps || []).forEach(function (c) { if (String(c.ID_TEMPORADA) === per && c.ESTADO === 'Contratado') ctpId[c.ID_CAMPO] = c.ID; });
+    var dura = entero(l.MINUTOS_PARTIDO) || 45;
+    var fuera = hs.filter(function (h) {
+      var fr = (d.dispo || []).filter(function (f) { return ctpId[h.ID_CAMPO] && String(f.ID_CAMPO_TEMPORADA) === String(ctpId[h.ID_CAMPO]) && f.DIA_SEMANA === h.DIA_SEMANA; });
+      if (!fr.length) return false;
+      var a = minutos(h.HORA);
+      return !(a !== null && fr.some(function (f) { var i = minutos(f.HORA_DESDE), j = minutos(f.HORA_HASTA); if (j === 0) j = 1440; return i !== null && j !== null && i <= a && a + dura <= j; }));
+    });
+    if (fuera.length) faltan.push('alquiler');
+    return { equipos: ins.length, confirmados: conf, partidos: partidos, horarios: hs.length, campos: campos, faltan: faltan, parada: !ins.length && !hs.length, ideal: id, fuera: fuera };
   }
 
   /**
@@ -59,19 +86,20 @@
     };
   }
 
-  var CALC = { semana: semana, estadoLiga: estadoLiga };
+  var CALC = { semana: semana, estadoLiga: estadoLiga, ideal: ideal };
   if (typeof window === 'undefined' || !window.UN || !window.UN.ajustes) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
 
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  var TABLAS = ['LIGAS', 'COMPETICIONES', 'INSCRIPCIONES_EQUIPOS', 'HUECOS', 'CAMPOS_TEMPORADA'];
-  var FALTA = { gestor: 'sin gestor', equipos: 'sin equipos', horarios: 'faltan horarios', campos: 'campo sin contratar' };
+  var TABLAS = ['LIGAS', 'COMPETICIONES', 'INSCRIPCIONES_EQUIPOS', 'HUECOS', 'CAMPOS_TEMPORADA', 'DISPONIBILIDAD_CAMPOS'];
+  var FALTA = { gestor: 'sin gestor', equipos: 'sin equipos', horarios: 'faltan horarios', campos: 'campo sin contratar',
+    caben: 'no caben todos', jornadas: 'jornadas que no cuadran', alquiler: 'fuera de lo alquilado' };
 
   window.UN.ajustes('SEMANA', {
     abrir: function (el, ctx) {
       var A = ctx.ajustes, T = ctx.tablas, abierta = '', partidos = {};
-      function datos() { return { ligas: T.filas('LIGAS'), comps: T.filas('COMPETICIONES'), inscripciones: T.filas('INSCRIPCIONES_EQUIPOS'), huecos: T.filas('HUECOS'), ctps: T.filas('CAMPOS_TEMPORADA') }; }
+      function datos() { return { ligas: T.filas('LIGAS'), comps: T.filas('COMPETICIONES'), inscripciones: T.filas('INSCRIPCIONES_EQUIPOS'), huecos: T.filas('HUECOS'), ctps: T.filas('CAMPOS_TEMPORADA'), dispo: T.filas('DISPONIBILIDAD_CAMPOS') }; }
       function pl(n, a, b) { return n + ' ' + (n === 1 ? a : b); }
       function caja(x) {
         var l = x.l, e = x.e, ab = abierta === String(l.ID);
@@ -90,10 +118,15 @@
         return '<div class="aj-se-det"><ul>' +
           fila(!!l.ID_GESTOR, 'Gestor:', l.ID_GESTOR ? texto(A.nombre('STAFF', l.ID_GESTOR)) : 'sin poner') +
           fila(e.confirmados >= 2, 'Equipos:', pl(e.confirmados, 'confirmado', 'confirmados') + (e.equipos > e.confirmados ? ' (y ' + pl(e.equipos - e.confirmados, 'por confirmar', 'por confirmar') + ')' : '')) +
+          (e.ideal ? fila(e.confirmados <= e.ideal.equipos, 'Caben:', e.ideal.equipos + ' equipos ' + (e.ideal.vueltas === 1 ? 'a una vuelta' : 'a dos vueltas') + ' (' + e.ideal.jornadas + ' jornadas)' +
+            (e.confirmados > e.ideal.equipos ? ': tiene ' + e.confirmados + ' confirmados' : '') + (e.faltan.indexOf('jornadas') >= 0 ? '; la liga dice ' + l.NUM_JORNADAS + ' jornadas' : '')) : '') +
+          (e.fuera.length ? fila(false, 'Alquiler:', e.fuera.map(function (h) { return texto(h.HORA) + ' en ' + texto(A.nombre('CAMPOS', h.ID_CAMPO)); }).join(', ') + ' cae fuera de lo alquilado') : '') +
           fila(e.horarios > 0 && e.horarios >= e.partidos, 'Horario:', e.horarios ? pl(e.horarios, 'hueco', 'huecos') + ' para ' + pl(e.partidos, 'partido', 'partidos') + ' por semana' : 'sin definir') +
           fila(e.campos.length > 0 && !nc.length, 'Campos:', e.campos.length ? e.campos.map(function (c) { return texto(A.nombre('CAMPOS', c.id)) + (c.estado !== 'Contratado' ? ' (' + texto(c.estado || 'sin contratar') + ')' : ''); }).join(', ') : 'ninguno') +
           (p === undefined ? '<li class="aj-se-espera"><span>…</span><b>Calendario:</b> mirando…</li>' : fila(p > 0, 'Calendario:', p > 0 ? pl(p, 'partido creado', 'partidos creados') : p === null ? 'no se ha podido mirar' : 'sin crear')) +
-          fila(!!l.FECHA_INICIO, 'Empieza:', l.FECHA_INICIO ? String(l.FECHA_INICIO).split('-').reverse().join('/') + (l.NUM_JORNADAS ? ' · ' + l.NUM_JORNADAS + ' jornadas' : '') : 'sin fecha') +
+          // Sin fecha propia, la de su competición (las ligas de una competición empiezan a la vez, Javi).
+          fila(!!(l.FECHA_INICIO || x.comp.FECHA_INICIO), 'Empieza:', (l.FECHA_INICIO || x.comp.FECHA_INICIO) ? String(l.FECHA_INICIO || x.comp.FECHA_INICIO).split('-').reverse().join('/') +
+            (l.FECHA_INICIO ? '' : ' (con la competición)') + (l.NUM_JORNADAS ? ' · ' + l.NUM_JORNADAS + ' jornadas' : '') : 'sin fecha') +
           '</ul><button type="button" class="u-btn" data-ficha="' + texto(l.ID) + '">Abrir la liga</button></div>';
       }
       function pintar() {
