@@ -311,6 +311,10 @@
       var CLAVE = 'aj_' + ctx.id + '_';
       var S = { vista: guardado(CLAVE + 'vista'), per: guardado(CLAVE + 'per'), q: '', bajas: false, leido: false };
       var nombres = Object.keys(E);
+      // T0293: ?s=ajustes&tabla=MODELOS abre esa tabla (la primera vez que sale en un bloque): así otra sección lleva a lo
+      // suyo («Cambiarlo en Ajustes ›» de Camisetas).
+      var pedida = String(new URLSearchParams(location.search).get('tabla') || '').toUpperCase();
+      if (pedida) B.some(function (b, i) { return b.tablas.some(function (t, j) { if (t.tabla !== pedida) return false; S.vista = i + '.' + j; guardado(CLAVE + 'vista', S.vista); return true; }); });
 
       el.innerHTML = '<div id="aj-cont"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div>' +
         '<div class="u-velo" id="aj-velo"><div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="aj-vt"><div class="n-ventana" id="aj-vent"></div></div></div>';
