@@ -866,14 +866,15 @@
               var nom = val('m-ctr-nom'), tipoC = val('m-ctr-tipo'), b = this;
               if (!nom) { verError(['Falta el nombre de quién paga o cobra.']); return; }
               var ya = d.ctr.filter(function (c) { return norm(c.NOMBRE) === norm(nom); })[0];
-              if (ya) { vent.querySelector('#m-ID_CONTRAPARTE').value = ya.ID; verError(['«' + ya.NOMBRE + '» ya estaba: queda elegida.']); refrescar(); return; }
+              var cerrarAlta = function () { vent.querySelector('#m-ctr-alta').hidden = true; bn.hidden = false; vent.querySelector('#m-ctr-nom').value = ''; verError([]); };
+              if (ya) { vent.querySelector('#m-ID_CONTRAPARTE').value = ya.ID; cerrarAlta(); refrescar(); if (ctx.abierta()) ctx.aviso('«' + ya.NOMBRE + '» ya estaba: queda elegida.'); return; }
               b.disabled = true; b.textContent = 'Añadiendo…';
               T.crear('CONTRAPARTES', { NOMBRE: nom, TIPO: tipoC }).then(function (r) {
                 if (!d.ctr.some(function (c) { return String(c.ID) === String(r.id); })) d.ctr.push(r.fila || { ID: r.id, NOMBRE: nom, TIPO: tipoC });
                 ix.ctr[r.id] = r.fila || { ID: r.id, NOMBRE: nom, TIPO: tipoC };
                 var s = vent.querySelector('#m-ID_CONTRAPARTE');
                 if (s) { s.innerHTML = opcContrapartes(r.id); refrescar(); }
-                vent.querySelector('#m-ctr-alta').hidden = true; bn.hidden = false; vent.querySelector('#m-ctr-nom').value = '';
+                cerrarAlta();
                 b.disabled = false; b.textContent = 'Añadirla';
                 if (ctx.abierta()) ctx.aviso(nom + ' añadida a quién paga o cobra.');
               }, function () { b.disabled = false; b.textContent = 'Volver a probar'; });

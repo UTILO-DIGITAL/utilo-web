@@ -186,6 +186,10 @@
         guardarLocal(n);
         emitir('cambio', n, { otras: true });
       });
+      // T0293: otras tablas en que ha escrito el motor después (el acceso y la caja de un alta de staff): se vuelven a
+      // leer, solo las que ya tiene esta copia.
+      var rf = ((r && r.refrescar) || []).filter(function (x) { return mem[x]; });
+      if (rf.length) refrescarTodo(rf, true).catch(function () {});
     }
 
     /**
@@ -396,6 +400,7 @@
           if (r.eliminada && r.fila) { var mm = mem[n]; for (var c in r.fila) f[c] = r.fila[c]; if (!mm.ids[id]) { mm.filas.splice(Math.min(i, mm.filas.length), 0, f); mm.ids[id] = f; } }
           guardarLocal(n);
           emitir('cambio', n, { id: id, confirmado: true });
+          otras(r);
           return r;
         }, function (e) {
           pendientes--;

@@ -277,7 +277,7 @@
   window.UN.registrar('CAMISETAS', {
     abrir: function (el, ctx) {
       var pref = leerLocal(ctx, 'pref') || {};
-      S = { el: el, ctx: ctx, T: ctx.tablas, vista: pref.vista || 'entregas', modelo: pref.modelo || '', comp: pref.comp || '',
+      S = { el: el, ctx: ctx, T: ctx.tablas, vista: pref.vista || 'entregas', modelo: pref.modelo || '', comp: pref.comp || '', temp: pref.temp || '',
         filtro: 'pendientes', q: '', todo: {}, verStock: 'libres', N: leerLocal(ctx, 'nombres'), cargado: false, error: '' };
       el.innerHTML = '<nav class="u-pestanas cm-pest" role="tablist" aria-label="Camisetas">' + VISTAS.map(function (v) {
         return '<button type="button" role="tab" data-cm-vista="' + v[0] + '" aria-selected="' + (S.vista === v[0]) + '">' + v[1] + '</button>';
@@ -312,7 +312,7 @@
   function claveLocal(ctx, k) { return 'cam5_' + String(ctx.correo || ctx.persona || '').toLowerCase() + '_' + k; }
   function leerLocal(ctx, k) { try { return JSON.parse(localStorage.getItem(claveLocal(ctx, k)) || 'null'); } catch (e) { return null; } }
   function guardarLocal(ctx, k, v) { try { if (v === null) localStorage.removeItem(claveLocal(ctx, k)); else localStorage.setItem(claveLocal(ctx, k), JSON.stringify(v)); } catch (e) {} }
-  function guardarPref() { guardarLocal(S.ctx, 'pref', { vista: S.vista, modelo: S.modelo, comp: S.comp }); }
+  function guardarPref() { guardarLocal(S.ctx, 'pref', { vista: S.vista, modelo: S.modelo, comp: S.comp, temp: S.temp }); }
 
   /* ---------- datos ---------- */
 
@@ -1060,14 +1060,14 @@
    * T0293 · Los modelos, el pack, los proveedores y su catálogo se cambian en Ajustes: un enlace que abre esa tabla.
    * Camisetas es de Socio, igual que Ajustes; si alguien no la viera, solo sale el texto.
    */
-  function enAjustes(tabla, t) {
+  function enAjustes(tabla, t, q) {
     var ve = (S.ctx.secciones || []).some(function (x) { return x.id === 'AJUSTES'; });
-    return ve ? '<a class="u-btn u-btn-texto cm-en-linea" href="?s=ajustes&amp;tabla=' + encodeURIComponent(tabla) + '" data-sx="AJUSTES">' + texto(t) + ' ›</a>' : '';
+    return ve ? '<a class="u-btn u-btn-texto cm-en-linea" href="?s=ajustes&amp;tabla=' + encodeURIComponent(tabla) + (q ? '&amp;q=' + encodeURIComponent(q) : '') + '" data-sx="AJUSTES">' + texto(t) + ' ›</a>' : '';
   }
   function htmlEnAjustes() {
     return '<section class="u-bloque cm-mods"><h2 class="n-grupo">Modelos y proveedores</h2>' +
       '<p class="u-nota">Los modelos, los proveedores con su contacto y el catálogo de cada uno (qué modelos hace, en qué colores, con su código y su precio) están en Ajustes › Camisetas. Un pedido solo puede ir a quien hace el modelo en todos sus colores.</p>' +
-      '<p>' + enAjustes('MODELOS', 'Modelos') + ' ' + enAjustes('CONTRAPARTES', 'Proveedores') + ' ' + enAjustes('CATALOGO', 'Catálogo') + '</p></section>';
+      '<p>' + enAjustes('MODELOS', 'Modelos') + ' ' + enAjustes('CONTRAPARTES', 'Proveedores', 'Proveedor') + ' ' + enAjustes('CATALOGO', 'Catálogo') + '</p></section>';
   }
   function nombreProveedor(id) { var x = S.T.fila('CONTRAPARTES', id); return x ? x.NOMBRE || id : id; }
   /*
@@ -1103,7 +1103,7 @@
   function contactoProveedor(id) {
     var x = S.T.fila('CONTRAPARTES', id);
     return x && x.CONTACTO ? '<div class="cm-contacto-b">' + htmlContacto(x.CONTACTO) + '</div>' :
-      '<p class="u-nota">Este proveedor no tiene contacto apuntado. ' + enAjustes('CONTRAPARTES', 'Ponerlo en Ajustes') + '</p>';
+      '<p class="u-nota">Este proveedor no tiene contacto apuntado. ' + enAjustes('CONTRAPARTES', 'Ponerlo en Ajustes', 'Proveedor') + '</p>';
   }
   /** El código del color: el del proveedor en su catálogo (T0268) o, si no lo tiene, el de COLORES. */
   function codigoColor(id, prov, modelo) {
@@ -1221,7 +1221,8 @@
   function pTemporada(c) {
     if (!S.N) { c.innerHTML = '<div class="kz-centro cm-carga" role="status"><div class="u-carga"></div><span class="u-nota">Cargando las temporadas y sus competiciones…</span></div>'; return; }
     var temps = S.N.temp || [];
-    if (!temps.some(function (t) { return t[0] === S.temp; })) S.temp = (temps[0] || [''])[0];
+    // T0293: la que se eligió la última vez o, si no, la más nueva con camisetas (la de Entregas), no una vacía que viene.
+    if (!temps.some(function (t) { return t[0] === S.temp; })) S.temp = ((temporadas()[0] || {}).id) || (temps[0] || [''])[0];
     var comps = Object.keys(S.N.comp).filter(function (k) { return S.N.comp[k][1] === S.temp; }).sort(function (a, b) { return norm(S.N.comp[a][0]) < norm(S.N.comp[b][0]) ? -1 : 1; });
     // T0293: el modelo y las camisetas que incluye la inscripción se preparan en Ajustes › Preparar la temporada (paso 4).
     var h = '<div class="u-filtros cm-filtros">' + campo('Temporada', '<select id="cm-temp">' + opciones(temps.map(function (t) { return [t[0], t[1]]; }), S.temp) + '</select>') + '</div>' +
@@ -1241,7 +1242,7 @@
         ]) + '</li>';
     }).join('') + '</ul>';
     c.innerHTML = h;
-    c.querySelector('#cm-temp').onchange = function () { S.temp = this.value; pintar(true); };
+    c.querySelector('#cm-temp').onchange = function () { S.temp = this.value; guardarPref(); pintar(true); };
     c.onclick = function (e) {
       var b = e.target.closest('[data-cm-tc]'); if (!b) return;
       var k = b.getAttribute('data-cm-tc'), acc = b.getAttribute('data-cm-acc');
