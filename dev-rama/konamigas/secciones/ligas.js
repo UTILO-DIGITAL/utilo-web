@@ -857,9 +857,10 @@
           '<th class="num" title="Ganados">G</th><th class="num" title="Empatados">E</th><th class="num" title="Perdidos">P</th>' +
           '<th class="num u-solo-ancho" title="Goles a favor">GF</th><th class="num u-solo-ancho" title="Goles en contra">GC</th><th class="num" title="Diferencia de goles">DG</th><th class="num">Pts</th></tr></thead><tbody>' +
           cl.map(function (e) {
-            var nSan = sancionesDe(d.san, { equipo: e.id }).length;
+            // T0297: en rojo solo lo que debe el equipo; una sanción ya pagada es solo información.
+            var nSan = sancionesDe(d.san, { equipo: e.id }).length, debe = multasPendientes(d.san, e.id, null).total;
             return '<tr><td class="num">' + e.pos + '</td><td class="u-tabla-t"><button type="button" class="lg-eqf" data-eqf="' + texto(e.id) + '"><span class="lg-eqt">' + punto(e.id) + texto(equipo(e.id)) + '</span></button>' +
-              (nSan ? '<div class="u-nota lg-san-nota">' + nSan + (nSan === 1 ? ' sanción' : ' sanciones') + '</div>' : '') +
+              (debe ? '<div class="u-nota lg-san-nota">Debe ' + euros(debe) + ' de multa</div>' : nSan ? '<div class="u-nota">' + nSan + (nSan === 1 ? ' sanción' : ' sanciones') + '</div>' : '') +
               (e.jugar ? '<div class="u-nota u-solo-ancho">' + e.jugar + ' por jugar</div>' : '') + '</td>' +
               '<td class="num">' + e.pj + '</td><td class="num">' + e.pg + '</td><td class="num">' + e.pe + '</td><td class="num">' + e.pp + '</td>' +
               '<td class="num u-solo-ancho">' + e.gf + '</td><td class="num u-solo-ancho">' + e.gc + '</td><td class="num">' + (e.dg > 0 ? '+' : '') + e.dg + '</td><td class="num"><b>' + e.pts + '</b></td></tr>';
@@ -1144,9 +1145,10 @@
           var rival = p ? (String(p.ID_INSCRIPCION_LOCAL) === String(s.ID_INSCRIPCION_EQUIPO) ? p.ID_INSCRIPCION_VISITANTE : p.ID_INSCRIPCION_LOCAL) : '';
           var din = dineroSancion(s, rival ? equipo(rival) : '');
           var dentro = '<span class="lg-san-tipo">' + texto(s.TIPO || 'Sanción') + '</span><span class="lg-san-txt"><b>' + texto(s.MOTIVO) + '</b><small>' + texto(de) + '</small>' +
-            (din ? '<small class="lg-san-din' + (!s.FECHA_PAGO || (num(s.COMPENSACION) > 0 && !s.FECHA_COMPENSACION) ? ' lg-san-debe' : '') + '">' + texto(din) + '</small>' : '') + '</span>';
+            (din ? '<small class="lg-san-din' + (!s.FECHA_PAGO ? ' lg-san-debe' : '') + '">' + texto(din) + '</small>' : '') + '</span>';
           var attr = s._nueva ? '' : sanciona ? ' data-san="' + texto(s.ID) + '"' : que === 'equipo' && p ? ' data-p="' + texto(p.ID) + '"' : '';
-          return '<li>' + (attr ? '<button type="button" class="lg-san-i lg-san-b"' + attr + '>' + dentro + '</button>' : '<div class="lg-san-i">' + dentro + '</div>') + '</li>';
+          var cl = 'lg-san-i' + (num(s.IMPORTE) > 0 && !s.FECHA_PAGO ? ' lg-san-i-debe' : ''); // rojizo solo si el equipo debe la multa
+          return '<li>' + (attr ? '<button type="button" class="' + cl + ' lg-san-b"' + attr + '>' + dentro + '</button>' : '<div class="' + cl + '">' + dentro + '</div>') + '</li>';
         }).join('') + '</ul>';
       }
 
@@ -1160,7 +1162,11 @@
         };
       }
 
-      /** Ficha de un equipo (su inscripción en una liga): su liga, cómo va y sus sanciones; quien sanciona apunta una nueva. */
+      /**
+       * Ficha de un equipo (su inscripción en una liga), para consultar (Javi, T0297): cómo va (puesto, puntos, ganados, empatados,
+       * perdidos y goles, como en la clasificación), su próximo partido y sus últimos resultados (cada uno abre su ficha), su
+       * plantilla con dorsal y goles en la liga (ligasJugadoras: solo nombre y dorsal) y sus sanciones. Quien sanciona apunta una.
+       */
       function fichaEquipo(id) {
         var e = ix.eq[String(id || '')];
         if (!e) return;
@@ -1169,21 +1175,65 @@
         var nombres = {}; d.eq.forEach(function (x) { nombres[x.ID] = x.NOMBRE_EQUIPO; });
         var l = ix.liga[e.ID_LIGA], c = l && ix.comp[l.ID_COMPETICION], copa = !!c && lista(cfg.SIN_CLASIFICACION).indexOf(String(c.TIPO || '')) >= 0;
         var fe = copa ? null : clasificacion(partidosLiga(e.ID_LIGA), equiposLiga(e.ID_LIGA), cfg.PUNTOS, nombres, nAnulado()).filter(function (x) { return x.id === String(e.ID); })[0];
-        var ps = d.par.filter(function (p) { return p.ID_INSCRIPCION_LOCAL === e.ID || p.ID_INSCRIPCION_VISITANTE === e.ID; });
-        var jugados = fe ? fe.pj : ps.filter(conResultado).length, quedan = fe ? fe.jugar : ps.filter(function (p) { return p.ESTADO === 'Programado'; }).length;
-        var html = '<h2 id="lg-vt">' + texto(equipo(e.ID)) + '</h2>' +
-          '<p class="u-nota">' + texto([ligaCompleta(e.ID_LIGA), nomColor(e.ID) ? 'Color ' + nomColor(e.ID).toLowerCase() : '', e.ESTADO === 'Baja' ? 'De baja' : ''].filter(String).join(' · ')) + '</p>' +
-          '<p>' + (fe ? fe.pos + '.º con ' + fe.pts + (fe.pts === 1 ? ' punto' : ' puntos') + ' · ' : '') + jugados + (jugados === 1 ? ' partido jugado' : ' partidos jugados') + (quedan ? ' y ' + quedan + ' por jugar' : '') + '.</p>' +
+        var ps = d.par.filter(function (p) { return !p._nueva && (p.ID_INSCRIPCION_LOCAL === e.ID || p.ID_INSCRIPCION_VISITANTE === e.ID); });
+        var nEq = equiposLiga(e.ID_LIGA).length;
+        // Cada partido desde el equipo: su resultado (el 0-5 de un anulado por culpa de alguien, también) y si lo ganó.
+        var desde = function (p) {
+          var an = resultadoAnulado(p, nAnulado()), loc = p.ID_INSCRIPCION_LOCAL === e.ID;
+          var gl = an ? an.gl : num(p.GOLES_LOCAL), gv = an ? an.gv : num(p.GOLES_VISITANTE), hay = !!an || conResultado(p);
+          var a = loc ? gl : gv, b = loc ? gv : gl;
+          return { p: p, rival: loc ? p.ID_INSCRIPCION_VISITANTE : p.ID_INSCRIPCION_LOCAL, hay: hay, a: a, b: b, r: !hay ? '' : a > b ? 'G' : a < b ? 'P' : 'E' };
+        };
+        var jugados = ps.map(desde).filter(function (x) { return x.hay; }).sort(function (x, y) { return orden(cuando(y.p), cuando(x.p)); });
+        var proximo = ps.filter(function (p) { return p.ESTADO === 'Programado' && String(p.FECHA || '') >= hoy(); }).sort(function (a, b) { return orden(cuando(a), cuando(b)); })[0];
+        var linea = function (x) {
+          return '<li><button type="button" class="lg-ef-p" data-p="' + texto(x.p.ID) + '"><span class="lg-ef-r lg-ef-' + x.r + '" title="' + ({ G: 'Ganado', E: 'Empatado', P: 'Perdido' })[x.r] + '">' + x.r + '</span>' +
+            '<span class="lg-ef-txt"><b>' + texto('Contra ' + equipo(x.rival)) + '</b><small>' + texto('J' + x.p.JORNADA + ' · ' + fecha(x.p.FECHA) + (x.p.ID_INSCRIPCION_LOCAL === e.ID ? ' · local' : ' · visitante') + (x.p.ESTADO === 'Anulado' ? ' · anulado' : '')) + '</small></span>' +
+            '<b class="u-cifra">' + x.a + '–' + x.b + '</b></button></li>';
+        };
+        var cifra = function (v, t) { return '<div><b class="u-cifra">' + texto(v) + '</b><span>' + texto(t) + '</span></div>'; };
+        var html = '<h2 id="lg-vt"><span class="lg-eqt">' + punto(e.ID) + texto(equipo(e.ID)) + '</span></h2>' +
+          '<p class="u-nota">' + texto([ligaCompleta(e.ID_LIGA), nomColor(e.ID) ? 'Color ' + nomColor(e.ID).toLowerCase() : '', e.NIVEL ? 'Nivel ' + e.NIVEL : '', e.ESTADO === 'Baja' ? 'De baja' : ''].filter(String).join(' · ')) + '</p>' +
+          (fe ? '<div class="pf-cifras lg-ef-cifras">' + cifra(fe.pos + '.º', 'de ' + nEq) + cifra(fe.pts, fe.pts === 1 ? 'punto' : 'puntos') +
+            cifra(fe.pg + ' · ' + fe.pe + ' · ' + fe.pp, 'ganados · empatados · perdidos') + cifra(fe.gf + '–' + fe.gc, 'goles a favor y en contra') + '</div>' +
+            '<p class="u-nota">' + fe.pj + (fe.pj === 1 ? ' partido jugado' : ' partidos jugados') + (fe.jugar ? ' y ' + fe.jugar + ' por jugar' : '') + '.</p>'
+            : '<p class="u-nota">' + jugados.length + (jugados.length === 1 ? ' partido jugado.' : ' partidos jugados.') + '</p>') +
+          (proximo ? '<h3 class="lg-sub">Próximo partido</h3><ul class="lg-ef-ps"><li><button type="button" class="lg-ef-p" data-p="' + texto(proximo.ID) + '"><span class="lg-ef-txt"><b>' +
+            texto('Contra ' + (equipo(proximo.ID_INSCRIPCION_LOCAL === e.ID ? proximo.ID_INSCRIPCION_VISITANTE : proximo.ID_INSCRIPCION_LOCAL) || 'por decidir')) + '</b><small>' +
+            texto(fechaDia(proximo.FECHA) + (proximo.HORA ? ' · ' + proximo.HORA : '') + (proximo.ID_CAMPO ? ' · ' + campo(proximo.ID_CAMPO) : '') + ' · J' + proximo.JORNADA +
+              (proximo.ID_INSCRIPCION_LOCAL === e.ID ? ' · local' : ' · visitante')) + '</small></span></button></li></ul>' : '') +
+          (jugados.length ? '<h3 class="lg-sub">Últimos resultados</h3><ul class="lg-ef-ps">' + jugados.slice(0, 5).map(linea).join('') + '</ul>' +
+            (jugados.length > 5 ? '<details><summary class="u-nota">Ver los ' + jugados.length + ' resultados</summary><ul class="lg-ef-ps">' + jugados.slice(5).map(linea).join('') + '</ul></details>' : '') : '') +
+          '<h3 class="lg-sub">Plantilla</h3><div id="lg-ef-plantilla">' + htmlPlantilla(e.ID) + '</div>' +
           '<h3 class="lg-sub">Sanciones</h3>' + (ss.length ? htmlSanciones(ss, 'equipo') : '<p class="u-vacio">No tiene sanciones.</p>') +
-          '<div class="n-botones">' + (sanciona ? '<button type="button" class="u-btn u-btn-accion" id="lg-san-nueva">Apuntar una sanción</button>' : '') +
-          '<button type="button" class="u-btn' + (sanciona ? ' u-btn-texto' : '') + '" data-cerrar>Cerrar</button></div>';
+          '<div class="n-botones">' + (sanciona ? '<button type="button" class="u-btn" id="lg-san-nueva">Apuntar una sanción</button>' : '') +
+          '<button type="button" class="u-btn u-btn-texto" data-cerrar>Cerrar</button></div>';
         ventana(html, function () {
           fichaAbierta = 'E:' + e.ID;
           var volver = function () { fichaEquipo(e.ID); };
           vent.onclick = clicFicha(volver);
           var sn = vent.querySelector('#lg-san-nueva');
           if (sn) sn.onclick = function () { formSancion(null, { equipo: e.ID }, volver); };
+          if (!JUG[e.ID]) cargarJugadoras([e.ID]).then(function () {
+            var x = vent.querySelector('#lg-ef-plantilla');
+            if (x && fichaAbierta === 'E:' + e.ID) x.innerHTML = htmlPlantilla(e.ID);
+          }, function () { var x = vent.querySelector('#lg-ef-plantilla'); if (x) x.innerHTML = '<p class="u-nota">No se ha podido leer la plantilla.</p>'; });
         });
+      }
+      /** La plantilla de un equipo: sus jugadoras activas por dorsal, con los goles que lleva en la liga; las de baja, aparte. */
+      function htmlPlantilla(ie) {
+        var js = JUG[ie];
+        if (!js) return '<p class="u-nota">Cargando la plantilla…</p>';
+        var goles = {};
+        d.gol.forEach(function (g) { if (String(g.ID_INSCRIPCION_EQUIPO) === String(ie) && g.ID_INSCRIPCION_JUGADORA) goles[g.ID_INSCRIPCION_JUGADORA] = (goles[g.ID_INSCRIPCION_JUGADORA] || 0) + 1; });
+        var act = js.filter(function (j) { return j.ACTIVA; }), baja = js.length - act.length;
+        if (!act.length) return '<p class="u-vacio">No tiene jugadoras inscritas' + (baja ? ' (' + baja + ' de baja)' : '') + '.</p>';
+        return '<p class="u-nota">' + act.length + (act.length === 1 ? ' jugadora' : ' jugadoras') + (baja ? ' (y ' + baja + ' de baja)' : '') + '.</p>' +
+          '<ol class="lg-ranking lg-ef-plantilla">' + act.map(function (j) {
+            var n = goles[j.ID] || 0;
+            return '<li><span class="lg-dorsal u-cifra">' + texto(j.DORSAL === '' || j.DORSAL == null ? '–' : j.DORSAL) + '</span><span class="lg-ef-nom">' + texto(j.NOMBRE) + '</span>' +
+              (n ? '<span class="u-cifra lg-ef-gol">' + n + (n === 1 ? ' gol' : ' goles') + '</span>' : '') + '</li>';
+          }).join('') + '</ol>';
       }
 
       /**
