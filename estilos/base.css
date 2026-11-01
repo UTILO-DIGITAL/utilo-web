@@ -444,6 +444,8 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .eco-barra { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--e3) var(--e4); margin: 0 0 var(--e4); }
 .u .eco-barra .eco-per { flex: 0 1 220px; }
 .u .eco-barra .u-pestanas { flex: 1 1 320px; min-width: 0; }
+/* T0336: en el móvil, las pestañas de Economía no caben en una línea: van en dos, sin esconder ninguna. */
+@media (max-width: 639px) { .u .eco-barra .u-pestanas { flex-wrap: wrap; overflow: visible; } .u .eco-barra .u-pestanas button { padding: 0 var(--e2); } }
 .u .eco-cab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e3); margin: 0 0 var(--e3); }
 .u .eco-cab .n-grupo, .u .eco-cab .u-nota { margin: 0; }
 .u .eco-tabla { margin: 0 0 var(--e2); }

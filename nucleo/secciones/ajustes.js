@@ -125,7 +125,7 @@
       if ((c.tipo === 'numero' || c.tipo === 'importe') && typeof x !== 'number') mal.push(et + ': «' + x + '» no es un número.');
       if (c.tipo === 'fecha' && !/^\d{4}-\d\d-\d\d$/.test(x)) mal.push(et + ': no es una fecha.');
       if (c.tipo === 'hora' && !/^\d\d:\d\d$/.test(x)) mal.push(et + ': no es una hora (hh:mm).');
-      if (c.tipo === 'lista' && (c.valores || []).indexOf(x) < 0) mal.push(et + ': «' + x + '» no está en la lista.');
+      if (c.tipo === 'lista' && !c.de && (c.valores || []).indexOf(x) < 0) mal.push(et + ': «' + x + '» no está en la lista.');
     });
     if (!id && !e.prefijo && !vacio(v[e.clave]) && filas.some(function (f) { return String(f[e.clave]) === String(v[e.clave]); })) {
       mal.push('Ya hay una fila con ' + etiqueta(spec, e.clave).toLowerCase() + ' ' + v[e.clave] + '.');
@@ -311,6 +311,10 @@
       var CLAVE = 'aj_' + ctx.id + '_';
       var S = { vista: guardado(CLAVE + 'vista'), per: guardado(CLAVE + 'per'), q: '', bajas: false, leido: false };
       var nombres = Object.keys(E);
+      // T0293: ?s=ajustes&tabla=MODELOS abre esa tabla (la primera vez que sale en un bloque), y con &q=… ya buscado: así
+      // otra sección lleva a lo suyo («Proveedores ›» de Camisetas abre las contrapartes con «Proveedor» buscado).
+      var url = new URLSearchParams(location.search), pedida = String(url.get('tabla') || '').toUpperCase();
+      if (pedida) B.some(function (b, i) { return b.tablas.some(function (t, j) { if (t.tabla !== pedida) return false; S.vista = i + '.' + j; S.q = String(url.get('q') || ''); guardado(CLAVE + 'vista', S.vista); return true; }); });
 
       el.innerHTML = '<div id="aj-cont"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div>' +
         '<div class="u-velo" id="aj-velo"><div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="aj-vt"><div class="n-ventana" id="aj-vent"></div></div></div>';
@@ -340,6 +344,11 @@
         // T0294: la que se nombra por su clave y es una fecha (un día de CALENDARIO), como fecha: 07/01/2027.
         var ck = vacio(n) ? colDe(e, e.clave) : null;
         return ck && ck.tipo === 'fecha' ? verValor(ck, f[e.clave]) : String(vacio(n) ? f[e.clave] : n);
+      }
+      /** T0336: los valores de una lista: los suyos o, con «de» (EPICAS.EPICA), los de esa columna de la otra tabla. */
+      function valoresLista(c) {
+        if (!c.de) return c.valores || [];
+        var p = c.de.split('.'); return filas(p[0]).map(function (f) { return String(f[p[1]] == null ? '' : f[p[1]]); }).filter(String);
       }
       function nombreRef(t, id) { var f = fila(t, id); return f ? nombreFila(t, f) : String(id); }
       /** La tabla de la vista guardada: «b.t» (bloque y tabla), «A:ID» (una acción) o '' (inicio). */
@@ -608,7 +617,7 @@
         if (c.n === E[t].clave && c.tipo === 'fecha') html = '<input type="date" id="' + id + '" value="' + texto(v) + '">';
         else if (c.n === E[t].clave) html = '<input type="text" id="' + id + '" value="' + texto(v) + '" maxlength="40">';
         else if (c.tipo === 'booleano') return '<label class="u-check"><input type="checkbox" id="' + id + '"' + (v === true ? ' checked' : '') + '> ' + texto(etiqueta(spec, c.n)) + '</label>';
-        else if (c.tipo === 'lista') html = '<select id="' + id + '">' + opciones((c.valores || []).map(function (x) { return [x, x]; }), v, c.ob ? 'Elige' : 'Sin elegir') + '</select>';
+        else if (c.tipo === 'lista') html = '<select id="' + id + '">' + opciones(valoresLista(c).map(function (x) { return [x, x]; }), v, c.ob ? 'Elige' : 'Sin elegir') + '</select>';
         else if (c.tipo === 'ref') html = '<select id="' + id + '">' + opcRef(c, v) + '</select>';
         else if (c.tipo === 'numero' || c.tipo === 'importe') html = '<input type="text" inputmode="decimal" id="' + id + '" value="' + texto(vacio(v) ? '' : String(v).replace('.', ',')) + '"' + (c.tipo === 'importe' ? ' placeholder="0,00"' : '') + '>';
         else if (c.tipo === 'fecha') html = '<input type="date" id="' + id + '" value="' + texto(v) + '">';

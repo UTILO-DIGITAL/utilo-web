@@ -801,6 +801,10 @@
         if (!m && DS && !v[DS] && S.des && S.des !== '-' && d.colsMov.indexOf(DS) >= 0) v[DS] = S.des;
         var tienePer = P && d.colsMov.indexOf(P) >= 0, tieneDes = DS && d.colsMov.indexOf(DS) >= 0;
         var cuentas = d.cue.map(function (c) { return [c.ID, c.NOMBRE]; }), st = { tipo: v.TIPO || 'Gasto' };
+        var altaCtr = [].concat(cfg.ALTA_CONTRAPARTE || []).map(String).filter(Boolean);
+        function opcContrapartes(sel) {
+          return opciones(d.ctr.map(function (c) { return [c.ID, c.NOMBRE]; }).sort(function (a, b) { return String(a[1]).localeCompare(String(b[1]), 'es'); }), sel, cfg.PIDE_CONTRAPARTE === 'Sí' ? 'Elige' : 'Nadie en concreto');
+        }
         var html = '<h2 id="eco-vt">' + (m ? 'Editar movimiento' : 'Añadir movimiento') + '</h2>' +
           '<div class="eco-sw" role="group" aria-label="Qué es">' +
           '<button type="button" data-tipo="Ingreso">↓ Entra dinero</button><button type="button" data-tipo="Gasto">↑ Sale dinero</button><button type="button" data-tipo="Interno">⇄ Entre cuentas</button></div>' +
@@ -816,7 +820,11 @@
           (tieneDes ? campo(texto(nomDes), '<select id="m-DES"></select>', 'eco-no-interno') : '') +
           campo('<span id="m-cue-et">Cuenta</span>', '<select id="m-ID_CUENTA">' + opciones(cuentas, v.ID_CUENTA, 'Elige la cuenta') + '</select>') +
           campo('A la cuenta', '<select id="m-ID_CUENTA_DESTINO">' + opciones(cuentas, v.ID_CUENTA_DESTINO, 'Elige a dónde va') + '</select>', 'eco-interno') +
-          campo('<span id="m-ctr-et">Quién paga o cobra</span>', '<select id="m-ID_CONTRAPARTE">' + opciones(d.ctr.map(function (c) { return [c.ID, c.NOMBRE]; }).sort(function (a, b) { return String(a[1]).localeCompare(String(b[1]), 'es'); }), v.ID_CONTRAPARTE, cfg.PIDE_CONTRAPARTE === 'Sí' ? 'Elige' : 'Nadie en concreto') + '</select>', 'eco-no-interno') +
+          campo('<span id="m-ctr-et">Quién paga o cobra</span>', '<select id="m-ID_CONTRAPARTE">' + opcContrapartes(v.ID_CONTRAPARTE) + '</select>', 'eco-no-interno') +
+          (altaCtr.length ? '<div class="u-ancho eco-no-interno"><button type="button" class="u-btn u-btn-texto" id="m-ctr-nueva">+ Nueva (no está en la lista)</button>' +
+            '<div class="u-campos" id="m-ctr-alta" hidden>' + campo('Nombre', '<input type="text" id="m-ctr-nom" maxlength="120" autocomplete="off">') +
+            campo('Es', '<select id="m-ctr-tipo">' + opciones(altaCtr.map(function (x) { return [x, x]; }), altaCtr[0]) + '</select>') +
+            '<p class="u-ancho"><button type="button" class="u-btn" id="m-ctr-ok">Añadirla</button> <span class="u-nota">El resto de sus datos (contacto…), en Ajustes.</span></p></div></div>' : '') +
           campo('Factura o ticket', '<select id="m-ID_FACTURA"></select>', 'eco-no-interno') +
           campo('Detalles <span class="eco-opc">(opcional)</span>', '<textarea id="m-NOTAS" rows="2" placeholder="Por qué se hizo, a qué corresponde, acuerdos…">' + texto(v.NOTAS) + '</textarea>', 'u-ancho') +
           '</div><p class="u-error" role="alert" hidden></p><div class="n-botones">' +
@@ -850,6 +858,28 @@
           ['m-TIPO_IVA', 'm-ID_CONTRAPARTE', 'm-PER'].forEach(function (id) { var e = vent.querySelector('#' + id); if (e) e.addEventListener('change', refrescar); });
           vent.querySelector('#m-BASE').addEventListener('input', refrescar);
           oirImporte('m', refrescar);
+          // T0293 · Alta rápida de quién paga o cobra (ALTA_CONTRAPARTE): se crea al momento y queda elegida.
+          var bn = vent.querySelector('#m-ctr-nueva');
+          if (bn) {
+            bn.onclick = function () { bn.hidden = true; vent.querySelector('#m-ctr-alta').hidden = false; vent.querySelector('#m-ctr-nom').focus(); };
+            vent.querySelector('#m-ctr-ok').onclick = function () {
+              var nom = val('m-ctr-nom'), tipoC = val('m-ctr-tipo'), b = this;
+              if (!nom) { verError(['Falta el nombre de quién paga o cobra.']); return; }
+              var ya = d.ctr.filter(function (c) { return norm(c.NOMBRE) === norm(nom); })[0];
+              var cerrarAlta = function () { vent.querySelector('#m-ctr-alta').hidden = true; bn.hidden = false; vent.querySelector('#m-ctr-nom').value = ''; verError([]); };
+              if (ya) { vent.querySelector('#m-ID_CONTRAPARTE').value = ya.ID; cerrarAlta(); refrescar(); if (ctx.abierta()) ctx.aviso('«' + ya.NOMBRE + '» ya estaba: queda elegida.'); return; }
+              b.disabled = true; b.textContent = 'Añadiendo…';
+              T.crear('CONTRAPARTES', { NOMBRE: nom, TIPO: tipoC }).then(function (r) {
+                if (!d.ctr.some(function (c) { return String(c.ID) === String(r.id); })) d.ctr.push(r.fila || { ID: r.id, NOMBRE: nom, TIPO: tipoC });
+                ix.ctr[r.id] = r.fila || { ID: r.id, NOMBRE: nom, TIPO: tipoC };
+                var s = vent.querySelector('#m-ID_CONTRAPARTE');
+                if (s) { s.innerHTML = opcContrapartes(r.id); refrescar(); }
+                cerrarAlta();
+                b.disabled = false; b.textContent = 'Añadirla';
+                if (ctx.abierta()) ctx.aviso(nom + ' añadida a quién paga o cobra.');
+              }, function () { b.disabled = false; b.textContent = 'Volver a probar'; });
+            };
+          }
           vent.querySelector('#m-guardar').onclick = function () {
             var tipo = st.tipo, interno = tipo === 'Interno';
             var nv = { FECHA: val('m-FECHA'), TIPO: tipo, CONCEPTO: val('m-CONCEPTO'), BASE: baseEn('m') / 100, TIPO_IVA: val('m-TIPO_IVA'),
