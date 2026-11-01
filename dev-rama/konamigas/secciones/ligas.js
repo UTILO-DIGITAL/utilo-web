@@ -1308,20 +1308,23 @@
           s.FECHA_PAGO ? (s.FECHA_COMPENSACION ? '' : '<button type="button" class="u-btn u-btn-texto" data-despagar="multa">Deshacer el pago</button>')
             : '<button type="button" class="u-btn" data-pago="multa">La ha pagado</button>');
         if (r > 0 && s.FECHA_PAGO) h += linea(euros(r) + ' para ' + (rival || 'el rival') + (s.FECHA_COMPENSACION ? ': dados el ' + fecha(s.FECHA_COMPENSACION) : ': se los debemos'), !s.FECHA_COMPENSACION,
-          s.FECHA_COMPENSACION ? '<button type="button" class="u-btn u-btn-texto" data-despagar="rival">Deshacer el pago</button>' : '<button type="button" class="u-btn" data-pago="rival">Ya se los hemos dado</button>');
+          s.FECHA_COMPENSACION ? (justificantes[s.ID] ? '<a class="u-btn u-btn-texto" href="' + texto(justificantes[s.ID]) + '" target="_blank" rel="noopener">Ver el justificante ↗</a>' : '') +
+            '<button type="button" class="u-btn u-btn-texto" data-despagar="rival">Deshacer el pago</button>' : '<button type="button" class="u-btn" data-pago="rival">Ya se los hemos dado</button>');
         if (num(s.PARA_ARBITRO) > 0 && p && (p.ID_ARBITRO_REAL || p.ID_ARBITRO)) h += linea(euros(s.PARA_ARBITRO) + ' para ' + persona(p.ID_ARBITRO_REAL || p.ID_ARBITRO) + ', el árbitro: ' +
           (s.FECHA_PAGO ? 'en sus cobros, con su arbitraje' : 'cuando se pague la multa'), false, '');
         return '<h3 class="lg-sub">Dinero</h3><ul class="lg-san-pagos">' + h + '</ul>';
       }
       var cuentasSan = null; // las cuentas de Economía (ligasSancionCuentas), mientras la página está abierta
+      var justificantes = {}; // el PDF del justificante de cada sanción pagada al rival en esta visita (ECONOMIA no la ve el gestor)
       /**
        * Cobrar la multa (que = 'multa') o pagar al rival (que = 'rival'): el día y la cuenta (por defecto, la caja de quien lo
-       * apunta o el banco). ligasSancionPagar apunta su movimiento en Economía; luego se vuelve a la sanción (volver).
+       * apunta o el banco). ligasSancionPagar apunta su movimiento en Economía, con su factura sin IVA (la multa) o su
+       * justificante en PDF (lo del rival, que se abre para imprimirlo o enviarlo); luego se vuelve a la sanción (volver).
        */
       function formPago(s, que, volver) {
         var multa = que === 'multa', imp = multa ? s.IMPORTE : s.COMPENSACION;
         var html = '<h2 id="lg-vt">' + (multa ? 'Cobrar la multa' : 'Pagar al rival') + '</h2>' +
-          '<p class="u-nota">' + texto(euros(imp) + (multa ? ' de ' + equipo(s.ID_INSCRIPCION_EQUIPO) + '. Se apunta como ingreso en Economía.' : '. Se apunta como gasto en Economía.')) + '</p>' +
+          '<p class="u-nota">' + texto(euros(imp) + (multa ? ' de ' + equipo(s.ID_INSCRIPCION_EQUIPO) + '. Se apunta como ingreso en Economía, con su factura sin IVA.' : '. Se apunta como gasto en Economía, con un justificante en PDF para que lo firme quien lo recibe.')) + '</p>' +
           '<div class="u-campos">' + campoF('Día', '<input type="date" id="lg-pg-fecha" value="' + hoy() + '" max="' + hoy() + '">') +
           campoF(multa ? 'Dónde entra el dinero' : 'De dónde sale el dinero', '<select id="lg-pg-cuenta"><option value="">Cargando…</option></select>') + '</div>' +
           '<p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="lg-pg-ok" disabled>' + (multa ? 'Apuntar el cobro' : 'Apuntar el pago') + '</button>' +
@@ -1347,9 +1350,12 @@
             var clave = fichaAbierta;
             hecho.then(function (r) {
               if (!ctx.abierta()) return;
-              ctx.aviso((multa ? 'Multa cobrada y apuntada en Economía.' : 'Pago al rival apuntado en Economía.') + (r && r.avisos && r.avisos.length ? ' ' + r.avisos.join(' ') : ''));
+              ctx.aviso((multa ? 'Multa cobrada: factura ' + ((r && r.factura) || '') + ' apuntada en Economía.' : 'Pago al rival apuntado en Economía' + (r && r.archivo ? ', con su justificante en Drive.' : '.')) +
+                (r && r.avisos && r.avisos.length ? ' ' + r.avisos.join(' ') : ''));
+              if (r && r.archivo) justificantes[s.ID] = r.archivo; // «Ver el justificante» en la sanción, para imprimirlo o enviarlo
               if (fichaAbierta === clave) volver();
             }, function () { if (fichaAbierta === clave) volver(); });
+            hecho.catch(function () {});
           };
         });
       }
