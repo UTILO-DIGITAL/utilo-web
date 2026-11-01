@@ -12,7 +12,7 @@
     var q = new URLSearchParams(location.search).get('marca'), m = q;
     try { if (q) localStorage.setItem('dev_marca', q); m = localStorage.getItem('dev_marca'); } catch (e) {}
     window.DEV_MARCA = /^(utilo|konamigas)$/.test(m || '') ? m : 'utilo';
-    document.write('<link rel="stylesheet" href="../' + window.DEV_MARCA + '/marca.css?v=47"><link rel="stylesheet" href="../estilos/base.css?v=47">');
+    document.write('<link rel="stylesheet" href="../' + window.DEV_MARCA + '/marca.css?v=47"><link rel="stylesheet" href="../estilos/base.css?v=48">');
   })();
 </script>
 <script>

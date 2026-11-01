@@ -706,7 +706,7 @@
     return v;
   }
   function cerrarVentana() { if (velo) { velo.classList.remove('abierto'); velo.firstChild.innerHTML = ''; } }
-  function campo(et, html) { return '<label class="u-campo"><span class="u-etiqueta">' + et + '</span>' + html + '</label>'; }
+  function campo(et, html, extra) { return '<label class="u-campo' + (extra ? ' ' + extra : '') + '"><span class="u-etiqueta">' + et + '</span>' + html + '</label>'; }
   function opciones(l, v) { return l.map(function (o) { o = [].concat(o); return '<option value="' + texto(o[0]) + '"' + (String(o[0]) === String(v) ? ' selected' : '') + '>' + texto(o.length > 1 ? o[1] : o[0]) + '</option>'; }).join(''); }
   function dl(pares) { return '<dl class="cm-dl">' + pares.filter(function (p) { return p[1]; }).map(function (p) { return '<dt>' + p[0] + '</dt><dd>' + p[1] + '</dd>'; }).join('') + '</dl>'; }
 
@@ -1160,7 +1160,7 @@
       return '<option value="' + texto(x.ID_PROVEEDOR) + '"' + (x.ID_PROVEEDOR === habitual ? ' selected' : '') + (x.faltan.length ? ' disabled' : '') + '>' +
         texto(nom + (x.ID_PROVEEDOR === String((S.T.fila('MODELOS', m) || {}).ID_PROVEEDOR || '') ? ' · habitual' : '') +
           (x.faltan.length ? ' · no hace ' + x.faltan.map(nombreColor).join(', ') : u ? ' · último ' + eur(u.unidad) : '')) + '</option>';
-    }).join('') + '</select>') + '</div><div id="' + pre + '-contacto"></div>';
+    }).join('') + '</select>', 'u-ancho') + '</div><div id="' + pre + '-contacto"></div>'; // T0336: a lo ancho, que el nombre no se corte
   }
   /** Al elegir proveedor: su contacto, su último precio y las líneas con su código y su precio de catálogo. */
   function engancharProveedor(v, m, lin, pre) {
