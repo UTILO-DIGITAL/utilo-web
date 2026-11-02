@@ -32,6 +32,7 @@
   var CON_MOTIVO = ['Aplazado', 'Suspendido', 'Anulado'];
   // T0297 (Javi, normativa): un suspendido (lluvia, lesión…) se vuelve a jugar otro día, como un aplazado.
   var POR_RECUPERAR = ['Aplazado', 'Suspendido'];
+  var MOTIVOS_SUSPENDER = ['Lluvia', 'Lesión', 'Pista en mal estado', 'Otro']; // el primero, el de casi siempre (Javi)
   var PUNTUALIDAD = 'Puntualidad'; // GOLES · NOTAS de un gol de puntualidad (ligasActa del motor)
   var EN_PROPIA = 'En propia'; // GOLES · NOTAS de un gol que no marca nadie del equipo
   function dos(n) { return (n < 10 ? '0' : '') + n; }
@@ -1849,7 +1850,7 @@
         return [
           ['jugado', p.ESTADO === 'Jugado' ? 'Se jugó: cambiar el acta' : 'Se jugó: cerrar el acta', dos && dia && p.ESTADO !== 'Aplazado' && p.ESTADO !== 'Libre'],
           ['nopresentado', 'Un equipo lo anuló sin avisar a tiempo o no vino' + (n > 0 ? ' (pierde 0-' + n + ')' : '') + ' y paga su multa', dos],
-          ['suspendido', 'Se suspendió (se vuelve a jugar otro día)', true],
+          ['suspendido', 'Se suspendió por lluvia u otra causa (se vuelve a jugar otro día)', true],
           ['aplazado', 'Se aplaza a otro día', programa],
           ['anulado', 'Anulado por otra causa (no cuenta)', programa],
           ['porjugar', 'Por jugar', p.ESTADO !== 'Programado' || programa],
@@ -1882,6 +1883,9 @@
           '<div class="u-campos">' +
           campoF('Qué equipo', '<select id="lg-ANULADO_POR">' + opciones([p.ID_INSCRIPCION_LOCAL, p.ID_INSCRIPCION_VISITANTE].filter(Boolean).map(function (e) { return [e, equipo(e)]; }), p.ANULADO_POR, 'Elige el equipo') + '</select>', 'lg-si-np') +
           campoF('Motivo', '<input type="text" id="lg-MOTIVO" maxlength="200" value="' + texto(p.MOTIVO) + '">', 'u-ancho lg-si-motivo') +
+          // T0297 (Javi): casi siempre se suspende por lluvia: viene puesta, y los demás motivos de siempre, a un toque.
+          '<div class="lg-fila-chips lg-chips-liga lg-si-susp u-ancho" role="group" aria-label="Motivo">' + MOTIVOS_SUSPENDER.map(function (m) {
+            return '<button type="button" data-motivo="' + texto(m) + '">' + texto(m) + '</button>'; }).join('') + '</div>' +
           (programa ? campoF('Árbitro', '<select id="lg-ID_ARBITRO">' + opciones(conStaff(function (s) { return s.ARBITRO; }, [p.ID_ARBITRO]), p.ID_ARBITRO, 'Sin asignar') + '</select>') +
             campoF('Gestor', '<select id="lg-ID_GESTOR">' + opciones(conStaff(function (s) { return s.GESTOR; }, [p.ID_GESTOR]), p.ID_GESTOR, 'Sin gestor') + '</select>') +
             campoF('Notas', '<textarea id="lg-NOTAS" rows="2">' + texto(p.NOTAS) + '</textarea>', 'u-ancho') : '') + '</div>' +
@@ -1896,12 +1900,31 @@
             var q = que();
             [].forEach.call(vent.querySelectorAll('.lg-si-np'), function (x) { x.hidden = q !== 'nopresentado'; });
             vent.querySelector('.lg-si-motivo').hidden = ['nopresentado', 'suspendido', 'aplazado', 'anulado'].indexOf(q) < 0;
+            vent.querySelector('.lg-si-susp').hidden = q !== 'suspendido';
+            var mo = vent.querySelector('#lg-MOTIVO');
+            if (q === 'suspendido' && (!mo.value || mo.getAttribute('data-auto'))) { mo.value = MOTIVOS_SUSPENDER[0]; mo.setAttribute('data-auto', '1'); }
+            else if (q !== 'suspendido' && mo.getAttribute('data-auto')) { mo.value = ''; mo.removeAttribute('data-auto'); }
+            marcarMotivo();
             vent.querySelector('.lg-si-jugado').hidden = q !== 'jugado';
             g.textContent = q === 'jugado' ? 'Seguir con el acta' : 'Guardar';
             g.removeAttribute('data-ok');
           }
           ver();
+          function marcarMotivo() {
+            var mo = vent.querySelector('#lg-MOTIVO').value;
+            [].forEach.call(vent.querySelectorAll('[data-motivo]'), function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-motivo') === mo ? 'true' : 'false'); });
+          }
           vent.onchange = function (e) { if (e.target.name === 'lg-que') ver(); };
+          vent.oninput = function (e) { if (e.target.id === 'lg-MOTIVO') { e.target.removeAttribute('data-auto'); marcarMotivo(); } };
+          vent.onclick = function (e) {
+            var b = e.target.closest('[data-motivo]');
+            if (!b) return;
+            var mo = vent.querySelector('#lg-MOTIVO'), m = b.getAttribute('data-motivo');
+            mo.removeAttribute('data-auto');
+            mo.value = m === 'Otro' ? '' : m;
+            marcarMotivo();
+            if (m === 'Otro') mo.focus();
+          };
           g.onclick = function () {
             var q = que(), v = {}, c = {}, mal = [];
             if (!q) { verError(['Elige qué pasó.']); return; }
