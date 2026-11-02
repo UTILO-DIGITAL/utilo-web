@@ -13,7 +13,8 @@
  * lo guarda la capa de tablas, con su LOG. Sirve igual para una temporada entera y para una competición suelta a mitad.
  * Cada liga dice su tamaño ideal: con sus horarios y los partidos por equipo de su competición (PARTIDOS_EQUIPO), cuántos
  * equipos caben y a cuántas vueltas (4 horarios y 16 partidos: 9 equipos, dos vueltas, 18 jornadas), y avisa si no cuadra.
- * Repartir y cerrar las ligas y avisar a las capitanas llegan después (T0304): se ve su estado, sin botones.
+ * Repartir y cerrar las ligas es la acción REPARTIR (T0304, repartir.js); el calendario, solo de las ligas cerradas; avisar a
+ * las capitanas de su liga, desde Gestión (cada paso dice cuántas faltan, con su enlace).
  */
 (function () {
   'use strict';
@@ -648,37 +649,59 @@
       items: items5, nota: 'Los equipos se apuntan con los formularios y se confirman en Gestión, al pagar la señal.',
       ref: xa ? xa.comps.filter(function (c) { return seApuntan(d, c); }).map(function (c) { return corto(c) + ': ' + pl(cuenta(xa, c).conf, 'equipo', 'equipos'); }) : [] });
 
-    /* 6 · Repartir los equipos y cerrar las ligas (T0304). */
-    var conf = x.ins.filter(function (i) { return i.ESTADO === 'Confirmada' && abiertas.some(function (c) { return s(c.ID) === s(i.ID_COMPETICION); }); });
-    var sinLiga = conf.filter(function (i) { return !i.ID_LIGA; });
-    pasos.push({ n: 6, id: 'REPARTIR', titulo: 'Cada equipo en su liga', estado: estadoDe(conf.length, sinLiga.length),
-      resumen: conf.length ? (sinLiga.length ? pl(sinLiga.length, 'equipo sin liga', 'equipos sin liga') : 'Todos los equipos tienen liga') : 'Sin equipos confirmados',
-      items: abiertas.map(function (c) {
-        var n = sinLiga.filter(function (i) { return s(i.ID_COMPETICION) === s(c.ID); }).length;
-        var t6 = pl(n, 'equipo confirmado sin liga', 'equipos confirmados sin liga') + '.', ar6 = {};
-        ar6[t6] = { texto: 'Verlos en Gestión', seccion: 'GESTION', href: '?s=gestion&tem=' + encodeURIComponent(s(tem.ID)) + '&comp=' + encodeURIComponent(s(c.ID)) + '&filtro=sinliga' };
-        return { titulo: nomC(c), faltan: n ? [t6] : [], arreglos: ar6, sub: '' };
-      }).filter(function (it) { return it.faltan.length; }),
-      nota: 'Repartir los equipos entre las ligas y cerrarlas se hará aquí en una próxima versión.', ref: [] });
+    /* 6 · Repartir los equipos y cerrar las ligas (T0304, la acción REPARTIR): cada equipo en una liga de su competición
+       y cada liga cerrada con sus equipos (LIGAS · FECHA_CIERRE). Las copas no se reparten: sus equipos salen de otra. */
+    var cerrada = function (l) { return !vacio(l.FECHA_CIERRE) && s(l.FECHA_CIERRE).trim() !== ''; };
+    var reparten = abiertas.filter(function (c) { return SIN_GENERAR.indexOf(s(c.TIPO)) < 0; });
+    var REP = { texto: 'Repartirlos', accion: 'REPARTIR' }, nSin = 0, nAb = 0, nCer = 0, nEq6 = 0;
+    var items6 = reparten.map(function (c) {
+      var ls = x.ligas.filter(function (l) { return s(l.ID_COMPETICION) === s(c.ID); }), is = x.ins.filter(function (i) { return s(i.ID_COMPETICION) === s(c.ID); });
+      var sinL = is.filter(function (i) { return !i.ID_LIGA; }), ab = ls.filter(function (l) { return !cerrada(l); }), fa = [], ar = {};
+      nSin += sinL.length; nAb += ab.length; nCer += ls.length - ab.length; nEq6 += is.length;
+      if (sinL.length) { var t6 = pl(sinL.length, 'equipo sin liga', 'equipos sin liga') + '.'; fa.push(t6); ar[t6] = REP; }
+      if (ab.length && (is.length || ls.length - ab.length)) {
+        var t6b = ab.length === 1 ? 'La liga ' + s(ab[0].NOMBRE || ab[0].ID) + ' sigue abierta.' : ab.length + ' ligas siguen abiertas: ' + lista(ab.map(function (l) { return s(l.NOMBRE || l.ID); })) + '.';
+        fa.push(t6b); ar[t6b] = { texto: ab.length === 1 ? 'Cerrarla' : 'Cerrarlas', accion: 'REPARTIR' };
+      }
+      return { titulo: nomC(c), faltan: fa, arreglos: ar, sub: pl(is.length, 'equipo', 'equipos') + ' · ' + (ls.length - ab.length) + ' de ' + pl(ls.length, 'liga cerrada', 'ligas cerradas') };
+    }).filter(function (it) { return it.faltan.length; });
+    pasos.push({ n: 6, id: 'REPARTIR', titulo: 'Cada equipo en su liga', estado: !nEq6 && !nCer ? 'pendiente' : nSin || nAb ? 'medias' : 'hecho',
+      resumen: !nEq6 && !nCer ? 'Sin equipos todavía' : [nSin ? pl(nSin, 'equipo sin liga', 'equipos sin liga') : 'Todos los equipos tienen liga', nCer + ' de ' + pl(nCer + nAb, 'liga cerrada', 'ligas cerradas')].join(' · '),
+      items: items6, botones: reparten.length ? [{ texto: 'Repartir los equipos y cerrar las ligas', accion: 'REPARTIR' }] : [],
+      nota: 'Se reparten arrastrando, con las plazas de cada liga y los días que puede cada equipo. Una liga se cierra con todos sus equipos confirmados (la señal pagada) y entonces queda fija.', ref: [] });
 
     /* 7 · Calendario de cada liga (las de eliminatorias no se generan). */
     var gen = x.ligas.filter(function (l) { var c = compDe[s(l.ID_COMPETICION)]; return c && SIN_GENERAR.indexOf(s(c.TIPO)) < 0; });
     var P = d.partidos, items7 = gen.map(function (l) {
       var n = P ? P[s(l.ID)] || 0 : 0;
-      return { titulo: s(l.NOMBRE || l.ID), faltan: P && !n ? ['Sin calendario.'] : [], sub: P === undefined ? 'mirando…' : P === null ? 'no se ha podido mirar' : n ? pl(n, 'partido', 'partidos') : '' };
+      return { titulo: s(l.NOMBRE || l.ID), faltan: P && !n ? [cerrada(l) ? 'Sin calendario.' : 'Sin cerrar: primero se cierra con sus equipos.'] : [],
+        sub: P === undefined ? 'mirando…' : P === null ? 'no se ha podido mirar' : n ? pl(n, 'partido', 'partidos') : cerrada(l) ? 'cerrada' : 'sin cerrar' };
     });
     var conCal = P ? gen.filter(function (l) { return P[s(l.ID)]; }).length : 0;
     pasos.push({ n: 7, id: 'CALENDARIO', titulo: 'Calendario de cada liga', estado: P === undefined && gen.length ? 'mirando' : !gen.length || !conCal ? 'pendiente' : conCal < gen.length ? 'medias' : 'hecho',
       resumen: !gen.length ? 'Sin ligas' : P === undefined ? 'Mirando…' : P === null ? 'No se ha podido mirar' : conCal + ' de ' + pl(gen.length, 'liga', 'ligas') + ' con calendario',
       items: items7, botones: gen.length ? [{ texto: 'Generar el calendario de una liga', accion: 'CALENDARIO' }] : [],
-      nota: 'Las copas y las supercopas no se generan: dependen de quién pasa.', ref: [] });
+      nota: 'Solo el de una liga cerrada (paso anterior). Las copas y las supercopas no se generan: dependen de quién pasa.', ref: [] });
 
     /* 9 · Las ligas en marcha: lo que no cuadra en una liga que ya se juega (va en «Y después», Javi). */
     pasos.push(enMarcha(d, x, compDe, tem));
 
-    /* 8 · Avisar a las capitanas (T0304). */
-    pasos.push({ n: 8, id: 'AVISAR', titulo: 'Avisar a las capitanas', estado: 'luego', resumen: 'Su liga y su calendario', items: [],
-      nota: 'Mandar a cada capitana su liga y su calendario se hará aquí en una próxima versión.', ref: [] });
+    /* 8 · Avisar a las capitanas (T0304): con la liga cerrada, a cada capitana su liga y su día oficial (Gestión, «Avisar de
+       su liga», INSCRIPCIONES_EQUIPOS · AVISO_LIGA_ENVIADO) y el grupo de WhatsApp del equipo (GRUPO_CREADO). */
+    var ligaCerrada = {}; x.ligas.forEach(function (l) { if (cerrada(l)) ligaCerrada[s(l.ID)] = true; });
+    var nAv = 0, nAvisar = 0, nGrupo = 0;
+    var items8 = reparten.map(function (c) {
+      var is = x.ins.filter(function (i) { return s(i.ID_COMPETICION) === s(c.ID) && i.ESTADO === 'Confirmada' && ligaCerrada[s(i.ID_LIGA)]; });
+      var sinAv = is.filter(function (i) { return i.AVISO_LIGA_ENVIADO !== true; }).length, sinGr = is.filter(function (i) { return i.GRUPO_CREADO !== true; }).length, fa = [], ar = {};
+      nAv += is.length; nAvisar += sinAv; nGrupo += sinGr;
+      var ges = '?s=gestion&tem=' + encodeURIComponent(s(tem.ID)) + '&comp=' + encodeURIComponent(s(c.ID)) + '&filtro=';
+      if (sinAv) { var t8 = pl(sinAv, 'capitana sin avisar de su liga', 'capitanas sin avisar de su liga') + '.'; fa.push(t8); ar[t8] = { texto: 'Avisarlas en Gestión', seccion: 'GESTION', href: ges + 'avisar' }; }
+      if (sinGr) { var t8b = pl(sinGr, 'equipo sin grupo de WhatsApp', 'equipos sin grupo de WhatsApp') + '.'; fa.push(t8b); ar[t8b] = { texto: 'Verlos en Gestión', seccion: 'GESTION', href: ges + 'avisos' }; }
+      return { titulo: nomC(c), faltan: fa, arreglos: ar, sub: is.length ? (is.length - sinAv) + ' de ' + pl(is.length, 'capitana avisada', 'capitanas avisadas') : 'Ninguna liga cerrada' };
+    }).filter(function (it) { return it.faltan.length; });
+    pasos.push({ n: 8, id: 'AVISAR', titulo: 'Avisar a las capitanas', estado: !nAv ? 'pendiente' : nAvisar || nGrupo ? 'medias' : 'hecho',
+      resumen: !nAv ? 'Cuando sus ligas estén cerradas' : (nAv - nAvisar) + ' de ' + pl(nAv, 'capitana avisada', 'capitanas avisadas') + (nGrupo ? ' · ' + pl(nGrupo, 'equipo sin grupo', 'equipos sin grupo') : ''),
+      items: items8, nota: 'Con su liga cerrada, se avisa a cada capitana de su liga y su día oficial desde Gestión, y se crea el grupo de WhatsApp del equipo.', ref: [] });
 
     // Sin claves vacías en los botones (ya: undefined).
     pasos.forEach(function (p) { [].concat(p.items, [].concat.apply([], (p.grupos || []).map(function (g) { return g.items; }))).forEach(function limpia(it) {
@@ -718,8 +741,8 @@
     { id: 'DESPUES', corto: 'Y después', pregunta: function () { return 'Equipos, calendario y ligas en marcha'; },
       ayuda: 'Cuando la temporada está preparada: los equipos se apuntan y se confirman (en Gestión), cada uno va a su liga y se saca el calendario. Si una liga en marcha tiene algo que no cuadra, sale aquí.' }
   ];
-  var DESPUES = { INSCRIPCIONES: 'Se apuntan con los formularios y se confirman en Gestión, al pagar la señal.', REPARTIR: 'La liga de cada equipo se pone en Gestión.',
-    CALENDARIO: 'Las copas y las supercopas no se generan: dependen de quién pasa.', AVISAR: 'Llegará en una próxima versión.',
+  var DESPUES = { INSCRIPCIONES: 'Se apuntan con los formularios y se confirman en Gestión, al pagar la señal.', REPARTIR: 'Cada equipo a una liga de su competición, con sus plazas y los días que puede; con todos confirmados, la liga se cierra y queda fija.',
+    CALENDARIO: 'Solo el de una liga cerrada. Las copas y las supercopas no se generan: dependen de quién pasa.', AVISAR: 'Con su liga cerrada, a cada capitana su liga y su día oficial (desde Gestión), y el grupo de WhatsApp del equipo.',
     MARCHA: 'Lo que no cuadra en una liga que ya se juega: equipos de más, jornadas o horarios fuera de lo que da el colegio.' };
   var fin = null;
 
@@ -1198,9 +1221,8 @@
         return h + referencia(p, c);
       }
       function pantallaDespues(c) {
-        // Avisar a las capitanas no sale hasta que exista (T0304): enseñar lo que no hay resta. Las ligas en marcha, solo si
-        // alguna tiene algo (Javi: lo pendiente, aquí; nada en las tablas).
-        return lineaHecho() + '<ul class="aj-as-lista aj-as-despues">' + c.pasos.slice(4).filter(function (p) { return p.id !== 'AVISAR' && !(p.id === 'MARCHA' && !p.items.length); }).map(function (p) {
+        // Las ligas en marcha, solo si alguna tiene algo (Javi: lo pendiente, aquí; nada en las tablas).
+        return lineaHecho() + '<ul class="aj-as-lista aj-as-despues">' + c.pasos.slice(4).filter(function (p) { return !(p.id === 'MARCHA' && !p.items.length); }).map(function (p) {
           var e = ESTADO[p.estado], ok = p.estado === 'hecho';
           return '<li class="aj-as-f ' + e[1] + (ok ? ' aj-as-ok' : ' aj-as-falta') + '"><span class="aj-as-i" aria-hidden="true">' + (ok ? '✓' : '') + '</span><div class="aj-as-c"><div class="aj-as-t"><b class="aj-as-nom">' + texto(p.titulo) + '</b>' +
             '<small>' + texto(p.resumen) + '</small></div><p class="u-nota aj-as-dn">' + texto(DESPUES[p.id]) + '</p>' +
@@ -1234,7 +1256,7 @@
         c.pasos.forEach(function (p) { [].concat(p.items, [].concat.apply([], (p.grupos || []).map(function (g) { return g.items; }))).forEach(function mira(it) { if (it.quitar) porQuitar[it.quitar.tabla + '|' + it.quitar.id] = it.quitar; (it.hijas || []).forEach(mira); }); });
         c.pasos.forEach(function (p) { de[p.id] = p; });
         // «Y después», en la barra: hecho si todo lo que enseña lo está; si no, a medias (y si no ha empezado nada, sin color).
-        var despues = c.pasos.slice(4).filter(function (p) { return p.id !== 'AVISAR' && !(p.id === 'MARCHA' && !p.items.length); });
+        var despues = c.pasos.slice(4).filter(function (p) { return !(p.id === 'MARCHA' && !p.items.length); });
         var estD = despues.every(function (p) { return p.estado === 'hecho'; }) ? 'hecho' : despues.some(function (p) { return p.estado === 'hecho' || p.estado === 'medias'; }) ? 'medias' : '';
         var est = function (id) { return id === 'DESPUES' ? estD : de[id].estado; };
         // Al entrar (o al cambiar de temporada), el primer paso sin hacer; si están todos, «Y después».
