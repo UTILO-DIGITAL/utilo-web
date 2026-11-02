@@ -436,6 +436,23 @@
   }
 
   /**
+   * T0297 · Un partido visto desde un equipo: { p, rival, hay (tiene resultado: jugado o anulado por culpa de alguien, que
+   * cuenta 0-n), a (sus goles), b (los del rival), r ('G', 'E', 'P' o '') }.
+   */
+  function resultadoDe(p, ie, nAn) {
+    var an = resultadoAnulado(p, nAn), loc = String(p.ID_INSCRIPCION_LOCAL) === String(ie);
+    var gl = an ? an.gl : num(p.GOLES_LOCAL), gv = an ? an.gv : num(p.GOLES_VISITANTE), hay = !!an || conResultado(p);
+    var a = loc ? gl : gv, b = loc ? gv : gl;
+    return { p: p, rival: loc ? p.ID_INSCRIPCION_VISITANTE : p.ID_INSCRIPCION_LOCAL, hay: hay, a: a, b: b, r: !hay ? '' : a > b ? 'G' : a < b ? 'P' : 'E' };
+  }
+  /** T0297 · La racha de un equipo: sus últimos n resultados (5), del más viejo al más nuevo, para la clasificación (Javi). */
+  function racha(ps, ie, n, nAn) {
+    return (ps || []).filter(function (p) { return String(p.ID_INSCRIPCION_LOCAL) === String(ie) || String(p.ID_INSCRIPCION_VISITANTE) === String(ie); })
+      .map(function (p) { return resultadoDe(p, ie, nAn); }).filter(function (x) { return x.hay; })
+      .sort(function (x, y) { return orden(cuando(x.p), cuando(y.p)); }).slice(-(n || 5));
+  }
+
+  /**
    * T0297 · Las multas que debe un equipo antes de jugar un partido: las de sus sanciones con IMPORTE y sin FECHA_PAGO, de ese
    * día o de antes y de otro partido. { total, n }.
    */
@@ -480,7 +497,7 @@
     textoAviso: textoAviso, fechaLarga: fechaLarga, recuperacionDe: recuperacionDe, aplazadosPendientes: aplazadosPendientes, huecosLibres: huecosLibres,
     planRecuperar: planRecuperar, diasRecuperar: diasRecuperar, repetidos: repetidos, resultadoAnulado: resultadoAnulado, diasDeJuego: diasDeJuego,
     diaInicial: diaInicial, resumenDia: resumenDia, rankingPersonas: rankingPersonas, resumenGoles: resumenGoles, estadisticasJugadora: estadisticasJugadora,
-    choqueCalendario: choqueCalendario, sancionesDe: sancionesDe, multasPendientes: multasPendientes, dineroSancion: dineroSancion, euros: euros };
+    choqueCalendario: choqueCalendario, sancionesDe: sancionesDe, multasPendientes: multasPendientes, resultadoDe: resultadoDe, racha: racha, dineroSancion: dineroSancion, euros: euros };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -855,20 +872,32 @@
         var P = cfg.PUNTOS || {}, jugados = ps.filter(conResultado).length;
         h += '<div class="u-tabla-caja"><table class="u-tabla lg-clas"><thead><tr><th class="num">#</th><th>Equipo</th><th class="num" title="Jugados">PJ</th>' +
           '<th class="num" title="Ganados">G</th><th class="num" title="Empatados">E</th><th class="num" title="Perdidos">P</th>' +
-          '<th class="num u-solo-ancho" title="Goles a favor">GF</th><th class="num u-solo-ancho" title="Goles en contra">GC</th><th class="num" title="Diferencia de goles">DG</th><th class="num">Pts</th></tr></thead><tbody>' +
+          '<th class="num u-solo-ancho" title="Goles a favor">GF</th><th class="num u-solo-ancho" title="Goles en contra">GC</th><th class="num" title="Diferencia de goles">DG</th><th class="num">Pts</th>' +
+          '<th class="u-solo-ancho" title="Los últimos 5 partidos, del más viejo al más nuevo">Últimos</th></tr></thead><tbody>' +
           cl.map(function (e) {
             // T0297: en rojo solo lo que debe el equipo; una sanción ya pagada es solo información.
             var nSan = sancionesDe(d.san, { equipo: e.id }).length, debe = multasPendientes(d.san, e.id, null).total;
+            var ra = htmlRacha(racha(ps, e.id, 5, nAn));
             return '<tr><td class="num">' + e.pos + '</td><td class="u-tabla-t"><button type="button" class="lg-eqf" data-eqf="' + texto(e.id) + '"><span class="lg-eqt">' + punto(e.id) + texto(equipo(e.id)) + '</span></button>' +
+              (ra ? '<div class="u-solo-movil">' + ra + '</div>' : '') +
               (debe ? '<div class="u-nota lg-san-nota">Debe ' + euros(debe) + ' de multa</div>' : nSan ? '<div class="u-nota">' + nSan + (nSan === 1 ? ' sanción' : ' sanciones') + '</div>' : '') +
               (e.jugar ? '<div class="u-nota u-solo-ancho">' + e.jugar + ' por jugar</div>' : '') + '</td>' +
               '<td class="num">' + e.pj + '</td><td class="num">' + e.pg + '</td><td class="num">' + e.pe + '</td><td class="num">' + e.pp + '</td>' +
-              '<td class="num u-solo-ancho">' + e.gf + '</td><td class="num u-solo-ancho">' + e.gc + '</td><td class="num">' + (e.dg > 0 ? '+' : '') + e.dg + '</td><td class="num"><b>' + e.pts + '</b></td></tr>';
+              '<td class="num u-solo-ancho">' + e.gf + '</td><td class="num u-solo-ancho">' + e.gc + '</td><td class="num">' + (e.dg > 0 ? '+' : '') + e.dg + '</td><td class="num"><b>' + e.pts + '</b></td>' +
+              '<td class="u-solo-ancho">' + ra + '</td></tr>';
           }).join('') + '</tbody></table></div>' +
           '<p class="u-nota">' + jugados + (jugados === 1 ? ' partido jugado' : ' partidos jugados') + '. ' + (isFinite(num(P.GANAR)) ? num(P.GANAR) : 3) + ' puntos por ganar y ' +
           (isFinite(num(P.EMPATAR)) ? num(P.EMPATAR) : 1) + ' por empatar; a igualdad de puntos, mejor diferencia de goles y después más goles a favor.' +
-          (nAn > 0 ? ' Un partido anulado cuenta como 0-' + nAn + ' para el equipo que lo provoca.' : '') + ' Toca un equipo para ver sus sanciones.</p>';
+          (nAn > 0 ? ' Un partido anulado cuenta como 0-' + nAn + ' para el equipo que lo provoca.' : '') + ' Los últimos partidos de cada equipo van del más viejo al más nuevo (a la derecha). Toca un equipo para ver su ficha.</p>';
         return h;
+      }
+      /** La racha: un cuadrito por partido con G, E o P en su color (el más nuevo, a la derecha), como en la ficha del equipo. */
+      function htmlRacha(xs) {
+        if (!xs.length) return '';
+        var nombre = { G: 'ganado', E: 'empatado', P: 'perdido' };
+        return '<span class="lg-racha" aria-label="Últimos partidos: ' + texto(xs.map(function (x) { return nombre[x.r]; }).join(', ')) + '">' + xs.map(function (x) {
+          return '<span class="lg-ef-r lg-ef-' + x.r + '" title="' + texto('J' + x.p.JORNADA + ' · ' + x.a + '–' + x.b + ' contra ' + equipo(x.rival)) + '">' + x.r + '</span>';
+        }).join('') + '</span>';
       }
       function nomJugadora(eq, id) {
         var j = (JUG[eq] || []).filter(function (x) { return x.ID === id; })[0];
@@ -1178,12 +1207,7 @@
         var ps = d.par.filter(function (p) { return !p._nueva && (p.ID_INSCRIPCION_LOCAL === e.ID || p.ID_INSCRIPCION_VISITANTE === e.ID); });
         var nEq = equiposLiga(e.ID_LIGA).length;
         // Cada partido desde el equipo: su resultado (el 0-5 de un anulado por culpa de alguien, también) y si lo ganó.
-        var desde = function (p) {
-          var an = resultadoAnulado(p, nAnulado()), loc = p.ID_INSCRIPCION_LOCAL === e.ID;
-          var gl = an ? an.gl : num(p.GOLES_LOCAL), gv = an ? an.gv : num(p.GOLES_VISITANTE), hay = !!an || conResultado(p);
-          var a = loc ? gl : gv, b = loc ? gv : gl;
-          return { p: p, rival: loc ? p.ID_INSCRIPCION_VISITANTE : p.ID_INSCRIPCION_LOCAL, hay: hay, a: a, b: b, r: !hay ? '' : a > b ? 'G' : a < b ? 'P' : 'E' };
-        };
+        var desde = function (p) { return resultadoDe(p, e.ID, nAnulado()); };
         var jugados = ps.map(desde).filter(function (x) { return x.hay; }).sort(function (x, y) { return orden(cuando(y.p), cuando(x.p)); });
         var proximo = ps.filter(function (p) { return p.ESTADO === 'Programado' && String(p.FECHA || '') >= hoy(); }).sort(function (a, b) { return orden(cuando(a), cuando(b)); })[0];
         var linea = function (x) {
@@ -1364,17 +1388,17 @@
           (s.FECHA_PAGO ? 'en sus cobros, con su arbitraje' : 'cuando se pague la multa'), false, '');
         return '<h3 class="lg-sub">Dinero</h3><ul class="lg-san-pagos">' + h + '</ul>';
       }
-      var cuentasSan = null; // las cuentas de Economía (ligasSancionCuentas), mientras la página está abierta
       var justificantes = {}; // el PDF del justificante de cada sanción pagada al rival en esta visita (ECONOMIA no la ve el gestor)
       /**
-       * Cobrar la multa (que = 'multa') o pagar al rival (que = 'rival'): el día y la cuenta (por defecto, la caja de quien lo
-       * apunta o el banco). ligasSancionPagar apunta su movimiento en Economía, con su factura sin IVA (la multa) o su
+       * Cobrar la multa (que = 'multa') o pagar al rival (que = 'rival'): el día y la cuenta (por defecto, la caja del gestor
+       * de la liga, que es quien cobra la multa y paga al rival: ligasSancionCuentas). ligasSancionPagar apunta su movimiento en Economía, con su factura sin IVA (la multa) o su
        * justificante en PDF (lo del rival, que se abre para imprimirlo o enviarlo); luego se vuelve a la sanción (volver).
        */
       function formPago(s, que, volver) {
         var multa = que === 'multa', imp = multa ? s.IMPORTE : s.COMPENSACION;
         var html = '<h2 id="lg-vt">' + (multa ? 'Cobrar la multa' : 'Pagar al rival') + '</h2>' +
           '<p class="u-nota">' + texto(euros(imp) + (multa ? ' de ' + equipo(s.ID_INSCRIPCION_EQUIPO) + '. Se apunta como ingreso en Economía, con su factura sin IVA.' : '. Se apunta como gasto en Economía, con un justificante en PDF para que lo firme quien lo recibe.')) + '</p>' +
+          '<p class="u-nota" id="lg-pg-gestor"></p>' +
           '<div class="u-campos">' + campoF('Día', '<input type="date" id="lg-pg-fecha" value="' + hoy() + '" max="' + hoy() + '">') +
           campoF(multa ? 'Dónde entra el dinero' : 'De dónde sale el dinero', '<select id="lg-pg-cuenta"><option value="">Cargando…</option></select>') + '</div>' +
           '<p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="lg-pg-ok" disabled>' + (multa ? 'Apuntar el cobro' : 'Apuntar el pago') + '</button>' +
@@ -1382,10 +1406,13 @@
         ventana(html, function () {
           var sel = vent.querySelector('#lg-pg-cuenta'), ok = vent.querySelector('#lg-pg-ok');
           vent.querySelector('#lg-pg-volver').onclick = volver;
-          (cuentasSan ? Promise.resolve(cuentasSan) : ctx.llamar('ligasSancionCuentas')).then(function (r) {
-            cuentasSan = r;
+          // La multa se le paga al gestor de la liga y de su caja sale lo del rival (Javi): por defecto, su caja.
+          ctx.llamar('ligasSancionCuentas', [s.ID]).then(function (r) {
             if (!vent.contains(sel)) return;
             sel.innerHTML = opciones((r.cuentas || []).map(function (x) { return [x.ID, x.NOMBRE]; }), r.defecto, 'Elige la cuenta');
+            var g = r.gestor ? r.gestor.APODO : '';
+            vent.querySelector('#lg-pg-gestor').innerHTML = r.aviso ? '<span class="u-mal">' + texto(r.aviso) + '</span>'
+              : texto(multa ? 'La multa se le paga a ' + g + ', el gestor de la liga: entra en su caja de Konamigas.' : 'Se los da ' + g + ', el gestor de la liga, de su caja de Konamigas.');
             ok.disabled = false;
           }, function (e) { if (vent.contains(sel)) { sel.innerHTML = '<option value="">—</option>'; verError(['No se han podido leer las cuentas: ' + String(e.message).replace(/^\w+:\s*/, '')]); } });
           ok.onclick = function () {
