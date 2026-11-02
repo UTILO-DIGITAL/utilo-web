@@ -439,6 +439,26 @@
   }
 
   /**
+   * T0297 · La carta de aplazamiento de un equipo para un partido (normativa 1a; como ligasAplazamiento_ del motor): una por
+   * equipo (su club, ID_EQUIPO) y temporada, en todas sus competiciones, avisando con min (7) días. La gasta un Aplazado que
+   * pidió ese club sin sanción de aplazamiento. t: { par, eq, ligas, comp, san }. { dias, min, aTiempo, usada, tipo }.
+   */
+  function cartaAplazamiento(p, ie, aviso, t, min) {
+    min = num(min); if (!(min >= 0)) min = 7;
+    var a = deIso(aviso), b = deIso(p.FECHA), dias = a && b ? Math.round((b - a) / 86400000) : NaN, aTiempo = isFinite(dias) && dias >= min;
+    var ins = indice(t.eq), ligaComp = {}, compTemp = {}, pagada = {};
+    (t.ligas || []).forEach(function (x) { ligaComp[String(x.ID)] = String(x.ID_COMPETICION); });
+    (t.comp || []).forEach(function (x) { compTemp[String(x.ID)] = String(x.ID_TEMPORADA); });
+    var club = function (i) { var x = ins[String(i)]; return x ? String(x.ID_EQUIPO || x.ID) : String(i); };
+    var temp = function (q) { return compTemp[ligaComp[String(q.ID_LIGA)]] || ''; };
+    (t.san || []).forEach(function (s) { if (s.TIPO === 'Aplazamiento fuera de plazo' || s.TIPO === 'Aplazamiento sin carta') pagada[String(s.ID_PARTIDO) + '|' + String(s.ID_INSCRIPCION_EQUIPO)] = 1; });
+    var usada = (t.par || []).filter(function (q) {
+      return String(q.ID) !== String(p.ID) && q.ESTADO === 'Aplazado' && q.APLAZADO_POR && club(q.APLAZADO_POR) === club(ie) && temp(q) === temp(p) && !pagada[String(q.ID) + '|' + String(q.APLAZADO_POR)];
+    }).sort(function (x, y) { return orden(String(x.FECHA), String(y.FECHA)); })[0] || null;
+    return { dias: dias, min: min, aTiempo: aTiempo, usada: usada, tipo: usada ? 'Aplazamiento sin carta' : !aTiempo ? 'Aplazamiento fuera de plazo' : '' };
+  }
+
+  /**
    * T0297 · Un partido visto desde un equipo: { p, rival, hay (tiene resultado: jugado o anulado por culpa de alguien, que
    * cuenta 0-n), a (sus goles), b (los del rival), r ('G', 'E', 'P' o '') }.
    */
@@ -500,14 +520,15 @@
     textoAviso: textoAviso, fechaLarga: fechaLarga, recuperacionDe: recuperacionDe, aplazadosPendientes: aplazadosPendientes, huecosLibres: huecosLibres,
     planRecuperar: planRecuperar, diasRecuperar: diasRecuperar, repetidos: repetidos, resultadoAnulado: resultadoAnulado, diasDeJuego: diasDeJuego,
     diaInicial: diaInicial, resumenDia: resumenDia, rankingPersonas: rankingPersonas, resumenGoles: resumenGoles, estadisticasJugadora: estadisticasJugadora,
-    choqueCalendario: choqueCalendario, sancionesDe: sancionesDe, multasPendientes: multasPendientes, resultadoDe: resultadoDe, racha: racha, dineroSancion: dineroSancion, euros: euros };
+    choqueCalendario: choqueCalendario, sancionesDe: sancionesDe, multasPendientes: multasPendientes, resultadoDe: resultadoDe, racha: racha, cartaAplazamiento: cartaAplazamiento, dineroSancion: dineroSancion, euros: euros };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
 
   var TABLAS = ['TEMPORADAS', 'COMPETICIONES', 'LIGAS', 'PARTIDOS', 'GOLES', 'CAMPOS', 'INSTALACIONES', 'CALENDARIO', 'INSCRIPCIONES_EQUIPOS', 'HUECOS', 'SANCIONES'];
   // T0297 · Los tipos de SANCIONES · TIPO (su YAML). El motor comprueba lo que se guarda.
-  var TIPOS_SANCION = ['No presentado', 'Retraso', 'Alineación indebida', 'Conducta', 'Otro'];
+  var TIPOS_SANCION = ['No presentado', 'Aplazamiento fuera de plazo', 'Aplazamiento sin carta', 'Retraso', 'Alineación indebida', 'Conducta', 'Otro'];
+  var TIPOS_PARTIDO = ['No presentado', 'Aplazamiento fuera de plazo', 'Aplazamiento sin carta']; // las que pone sola el partido (normativa 1b)
   var PESTANAS = { PARTIDOS: 'Partidos', CLASIFICACION: 'Clasificación', GOLEADORAS: 'Goleadoras' };
   var ANTES = { JORNADAS: 'PARTIDOS', CALENDARIO: 'PARTIDOS' }; // las pestañas de antes de T0255 (jornadas y calendario, juntas)
   var ESTADOS = { Programado: 'ni', Jugado: 'co', Aplazado: 'pr', Suspendido: 'pr', Anulado: 'bl', Libre: 'x' };
@@ -706,7 +727,7 @@
       function chipEstado(p) {
         if (p._pendiente) return '<span class="u-chip">Guardando</span>';
         // T0297: la normativa no contempla anular: un anulado con culpable es que ese equipo no se presentó.
-        return '<span class="n-estado n-e-' + (ESTADOS[p.ESTADO] || 'x') + '">' + texto(p.ESTADO === 'Anulado' && p.ANULADO_POR ? 'No presentado' : p.ESTADO || 'Sin estado') + '</span>';
+        return '<span class="n-estado n-e-' + (ESTADOS[p.ESTADO] || 'x') + '">' + texto(p.ESTADO === 'Anulado' && p.ANULADO_POR ? (p.APLAZADO_POR === p.ANULADO_POR ? 'Lo pierde' : 'No presentado') : p.ESTADO || 'Sin estado') + '</span>';
       }
       /**
        * Lo que hay que saber de un partido que no se juega como estaba: anulado (no se recupera), aplazado (se recupera:
@@ -715,7 +736,7 @@
       function avisoPartido(p) {
         if (p.ESTADO === 'Anulado') {
           var an = resultadoAnulado(p, nAnulado());
-          if (p.ANULADO_POR) return { clase: 'lg-av-no', texto: 'No presentado: ' + equipo(p.ANULADO_POR) + (an ? ' pierde ' + Math.min(an.gl, an.gv) + '-' + Math.max(an.gl, an.gv) : '') + ' y paga su multa' };
+          if (p.ANULADO_POR) return { clase: 'lg-av-no', texto: (p.APLAZADO_POR === p.ANULADO_POR ? 'Aplazamiento no aceptado: ' + equipo(p.ANULADO_POR) + ' lo' : 'No presentado: ' + equipo(p.ANULADO_POR)) + (an ? ' pierde ' + Math.min(an.gl, an.gv) + '-' + Math.max(an.gl, an.gv) : '') + ' y paga su multa' };
           return { clase: 'lg-av-no', texto: 'Anulado: no se recuperará ni cuenta' };
         }
         if (POR_RECUPERAR.indexOf(p.ESTADO) >= 0) {
@@ -758,7 +779,7 @@
       /** T0297 · Un anulado por culpa de un equipo sin su No presentado (anulado antes de las sanciones o a mano en el Excel). */
       function faltaSancion(p) {
         return p.ESTADO === 'Anulado' && !!p.ANULADO_POR && !T.filas('SANCIONES').some(function (s) {
-          return String(s.ID_PARTIDO) === String(p.ID) && String(s.ID_INSCRIPCION_EQUIPO) === String(p.ANULADO_POR) && s.TIPO === 'No presentado';
+          return String(s.ID_PARTIDO) === String(p.ID) && String(s.ID_INSCRIPCION_EQUIPO) === String(p.ANULADO_POR) && TIPOS_PARTIDO.indexOf(s.TIPO) >= 0;
         });
       }
       /** T0297 · En un partido por jugar, cada equipo que debe una multa: «PESCADORAS FC debe 60 € de una sanción». */
@@ -1147,7 +1168,9 @@
           fila('Árbitro', texto(p.ID_ARBITRO ? persona(p.ID_ARBITRO) : 'Sin asignar') + (p.ID_ARBITRO_REAL ? ' · arbitró ' + texto(persona(p.ID_ARBITRO_REAL)) : '')) +
           fila('Gestor', p.ID_GESTOR ? texto(persona(p.ID_GESTOR)) + (tel ? ' <a href="' + texto(tel) + '" target="_blank" rel="noopener">WhatsApp</a>' : '') : '') +
           fila('Motivo', texto(p.MOTIVO)) +
-          fila('No se presentó', texto(p.ESTADO === 'Anulado' && p.ANULADO_POR ? equipo(p.ANULADO_POR) : '')) +
+          fila('No se presentó', texto(p.ESTADO === 'Anulado' && p.ANULADO_POR && p.APLAZADO_POR !== p.ANULADO_POR ? equipo(p.ANULADO_POR) : '')) +
+          fila('Pidió aplazarlo', texto(p.APLAZADO_POR ? equipo(p.APLAZADO_POR) + (p.AVISO_APLAZAMIENTO ? ', avisó el ' + fecha(p.AVISO_APLAZAMIENTO) : '') +
+            (p.ESTADO === 'Anulado' ? ' (no se aplazó: lo pierde)' : '') : '')) +
           fila('Notas', texto(p.NOTAS)) + '</dl>';
         var sp = sancionesDe(T.filas('SANCIONES'), { partido: p.ID }), sanNueva = sanciona && !p._nueva && !!(L || V);
         if (sanNueva && faltaSancion(p)) html += '<div class="lg-pend-rec"><span><b>' + texto(equipo(p.ANULADO_POR) + ' no se presentó, pero aún no tiene su sanción de no presentado') + '</b>' +
@@ -1255,6 +1278,11 @@
           (jugados.length ? '<h3 class="lg-sub">Últimos resultados</h3><ul class="lg-ef-ps">' + jugados.slice(0, 5).map(linea).join('') + '</ul>' +
             (jugados.length > 5 ? '<details><summary class="u-nota">Ver los ' + jugados.length + ' resultados</summary><ul class="lg-ef-ps">' + jugados.slice(5).map(linea).join('') + '</ul></details>' : '') : '') +
           '<h3 class="lg-sub">Plantilla</h3><div id="lg-ef-plantilla">' + htmlPlantilla(e.ID) + '</div>' +
+          (function () { // T0297: la carta de aplazamiento de la temporada (una por equipo, en todas sus competiciones)
+            var c = carta({ ID: '', FECHA: hoy(), ID_LIGA: e.ID_LIGA }, e.ID, hoy());
+            return '<h3 class="lg-sub">Carta de aplazamiento</h3><p>' + texto(c.usada ? 'Ya la ha gastado esta temporada: aplazó el partido del ' + fecha(c.usada.FECHA) + '. Otro aplazamiento le cuesta su multa.'
+              : 'La tiene: puede aplazar un partido esta temporada avisando con ' + c.min + ' días como mínimo.') + '</p>';
+          })() +
           '<h3 class="lg-sub">Sanciones</h3>' + (ss.length ? htmlSanciones(ss, 'equipo') : '<p class="u-vacio">No tiene sanciones.</p>') +
           '<div class="n-botones">' + (sanciona ? '<button type="button" class="u-btn" id="lg-san-nueva">Apuntar una sanción</button>' : '') +
           '<button type="button" class="u-btn u-btn-texto" data-cerrar>Cerrar</button></div>';
@@ -1862,7 +1890,19 @@
           ['libre', 'Campo libre', programa && (p.ESTADO === 'Libre' || !dos)]
         ].filter(function (x) { return x[2]; });
       }
+      /** La carta de un equipo para un partido, con lo que hay ahora en la pantalla. */
+      function carta(p, ie, aviso) {
+        return cartaAplazamiento(p, ie, aviso, { par: T.filas('PARTIDOS'), eq: d.eq, ligas: d.ligas, comp: d.comp, san: T.filas('SANCIONES') }, cfg.CARTA_DIAS);
+      }
+      /** En una línea: «Avisó con 10 días y tiene su carta: se aplaza sin multa», o por qué paga. */
+      function textoCarta(c, nom) {
+        if (!isFinite(c.dias)) return '';
+        if (!c.tipo) return nom + ' avisó con ' + c.dias + (c.dias === 1 ? ' día' : ' días') + ' y tiene su carta de aplazamiento: se aplaza sin multa (y la gasta).';
+        return c.usada ? nom + ' ya gastó su carta de aplazamiento de esta temporada (el ' + fecha(c.usada.FECHA) + '): paga su multa.'
+          : nom + ' avisó con ' + c.dias + (c.dias === 1 ? ' día' : ' días') + ' (el mínimo son ' + c.min + '): paga su multa.';
+      }
       function queEs(p) {
+        if (p.ESTADO === 'Anulado' && p.APLAZADO_POR && p.APLAZADO_POR === p.ANULADO_POR) return 'aplazado'; // pidió aplazarlo y el gestor no lo aplazó
         return p.ESTADO === 'Jugado' ? 'jugado' : p.ESTADO === 'Anulado' ? (p.ANULADO_POR ? 'nopresentado' : 'anulado') : p.ESTADO === 'Suspendido' ? 'suspendido'
           : p.ESTADO === 'Aplazado' ? 'aplazado' : p.ESTADO === 'Libre' ? 'libre' : 'porjugar';
       }
@@ -1887,6 +1927,14 @@
           }).join('') + '</fieldset>' +
           '<div class="u-campos">' +
           campoF('Qué equipo', '<select id="lg-ANULADO_POR">' + opciones([p.ID_INSCRIPCION_LOCAL, p.ID_INSCRIPCION_VISITANTE].filter(Boolean).map(function (e) { return [e, equipo(e)]; }), p.ANULADO_POR, 'Elige el equipo') + '</select>', 'lg-si-np') +
+          // T0297 · Aplazar: ¿lo pide un equipo? Entonces, cuándo avisó, si es a tiempo y con su carta y, si paga, qué decide el gestor.
+          (programa ? campoF('¿Lo pide un equipo?', '<select id="lg-APLAZADO_POR">' + opciones([p.ID_INSCRIPCION_LOCAL, p.ID_INSCRIPCION_VISITANTE].filter(Boolean).map(function (e) { return [e, equipo(e)]; }),
+              p.APLAZADO_POR, 'No: por otra causa (sin carta ni multa)') + '</select>', 'lg-si-apl') +
+            campoF('Avisó el', '<input type="date" id="lg-AVISO_APLAZAMIENTO" value="' + texto(p.AVISO_APLAZAMIENTO || hoy()) + '">', 'lg-si-apl lg-si-pide') +
+            '<p class="u-nota u-ancho lg-si-apl lg-si-pide" id="lg-veredicto"></p>' +
+            '<fieldset class="lg-que u-ancho lg-si-paga"><legend class="u-etiqueta">Paga su multa. ¿Y el partido?</legend>' +
+              '<label class="u-check"><input type="radio" name="lg-decide" value="aplaza"' + (p.ESTADO !== 'Anulado' ? ' checked' : '') + '> Se aplaza igual</label>' +
+              '<label class="u-check"><input type="radio" name="lg-decide" value="pierde"' + (p.ESTADO === 'Anulado' ? ' checked' : '') + '> No se aplaza: lo pierde 0-' + nAnulado() + '</label></fieldset>' : '') +
           campoF('Motivo', '<input type="text" id="lg-MOTIVO" maxlength="200" value="' + texto(p.MOTIVO) + '">', 'u-ancho lg-si-motivo') +
           // T0297 (Javi): casi siempre se suspende por lluvia: viene puesta, y los demás motivos de siempre, a un toque.
           '<div class="lg-fila-chips lg-chips-liga lg-si-susp u-ancho" role="group" aria-label="Motivo">' + MOTIVOS_SUSPENDER.map(function (m) {
@@ -1906,6 +1954,7 @@
             [].forEach.call(vent.querySelectorAll('.lg-si-np'), function (x) { x.hidden = q !== 'nopresentado'; });
             vent.querySelector('.lg-si-motivo').hidden = ['nopresentado', 'suspendido', 'aplazado', 'anulado'].indexOf(q) < 0;
             vent.querySelector('.lg-si-susp').hidden = q !== 'suspendido';
+            verCarta();
             var mo = vent.querySelector('#lg-MOTIVO');
             if (q === 'suspendido' && (!mo.value || mo.getAttribute('data-auto'))) { mo.value = MOTIVOS_SUSPENDER[0]; mo.setAttribute('data-auto', '1'); }
             else if (q !== 'suspendido' && mo.getAttribute('data-auto')) { mo.value = ''; mo.removeAttribute('data-auto'); }
@@ -1915,11 +1964,20 @@
             g.removeAttribute('data-ok');
           }
           ver();
+          /** Aplazar: los campos de la carta según quién lo pide, y si paga, qué decide el gestor. */
+          function verCarta() {
+            var apl = que() === 'aplazado', sel = vent.querySelector('#lg-APLAZADO_POR'), pide = apl && sel && sel.value;
+            [].forEach.call(vent.querySelectorAll('.lg-si-apl'), function (x) { x.hidden = !apl; });
+            [].forEach.call(vent.querySelectorAll('.lg-si-pide'), function (x) { x.hidden = !pide; });
+            var c = pide ? carta(p, sel.value, val('lg-AVISO_APLAZAMIENTO')) : null, v = vent.querySelector('#lg-veredicto');
+            if (v) { v.textContent = c ? textoCarta(c, equipo(sel.value)) : ''; v.className = 'u-nota u-ancho lg-si-apl lg-si-pide' + (c && c.tipo ? ' u-mal' : ''); }
+            [].forEach.call(vent.querySelectorAll('.lg-si-paga'), function (x) { x.hidden = !(c && c.tipo); });
+          }
           function marcarMotivo() {
             var mo = vent.querySelector('#lg-MOTIVO').value;
             [].forEach.call(vent.querySelectorAll('[data-motivo]'), function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-motivo') === mo ? 'true' : 'false'); });
           }
-          vent.onchange = function (e) { if (e.target.name === 'lg-que') ver(); };
+          vent.onchange = function (e) { if (e.target.name === 'lg-que') ver(); else if (e.target.id === 'lg-APLAZADO_POR' || e.target.id === 'lg-AVISO_APLAZAMIENTO') verCarta(); };
           vent.oninput = function (e) { if (e.target.id === 'lg-MOTIVO') { e.target.removeAttribute('data-auto'); marcarMotivo(); } };
           vent.onclick = function (e) {
             var b = e.target.closest('[data-motivo]');
@@ -1934,6 +1992,7 @@
             var q = que(), v = {}, c = {}, mal = [];
             if (!q) { verError(['Elige qué pasó.']); return; }
             if (programa) ['ID_ARBITRO', 'ID_GESTOR', 'NOTAS'].forEach(function (k) { v[k] = val('lg-' + k); });
+            if (programa) { v.APLAZADO_POR = ''; v.AVISO_APLAZAMIENTO = ''; } // solo un aplazamiento que pide un equipo los lleva
             var motivo = val('lg-MOTIVO');
             if (q === 'jugado') {
               // Primero lo demás (y, si estaba anulado, por jugar: un anulado no tiene acta); luego el acta.
@@ -1941,6 +2000,15 @@
             } else {
               v.ESTADO = { nopresentado: 'Anulado', suspendido: 'Suspendido', aplazado: 'Aplazado', anulado: 'Anulado', porjugar: 'Programado', libre: 'Libre' }[q];
               v.ANULADO_POR = q === 'nopresentado' ? val('lg-ANULADO_POR') : '';
+              var pide = q === 'aplazado' && programa ? val('lg-APLAZADO_POR') : '';
+              if (pide) {
+                v.APLAZADO_POR = pide; v.AVISO_APLAZAMIENTO = val('lg-AVISO_APLAZAMIENTO');
+                if (!v.AVISO_APLAZAMIENTO) mal.push('Di cuándo avisó.');
+                else if (v.AVISO_APLAZAMIENTO > String(p.FECHA || '9999')) mal.push('El aviso no puede ser después del partido.');
+                var cc = carta(p, pide, v.AVISO_APLAZAMIENTO), dec = vent.querySelector('input[name="lg-decide"]:checked');
+                if (cc.tipo && dec && dec.value === 'pierde') { v.ESTADO = 'Anulado'; v.ANULADO_POR = pide; }
+                if (!motivo) motivo = 'Lo pide ' + equipo(pide);
+              }
               v.MOTIVO = q === 'nopresentado' ? motivo || 'No se presentó' : ['suspendido', 'aplazado', 'anulado'].indexOf(q) >= 0 ? motivo : '';
               if (q === 'nopresentado' && !v.ANULADO_POR) mal.push('Di qué equipo no se presentó.');
               if (['suspendido', 'aplazado', 'anulado'].indexOf(q) >= 0 && !motivo) mal.push('Di el motivo.');
