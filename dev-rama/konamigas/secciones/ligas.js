@@ -507,7 +507,7 @@
 
   var TABLAS = ['TEMPORADAS', 'COMPETICIONES', 'LIGAS', 'PARTIDOS', 'GOLES', 'CAMPOS', 'INSTALACIONES', 'CALENDARIO', 'INSCRIPCIONES_EQUIPOS', 'HUECOS', 'SANCIONES'];
   // T0297 · Los tipos de SANCIONES · TIPO (su YAML). El motor comprueba lo que se guarda.
-  var TIPOS_SANCION = ['Anulación tardía', 'Retraso', 'Alineación indebida', 'Conducta', 'Otro'];
+  var TIPOS_SANCION = ['No presentado', 'Retraso', 'Alineación indebida', 'Conducta', 'Otro'];
   var PESTANAS = { PARTIDOS: 'Partidos', CLASIFICACION: 'Clasificación', GOLEADORAS: 'Goleadoras' };
   var ANTES = { JORNADAS: 'PARTIDOS', CALENDARIO: 'PARTIDOS' }; // las pestañas de antes de T0255 (jornadas y calendario, juntas)
   var ESTADOS = { Programado: 'ni', Jugado: 'co', Aplazado: 'pr', Suspendido: 'pr', Anulado: 'bl', Libre: 'x' };
@@ -705,7 +705,8 @@
 
       function chipEstado(p) {
         if (p._pendiente) return '<span class="u-chip">Guardando</span>';
-        return '<span class="n-estado n-e-' + (ESTADOS[p.ESTADO] || 'x') + '">' + texto(p.ESTADO || 'Sin estado') + '</span>';
+        // T0297: la normativa no contempla anular: un anulado con culpable es que ese equipo no se presentó.
+        return '<span class="n-estado n-e-' + (ESTADOS[p.ESTADO] || 'x') + '">' + texto(p.ESTADO === 'Anulado' && p.ANULADO_POR ? 'No presentado' : p.ESTADO || 'Sin estado') + '</span>';
       }
       /**
        * Lo que hay que saber de un partido que no se juega como estaba: anulado (no se recupera), aplazado (se recupera:
@@ -714,7 +715,8 @@
       function avisoPartido(p) {
         if (p.ESTADO === 'Anulado') {
           var an = resultadoAnulado(p, nAnulado());
-          return { clase: 'lg-av-no', texto: 'Anulado: no se recuperará' + (p.ANULADO_POR ? '. Lo provoca ' + equipo(p.ANULADO_POR) + (an ? ': pierde ' + Math.min(an.gl, an.gv) + '-' + Math.max(an.gl, an.gv) : '') : '') };
+          if (p.ANULADO_POR) return { clase: 'lg-av-no', texto: 'No presentado: ' + equipo(p.ANULADO_POR) + (an ? ' pierde ' + Math.min(an.gl, an.gv) + '-' + Math.max(an.gl, an.gv) : '') + ' y paga su multa' };
+          return { clase: 'lg-av-no', texto: 'Anulado: no se recuperará ni cuenta' };
         }
         if (POR_RECUPERAR.indexOf(p.ESTADO) >= 0) {
           var r = recuperacionDe(d.par, p.ID);
@@ -746,17 +748,17 @@
           roto ? '<span class="lg-pav lg-av-no">En PARTIDOS falta el ' + (p.ID_INSCRIPCION_LOCAL ? 'visitante' : 'local') + ' (' + texto(p.ID) + '): no cuenta en la clasificación</span>' : '',
           av ? '<span class="lg-pav ' + av.clase + '">' + texto(av.texto) + (p.MOTIVO && CON_MOTIVO.indexOf(p.ESTADO) >= 0 ? ' · ' + texto(p.MOTIVO) : '') + '</span>' : '',
           avisoMultas(p).map(function (t) { return '<span class="lg-pav lg-av-no">' + texto(t) + '</span>'; }).join(''),
-          sanciona && faltaSancion(p) ? '<span class="lg-pav lg-av-si">Sin su sanción de anulación tardía</span>' : ''].join('');
+          sanciona && faltaSancion(p) ? '<span class="lg-pav lg-av-si">Sin su sanción de no presentado</span>' : ''].join('');
         return '<button type="button" class="lg-p' + (esMio(p) ? ' lg-mio' : '') + (CON_MOTIVO.indexOf(p.ESTADO) >= 0 ? ' lg-p-fuera' : '') + '" data-p="' + texto(p.ID) + '"' +
           ' aria-label="' + texto(titulo(p) + ', ' + (p.HORA || '') + ', ' + campo(p.ID_CAMPO) + (res ? ', ' + gl + ' a ' + gv : '')) + '">' + info +
           (libre ? '<span class="lg-pl"></span><span class="lg-pc lg-pvs">' + texto(equipo(p.ID_INSCRIPCION_LOCAL || p.ID_INSCRIPCION_VISITANTE) || 'Campo libre') + '</span><span class="lg-pv"></span>'
             : eq(p.ID_INSCRIPCION_LOCAL, 'l', res && gl > gv) + '<span class="lg-pc' + (res ? '' : ' lg-pvs') + (an ? ' lg-pc-an' : '') + '">' + (res ? '<b class="u-cifra">' + gl + '<span>–</span>' + gv + '</b>' : 'vs') + '</span>' + eq(p.ID_INSCRIPCION_VISITANTE, 'v', res && gv > gl)) +
           (debajo ? '<span class="lg-pa">' + debajo + '</span>' : '') + '</button>';
       }
-      /** T0297 · Un anulado por culpa de un equipo sin su Anulación tardía (anulado antes de las sanciones o a mano en el Excel). */
+      /** T0297 · Un anulado por culpa de un equipo sin su No presentado (anulado antes de las sanciones o a mano en el Excel). */
       function faltaSancion(p) {
         return p.ESTADO === 'Anulado' && !!p.ANULADO_POR && !T.filas('SANCIONES').some(function (s) {
-          return String(s.ID_PARTIDO) === String(p.ID) && String(s.ID_INSCRIPCION_EQUIPO) === String(p.ANULADO_POR) && s.TIPO === 'Anulación tardía';
+          return String(s.ID_PARTIDO) === String(p.ID) && String(s.ID_INSCRIPCION_EQUIPO) === String(p.ANULADO_POR) && s.TIPO === 'No presentado';
         });
       }
       /** T0297 · En un partido por jugar, cada equipo que debe una multa: «PESCADORAS FC debe 60 € de una sanción». */
@@ -1145,10 +1147,10 @@
           fila('Árbitro', texto(p.ID_ARBITRO ? persona(p.ID_ARBITRO) : 'Sin asignar') + (p.ID_ARBITRO_REAL ? ' · arbitró ' + texto(persona(p.ID_ARBITRO_REAL)) : '')) +
           fila('Gestor', p.ID_GESTOR ? texto(persona(p.ID_GESTOR)) + (tel ? ' <a href="' + texto(tel) + '" target="_blank" rel="noopener">WhatsApp</a>' : '') : '') +
           fila('Motivo', texto(p.MOTIVO)) +
-          fila('Anulado por', texto(p.ANULADO_POR ? equipo(p.ANULADO_POR) : '')) +
+          fila('No se presentó', texto(p.ESTADO === 'Anulado' && p.ANULADO_POR ? equipo(p.ANULADO_POR) : '')) +
           fila('Notas', texto(p.NOTAS)) + '</dl>';
         var sp = sancionesDe(T.filas('SANCIONES'), { partido: p.ID }), sanNueva = sanciona && !p._nueva && !!(L || V);
-        if (sanNueva && faltaSancion(p)) html += '<div class="lg-pend-rec"><span><b>' + texto('Lo provoca ' + equipo(p.ANULADO_POR) + ', pero aún no tiene su sanción de anulación tardía') + '</b>' +
+        if (sanNueva && faltaSancion(p)) html += '<div class="lg-pend-rec"><span><b>' + texto(equipo(p.ANULADO_POR) + ' no se presentó, pero aún no tiene su sanción de no presentado') + '</b>' +
           '<small>Se anuló antes de que existieran las sanciones (o a mano en el Excel). Se apunta con la multa de siempre.</small></span>' +
           '<button type="button" class="u-btn" id="lg-san-falta">Apuntar su sanción</button></div>';
         if (sp.length) html += '<h3 class="lg-sub">' + (sp.length === 1 ? 'Sanción' : 'Sanciones') + '</h3>' + htmlSanciones(sp, 'partido');
@@ -1157,7 +1159,7 @@
         var estado = !p._nueva && quePuede(p).length > 0;
         // T0297: al árbitro, en sus partidos por jugar, cuándo podrá decir qué pasó (antes solo veía «Cerrar»).
         if (!estado && !programa && arbitraEste(p) && p.ESTADO === 'Programado' && String(p.FECHA || '') > hoy())
-          html += '<p class="u-nota">El día del partido podrás cerrar el acta o decir si un equipo lo anuló sin avisar a tiempo o si se suspendió.</p>';
+          html += '<p class="u-nota">El día del partido podrás cerrar el acta o decir si un equipo no se presentó o si se suspendió.</p>';
         html += '<div class="n-botones">' + (estado ? '<button type="button" class="u-btn u-btn-accion" id="lg-prog">Acta y estado</button>' : '') +
           (mover ? '<button type="button" class="u-btn" id="lg-mover">Mover dentro del día</button>' : '') +
           (programa && POR_RECUPERAR.indexOf(p.ESTADO) >= 0 && !recuperacionDe(d.par, p.ID) ? '<button type="button" class="u-btn" id="lg-recuperar">Recuperar en un hueco libre</button>' : '') +
@@ -1170,7 +1172,7 @@
           var sn = vent.querySelector('#lg-san-nueva');
           if (sn) sn.onclick = function () { formSancion(null, { partido: p.ID }, volver); };
           var sf = vent.querySelector('#lg-san-falta');
-          if (sf) sf.onclick = function () { formSancion(null, { partido: p.ID }, volver); }; // ya propone el equipo, Anulación tardía y la multa
+          if (sf) sf.onclick = function () { formSancion(null, { partido: p.ID }, volver); }; // ya propone el equipo, No presentado y la multa
           var a = vent.querySelector('#lg-acta'), b = vent.querySelector('#lg-prog'), m = vent.querySelector('#lg-mover');
           if (a) a.onclick = function () { formActa(p); };
           if (b) b.onclick = function () { formPartido(T.fila('PARTIDOS', p.ID) || p); };
@@ -1286,7 +1288,7 @@
 
       /**
        * Apuntar (s = null) o cambiar una sanción. Desde un partido (base.partido) se elige el equipo entre sus dos (si lo
-       * anuló uno y aún no tiene su Anulación tardía, ese y Anulación tardía, con el motivo del partido); desde un equipo (base.equipo) o al cambiarla, el equipo
+       * anuló uno y aún no tiene su No presentado, ese y No presentado, con el motivo del partido); desde un equipo (base.equipo) o al cambiarla, el equipo
        * queda y se elige su partido (o ninguno). La fecha es la del partido mientras no se cambie. ligasSancion la escribe;
        * al acabar se vuelve a la ficha de la que se venía (volver).
        * La multa, lo del rival y lo del árbitro se proponen con el tipo (SANCION_MULTAS) mientras no se toquen; lo pagado no se
@@ -1297,10 +1299,10 @@
         var pFijo = !s && base.partido ? T.fila('PARTIDOS', base.partido) : null;
         var idEq = s ? String(s.ID_INSCRIPCION_EQUIPO || '') : base.equipo || '', idP = s ? String(s.ID_PARTIDO || '') : pFijo ? pFijo.ID : '';
         var anulo = pFijo && pFijo.ESTADO === 'Anulado' && pFijo.ANULADO_POR ? pFijo.ANULADO_POR : '';
-        // …si aún no tiene su Anulación tardía en ese partido.
-        if (anulo && sancionesDe(T.filas('SANCIONES'), { partido: pFijo.ID, equipo: anulo }).some(function (x) { return x.TIPO === 'Anulación tardía'; })) anulo = '';
+        // …si aún no tiene su No presentado en ese partido.
+        if (anulo && sancionesDe(T.filas('SANCIONES'), { partido: pFijo.ID, equipo: anulo }).some(function (x) { return x.TIPO === 'No presentado'; })) anulo = '';
         if (pFijo) idEq = anulo;
-        var tipo = s ? s.TIPO : anulo ? 'Anulación tardía' : '', motivo = s ? s.MOTIVO : anulo ? pFijo.MOTIVO || '' : '';
+        var tipo = s ? s.TIPO : anulo ? 'No presentado' : '', motivo = s ? s.MOTIVO : anulo ? pFijo.MOTIVO || '' : '';
         var fechaDe = function (id) { var p = id && T.fila('PARTIDOS', id); return (p && p.FECHA) || hoy(); };
         var fechaIni = s && s.FECHA ? s.FECHA : fechaDe(idP);
         var suyos = d.par.filter(function (p) { return !p._nueva && (p.ID_INSCRIPCION_LOCAL === idEq || p.ID_INSCRIPCION_VISITANTE === idEq); })
@@ -1852,10 +1854,10 @@
         var n = nAnulado();
         return [
           ['jugado', p.ESTADO === 'Jugado' ? 'Se jugó: cambiar el acta' : 'Se jugó: cerrar el acta', dos && dia && p.ESTADO !== 'Aplazado' && p.ESTADO !== 'Libre'],
-          ['nopresentado', 'Un equipo lo anuló sin avisar a tiempo o no vino' + (n > 0 ? ' (pierde 0-' + n + ')' : '') + ' y paga su multa', dos],
+          ['nopresentado', 'Un equipo no se presentó o avisó demasiado tarde' + (n > 0 ? ' (pierde 0-' + n + ')' : '') + ' y paga su multa', dos],
           ['suspendido', 'Se suspendió por lluvia u otra causa (se vuelve a jugar otro día)', true],
-          ['aplazado', 'Se aplaza a otro día', programa],
-          ['anulado', 'Anulado por otra causa (no cuenta)', programa],
+          ['aplazado', 'Se aplaza a otro día (el equipo avisó con tiempo, u otra causa)', programa],
+          ['anulado', 'Anulado sin culpable, por algo excepcional (no cuenta)', programa],
           ['porjugar', 'Por jugar', p.ESTADO !== 'Programado' || programa],
           ['libre', 'Campo libre', programa && (p.ESTADO === 'Libre' || !dos)]
         ].filter(function (x) { return x[2]; });
@@ -1893,7 +1895,7 @@
             campoF('Gestor', '<select id="lg-ID_GESTOR">' + opciones(conStaff(function (s) { return s.GESTOR; }, [p.ID_GESTOR]), p.ID_GESTOR, 'Sin gestor') + '</select>') +
             campoF('Notas', '<textarea id="lg-NOTAS" rows="2">' + texto(p.NOTAS) + '</textarea>', 'u-ancho') : '') + '</div>' +
           '<p class="u-nota lg-si-jugado">Al seguir, el marcador y quién marcó cada gol.</p>' +
-          '<p class="u-nota lg-si-np">Su sanción de anulación tardía se apunta sola, con la multa de la normativa.</p>' +
+          '<p class="u-nota lg-si-np">Su sanción de no presentado se apunta sola, con la multa de la normativa.</p>' +
           '<p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="lg-guardar">Guardar</button>' +
           '<button type="button" class="u-btn u-btn-texto" data-cerrar>Cancelar</button></div>';
         ventana(html, function () {
@@ -1939,8 +1941,8 @@
             } else {
               v.ESTADO = { nopresentado: 'Anulado', suspendido: 'Suspendido', aplazado: 'Aplazado', anulado: 'Anulado', porjugar: 'Programado', libre: 'Libre' }[q];
               v.ANULADO_POR = q === 'nopresentado' ? val('lg-ANULADO_POR') : '';
-              v.MOTIVO = q === 'nopresentado' ? motivo || 'Lo anuló sin avisar a tiempo' : ['suspendido', 'aplazado', 'anulado'].indexOf(q) >= 0 ? motivo : '';
-              if (q === 'nopresentado' && !v.ANULADO_POR) mal.push('Di qué equipo lo anuló.');
+              v.MOTIVO = q === 'nopresentado' ? motivo || 'No se presentó' : ['suspendido', 'aplazado', 'anulado'].indexOf(q) >= 0 ? motivo : '';
+              if (q === 'nopresentado' && !v.ANULADO_POR) mal.push('Di qué equipo no se presentó.');
               if (['suspendido', 'aplazado', 'anulado'].indexOf(q) >= 0 && !motivo) mal.push('Di el motivo.');
             }
             Object.keys(v).forEach(function (k) { if (String(p[k] == null ? '' : p[k]) !== v[k]) c[k] = v[k]; });
@@ -1965,8 +1967,8 @@
         var h = T.actualizar('PARTIDOS', p.ID, pantalla, { fn: 'ligasPartido', args: [p.ID, c] });
         h.then(function (r) {
           if (r && r.quitados) T.refrescar(['GOLES']).catch(function () {});
-          if (r && r.sanciones) T.refrescar(['SANCIONES']).catch(function () {}); // T0297: el Anulación tardía del anulado
-          if (ctx.abierta()) ctx.aviso(r && r.aviso ? r.aviso : r && r.sanciones && c.ESTADO === 'Anulado' ? 'Partido guardado: apuntada su sanción de anulación tardía.' : r && r.sanciones ? 'Partido guardado. Su sanción de anulación tardía está al día.' : 'Partido guardado.');
+          if (r && r.sanciones) T.refrescar(['SANCIONES']).catch(function () {}); // T0297: el No presentado del anulado
+          if (ctx.abierta()) ctx.aviso(r && r.aviso ? r.aviso : r && r.sanciones && c.ESTADO === 'Anulado' ? 'Partido guardado: apuntada su sanción de no presentado.' : r && r.sanciones ? 'Partido guardado. Su sanción de no presentado está al día.' : 'Partido guardado.');
         }, function () {});
         return h;
       }
@@ -1980,7 +1982,7 @@
         ctx.llamar('ligasSancionesFaltan', [ids]).then(function (r) { return T.refrescar(['SANCIONES']).then(function () { return r; }); }).then(function (r) {
           S.apuntandoSan = false;
           if (!ctx.abierta()) return;
-          ctx.aviso(r.creadas === 1 ? 'Apuntada 1 sanción de anulación tardía.' : 'Apuntadas ' + r.creadas + ' sanciones de anulación tardía.');
+          ctx.aviso(r.creadas === 1 ? 'Apuntada 1 sanción de no presentado.' : 'Apuntadas ' + r.creadas + ' sanciones de no presentado.');
           pintar();
         }, function (e) {
           S.apuntandoSan = false;
