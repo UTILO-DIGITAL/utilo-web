@@ -742,12 +742,19 @@
           p._pendiente || p._nueva ? '<span class="u-chip">Guardando</span>' : '',
           roto ? '<span class="lg-pav lg-av-no">En PARTIDOS falta el ' + (p.ID_INSCRIPCION_LOCAL ? 'visitante' : 'local') + ' (' + texto(p.ID) + '): no cuenta en la clasificación</span>' : '',
           av ? '<span class="lg-pav ' + av.clase + '">' + texto(av.texto) + (p.MOTIVO && CON_MOTIVO.indexOf(p.ESTADO) >= 0 ? ' · ' + texto(p.MOTIVO) : '') + '</span>' : '',
-          avisoMultas(p).map(function (t) { return '<span class="lg-pav lg-av-no">' + texto(t) + '</span>'; }).join('')].join('');
+          avisoMultas(p).map(function (t) { return '<span class="lg-pav lg-av-no">' + texto(t) + '</span>'; }).join(''),
+          sanciona && faltaSancion(p) ? '<span class="lg-pav lg-av-si">Sin su sanción de no presentado</span>' : ''].join('');
         return '<button type="button" class="lg-p' + (esMio(p) ? ' lg-mio' : '') + (CON_MOTIVO.indexOf(p.ESTADO) >= 0 ? ' lg-p-fuera' : '') + '" data-p="' + texto(p.ID) + '"' +
           ' aria-label="' + texto(titulo(p) + ', ' + (p.HORA || '') + ', ' + campo(p.ID_CAMPO) + (res ? ', ' + gl + ' a ' + gv : '')) + '">' + info +
           (libre ? '<span class="lg-pl"></span><span class="lg-pc lg-pvs">' + texto(equipo(p.ID_INSCRIPCION_LOCAL || p.ID_INSCRIPCION_VISITANTE) || 'Campo libre') + '</span><span class="lg-pv"></span>'
             : eq(p.ID_INSCRIPCION_LOCAL, 'l', res && gl > gv) + '<span class="lg-pc' + (res ? '' : ' lg-pvs') + (an ? ' lg-pc-an' : '') + '">' + (res ? '<b class="u-cifra">' + gl + '<span>–</span>' + gv + '</b>' : 'vs') + '</span>' + eq(p.ID_INSCRIPCION_VISITANTE, 'v', res && gv > gl)) +
           (debajo ? '<span class="lg-pa">' + debajo + '</span>' : '') + '</button>';
+      }
+      /** T0297 · Un anulado por culpa de un equipo sin su No presentado (anulado antes de las sanciones o a mano en el Excel). */
+      function faltaSancion(p) {
+        return p.ESTADO === 'Anulado' && !!p.ANULADO_POR && !T.filas('SANCIONES').some(function (s) {
+          return String(s.ID_PARTIDO) === String(p.ID) && String(s.ID_INSCRIPCION_EQUIPO) === String(p.ANULADO_POR) && s.TIPO === 'No presentado';
+        });
       }
       /** T0297 · En un partido por jugar, cada equipo que debe una multa: «PESCADORAS FC debe 60 € de una sanción». */
       function avisoMultas(p) {
@@ -808,6 +815,11 @@
           if (rotos.length) h += '<p class="lg-pav lg-pav-ficha lg-av-no" role="alert">' + rotos.length + (rotos.length === 1 ? ' partido de esta liga no tiene' : ' partidos de esta liga no tienen') +
             ' uno de los dos equipos en COMPETICION · PARTIDOS (' + texto(rotos.slice(0, 6).map(function (p) { return p.ID; }).join(', ') + (rotos.length > 6 ? '…' : '')) +
             '). No cuentan en la clasificación ni en las goleadoras, y quién descansa puede salir mal. Avisa a quien administra para completarlos.</p>';
+          // T0297: anulados por culpa de un equipo sin su sanción (de antes de las sanciones): se apuntan de una vez.
+          var sinSan = sanciona ? partidosLiga(actual.liga.ID).filter(faltaSancion) : [];
+          if (sinSan.length) h += '<div class="lg-pend-rec"><span><b>' + sinSan.length + (sinSan.length === 1 ? ' partido anulado por culpa de un equipo sin su sanción' : ' partidos anulados por culpa de un equipo sin su sanción') + '</b>' +
+            '<small>' + texto(sinSan.map(function (p) { return 'J' + p.JORNADA + ' ' + equipo(p.ANULADO_POR); }).join(' · ')) + '</small></span>' +
+            '<button type="button" class="u-btn" data-accion="sanciones"' + (S.apuntandoSan ? ' disabled' : '') + '>' + (S.apuntandoSan ? 'Apuntando…' : 'Apuntar sus sanciones') + '</button></div>';
           var pend = aplazadosPendientes(d.par, actual.liga.ID);
           if (pend.length) h += '<div class="lg-pend-rec"><span><b>' + pend.length + (pend.length === 1 ? ' partido aplazado' : ' partidos aplazados') + ' por recuperar</b>' +
             '<small>' + texto(pend.map(function (p) { return 'J' + p.JORNADA + ' ' + titulo(p); }).join(' · ')) + '</small></span>' +
@@ -1133,6 +1145,9 @@
           fila('Anulado por', texto(p.ANULADO_POR ? equipo(p.ANULADO_POR) : '')) +
           fila('Notas', texto(p.NOTAS)) + '</dl>';
         var sp = sancionesDe(T.filas('SANCIONES'), { partido: p.ID }), sanNueva = sanciona && !p._nueva && !!(L || V);
+        if (sanNueva && faltaSancion(p)) html += '<div class="lg-pend-rec"><span><b>' + texto('Lo provoca ' + equipo(p.ANULADO_POR) + ', pero aún no tiene su sanción de no presentado') + '</b>' +
+          '<small>Se anuló antes de que existieran las sanciones (o a mano en el Excel). Se apunta con la multa de siempre.</small></span>' +
+          '<button type="button" class="u-btn" id="lg-san-falta">Apuntar su sanción</button></div>';
         if (sp.length) html += '<h3 class="lg-sub">' + (sp.length === 1 ? 'Sanción' : 'Sanciones') + '</h3>' + htmlSanciones(sp, 'partido');
         var mover = programa && !p._nueva && p.ESTADO === 'Programado' && String(p.FECHA || '') >= hoy();
         html += '<div class="n-botones">' + (acta ? '<button type="button" class="u-btn u-btn-accion" id="lg-acta">' + (p.ESTADO === 'Jugado' ? 'Cambiar el acta' : 'Cerrar el acta') + '</button>' : '') +
@@ -1147,6 +1162,8 @@
           vent.onclick = clicFicha(volver);
           var sn = vent.querySelector('#lg-san-nueva');
           if (sn) sn.onclick = function () { formSancion(null, { partido: p.ID }, volver); };
+          var sf = vent.querySelector('#lg-san-falta');
+          if (sf) sf.onclick = function () { formSancion(null, { partido: p.ID }, volver); }; // ya propone el equipo, No presentado y la multa
           var a = vent.querySelector('#lg-acta'), b = vent.querySelector('#lg-prog'), m = vent.querySelector('#lg-mover');
           if (a) a.onclick = function () { formActa(p); };
           if (b) b.onclick = function () { formPartido(p); };
@@ -1859,6 +1876,24 @@
         });
       }
 
+      /** T0297 · Las sanciones que les faltan a los anulados de la liga que se ve, de una vez (ligasSancionesFaltan). */
+      function apuntarSanciones() {
+        if (S.apuntandoSan || !actual) return;
+        var ids = partidosLiga(actual.liga.ID).filter(faltaSancion).map(function (p) { return p.ID; });
+        if (!ids.length) return;
+        S.apuntandoSan = true; pintar();
+        ctx.llamar('ligasSancionesFaltan', [ids]).then(function (r) { return T.refrescar(['SANCIONES']).then(function () { return r; }); }).then(function (r) {
+          S.apuntandoSan = false;
+          if (!ctx.abierta()) return;
+          ctx.aviso(r.creadas === 1 ? 'Apuntada 1 sanción de no presentado.' : 'Apuntadas ' + r.creadas + ' sanciones de no presentado.');
+          pintar();
+        }, function (e) {
+          S.apuntandoSan = false;
+          if (!ctx.abierta()) return;
+          ctx.aviso('No se han apuntado: ' + String(e.message).replace(/^\w+:\s*/, '')); pintar();
+        });
+      }
+
       /* ---------- eventos ---------- */
 
       function irA(tab) { S.tab = tab; guardado(CLAVE + 'tab', tab); pintar(); window.scrollTo(0, 0); }
@@ -1885,6 +1920,7 @@
         b = t.closest('[data-accion="jornadas"]'); if (b) { formJornadas(); return; }
         b = t.closest('[data-accion="recuperar"]'); if (b) { formRecuperar(actual.liga.ID, null); return; }
         b = t.closest('[data-accion="copiar"]'); if (b) { copiar(); return; }
+        b = t.closest('[data-accion="sanciones"]'); if (b) { apuntarSanciones(); return; }
         b = t.closest('[data-ir-pend]'); if (b) { S.comp = '*'; S.mios = true; S.fecha = b.getAttribute('data-ir-pend'); pintar(); return; }
         b = t.closest('[data-p]'); if (b) ficha(b.getAttribute('data-p'));
       });
