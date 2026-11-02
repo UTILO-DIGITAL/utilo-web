@@ -1155,6 +1155,9 @@
         var mover = programa && !p._nueva && p.ESTADO === 'Programado' && String(p.FECHA || '') >= hoy();
         // T0297 (Javi): un solo botón para el acta y el estado; apuntar otra sanción, como enlace (la de no presentarse va sola).
         var estado = !p._nueva && quePuede(p).length > 0;
+        // T0297: al árbitro, en sus partidos por jugar, cuándo podrá decir qué pasó (antes solo veía «Cerrar»).
+        if (!estado && !programa && arbitraEste(p) && p.ESTADO === 'Programado' && String(p.FECHA || '') > hoy())
+          html += '<p class="u-nota">El día del partido podrás cerrar el acta o decir si un equipo lo anuló sin avisar a tiempo o si se suspendió.</p>';
         html += '<div class="n-botones">' + (estado ? '<button type="button" class="u-btn u-btn-accion" id="lg-prog">Acta y estado</button>' : '') +
           (mover ? '<button type="button" class="u-btn" id="lg-mover">Mover dentro del día</button>' : '') +
           (programa && POR_RECUPERAR.indexOf(p.ESTADO) >= 0 && !recuperacionDe(d.par, p.ID) ? '<button type="button" class="u-btn" id="lg-recuperar">Recuperar en un hueco libre</button>' : '') +
