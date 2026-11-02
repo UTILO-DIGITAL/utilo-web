@@ -542,6 +542,7 @@
       var quien = { admin: !!ctx.admin, perfil: ctx.perfil, actaTodas: lista(cfg.ACTA_TODAS), yo: staff.yo };
       var programa = !!ctx.admin || lista(cfg.PROGRAMAR).indexOf(ctx.perfil) >= 0;
       var sanciona = !!ctx.admin || lista(cfg.SANCIONAR).indexOf(ctx.perfil) >= 0; // T0297: apunta, cambia y quita sanciones
+      var ponePrecio = !!ctx.admin || lista(cfg.SANCION_IMPORTE).indexOf(ctx.perfil) >= 0; // T0297: solo Socio cambia el importe de una multa
       // comp: la competición elegida ('*' = todas, solo en Partidos); fecha: el día de juego abierto en Partidos; golAmbito:
       // las goleadoras de la liga o de toda la competición; q: lo que se busca en Goleadoras.
       var S = { tab: pest.indexOf(guardado(CLAVE + 'tab')) >= 0 ? guardado(CLAVE + 'tab') : '', temp: guardado(CLAVE + 'temp'), comp: guardado(CLAVE + 'comp'),
@@ -1150,12 +1151,13 @@
           '<button type="button" class="u-btn" id="lg-san-falta">Apuntar su sanción</button></div>';
         if (sp.length) html += '<h3 class="lg-sub">' + (sp.length === 1 ? 'Sanción' : 'Sanciones') + '</h3>' + htmlSanciones(sp, 'partido');
         var mover = programa && !p._nueva && p.ESTADO === 'Programado' && String(p.FECHA || '') >= hoy();
-        html += '<div class="n-botones">' + (acta ? '<button type="button" class="u-btn u-btn-accion" id="lg-acta">' + (p.ESTADO === 'Jugado' ? 'Cambiar el acta' : 'Cerrar el acta') + '</button>' : '') +
+        // T0297 (Javi): un solo botón para el acta y el estado; apuntar otra sanción, como enlace (la de no presentarse va sola).
+        var estado = !p._nueva && quePuede(p).length > 0;
+        html += '<div class="n-botones">' + (estado ? '<button type="button" class="u-btn u-btn-accion" id="lg-prog">Acta y estado</button>' : '') +
           (mover ? '<button type="button" class="u-btn" id="lg-mover">Mover dentro del día</button>' : '') +
           (programa && p.ESTADO === 'Aplazado' && !recuperacionDe(d.par, p.ID) ? '<button type="button" class="u-btn" id="lg-recuperar">Recuperar en un hueco libre</button>' : '') +
-          (programa && !p._nueva ? '<button type="button" class="u-btn" id="lg-prog">Árbitro y estado</button>' : '') +
-          (sanNueva ? '<button type="button" class="u-btn" id="lg-san-nueva">Apuntar una sanción</button>' : '') +
-          '<button type="button" class="u-btn' + (acta || programa || sanNueva ? ' u-btn-texto' : '') + '" data-cerrar>Cerrar</button></div>';
+          (sanNueva ? '<button type="button" class="u-btn u-btn-texto" id="lg-san-nueva">Apuntar una sanción</button>' : '') +
+          '<button type="button" class="u-btn u-btn-texto" data-cerrar>Cerrar</button></div>';
         ventana(html, function () {
           fichaAbierta = 'P:' + p.ID;
           var volver = function () { ficha(p.ID); };
@@ -1166,7 +1168,7 @@
           if (sf) sf.onclick = function () { formSancion(null, { partido: p.ID }, volver); }; // ya propone el equipo, No presentado y la multa
           var a = vent.querySelector('#lg-acta'), b = vent.querySelector('#lg-prog'), m = vent.querySelector('#lg-mover');
           if (a) a.onclick = function () { formActa(p); };
-          if (b) b.onclick = function () { formPartido(p); };
+          if (b) b.onclick = function () { formPartido(T.fila('PARTIDOS', p.ID) || p); };
           if (m) m.onclick = function () { formMover(p); };
           var rc = vent.querySelector('#lg-recuperar');
           if (rc) rc.onclick = function () { formRecuperar(p.ID_LIGA, [p.ID]); };
@@ -1313,10 +1315,11 @@
           campoF('Tipo', '<select id="lg-s-tipo">' + opciones(TIPOS_SANCION.concat(tipo && TIPOS_SANCION.indexOf(tipo) < 0 ? [tipo] : []).map(function (x) { return [x, x]; }), tipo, 'Elige el tipo') + '</select>') +
           campoF('Fecha', '<input type="date" id="lg-s-fecha" value="' + texto(fechaIni) + '">') +
           campoF('Motivo', '<textarea id="lg-s-motivo" rows="2" maxlength="300">' + texto(motivo) + '</textarea>', 'u-ancho') +
-          campoF('Multa (€)', importe('IMPORTE', s && s.FECHA_PAGO)) + campoF('Para el rival (€)', importe('COMPENSACION', s && s.FECHA_COMPENSACION)) +
-          campoF('Para el árbitro (€)', importe('PARA_ARBITRO', s && s.FECHA_PAGO)) + '</div>' +
-          '<p class="u-nota">De la multa, lo que se da al equipo rival y lo que gana el árbitro del partido (suma a sus cobros cuando el equipo la paga).' +
-          (s && (s.FECHA_PAGO || s.FECHA_COMPENSACION) ? ' Lo pagado no se cambia: deshaz antes el pago.' : '') + '</p>' +
+          (ponePrecio ? campoF('Multa (€)', importe('IMPORTE', s && s.FECHA_PAGO)) + campoF('Para el rival (€)', importe('COMPENSACION', s && s.FECHA_COMPENSACION)) +
+            campoF('Para el árbitro (€)', importe('PARA_ARBITRO', s && s.FECHA_PAGO)) : '') + '</div>' +
+          (ponePrecio ? '<p class="u-nota">De la multa, lo que se da al equipo rival y lo que gana el árbitro del partido (suma a sus cobros cuando el equipo la paga). Por defecto, el de la normativa.' +
+            (s && (s.FECHA_PAGO || s.FECHA_COMPENSACION) ? ' Lo pagado no se cambia: deshaz antes el pago.' : '') + '</p>'
+            : '<p class="u-nota" id="lg-s-precio">' + texto(textoPrecio(ini)) + '</p>') +
           (s && !s._nueva ? htmlPagos(s) : '') +
           '<p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="lg-guardar">' + (s ? 'Guardar cambios' : 'Apuntar la sanción') + '</button>' +
           (s && !s.FECHA_PAGO && !s.FECHA_COMPENSACION ? '<button type="button" class="u-btn" id="lg-s-quitar">Quitar la sanción</button>' : '') +
@@ -1330,7 +1333,8 @@
           vent.oninput = function (e) { if (e.target.id === 'lg-s-fecha') fechaMano = true; if (/^lg-s-(IMPORTE|COMPENSACION|PARA_ARBITRO)$/.test(e.target.id)) importesMano = true; };
           vent.onchange = function (e) {
             if (e.target.id === 'lg-s-par' && !fechaMano) vent.querySelector('#lg-s-fecha').value = fechaDe(e.target.value);
-            if (e.target.id === 'lg-s-tipo' && !importesMano) { var m = multaDe(e.target.value); IMPORTES.forEach(function (k) { vent.querySelector('#lg-s-' + k).value = m[k] === '' ? '' : String(m[k]).replace('.', ','); }); }
+            if (e.target.id === 'lg-s-tipo' && !ponePrecio && (!s || (!s.FECHA_PAGO && !s.FECHA_COMPENSACION))) vent.querySelector('#lg-s-precio').textContent = textoPrecio(multaDe(e.target.value));
+            if (e.target.id === 'lg-s-tipo' && ponePrecio && !importesMano) { var m = multaDe(e.target.value); IMPORTES.forEach(function (k) { vent.querySelector('#lg-s-' + k).value = m[k] === '' ? '' : String(m[k]).replace('.', ','); }); }
           };
           vent.onclick = function (e) {
             var b = e.target.closest('[data-pago]'); if (b) { formPago(s, b.getAttribute('data-pago'), function () { formSancion(T.fila('SANCIONES', s.ID) || s, null, volver); }); return; }
@@ -1341,7 +1345,7 @@
           vent.querySelector('#lg-guardar').onclick = function () {
             var v = { ID_PARTIDO: pFijo ? pFijo.ID : val('lg-s-par'), ID_INSCRIPCION_EQUIPO: pFijo ? val('lg-s-eq') : idEq, TIPO: val('lg-s-tipo'), MOTIVO: val('lg-s-motivo'), FECHA: val('lg-s-fecha') };
             var mal = [];
-            IMPORTES.forEach(function (k) {
+            if (ponePrecio) IMPORTES.forEach(function (k) {
               var x = val('lg-s-' + k).replace(/\s*€$/, '').replace(',', '.');
               if (x !== '' && !(Number(x) >= 0)) mal.push('Pon los importes en euros (por ejemplo, 60).');
               else v[k] = x === '' ? '' : Math.round(Number(x) * 100) / 100;
@@ -1388,6 +1392,13 @@
         var m = (cfg.SANCION_MULTAS || {})[tipo];
         return m ? { IMPORTE: m.MULTA === undefined ? '' : m.MULTA, COMPENSACION: m.RIVAL === undefined ? '' : m.RIVAL, PARA_ARBITRO: m.ARBITRO === undefined ? '' : m.ARBITRO }
           : { IMPORTE: '', COMPENSACION: '', PARA_ARBITRO: '' };
+      }
+      /** La multa de la normativa en una línea, para quien no la cambia: «Multa: 60 € (50 € para el rival y 10 € para el árbitro), la de la normativa». */
+      function textoPrecio(m) {
+        var x = num(m.IMPORTE);
+        if (!(x > 0)) return 'Este tipo de sanción no lleva multa.';
+        var r = num(m.COMPENSACION) > 0 ? euros(m.COMPENSACION) + ' para el rival' : '', a = num(m.PARA_ARBITRO) > 0 ? euros(m.PARA_ARBITRO) + ' para el árbitro' : '';
+        return 'Multa: ' + euros(x) + ([r, a].filter(String).length ? ' (' + [r, a].filter(String).join(' y ') + ')' : '') + ', la de la normativa. Solo un Socio la cambia.';
       }
       /** El dinero de una sanción ya apuntada: si la multa está cobrada y lo del rival pagado, con sus botones. */
       function htmlPagos(s) {
@@ -1821,59 +1832,116 @@
         });
       }
 
-      /** Árbitro, gestor y estado (aplazar, suspender, anular). El día, la hora y el campo se cambian moviendo el partido. */
+      /** ¿Arbitra este partido quien ha entrado (o puede cerrar todas las actas)? Sin mirar el estado ni el día. */
+      function arbitraEste(p) {
+        return !!quien.admin || (quien.actaTodas || []).indexOf(quien.perfil) >= 0 || (!!quien.yo && (p.ID_ARBITRO === quien.yo || p.ID_ARBITRO_REAL === quien.yo));
+      }
+      /**
+       * T0297 · Qué se puede decir de un partido en «Acta y estado» (Javi, 02/11/2026): [clave, texto], según quién es. El árbitro
+       * (arbitraEste), desde el día del partido: se jugó, no se presentó un equipo, se suspendió o por jugar. Quien programa,
+       * también aplazado, anulado por otra causa y campo libre, cualquier día.
+       */
+      function quePuede(p) {
+        var dia = String(p.FECHA || '') <= hoy(), dos = !!(p.ID_INSCRIPCION_LOCAL && p.ID_INSCRIPCION_VISITANTE), arb = arbitraEste(p) && dia;
+        if (!programa && (!arb || p.ESTADO === 'Aplazado' || p.ESTADO === 'Libre')) return [];
+        var n = nAnulado();
+        return [
+          ['jugado', p.ESTADO === 'Jugado' ? 'Se jugó: cambiar el acta' : 'Se jugó: cerrar el acta', dos && dia && p.ESTADO !== 'Aplazado' && p.ESTADO !== 'Libre'],
+          ['nopresentado', 'No se presentó un equipo' + (n > 0 ? ' (pierde 0-' + n + ')' : '') + ' y paga su multa', dos],
+          ['suspendido', 'Se suspendió', true],
+          ['aplazado', 'Se aplaza a otro día', programa],
+          ['anulado', 'Anulado por otra causa (no cuenta)', programa],
+          ['porjugar', 'Por jugar', p.ESTADO !== 'Programado' || programa],
+          ['libre', 'Campo libre', programa && (p.ESTADO === 'Libre' || !dos)]
+        ].filter(function (x) { return x[2]; });
+      }
+      function queEs(p) {
+        return p.ESTADO === 'Jugado' ? 'jugado' : p.ESTADO === 'Anulado' ? (p.ANULADO_POR ? 'nopresentado' : 'anulado') : p.ESTADO === 'Suspendido' ? 'suspendido'
+          : p.ESTADO === 'Aplazado' ? 'aplazado' : p.ESTADO === 'Libre' ? 'libre' : 'porjugar';
+      }
+
+      /**
+       * «Acta y estado» (T0297, antes «Cerrar el acta» y «Árbitro y estado» por separado): qué pasó en el partido y, a quien
+       * programa, árbitro, gestor y notas. «Se jugó» sigue con el acta (formActa: marcador y quién marcó); lo demás lo escribe
+       * ligasPartido. No presentarse anula el partido (0-5) y apunta sola su sanción, al precio de la normativa. El día, la hora
+       * y el campo se cambian moviendo el partido.
+       */
       function formPartido(p) {
-        var ests = ['Programado', 'Aplazado', 'Suspendido', 'Anulado', 'Libre'].concat(p.ESTADO === 'Jugado' ? ['Jugado'] : []);
-        var conStaff = function (f, ya) {
+        var ops = quePuede(p), ya = queEs(p);
+        var conStaff = function (f, yaEsta) {
           var l = staff.staff.filter(function (s) { return f(s) && s.ACTIVO; }).map(function (s) { return s.ID; });
-          ya.forEach(function (x) { if (x && l.indexOf(x) < 0) l.push(x); });
+          yaEsta.forEach(function (x) { if (x && l.indexOf(x) < 0) l.push(x); });
           return l.map(function (x) { return [x, persona(x)]; });
         };
         var html = '<h2 id="lg-vt">' + texto(titulo(p)) + '</h2><p class="u-nota">' + texto(fechaDia(p.FECHA) + ' · ' + p.HORA + ' · ' + campo(p.ID_CAMPO)) +
-          (p.ESTADO === 'Programado' && String(p.FECHA || '') >= hoy() ? '. Para cambiar la hora o el campo, usa «Mover dentro del día».' : '.') + '</p>' +
+          (programa && p.ESTADO === 'Programado' && String(p.FECHA || '') >= hoy() ? '. Para cambiar la hora o el campo, usa «Mover dentro del día».' : '.') + '</p>' +
+          '<fieldset class="lg-que"><legend class="u-etiqueta">¿Qué pasó?</legend>' + ops.map(function (o) {
+            return '<label class="u-check"><input type="radio" name="lg-que" value="' + o[0] + '"' + (o[0] === ya ? ' checked' : '') + '> ' + texto(o[1]) + '</label>';
+          }).join('') + '</fieldset>' +
           '<div class="u-campos">' +
-          campoF('Árbitro', '<select id="lg-ID_ARBITRO">' + opciones(conStaff(function (s) { return s.ARBITRO; }, [p.ID_ARBITRO]), p.ID_ARBITRO, 'Sin asignar') + '</select>') +
-          campoF('Gestor', '<select id="lg-ID_GESTOR">' + opciones(conStaff(function (s) { return s.GESTOR; }, [p.ID_GESTOR]), p.ID_GESTOR, 'Sin gestor') + '</select>') +
-          campoF('Estado', '<select id="lg-ESTADO">' + opciones(ests.map(function (e) { return [e, e]; }), p.ESTADO) + '</select>') +
-          campoF('Lo provoca', '<select id="lg-ANULADO_POR">' + opciones([p.ID_INSCRIPCION_LOCAL, p.ID_INSCRIPCION_VISITANTE].filter(Boolean).map(function (e) { return [e, equipo(e)]; }), p.ANULADO_POR, 'Ninguno de los dos') + '</select>', 'lg-si-anulado') +
+          campoF('Qué equipo', '<select id="lg-ANULADO_POR">' + opciones([p.ID_INSCRIPCION_LOCAL, p.ID_INSCRIPCION_VISITANTE].filter(Boolean).map(function (e) { return [e, equipo(e)]; }), p.ANULADO_POR, 'Elige el equipo') + '</select>', 'lg-si-np') +
           campoF('Motivo', '<input type="text" id="lg-MOTIVO" maxlength="200" value="' + texto(p.MOTIVO) + '">', 'u-ancho lg-si-motivo') +
-          campoF('Notas', '<textarea id="lg-NOTAS" rows="2">' + texto(p.NOTAS) + '</textarea>', 'u-ancho') + '</div>' +
-          '<p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="lg-guardar">Guardar cambios</button>' +
-          '<button type="button" class="u-btn" data-cerrar>Cancelar</button></div>';
+          (programa ? campoF('Árbitro', '<select id="lg-ID_ARBITRO">' + opciones(conStaff(function (s) { return s.ARBITRO; }, [p.ID_ARBITRO]), p.ID_ARBITRO, 'Sin asignar') + '</select>') +
+            campoF('Gestor', '<select id="lg-ID_GESTOR">' + opciones(conStaff(function (s) { return s.GESTOR; }, [p.ID_GESTOR]), p.ID_GESTOR, 'Sin gestor') + '</select>') +
+            campoF('Notas', '<textarea id="lg-NOTAS" rows="2">' + texto(p.NOTAS) + '</textarea>', 'u-ancho') : '') + '</div>' +
+          '<p class="u-nota lg-si-jugado">Al seguir, el marcador y quién marcó cada gol.</p>' +
+          '<p class="u-nota lg-si-np">Su sanción de no presentado se apunta sola, con la multa de la normativa.</p>' +
+          '<p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="lg-guardar">Guardar</button>' +
+          '<button type="button" class="u-btn u-btn-texto" data-cerrar>Cancelar</button></div>';
         ventana(html, function () {
+          var g = vent.querySelector('#lg-guardar');
+          function que() { var r = vent.querySelector('input[name="lg-que"]:checked'); return r ? r.value : ''; }
           function ver() {
-            var e = val('lg-ESTADO');
-            vent.querySelector('.lg-si-anulado').hidden = e !== 'Anulado';
-            vent.querySelector('.lg-si-motivo').hidden = CON_MOTIVO.indexOf(e) < 0;
+            var q = que();
+            [].forEach.call(vent.querySelectorAll('.lg-si-np'), function (x) { x.hidden = q !== 'nopresentado'; });
+            vent.querySelector('.lg-si-motivo').hidden = ['nopresentado', 'suspendido', 'aplazado', 'anulado'].indexOf(q) < 0;
+            vent.querySelector('.lg-si-jugado').hidden = q !== 'jugado';
+            g.textContent = q === 'jugado' ? 'Seguir con el acta' : 'Guardar';
+            g.removeAttribute('data-ok');
           }
           ver();
-          vent.onchange = function (e) { if (e.target.id === 'lg-ESTADO') ver(); };
-          var g = vent.querySelector('#lg-guardar');
+          vent.onchange = function (e) { if (e.target.name === 'lg-que') ver(); };
           g.onclick = function () {
-            var v = {}, c = {}, mal = [];
-            ['ID_ARBITRO', 'ID_GESTOR', 'ESTADO', 'MOTIVO', 'ANULADO_POR', 'NOTAS'].forEach(function (k) { v[k] = val('lg-' + k); });
-            if (v.ESTADO !== 'Anulado') v.ANULADO_POR = '';
-            if (CON_MOTIVO.indexOf(v.ESTADO) < 0) v.MOTIVO = '';
-            else if (!v.MOTIVO) mal.push('Di el motivo.');
+            var q = que(), v = {}, c = {}, mal = [];
+            if (!q) { verError(['Elige qué pasó.']); return; }
+            if (programa) ['ID_ARBITRO', 'ID_GESTOR', 'NOTAS'].forEach(function (k) { v[k] = val('lg-' + k); });
+            var motivo = val('lg-MOTIVO');
+            if (q === 'jugado') {
+              // Primero lo demás (y, si estaba anulado, por jugar: un anulado no tiene acta); luego el acta.
+              if (p.ESTADO === 'Anulado') { v.ESTADO = 'Programado'; v.ANULADO_POR = ''; v.MOTIVO = ''; }
+            } else {
+              v.ESTADO = { nopresentado: 'Anulado', suspendido: 'Suspendido', aplazado: 'Aplazado', anulado: 'Anulado', porjugar: 'Programado', libre: 'Libre' }[q];
+              v.ANULADO_POR = q === 'nopresentado' ? val('lg-ANULADO_POR') : '';
+              v.MOTIVO = q === 'nopresentado' ? motivo || 'No se presentó' : ['suspendido', 'aplazado', 'anulado'].indexOf(q) >= 0 ? motivo : '';
+              if (q === 'nopresentado' && !v.ANULADO_POR) mal.push('Di qué equipo no se presentó.');
+              if (['suspendido', 'aplazado', 'anulado'].indexOf(q) >= 0 && !motivo) mal.push('Di el motivo.');
+            }
             Object.keys(v).forEach(function (k) { if (String(p[k] == null ? '' : p[k]) !== v[k]) c[k] = v[k]; });
             verError(mal);
             if (mal.length) return;
-            if (!Object.keys(c).length) { cerrar(true); return; }
-            var pierde = p.ESTADO === 'Jugado' && v.ESTADO !== 'Jugado';
+            var pierde = p.ESTADO === 'Jugado' && q !== 'jugado';
             if (pierde && !g.getAttribute('data-ok')) { g.setAttribute('data-ok', '1'); g.textContent = 'Se borra el resultado y sus goles: pulsa otra vez'; return; }
-            var pantalla = Object.assign({}, c, pierde ? { GOLES_LOCAL: '', GOLES_VISITANTE: '' } : {});
-            // Como el motor: un anulado por culpa de un equipo se queda con su 0-5 en el Excel; si deja de estarlo, sin resultado.
-            var an = resultadoAnulado(Object.assign({}, p, v), nAnulado());
-            if (an) { pantalla.GOLES_LOCAL = an.gl; pantalla.GOLES_VISITANTE = an.gv; }
-            else if (p.ESTADO === 'Anulado') { pantalla.GOLES_LOCAL = ''; pantalla.GOLES_VISITANTE = ''; }
+            var hecho = Object.keys(c).length ? guardarEstado(p, c, pierde) : null;
+            if (q === 'jugado') { formActa(T.fila('PARTIDOS', p.ID) || p); return; } // el acta va detrás, en la misma cola del partido
+            if (hecho) hecho.catch(function () {});
             cerrar(true);
-            T.actualizar('PARTIDOS', p.ID, pantalla, { fn: 'ligasPartido', args: [p.ID, c] }).then(function (r) {
-              if (r && r.quitados) T.refrescar(['GOLES']).catch(function () {});
-              if (r && r.sanciones) T.refrescar(['SANCIONES']).catch(function () {}); // T0297: el No presentado del anulado
-              if (ctx.abierta()) ctx.aviso(r && r.aviso ? r.aviso : r && r.sanciones ? 'Partido guardado. Su sanción de no presentado está al día.' : 'Partido guardado.');
-            }, function () {});
           };
         });
+      }
+      /** Escribe el estado (ligasPartido) con la pantalla al momento: el 0-5 de un anulado por culpa de un equipo, el resultado que se pierde y su sanción. */
+      function guardarEstado(p, c, pierde) {
+        var pantalla = Object.assign({}, c, pierde ? { GOLES_LOCAL: '', GOLES_VISITANTE: '' } : {});
+        // Como el motor: un anulado por culpa de un equipo se queda con su 0-5 en el Excel; si deja de estarlo, sin resultado.
+        var an = resultadoAnulado(Object.assign({}, p, c), nAnulado());
+        if (an) { pantalla.GOLES_LOCAL = an.gl; pantalla.GOLES_VISITANTE = an.gv; }
+        else if (p.ESTADO === 'Anulado') { pantalla.GOLES_LOCAL = ''; pantalla.GOLES_VISITANTE = ''; }
+        var h = T.actualizar('PARTIDOS', p.ID, pantalla, { fn: 'ligasPartido', args: [p.ID, c] });
+        h.then(function (r) {
+          if (r && r.quitados) T.refrescar(['GOLES']).catch(function () {});
+          if (r && r.sanciones) T.refrescar(['SANCIONES']).catch(function () {}); // T0297: el No presentado del anulado
+          if (ctx.abierta()) ctx.aviso(r && r.aviso ? r.aviso : r && r.sanciones && c.ESTADO === 'Anulado' ? 'Partido guardado: apuntada su sanción de no presentado.' : r && r.sanciones ? 'Partido guardado. Su sanción de no presentado está al día.' : 'Partido guardado.');
+        }, function () {});
+        return h;
       }
 
       /** T0297 · Las sanciones que les faltan a los anulados de la liga que se ve, de una vez (ligasSancionesFaltan). */
