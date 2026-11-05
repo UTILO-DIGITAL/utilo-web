@@ -14,7 +14,7 @@
   var CLAVE = 'kanban_' + (C.clave || 'negocio');
   // T0133: carpeta de este archivo (…/kanban/), para cargar los módulos de las secciones (economia.js…).
   var BASE = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/[^/]*$/, '') : '../kanban/'; })();
-  var VERSION_MODULOS = '47'; // T0207 · T0208 · T0149 · T0213 · T0218 · T0224 · T0225 · T0230 · T0231 · T0232 · T0233 · T0228 · T0234 · T0235 · T0238 · T0237 · T0240 · T0246 · T0241 (también el ?v= de las hojas del tablero)
+  var VERSION_MODULOS = '48'; // T0207 · T0208 · T0149 · T0213 · T0218 · T0224 · T0225 · T0230 · T0231 · T0232 · T0233 · T0228 · T0234 · T0235 · T0238 · T0237 · T0240 · T0246 · T0241 · T0399 (también el ?v= de las hojas del tablero)
   var VERSION_ICONO = '2'; // T0222: el ?v= de los iconos del index.html de cada negocio (sube con ellos)
   // T0150: diseño de PROTOCOLO DISEÑO UTILO. Solo para los negocios que tienen su marca.css (index.html con marca: '…').
   // Los demás (Konamigas hasta T0149) siguen exactamente como antes.
@@ -160,6 +160,7 @@
     // T0218: la Bandeja de Utilo es una sección, pero vive dentro de la página del tablero (la pinta el motor):
     // la barra solo le dice al tablero qué enseñar (window.SX_TABLERO, BANDEJA_WEB.js del motor).
     BANDEJA: { t: 'Bandeja', i: '📥', tablero: true },
+    ENTREGAS: { t: 'Entregas', i: '🎯', tablero: true }, // T0399: también dentro del tablero (ENTREGAS_WEB.js del motor)
     PERFIL: { t: 'Perfil', i: '👤' }
   };
 
@@ -174,6 +175,7 @@
     ECONOMIA: '<path d="M17 6.5A7 7 0 1 0 17 17.5"/><path d="M4 10.5h9M4 13.5h9"/>',
     LIGAS: '<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4"/><path d="M12 13v4M9 20h6"/>',
     BANDEJA: '<path d="M4 13l2.5-7.5A2 2 0 0 1 8.4 4h7.2a2 2 0 0 1 1.9 1.5L20 13"/><path d="M4 13v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5h-5l-1 2h-4l-1-2z"/>',
+    ENTREGAS: '<path d="M5 21V4"/><path d="M5 4h11l-2 3.5 2 3.5H5"/>', // T0399: una bandera
     PERFIL: '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"/>'
   };
   function icono(s) {

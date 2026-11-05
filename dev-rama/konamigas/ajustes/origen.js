@@ -52,7 +52,7 @@
       var A = ctx.ajustes, T = ctx.tablas;
       function caja(n) {
         var c = n.c;
-        return '<button type="button" class="aj-or-c" data-comp="' + texto(c.ID) + '"><strong>' + texto(c.NOMBRE) + '</strong><small>' + texto(c.TIPO || '') +
+        return '<button type="button" class="aj-or-c" data-comp="' + texto(c.ID) + '"><strong>' + texto(c.NOMBRE_COMERCIAL || c.NOMBRE) + '</strong><small>' + texto(c.TIPO || '') +
           (c.INCLUIDA === true ? ' · incluida' : '') + ' · ' + n.ligas + (n.ligas === 1 ? ' liga' : ' ligas') + '</small>' +
           (c.DESCRIPCION ? '<small class="aj-or-nota">' + texto(String(c.DESCRIPCION).slice(0, 90)) + '</small>' : '') + '</button>';
       }

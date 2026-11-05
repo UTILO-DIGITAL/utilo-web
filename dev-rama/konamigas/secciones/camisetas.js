@@ -248,7 +248,14 @@
   }
   // --- fin de las cuentas ---
 
-  var CALC = { stock: cam5Stock_, plan: cam5Plan_, lineas: cam5Lineas_, paso: cam5Paso_, local: cam5Local_, clave: cam5Clave_, orden: cam5Orden_,
+  /**
+   * T0367 · Las camisetas de Entregas que se ven con un filtro: las que encajan (vale) y las que se acaban de marcar desde la
+   * lista (quedan: { ID: true }), aunque ya no encajen. Así una fila no desaparece al cambiar su estado y la de debajo no
+   * sube bajo el dedo (en la demo, entregar con «Por entregar» hacía saltar la lista). Se van al cambiar de filtro.
+   */
+  function seVen(filas, vale, quedan) { return filas.filter(function (x) { return vale(x) || !!(quedan && quedan[x.c.ID]); }); }
+
+  var CALC = { seVen: seVen, stock: cam5Stock_, plan: cam5Plan_, lineas: cam5Lineas_, paso: cam5Paso_, local: cam5Local_, clave: cam5Clave_, orden: cam5Orden_,
     pack: cam5Pack_, leerPack: cam5LeerPack_, incluidas: cam5Incluidas_, catalogo: cam5Catalogo_, proveedores: cam5Proveedores_, tarifa: cam5Tarifa_ };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
@@ -278,13 +285,13 @@
     abrir: function (el, ctx) {
       var pref = leerLocal(ctx, 'pref') || {};
       S = { el: el, ctx: ctx, T: ctx.tablas, vista: pref.vista || 'entregas', modelo: pref.modelo || '', comp: pref.comp || '', temp: pref.temp || '',
-        filtro: 'pendientes', q: '', todo: {}, verStock: 'libres', N: leerLocal(ctx, 'nombres'), cargado: false, error: '' };
+        filtro: 'pendientes', q: '', todo: {}, quedan: {}, verStock: 'libres', N: leerLocal(ctx, 'nombres'), cargado: false, error: '' };
       el.innerHTML = '<nav class="u-pestanas cm-pest" role="tablist" aria-label="Camisetas">' + VISTAS.map(function (v) {
         return '<button type="button" role="tab" data-cm-vista="' + v[0] + '" aria-selected="' + (S.vista === v[0]) + '">' + v[1] + '</button>';
       }).join('') + '</nav><div id="cm-cuerpo" class="cm"></div>';
       el.querySelector('.cm-pest').onclick = function (e) {
         var b = e.target.closest('[data-cm-vista]'); if (!b) return;
-        S.vista = b.getAttribute('data-cm-vista');
+        S.vista = b.getAttribute('data-cm-vista'); S.quedan = {};
         [].forEach.call(el.querySelectorAll('[data-cm-vista]'), function (x) { x.setAttribute('aria-selected', x === b); });
         guardarPref(); window.scrollTo(0, 0); document.body.scrollTop = 0; pintar(true);
       };
@@ -428,10 +435,10 @@
         '<label class="u-campo"><span class="u-etiqueta">Juegan</span><select id="cm-dia">' + opciones(DIAS_JUEGAN.map(function (d) { return [d[0], d[1]()]; }), S.dia || '') + '</select></label>' +
         '<label class="u-campo"><span class="u-etiqueta">Buscar</span><input type="search" id="cm-q" placeholder="Equipo, jugadora, dorsal, color o talla" value="' + texto(S.q) + '" autocomplete="off"></label></div>' +
         '<div id="cm-chips" class="cm-chips" role="group" aria-label="Qué camisetas"></div><div id="cm-lista"></div>';
-      c.querySelector('#cm-comp').onchange = function () { S.comp = this.value; S.todo = {}; guardarPref(); pintar(false); };
-      c.querySelector('#cm-q').oninput = function () { S.q = this.value; pintar(false); };
-      c.querySelector('#cm-dia').onchange = function () { S.dia = this.value; S.todo = {}; pintar(false); };
-      c.querySelector('#cm-chips').onclick = function (e) { var b = e.target.closest('[data-cm-f]'); if (b) { S.filtro = b.getAttribute('data-cm-f'); S.todo = {}; pintar(false); } };
+      c.querySelector('#cm-comp').onchange = function () { S.comp = this.value; S.todo = {}; S.quedan = {}; guardarPref(); pintar(false); };
+      c.querySelector('#cm-q').oninput = function () { S.q = this.value; S.quedan = {}; pintar(false); };
+      c.querySelector('#cm-dia').onchange = function () { S.dia = this.value; S.todo = {}; S.quedan = {}; pintar(false); };
+      c.querySelector('#cm-chips').onclick = function (e) { var b = e.target.closest('[data-cm-f]'); if (b) { S.filtro = b.getAttribute('data-cm-f'); S.todo = {}; S.quedan = {}; pintar(false); } };
       c.querySelector('#cm-lista').onclick = clicLista;
     }
     // Las camisetas de la competición elegida, con quién las lleva y qué toca.
@@ -460,7 +467,8 @@
 
     var grupos = {}, orden = [];
     base.forEach(function (x) { var k = x.q.ie || '—'; if (!grupos[k]) { grupos[k] = []; orden.push(k); } grupos[k].push(x); });
-    var eqs = orden.filter(function (k) { return grupos[k].some(function (x) { return es(S.filtro)(x) && busca(x); }); });
+    var vale = function (x) { return es(S.filtro)(x) && busca(x); };
+    var eqs = orden.filter(function (k) { return seVen(grupos[k], vale, S.quedan).length; });
     var cuando = function (k) { var p = S.N.prox && S.N.prox[k]; return p ? p[0] + ' ' + (p[1] || '') : '9'; };
     eqs.sort(function (a, b) {
       // Con «Juegan», por la hora del partido: lo primero, lo que toca antes.
@@ -480,7 +488,7 @@
     h += '<div class="cm-eqs">' + eqs.map(function (k) {
       var todas = grupos[k].slice().sort(function (a, b) { return cam5Orden_(a.c, b.c) || (a.q.jugadora < b.q.jugadora ? -1 : 1); });
       var pk = packEquipo(todas);
-      var ver = S.todo[k] || S.filtro === 'todas' ? todas : todas.filter(function (x) { return es(S.filtro)(x) && busca(x); });
+      var ver = S.todo[k] || S.filtro === 'todas' ? todas : seVen(todas, vale, S.quedan);
       var aDar = todas.filter(function (x) { return !x.q.baja && x.s !== 'Sin camiseta'; }), ent = aDar.filter(function (x) { return x.s === 'Entregada'; }).length;
       var prep = todas.filter(function (x) { return x.s === 'Preparada'; });
       var x0 = todas[0].q;
@@ -552,7 +560,7 @@
       var c = S.T.fila('CAMISETAS', id); if (!c) return;
       var sig = siguiente(situacion(c, quien(c)));
       if (!sig) return;
-      if (sig[0] === 'ficha') ventanaCamiseta(c); else marcar(c, sig[0], true);
+      if (sig[0] === 'ficha') ventanaCamiseta(c); else { S.quedan[c.ID] = true; marcar(c, sig[0], true); }
     } else if ((id = b.getAttribute('data-cm-cam'))) {
       var f = S.T.fila('CAMISETAS', id); if (f) ventanaCamiseta(f);
     } else if ((id = b.getAttribute('data-cm-todo'))) {
@@ -671,6 +679,7 @@
         var c = S.T.fila('CAMISETAS', id);
         if (!c || c.ESTADO !== 'Preparada') return;
         hechos.push([id, { ESTADO: 'Entregada', FECHA_ENTREGA: f }, { ESTADO: c.ESTADO, FECHA_ENTREGA: c.FECHA_ENTREGA || '' }]);
+        S.quedan[id] = true; // T0367: siguen en la lista hasta cambiar de filtro
         S.T.actualizar('CAMISETAS', id, { ESTADO: 'Entregada', FECHA_ENTREGA: f }).catch(function () {});
       });
       if (hechos.length) avisoDeshacer(eq + ': ' + plural(hechos.length, 'camiseta entregada', 'camisetas entregadas') + '.', hechos);

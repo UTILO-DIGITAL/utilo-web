@@ -1,0 +1,365 @@
+/*
+ * Estilos de la maqueta de Konamigas · T0364 · maqueta.js
+ * Lo de konamigas.com y la sección «Futuro», con las variables de konamigas/marca.css y base.css. Solo las jornadas
+ * temáticas llevan colores escritos: los de cada fiesta, para su plantilla y sus avisos.
+ * Va aparte de base.css porque la maqueta no se publica: lo que pase a una sección de verdad se lleva a base.css.
+ */
+.u .mq { display: flex; flex-direction: column; gap: var(--e4); padding-bottom: var(--e6); }
+.u .mq-volver { margin: calc(var(--e2) * -1) 0 0; }
+.u .mq-volver .u-btn { padding-left: 0; }
+
+/* La franja «Maqueta»: siempre arriba de cada pantalla. */
+.u .mq-franja { display: flex; align-items: center; gap: var(--e3); padding: var(--e2) var(--e3); border-radius: var(--radio);
+  background: var(--color-principal); color: var(--color-sobre-principal); }
+.u .mq-franja p { margin: 0; font-size: 13px; line-height: 1.35; }
+.u .mq-sello { flex: none; padding: 2px var(--e2); border-radius: var(--radio-peq); background: var(--color-destacado); color: var(--color-principal-oscuro);
+  font: 700 12px/1.3 var(--fuente-texto); text-transform: uppercase; letter-spacing: .06em; }
+.u .mq-pintada { font-family: var(--fuente-destacar); font-weight: 400; color: var(--color-accion); }
+.u .mq-intro { margin: 0; max-width: 60em; }
+.u .mq-aviso { margin: 0 0 var(--e3); padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-bloque); font-size: 14px; }
+
+/* Portada: una tarjeta por cosa que viene. */
+.u .mq-tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--e3); }
+.u .mq-tarjeta { display: flex; flex-direction: column; gap: var(--e2); padding: var(--e4); border: 1.5px solid var(--color-linea); border-radius: var(--radio);
+  background: var(--color-tarjeta, var(--color-superficie)); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.u .mq-tarjeta:hover { border-color: var(--color-principal); }
+.u .mq-t-tit { font: var(--peso-titulos) 20px/1.2 var(--fuente-titulos); }
+.u .mq-t-quien { font: 700 12px/1.3 var(--fuente-texto); text-transform: uppercase; letter-spacing: .02em; color: var(--color-suave); }
+.u .mq-t-que { font-size: 14px; }
+.u .mq-t-ir { margin-top: auto; font-weight: 700; color: var(--color-principal-oscuro); }
+
+/* Quién se está viendo y el saludo. */
+.u .mq-quien { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e3);
+  padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-tarjeta-cab, var(--color-bloque)); }
+.u .mq-quien p { margin: 0; }
+.u .mq-hola h2 { font-size: 26px; }
+.u .mq-hola .mq-pintada { font-size: 30px; }
+.u .mq-hola .u-nota { margin: var(--e1) 0 0; }
+.u .mq-cuerpo { min-width: 0; }
+.u .mq-pest { margin-top: calc(var(--e2) * -1); }
+/* T0366: en konamigas.com (el móvil), las pestañas de Mi área en dos filas: «Mis datos» se veía solo deslizando. */
+.u .mqw-pagina .mq-pest { flex-wrap: wrap; overflow: visible; row-gap: 0; }
+.u .mq-botones { margin: var(--e3) 0; }
+.u .mq-fila-mia td { background: var(--color-tarjeta-cab, var(--color-bloque)); font-weight: 700; }
+.u .mq-ok { color: var(--color-bien); background: color-mix(in srgb, var(--color-bien) 12%, var(--color-superficie)); }
+
+/* Entrar con el correo y un código. */
+.u .mq-entrar { display: flex; flex-direction: column; gap: var(--e3); max-width: 420px; padding: var(--e5) var(--e4); margin: var(--e2) auto;
+  border: 1.5px solid var(--color-linea); border-radius: var(--radio); }
+.u .mq-entrar h2 { font-size: 22px; }
+.u .mq-entrar p { margin: 0; }
+.u .mq-codigo { letter-spacing: .4em; font-size: 22px; text-align: center; }
+
+/* Goles, datos y plantilla. */
+.u .mq-goles { list-style: none; margin: 0 0 var(--e3); padding: 0; border-top: 1px solid var(--color-linea); }
+.u .mq-goles li { display: flex; gap: var(--e3); align-items: center; padding: var(--e2) 0; border-bottom: 1px solid var(--color-linea); }
+.u .mq-goles li > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.u .mq-goles small { color: var(--color-suave); font-size: 12px; }
+.u .mq-gol-n { flex: none; min-width: 3.5em; }
+.u .mq-doc { margin: 0; min-height: 44px; display: flex; align-items: center; font-weight: 600; letter-spacing: .1em; }
+/* T0366: su camiseta (dorsal, talla y si se la han dado), en Mis datos. */
+.u .mq-camiseta { margin: 0; display: flex; align-items: baseline; gap: var(--e2); flex-wrap: wrap; }
+.u .mq-camiseta .u-cifra { font-size: 1.6em; }
+.u .mq-plantilla li { display: flex; gap: var(--e2); align-items: center; padding: var(--e2) 0; border-bottom: 1px solid var(--color-linea); }
+.u .mq-plantilla { list-style: none; padding: 0; margin: 0; border-top: 1px solid var(--color-linea); }
+
+/* Incidencias: lo de la capitana y cómo le llega al gestor. */
+.u .mq-incs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--e2); }
+.u .mq-inc { padding: var(--e3); border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); }
+.u .mq-inc-cab { display: flex; justify-content: space-between; gap: var(--e2); align-items: center; }
+.u .mq-inc small { color: var(--color-suave); font-size: 12px; }
+.u .mq-inc p { margin: var(--e1) 0 0; }
+.u .mq-inc .n-botones { margin-top: var(--e2); }
+.u .mq-resp { padding-left: var(--e3); border-left: 3px solid var(--color-principal); }
+.u .mq-gestor { margin-top: var(--e4); padding: var(--e4); border-radius: var(--radio); background: var(--color-tarjeta, var(--color-bloque)); }
+.u .mq-gestor .n-grupo { margin-top: 0; }
+
+/* Árbitro: actas por cerrar. */
+.u .mq-actas { list-style: none; margin: 0 0 var(--e3); padding: 0; }
+.u .mq-actas li { display: flex; flex-direction: column; gap: var(--e2); padding-bottom: var(--e3); border-bottom: 1px solid var(--color-linea); }
+.u .mq-actas li .u-btn { align-self: flex-start; }
+.u .mq-acta { display: grid; grid-template-columns: 1fr auto 1fr; gap: var(--e3); align-items: end; }
+.u .mq-acta input { width: 100%; text-align: center; font-size: 22px; }
+
+/* Web pública. */
+.u .mq-web-hero { display: flex; flex-direction: column; align-items: flex-start; gap: var(--e2); padding: var(--e5) var(--e4); border-radius: var(--radio);
+  background: var(--color-principal); color: var(--color-sobre-principal); }
+.u .mq-web-hero h2 { font-size: 26px; }
+.u .mq-web-hero .mq-pintada { color: var(--color-destacado); }
+.u .mq-web-hero p { margin: 0; }
+.u .mq-web-marca { font: var(--peso-titulos) 13px/1 var(--fuente-titulos); letter-spacing: .2em; text-transform: uppercase; color: var(--color-destacado); }
+.u .mq-elige { max-width: 460px; }
+.u .mq-elige select { width: 100%; }
+
+/* Fotos. */
+.u .mq-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: var(--e2); }
+.u .mq-foto { display: flex; flex-direction: column; gap: 2px; padding: 0 0 var(--e2); border: 2px solid transparent; border-radius: var(--radio);
+  background: var(--color-tarjeta, var(--color-bloque)); color: inherit; font: inherit; text-align: left; cursor: pointer; overflow: hidden; }
+.u .mq-foto-sel { border-color: var(--color-accion); }
+.u .mq-foto-img { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 1; width: 100%;
+  background: var(--color-tarjeta-cab, var(--color-bloque)) center / cover no-repeat; }
+.u .mq-foto-ini { font: var(--peso-titulos) 34px/1 var(--fuente-titulos); color: var(--color-suave); }
+.u .mq-foto-cargada .mq-foto-ini { display: none; }
+.u .mq-foto-pie { padding: 0 var(--e2); font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.u .mq-foto-ok, .u .mq-foto-no { padding: 0 var(--e2); font-size: 11px; }
+.u .mq-foto-ok { color: var(--color-bien); }
+.u .mq-foto-no { color: var(--color-suave); }
+
+/* Calendario de publicaciones. */
+.u .mq-mes { display: flex; align-items: center; gap: var(--e3); }
+.u .mq-mes b { min-width: 9em; text-align: center; text-transform: capitalize; }
+.u .mq-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; max-width: 640px; margin: var(--e2) 0; }
+.u .mq-cal > span:nth-child(-n+7) { font: 700 12px/2 var(--fuente-texto); text-align: center; color: var(--color-suave); }
+.u .mq-cal-d { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 2px; min-height: 52px; padding: 4px; border-radius: var(--radio-peq); background: var(--color-tarjeta, var(--color-bloque)); }
+.u .mq-cal-d b { width: 100%; font-size: 12px; }
+.u .mq-cal-hoy { outline: 2px solid var(--color-principal); }
+.u .mq-cal-p { display: inline-block; width: 10px; height: 10px; border-radius: var(--radio-peq); vertical-align: middle; }
+.u .mq-tipo-previa { background: var(--estado-ec); }
+.u .mq-tipo-resultados { background: var(--color-accion); }
+.u .mq-tipo-fotos { background: var(--estado-pr); }
+.u .mq-tipo-jugadora { background: var(--color-principal); }
+.u .mq-leyenda i { margin: 0 2px 0 var(--e2); }
+.u .mq-leyenda i:first-child { margin-left: 0; }
+.u .mq-posts { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-linea); }
+.u .mq-posts li { display: flex; align-items: center; gap: var(--e3); padding: var(--e2) 0; border-bottom: 1px solid var(--color-linea); }
+.u .mq-post-f { flex: none; width: 4em; font-weight: 700; }
+.u .mq-post-t { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
+.u .mq-post-t small { color: var(--color-suave); font-size: 12px; overflow-wrap: anywhere; }
+@media (max-width: 639px) { .u .mq-posts li { flex-wrap: wrap; } .u .mq-posts .u-btn { margin-left: calc(4em + var(--e3)); } }
+
+/* Crear una publicación: las opciones y, al lado, cómo queda la imagen con la marca. */
+.u .mq-crear { display: grid; grid-template-columns: 1fr; gap: var(--e5); }
+@media (min-width: 900px) { .u .mq-crear { grid-template-columns: minmax(0, 1fr) minmax(0, 420px); } }
+.u .mq-crear-op { display: flex; flex-direction: column; gap: var(--e3); }
+.u .mq-crear-op textarea { width: 100%; }
+.u .mq-crear-vista { display: flex; justify-content: center; }
+.u .mq-post { display: flex; flex-direction: column; gap: var(--e2); width: 100%; max-width: 420px; padding: var(--e5); overflow: hidden;
+  border-radius: var(--radio); background: var(--color-principal); color: var(--color-sobre-principal); box-shadow: var(--sombra-flota); }
+.u .mq-post-cuadrado { aspect-ratio: 1; }
+.u .mq-post-vertical { aspect-ratio: 9 / 16; max-width: 300px; justify-content: center; }
+.u .mq-post-marca { margin: 0; font: var(--peso-titulos) 12px/1 var(--fuente-titulos); letter-spacing: .3em; color: var(--color-destacado); }
+.u .mq-post-grande { margin: 0; font: 400 44px/1 var(--fuente-destacar); color: var(--color-accion); }
+.u .mq-post-peq { margin: 0; font-size: 13px; font-weight: 600; }
+.u .mq-post-nombre { margin: var(--e4) 0 0; font: var(--peso-titulos) 34px/1.1 var(--fuente-titulos); color: var(--color-destacado); }
+.u .mq-post-lista { list-style: none; margin: var(--e2) 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.u .mq-post-lista li { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: var(--e2); align-items: center; font-size: 12px; font-weight: 600; }
+.u .mq-post-lista li span:first-child { text-align: right; }
+.u .mq-post-lista b { padding: 2px 6px; border-radius: var(--radio-peq); background: var(--color-destacado); color: var(--color-principal-oscuro); font-size: 13px; white-space: nowrap; }
+.u .mq-post-fotos { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; flex: 1 1 auto; }
+.u .mq-post-fotos .mq-foto-img { aspect-ratio: auto; height: 100%; min-height: 60px; border-radius: var(--radio-peq); }
+
+/* Automático: cada regla, con su explicación debajo. */
+.u .mq-regla { align-items: flex-start; padding: var(--e2) 0; }
+.u .mq-regla input { margin-top: 4px; }
+.u .mq-regla span { display: flex; flex-direction: column; }
+.u .mq-regla small { color: var(--color-suave); font-size: 13px; }
+
+/* En el móvil, en la crear publicación, la imagen va arriba (es lo que se viene a ver). */
+@media (max-width: 899px) { .u .mq-crear-vista { order: -1; } }
+/* La maqueta tiene una sección más que la web de verdad: en el móvil, la barra de abajo con la letra algo más pequeña
+   para que quepan las ocho. */
+@media (max-width: 479px) {
+  .sx.u-sx a { min-width: 0; padding: var(--e1) 0; font-size: 10px; letter-spacing: -.01em; }
+  .sx.u-sx a > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* ---------- konamigas.com (index.html con web.js): la web de todas, sin el marco del núcleo ---------- */
+.u .mqw-pagina { min-height: 100vh; background: var(--color-fondo); }
+/* La cabecera, de lado a lado; lo demás, centrado y hasta 1200 px, con su margen a los lados. */
+.u .mqw { gap: var(--e4); }
+.u .mqw > :not(.mqw-cab) { width: 100%; max-width: 1232px; margin-inline: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.u .mqw > .mq-franja, .u .mqw > .mq-web-hero, .u .mqw > .mqw-invita, .u .mqw > .mqw-yo, .u .mqw > .mq-quien { width: calc(100% - 2 * max(16px, env(safe-area-inset-left, 0px))); max-width: 1200px; }
+.u .mqw > .mq-web-hero, .u .mqw > .mqw-invita, .u .mqw > .mqw-yo { padding: var(--e5) var(--e4); }
+.u .mqw > .mq-franja, .u .mqw > .mq-quien { padding: var(--e2) var(--e3); }
+.u .mqw-cab { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2) var(--e4);
+  padding: var(--e2) max(16px, env(safe-area-inset-right, 0px)) var(--e2) max(16px, env(safe-area-inset-left, 0px));
+  background: var(--color-principal); color: var(--color-sobre-principal); }
+@media (min-width: 900px) {
+  .u .mqw-cab { padding-left: max(32px, calc((100% - 1200px) / 2)); padding-right: max(32px, calc((100% - 1200px) / 2)); }
+  .u .mq-web-hero h2 { font-size: 40px; }
+  .u .mqw-tit { font-size: 26px; }
+}
+.u .mqw-marca { display: flex; align-items: center; gap: var(--e2); padding: 0; border: 0; background: none; color: inherit; cursor: pointer;
+  font: var(--peso-titulos) 18px/1 var(--fuente-titulos); letter-spacing: .12em; }
+.u .mqw-marca img { border-radius: var(--radio-peq); }
+.u .mqw-nav { display: flex; flex-wrap: wrap; gap: var(--e1); }
+.u .mqw-nav a, .u .mqw-nav button { display: inline-flex; align-items: center; min-height: 40px; padding: 0 var(--e3); border: 0; border-radius: var(--radio);
+  background: none; color: inherit; font: 600 14px/1 var(--fuente-texto); text-decoration: none; cursor: pointer; }
+.u .mqw-nav [aria-current=page] { background: var(--color-destacado); color: var(--color-principal-oscuro); }
+@media (max-width: 560px) {
+  .u .mqw-cab { justify-content: center; }
+  .u .mqw-nav { width: 100%; justify-content: space-between; }
+  .u .mqw-nav a, .u .mqw-nav button { padding: 0 var(--e2); font-size: 13px; }
+}
+.u .mqw-tit { margin: var(--e3) 0 0; font-size: 22px; }
+.u .mqw-botones { display: flex; flex-wrap: wrap; gap: var(--e2); margin-top: var(--e2); }
+.u .mqw-btn-claro { background: transparent; color: var(--color-sobre-principal); border-color: var(--color-sobre-principal); }
+.u .mqw-invita, .u .mqw-yo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e3); padding: var(--e4);
+  border-radius: var(--radio); background: var(--color-bloque); }
+.u .mqw-yo { background: var(--color-tarjeta-cab, var(--color-bloque)); }
+.u .mqw-invita > div, .u .mqw-yo > div { flex: 1 1 280px; min-width: 0; }
+.u .mqw-invita h3, .u .mqw-yo h3 { margin: 0 0 var(--e1); font-size: 18px; }
+.u .mqw-invita p { margin: 0; }
+.u .mqw-comps { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--e3); }
+.u .mqw-comp { display: flex; flex-direction: column; gap: var(--e2); padding: var(--e4); border: 1.5px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); }
+.u .mqw-comp h3 { margin: 0; font-size: 17px; }
+.u .mqw-comp p { margin: 0; }
+.u .mqw-comp .u-btn { margin-top: auto; align-self: flex-start; }
+.u .mqw-precio { font: var(--peso-titulos) 22px/1 var(--fuente-titulos); }
+.u .mqw-precio small { font: 500 13px/1 var(--fuente-texto); }
+.u .mqw-ins-mas { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--e3); }
+.u .mqw-ins-op { display: flex; flex-direction: column; gap: 2px; padding: var(--e3) var(--e4); border-radius: var(--radio); background: var(--color-tarjeta, var(--color-bloque));
+  color: inherit; text-decoration: none; }
+.u .mqw-ins-op span { color: var(--color-principal-oscuro); font-size: 14px; font-weight: 600; }
+.u .mqw-ligas { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--e3); }
+.u .mqw-liga { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: var(--e3) var(--e4); border: 1.5px solid var(--color-linea); border-radius: var(--radio);
+  background: var(--color-superficie); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.u .mqw-liga:hover { border-color: var(--color-principal); }
+.u .mqw-liga-mia { border-color: var(--color-principal); border-width: 2px; }
+.u .mqw-liga small { color: var(--color-suave); }
+.u .mqw-liga span { font-size: 13px; }
+.u .mqw-entrar { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--e4); align-items: start; }
+.u .mqw-entrar .mq-entrar { margin: 0; max-width: none; }
+.u .mqw-entrar .u-btn { align-self: flex-start; }
+.u .mqw-como { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e1) var(--e2); padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-bloque); }
+.u .mqw-como p { flex: 1 1 160px; margin: 0; font-size: 14px; }
+.u .mqw-pie { margin-top: var(--e5); padding-top: var(--e3); border-top: 1px solid var(--color-linea); font-size: 13px; color: var(--color-suave); text-align: center; }
+.u .lg-ranking .mq-fila-mia { background: var(--color-tarjeta-cab, var(--color-bloque)); }
+.u .mqw-aviso { position: fixed; left: 50%; bottom: calc(var(--e4) + env(safe-area-inset-bottom, 0px)); z-index: 20; max-width: calc(100% - 32px); padding: var(--e2) var(--e4);
+  border-radius: var(--radio); background: var(--color-principal); color: var(--color-sobre-principal); font-size: 14px; box-shadow: var(--sombra-flota);
+  transform: translate(-50%, 200%); transition: transform .2s; }
+.u .mqw-aviso.abierto { transform: translate(-50%, 0); }
+
+/* ---------- Avisos a las jugadoras (konamigas.com) ---------- */
+.u .mqw-avisos { display: flex; flex-direction: column; gap: var(--e2); }
+.u .mqw-av { display: flex; flex-direction: column; gap: 2px; padding: var(--e3) var(--e4); border-radius: var(--radio); border-left: 6px solid var(--mq-tema-acento, var(--color-accion));
+  background: var(--mq-tema-suave, var(--color-bloque)); }
+.u .mqw-av b { font: var(--peso-titulos) 17px/1.25 var(--fuente-titulos); }
+.u .mqw-av p { margin: 0; }
+.u .mqw-av small { color: var(--color-suave); }
+
+/* ---------- Jornadas temáticas (Redes sociales) ----------
+   Cada ocasión tiene sus colores, solo para su plantilla y sus avisos (no son de la marca: son de la fiesta). */
+.u .mq-tema-halloween { --mq-tema-fondo: #1A0B2E; --mq-tema-acento: #FF7A00; --mq-tema-texto: #FFE7CC; --mq-tema-suave: #FFF1E3; }
+.u .mq-tema-navidad { --mq-tema-fondo: #0F3D2E; --mq-tema-acento: #E63946; --mq-tema-texto: #FFFFFF; --mq-tema-suave: #FDECEC; }
+.u .mq-tema-carnaval { --mq-tema-fondo: #3A0CA3; --mq-tema-acento: #F72585; --mq-tema-texto: #FFF3B0; --mq-tema-suave: #F4E9FF; }
+.u .mq-tema-santjordi { --mq-tema-fondo: #7A0019; --mq-tema-acento: #FFD23F; --mq-tema-texto: #FFFFFF; --mq-tema-suave: #FFF0F0; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .u .mq-tema-halloween, :root:not([data-theme="light"]) .u .mq-tema-navidad,
+  :root:not([data-theme="light"]) .u .mq-tema-carnaval, :root:not([data-theme="light"]) .u .mq-tema-santjordi { --mq-tema-suave: var(--color-bloque); }
+}
+.u .mq-temas { display: flex; flex-direction: column; gap: var(--e4); }
+.u .mq-tema { border: 1.5px solid var(--color-linea); border-top: 6px solid var(--mq-tema-acento, var(--color-principal)); border-radius: var(--radio); background: var(--color-superficie); overflow: hidden; }
+.u .mq-tema-cab { display: flex; align-items: center; gap: var(--e3); padding: var(--e3) var(--e4); background: var(--mq-tema-suave, var(--color-bloque)); }
+.u .mq-tema-cab > div { flex: 1 1 auto; min-width: 0; }
+.u .mq-tema-cab h3 { margin: 0; font-size: 20px; }
+.u .mq-tema-cab p { margin: 0; font-size: 13px; }
+.u .mq-tema-emoji { font-size: 34px; line-height: 1; }
+.u .mq-tema-partes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--e4); padding: var(--e4); }
+.u .mq-tema-partes section { display: flex; flex-direction: column; gap: var(--e2); min-width: 0; }
+.u .mq-tema-partes h4 { margin: 0; font: var(--peso-titulos) 14px/1.2 var(--fuente-titulos); text-transform: uppercase; letter-spacing: .04em; }
+.u .mq-tema-partes p { margin: 0; }
+.u .mq-tema-tareas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--e2); }
+.u .mq-tema-tareas li { display: flex; gap: var(--e2); font-size: 14px; }
+.u .mq-tema-tareas li > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.u .mq-tema-tareas small { color: var(--color-suave); font-size: 12px; }
+.u .mq-post-mini { max-width: 220px; aspect-ratio: 1; padding: var(--e4); }
+.u .mq-post-mini .mq-post-grande { font-size: 30px; }
+.u .mq-cal-tema { box-shadow: inset 0 -4px 0 var(--mq-tema-acento); }
+.u .mq-avisos { list-style: none; margin: 0 0 var(--e4); padding: 0; display: flex; flex-direction: column; gap: var(--e3); }
+.u .mq-av-ed { padding: var(--e3); border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); }
+.u .mq-av-ed textarea { width: 100%; }
+/* La plantilla de la ocasión: sus colores y su emoji encima de la imagen de la marca. */
+.u .mq-post[class*="mq-post-tema-"] { background: var(--mq-tema-fondo); color: var(--mq-tema-texto); }
+.u .mq-post[class*="mq-post-tema-"] .mq-post-grande { color: var(--mq-tema-acento); }
+.u .mq-post[class*="mq-post-tema-"] .mq-post-marca { color: var(--mq-tema-texto); }
+.u .mq-post[class*="mq-post-tema-"] .mq-post-lista b { background: var(--mq-tema-acento); color: var(--mq-tema-fondo); }
+.u .mq-post-deco { margin: 0; font-size: 26px; letter-spacing: .2em; }
+.u .mq-post-tema-halloween { --mq-tema-fondo: #1A0B2E; --mq-tema-acento: #FF7A00; --mq-tema-texto: #FFE7CC; }
+.u .mq-post-tema-navidad { --mq-tema-fondo: #0F3D2E; --mq-tema-acento: #E63946; --mq-tema-texto: #FFFFFF; }
+.u .mq-post-tema-carnaval { --mq-tema-fondo: #3A0CA3; --mq-tema-acento: #F72585; --mq-tema-texto: #FFF3B0; }
+.u .mq-post-tema-santjordi { --mq-tema-fondo: #7A0019; --mq-tema-acento: #FFD23F; --mq-tema-texto: #FFFFFF; }
+.u .mq-post[class*="mq-post-tema-p"] { --mq-tema-fondo: var(--color-principal); --mq-tema-acento: var(--color-accion); --mq-tema-texto: var(--color-sobre-principal); }
+
+/* ---------- Competiciones (konamigas.com): la sección Ligas, con la invitación encima ---------- */
+.u .mqw > .mqw-anima { width: calc(100% - 2 * max(16px, env(safe-area-inset-left, 0px))); max-width: 1200px; padding: 0; }
+.u .mqw-anima { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--e3); }
+.u .mqw-anima > div { display: flex; flex-direction: column; align-items: flex-start; gap: var(--e1); padding: var(--e3) var(--e4); border-radius: var(--radio); background: var(--color-bloque); }
+.u .mqw-anima > div + div { background: var(--color-tarjeta, var(--color-bloque)); }
+.u .mqw-anima b { font: var(--peso-titulos) 17px/1.25 var(--fuente-titulos); }
+.u .mqw-anima p { margin: 0 0 var(--e1); }
+.u .mqw-tu .n-botones { margin: 0; }
+.u .mqw-recl { margin: var(--e3) 0 0; }
+
+/* ---------- Novedades de la jugadora y la inscripción recién hecha (konamigas.com) ---------- */
+.u .mqw-punto { display: inline-block; width: 8px; height: 8px; margin-left: 4px; border-radius: 50%; background: var(--color-accion); vertical-align: top; }
+.u .mqw-novs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--e2); }
+.u .mqw-novs li { padding: var(--e3); border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); }
+.u .mqw-novs li.mqw-nov-nueva { border-left: 5px solid var(--color-accion); background: var(--color-bloque); }
+.u .mqw-novs b { font: var(--peso-titulos) 15px/1.3 var(--fuente-titulos); }
+.u .mqw-novs p { margin: 2px 0; }
+.u .mqw-novs small { color: var(--color-suave); }
+.u .mqw > .mqw-nov-aviso { width: calc(100% - 2 * max(16px, env(safe-area-inset-left, 0px))); max-width: 1200px; padding: var(--e3) var(--e4); }
+.u .mqw-nov-aviso { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; border: 0; border-left: 5px solid var(--color-accion); border-radius: var(--radio);
+  background: var(--color-bloque); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.u .mqw-nov-aviso b { font: var(--peso-titulos) 16px/1.3 var(--fuente-titulos); }
+.u .mqw-nov-aviso em { font-style: normal; font-weight: 700; color: var(--color-principal-oscuro); }
+.u .mqw-solicitada { display: flex; flex-direction: column; align-items: flex-start; gap: var(--e2); padding: var(--e3) var(--e4); border-radius: var(--radio); border: 1.5px dashed var(--color-principal); }
+.u .mqw-solicitada p { margin: 0; }
+/* T0366: con la señal pagada, la plaza confirmada (borde seguido, en verde). */
+.u .mqw-confirmada { border-style: solid; border-color: var(--color-bien); }
+.u .mqw > .mqw-solicitada { width: calc(100% - 2 * max(16px, env(safe-area-inset-left, 0px))); max-width: 1200px; padding: var(--e3) var(--e4); }
+
+/* ---------- Mi área: cada partido se toca y abre su ficha ---------- */
+.u .mq-clic { cursor: pointer; }
+.u .mq-clic:hover, .u .mq-clic:focus-visible { background: var(--color-tarjeta, var(--color-bloque)); outline: none; }
+.u .mq-ficha-m { display: flex; align-items: center; gap: var(--e3); margin: var(--e2) 0; }
+.u .mq-ficha-m b { font: var(--peso-titulos) 34px/1 var(--fuente-titulos); }
+.u .mq-ficha-d { display: grid; grid-template-columns: auto 1fr; gap: 4px var(--e3); margin: 0 0 var(--e3); }
+.u .mq-ficha-d dt { font: 700 12px/1.6 var(--fuente-texto); text-transform: uppercase; letter-spacing: .03em; }
+.u .mq-ficha-d dd { margin: 0; }
+
+/* ---------- Árbitro: el acta en el campo (para el móvil: botones grandes) ---------- */
+.u .mq-arb-lista { display: flex; flex-direction: column; gap: var(--e2); }
+.u .mq-arb-p { display: flex; align-items: center; gap: var(--e3); width: 100%; min-height: 64px; padding: var(--e2) var(--e3); border: 1.5px solid var(--color-linea); border-radius: var(--radio);
+  background: var(--color-superficie); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.u .mq-arb-p:hover { border-color: var(--color-principal); }
+.u .mq-arb-h { display: flex; flex-direction: column; min-width: 3.5em; }
+.u .mq-arb-h b { font: var(--peso-titulos) 18px/1 var(--fuente-titulos); }
+.u .mq-arb-h small, .u .mq-arb-e small { color: var(--color-suave); font-size: 12px; }
+.u .mq-arb-e { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.u .mq-arb-cab { position: sticky; top: 0; z-index: 2; padding: var(--e2) 0; background: var(--color-fondo); }
+.u .mq-arb-marcador { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--e3); padding: var(--e3); border-radius: var(--radio);
+  background: var(--color-principal); color: var(--color-sobre-principal); }
+.u .mq-arb-marcador span { font: var(--peso-titulos) 15px/1.2 var(--fuente-titulos); }
+.u .mq-arb-marcador span:first-child { text-align: right; }
+.u .mq-arb-marcador b { font: var(--peso-titulos) 40px/1 var(--fuente-titulos); color: var(--color-destacado); }
+.u .mq-arb-marcador i { font-style: normal; padding: 0 6px; }
+.u .mq-arb-eqs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--e4); margin-top: var(--e3); }
+.u .mq-arb-eq h3 { margin: 0; font-size: 17px; }
+.u .mq-arb-eq ul { list-style: none; margin: var(--e2) 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.u .mq-arb-eq li { display: flex; gap: 6px; }
+.u .mq-arb-j { display: flex; align-items: center; gap: var(--e2); flex: 1 1 auto; min-height: 48px; padding: 6px var(--e3); border: 1.5px solid var(--color-linea); border-radius: var(--radio);
+  background: var(--color-superficie); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.u .mq-arb-j:active { transform: scale(.98); }
+.u .mq-arb-marco { border-color: var(--color-accion); background: var(--color-bloque); }
+.u .mq-arb-d { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: var(--color-tarjeta-cab, var(--color-bloque)); font: 700 13px/1 var(--fuente-texto); flex: none; }
+.u .mq-arb-n { margin-left: auto; }
+.u .mq-arb-propia { border-style: dashed; }
+.u .mq-arb-pie { position: sticky; bottom: 0; z-index: 2; padding: var(--e2) 0; background: var(--color-fondo); }
+.u .mq-arb-pie .u-btn { flex: 1 1 auto; }
+.u .mq-arb-mas { display: flex; flex-wrap: wrap; gap: 0 var(--e3); margin: 0; }
+.u .mq-arb-mas .u-btn { padding-left: 0; padding-right: 0; font-size: 13px; }
+
+/* ---------- En directo: el árbitro lleva el acta desde el móvil ---------- */
+.u .mq-vivo { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: var(--radio-peq); background: var(--color-accion); color: var(--color-sobre-accion); font: 700 12px/1.4 var(--fuente-texto); }
+.u .mq-vivo::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: mq-late 1.2s infinite; }
+@keyframes mq-late { 50% { opacity: .2; } }
+.u .mq-arb-vivo { display: flex; align-items: center; gap: var(--e2); margin: var(--e2) 0 0; font-size: 13px; }
+.u .mqw-directo { display: flex; flex-direction: column; gap: var(--e2); }
+.u .mqw > .mqw-directo { width: calc(100% - 2 * max(16px, env(safe-area-inset-left, 0px))); max-width: 1200px; padding: 0; }
+.u .mqw-directo article { display: flex; flex-direction: column; gap: 4px; padding: var(--e3) var(--e4); border-radius: var(--radio); border: 2px solid var(--color-accion); background: var(--color-superficie); }
+.u .mqw-dir-m { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--e3); }
+.u .mqw-dir-m b:first-child { text-align: right; }
+.u .mqw-dir-m .u-cifra { font: var(--peso-titulos) 28px/1 var(--fuente-titulos); }
+.u .mqw-directo small { color: var(--color-suave); }
