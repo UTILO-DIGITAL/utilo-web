@@ -306,6 +306,48 @@ body.ver-bandeja .bj-tabs .hora { display: none; }
   .u .bj-lista > .bj-msg { grid-column: 1 / -1; }
 }
 
+/* ===================== Entregas (ENTREGAS_WEB, T0399; hasta el kanban sobre Supabase, T0386) ===================== */
+.u .en { display: none; padding: var(--e3) var(--e4) 96px; }
+body.ver-entregas .en { display: block; }
+body.ver-entregas .filtros, body.ver-entregas #tablero, body.ver-entregas .bj { display: none; }
+.u .en-fil { display: flex; flex-wrap: wrap; gap: var(--e3) var(--e4); align-items: flex-end; margin-bottom: var(--e4); }
+.u .en-fil label { display: flex; flex-direction: column; gap: var(--e1); font: 700 12px/1.3 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; }
+.u .en-fil .act { margin-left: auto; }
+.u .en-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--e4); align-items: start; }
+.u .en-msg { color: var(--color-suave); padding: var(--e4) 0; }
+.u .en-c { background: var(--color-superficie); border: 1px solid var(--color-linea); border-top: 4px solid var(--color-principal); border-radius: var(--radio); padding: var(--e3) var(--e4); min-width: 0; }
+.u .en-c.en-aplazada { border-top-color: var(--color-borde-campo); }
+.u .en-c.en-entregada { border-top-color: var(--estado-co); }
+.u .en-top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); }
+.u .en-corto { padding: 0 var(--e2); border-radius: var(--radio-peq); background: var(--color-principal-oscuro); color: var(--color-superficie); font: 700 13px/1.7 var(--fuente-texto); }
+.u .en-est { padding: 0 var(--e2); border-radius: var(--radio-peq); background: var(--color-bloque); color: var(--color-texto); font: 700 12px/1.7 var(--fuente-texto); }
+.u .en-cli { margin-left: auto; font-size: 13px; color: var(--color-suave); }
+.u .en-t { margin: var(--e2) 0 var(--e3); font: 600 19px/1.3 var(--fuente-titulos); color: var(--color-texto); }
+.u .en-pct { display: flex; align-items: baseline; gap: var(--e1); font-size: 14px; color: var(--color-suave); }
+.u .en-pct b { color: var(--color-texto); font-size: 16px; }
+.u .en-num { margin-left: auto; font: 700 22px/1 var(--fuente-titulos); color: var(--color-principal-oscuro); font-variant-numeric: tabular-nums; }
+.u .en-barra { display: flex; gap: 2px; height: 12px; margin: var(--e2) 0; overflow: hidden; border-radius: var(--radio-peq); background: var(--color-linea); }
+.u .en-barra span { flex: 1 1 0; min-width: 4px; background: var(--estado); }
+.u .en-ley { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e3); margin: 0 0 var(--e2); padding: 0; list-style: none; font-size: 13px; color: var(--color-suave); }
+.u .en-ley li { display: inline-flex; align-items: center; gap: var(--e1); }
+.u .en-ley li::before { content: ''; width: 10px; height: 10px; border-radius: var(--radio-peq); background: var(--estado); }
+.u .en-fecha { margin: var(--e2) 0; padding-left: var(--e2); border-left: 3px solid var(--color-linea); font-size: 14px; }
+.u .en-fecha.pronto { border-left-color: var(--estado-pr); font-weight: 700; }
+.u .en-fecha.vencida { border-left-color: var(--estado-bl); color: var(--estado-bl); font-weight: 700; }
+.u .en-inc { margin: var(--e2) 0 0; font-size: 14px; color: var(--color-suave); white-space: pre-line; }
+.u .en-tareas { margin-top: var(--e3); border-top: 1px solid var(--color-linea); padding-top: var(--e2); }
+.u .en-tareas summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; font-weight: 700; color: var(--color-principal-oscuro); }
+.u .en-tareas h4 { display: flex; align-items: center; gap: var(--e1); margin: var(--e3) 0 var(--e1); font: 700 13px/1.4 var(--fuente-texto); color: var(--color-texto); }
+.u .en-tareas h4::before { content: ''; width: 10px; height: 10px; border-radius: var(--radio-peq); background: var(--estado); }
+.u .en-tareas ul { margin: 0; padding: 0; list-style: none; }
+.u .en-tareas li { padding: var(--e1) 0; border-bottom: 1px solid var(--color-linea); }
+.u .en-tareas li:last-child { border-bottom: 0; }
+.u .en-tareas a { color: var(--color-texto); text-decoration: none; font-size: 14px; }
+.u .en-tareas a:hover { text-decoration: underline; }
+.u .en-tareas a .id { font: 600 13px var(--fuente-titulos); color: var(--color-principal-oscuro); }
+.u .en-quien { display: block; font-size: 12px; color: var(--color-suave); }
+@media (max-width: 640px) { .u .en { padding: var(--e3) var(--e3) 96px; } .u .en-lista { grid-template-columns: 1fr; } }
+
 /* ===================== Pedir algo a Utilo (SOLICITUDES_WEB, kanban del cliente) ===================== */
 .u .sol-velo { position: fixed; inset: var(--tope, 0px) 0 0; z-index: 60; background: var(--color-velo); display: none; align-items: flex-start;
   justify-content: center; padding: 5vh var(--e3); overflow: auto; }
