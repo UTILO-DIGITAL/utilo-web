@@ -608,8 +608,9 @@
           '<p class="u-nota">Árbitros y gestores no tienen Economía: sus cobros y su nivel salen de una copia que se hace sola al apuntar un pago a staff en Economía y cada noche. Si has cambiado algo a mano en el Excel ECONOMIA, cópialos ahora.</p>' +
           '<p class="u-nota">' + texto(x.ultima) + '</p>' +
           (x.nocheMal ? '<p class="u-error">' + texto(x.nocheMal) + '</p>' : '') + (x.error ? '<p class="u-error">' + texto(x.error) + '</p>' : '') +
-          (x.avisos.length ? '<details><summary class="u-nota">' + (x.avisos.length + x.mas === 1 ? '1 pago parece de staff, pero no es de nadie de STAFF: no se copia' :
-            (x.avisos.length + x.mas) + ' pagos parecen de staff, pero no son de nadie de STAFF: no se copian') + '</summary><ul class="u-nota">' +
+          // T0374: no solo pagos de alguien que no está en STAFF: también movimientos sin ID. Cada aviso dice por qué.
+          (x.avisos.length ? '<details><summary class="u-nota">' + (x.avisos.length + x.mas === 1 ? '1 movimiento no se copia' :
+            (x.avisos.length + x.mas) + ' movimientos no se copian') + '</summary><ul class="u-nota">' +
             x.avisos.map(function (a) { return '<li>' + texto(a) + '</li>'; }).join('') + (x.mas ? '<li>y ' + x.mas + ' más</li>' : '') + '</ul></details>' : '') +
           '<p><button type="button" class="u-btn" data-accion="copiar"' + (copiando ? ' disabled' : '') + '>' + (copiando ? 'Copiando…' : 'Actualizar pagos del staff') + '</button></p>';
       }
