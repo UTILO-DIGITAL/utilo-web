@@ -309,3 +309,17 @@ body:has(.ins-barra.siempre:not([hidden])) .ins-pie { padding-bottom: 96px; }
 .ins-legal p { margin: 0 0 10px; }
 
 @media (prefers-reduced-motion: reduce) { .ins-punto { animation: none; } }
+
+/* T0343 · La capitana elige el color de su equipo (?f=color). */
+.ins-color-eq { font-weight: 700; }
+.ins-color-mio { display: flex; align-items: center; gap: 12px; width: auto; max-width: none; margin: 8px 0; text-align: left; position: static; }
+.ins-color-mio svg { width: 72px; flex: 0 0 72px; }
+.ins-colores { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin: 12px 0; }
+.ins-color { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 8px; border: 2px solid var(--color-linea, #D5DAE6); border-radius: var(--radio); background: var(--color-superficie, #fff); color: inherit; font: inherit; cursor: pointer; }
+.ins-color:hover:not(:disabled) { border-color: var(--color-texto, #020252); }
+.ins-color:focus-visible { outline: 3px solid var(--color-accion); outline-offset: 2px; }
+.ins-color:disabled { cursor: default; opacity: .45; }
+.ins-color.mio { opacity: 1; border: 3px solid var(--color-accion); background: color-mix(in srgb, var(--color-accion) 10%, #fff); }
+.ins-color-cam { width: 72px; }
+.ins-color-cam svg { width: 100%; height: auto; display: block; }
+.ins-color small { font-size: 12px; }

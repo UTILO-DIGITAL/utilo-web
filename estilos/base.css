@@ -697,7 +697,8 @@ body.aj-cu-arrastrando { cursor: grabbing; user-select: none; -webkit-user-selec
 /* T0294 · Ajustes › Preparar la temporada (konamigas/ajustes/temporada.js): un asistente, una pantalla por paso. */
 .u .aj-recien { margin: 0 0 var(--e3); padding: var(--e2) var(--e3); border-radius: var(--radio-peq); background: color-mix(in srgb, var(--color-bien) 12%, var(--color-superficie)); font-weight: 700; font-size: 14px; }
 .u .aj-inicio { margin: var(--e3) 0 var(--e5); }
-.u .aj-as { max-width: 860px; }
+.u .aj-as { max-width: none; } /* T0343 (Javi): todo el ancho; los textos largos, a una medida que se lee */
+.u .aj-as-pant > .u-nota, .u .aj-as-pant > .aj-as-preg { max-width: 80ch; }
 .u .aj-as-cab { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--e2) var(--e4); margin: 0 0 var(--e3); }
 .u .aj-as-modos { display: flex; flex-wrap: wrap; gap: var(--e2) var(--e5); margin: 0 0 var(--e3); }
 .u .aj-as-traer .aj-as-chips { gap: var(--e2) var(--e5); }
@@ -717,7 +718,24 @@ body.aj-cu-arrastrando { cursor: grabbing; user-select: none; -webkit-user-selec
 .u .aj-as-dias { flex-basis: 100%; margin: 0 0 var(--e1) var(--e3); padding-left: var(--e2); border-left: 2px solid var(--color-linea); }
 .u .aj-as-chipf { border-style: dashed; color: var(--estado-pr); }
 .u .aj-as-acabada { margin: 0 0 var(--e3); padding: var(--e2) var(--e3); border-left: 4px solid var(--color-borde-campo); border-radius: var(--radio-peq); background: var(--color-bloque); font-size: 14px; }
-.u .aj-as-barra { list-style: none; display: flex; gap: var(--e1); margin: 0 0 var(--e4); padding: 0; overflow-x: auto; scrollbar-width: none; }
+/* T0343 (Javi) · Los pasos, en una fila de pastillas que se desplaza de lado; el estado, un punto de color. */
+.u .aj-as-pasos { display: flex; align-items: center; gap: 6px; margin: 0 0 var(--e4); padding: 2px 0 6px; overflow-x: auto; scrollbar-width: thin; }
+.u .aj-as-gt { flex: 0 0 auto; color: var(--color-suave); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; margin-right: 2px; }
+.u .aj-as-gt2 { margin-left: var(--e2); padding-left: var(--e3); border-left: 1px solid var(--color-linea); }
+.u .aj-as-pp { position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 0 12px; border: 1px solid var(--color-linea); border-radius: 999px;
+  background: var(--color-superficie); color: var(--color-texto); font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.u .aj-as-pp:hover { background: var(--color-bloque); }
+.u .aj-as-pp:focus-visible { outline: 3px solid var(--color-principal-oscuro); outline-offset: 1px; }
+.u .aj-as-dot { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--color-borde-campo); box-sizing: border-box; }
+.u .aj-as-pp-hecho .aj-as-dot { background: var(--color-bien); border-color: var(--color-bien); }
+.u .aj-as-pp-medias .aj-as-dot { background: var(--estado-pr); border-color: var(--estado-pr); }
+.u .aj-as-pp-luego { color: var(--color-suave); border-style: dashed; }
+.u .aj-as-pp-luego .aj-as-dot { border-style: dotted; }
+.u .aj-as-pp.aj-as-actual { background: var(--color-texto); border-color: var(--color-texto); color: var(--color-superficie); font-weight: 700; }
+.u .aj-as-pp.aj-as-actual .aj-as-dot { box-shadow: 0 0 0 2px var(--color-texto), 0 0 0 3px var(--color-superficie); }
+.u .aj-as-svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; vertical-align: -2px; }
+.u .aj-as-estado .aj-as-svg, .u .aj-as-hecho .aj-as-svg { margin-right: 6px; }
+.u .aj-as-barra { list-style: none; display: flex; gap: var(--e1); margin: 0; padding: 0; overflow-x: auto; scrollbar-width: none; }
 .u .aj-as-barra li { flex: 1 1 0; min-width: 64px; }
 .u .aj-as-p { display: flex; flex-direction: column; align-items: center; gap: var(--e1); width: 100%; padding: var(--e2) var(--e1); border: 0; border-bottom: 4px solid var(--color-linea);
   background: none; color: var(--color-suave); font: inherit; font-size: 12px; text-align: center; cursor: pointer; }
@@ -728,7 +746,7 @@ body.aj-cu-arrastrando { cursor: grabbing; user-select: none; -webkit-user-selec
 .u .aj-as-p.aj-as-medias { color: var(--color-texto); border-bottom-color: var(--color-borde-campo); }
 .u .aj-as-p.aj-as-actual { color: var(--color-texto); font-weight: 700; background: var(--color-bloque); }
 .u .aj-as-p.aj-as-actual .aj-as-pn { background: var(--color-texto); border-color: var(--color-texto); color: var(--color-superficie); }
-@media (max-width: 599px) { .u .aj-as-pt, .u .aj-as-sig { display: none; } }
+@media (max-width: 599px) { .u .aj-as-pt, .u .aj-as-sig { display: none; } .u .aj-as-barra li { min-width: 34px; } }
 @media (min-width: 600px) { .u .aj-as-sigc { display: none; } } /* en el móvil, los números (el nombre va en la pantalla) */
 .u .aj-as-pant { padding: var(--e4); border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); }
 .u .aj-as-num-paso { margin: 0; color: var(--color-suave); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
@@ -746,6 +764,10 @@ body.aj-cu-arrastrando { cursor: grabbing; user-select: none; -webkit-user-selec
 .u .aj-as-ok > .aj-as-i { background: var(--color-bien); }
 .u .aj-as-mal > .aj-as-i { background: var(--estado-pr); }
 .u .aj-as-falta > .aj-as-i { border: 2px solid var(--color-borde-campo); background: none; }
+.u .aj-as-luegof { border-style: dashed; background: var(--color-bloque); } /* T0343: una competición que aún no toca preparar, en gris */
+.u .aj-as-luegof > .aj-as-i { color: var(--color-suave); }
+.u .aj-as-luegof .aj-as-nom, .u .aj-as-luegof .aj-as-t small, .u .aj-as-luegof .aj-as-av li { color: var(--color-suave); }
+.u .aj-as-calleyg { display: inline-flex; align-items: center; gap: 4px; }
 .u .aj-as-num { background: var(--color-suave); }
 .u .aj-as-c { flex: 1 1 auto; min-width: 0; }
 .u .aj-as-t { display: flex; flex-direction: column; gap: 2px; }
@@ -765,6 +787,11 @@ body.aj-cu-arrastrando { cursor: grabbing; user-select: none; -webkit-user-selec
 .u .aj-as-despues .aj-as-medias .aj-as-chip { background: color-mix(in srgb, var(--estado-pr) 18%, var(--color-superficie)); }
 .u .aj-as-despues .aj-as-pendiente .aj-as-chip, .u .aj-as-despues .aj-as-luego .aj-as-chip { background: var(--color-superficie); }
 .u .aj-as-dn { margin: var(--e1) 0 0; font-size: 13px; }
+/* T0343 · Cada fase de la temporada: qué falta para pasar a la siguiente y qué se puede cambiar todavía. */
+.u .aj-as-fase { display: grid; gap: var(--e3); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin: var(--e4) 0 0; padding: var(--e3); border-radius: var(--radio-peq); background: var(--color-bloque); font-size: 14px; }
+.u .aj-as-fase .aj-as-g { margin: 0 0 var(--e1); }
+.u .aj-as-fase p, .u .aj-as-fase ul { margin: 0; }
+.u .aj-as-fase ul { padding-left: 1.2em; display: flex; flex-direction: column; gap: var(--e1); }
 .u .aj-as-q { color: var(--color-suave); }
 .u .aj-as-hecho { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e1) var(--e3); margin: 0 0 var(--e3); padding: var(--e2) var(--e3); border-radius: var(--radio-peq);
   background: color-mix(in srgb, var(--color-bien) 12%, var(--color-superficie)); color: var(--color-texto); font-weight: 700; font-size: 14px; }
@@ -1497,13 +1524,28 @@ html.gs-sin-scroll, html.gs-sin-scroll body { overflow: hidden !important; }
 .u .gs5 .gs-sub2 { margin: -4px 0 var(--e2); }
 .u .gs5 .gs-sec { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--color-principal-oscuro); margin: var(--e5) 0 2px; font-weight: 700; }
 .u .gs5 .gs-sec .gs-color { margin: 0 var(--e1) 0 0; }
+/* T0368 · Bloques plegados de la ficha del equipo: el título y una línea de lo que tienen. */
+.u .gs5 .gs-plg { border-top: 1px solid var(--gs-l); margin-top: var(--e4); }
+.u .gs5 .gs-plg > summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--e2); padding: var(--e2) 0; min-height: 32px; }
+.u .gs5 .gs-plg > summary::-webkit-details-marker { display: none; }
+.u .gs5 .gs-plg > summary::after { content: '›'; margin-left: auto; color: var(--gs-g); transition: transform .15s; }
+.u .gs5 .gs-plg[open] > summary::after { transform: rotate(90deg); }
+.u .gs5 .gs-plg > summary .gs-sec { margin: 0; }
+.u .gs5 .gs-plg-r { font-size: 13px; color: var(--gs-g); }
+.u .gs5 .gs-plg[open] > summary .gs-plg-r { display: none; }
+/* La línea de cada equipo: el texto se queda con su ancho y, si no caben al lado (móvil), los botones bajan debajo. */
+/* T0368 · El error de una ventana va dentro del pie fijo, encima de los botones: debajo del texto quedaba tapado por él. */
+.u .gs5 .gs-pie > .gs-error { flex: 1 1 100%; margin: 0; }
+.u .gs5 .gs-senal-i { align-items: center; flex-wrap: wrap; row-gap: var(--e2); }
+.u .gs5 .gs-senal-i .gs-min { flex: 1 1 15em; min-width: 0; }
+.u .gs5 .gs-senal-i .gs-acc { display: flex; align-items: center; gap: var(--e2); flex: 0 0 auto; margin: 0; }
 .u .gs5 .gs-btns { display: flex; gap: var(--e2); flex-wrap: wrap; margin: 2px 0 var(--e2); }
 .u .gs5 .gs-btns a, .u .gs5 .gs-btns button { font-size: 14px; }
 .u .gs5 .gs-campo { display: block; margin-top: var(--e3); font: 700 12px/1.3 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase;
   letter-spacing: .02em; min-width: 0; }
 .u .gs5 .gs-campo > select, .u .gs5 .gs-campo > input, .u .gs5 .gs-campo > textarea { display: block; width: 100%; margin-top: var(--e1); text-transform: none; letter-spacing: 0; }
 .u .gs5 .gs-campo > input + select { margin-top: var(--e2); }
-.u .gs5 .gs-dos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 var(--e3); align-items: end; }
+.u .gs5 .gs-dos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 var(--e3); align-items: start; } /* T0343: una nota debajo de un campo no baja al de al lado */
 .u .gs5 .gs-dos > .gs-ancho { grid-column: 1 / -1; }
 .u .gs5 .gs-check { display: flex; align-items: center; gap: var(--e2); margin-top: var(--e2); font-weight: 600; font-size: 15px; min-height: 32px; }
 .u .gs5 .gs-check input { flex: none; }

@@ -16,7 +16,22 @@
  */
 (function () {
   'use strict';
-  if (typeof window === 'undefined' || !window.UN || !window.UN.ajustes) return;
+
+  /**
+   * T0367 · Qué hace un evento del puntero con el arrastre de un hueco (arr: { id } del que arrastra, o null): 'nada',
+   * 'mover' o 'soltar'. Solo cuenta el puntero que empezó el arrastre, y un ratón que se mueve sin el botón pulsado lo
+   * suelta: si el «soltar» se pierde (se suelta fuera de la ventana o del marco, un menú del botón derecho), el hueco ya no
+   * se queda enganchado al cursor. Antes, enganchado, el primer clic en «Guardar» solo lo soltaba (y volvía a preparar el
+   * calendario con el orden nuevo): parecía que no hacía nada.
+   */
+  function arrastre(arr, e) {
+    if (!arr || !e || e.pointerId !== arr.id) return 'nada';
+    if (e.type === 'pointermove') return e.pointerType === 'mouse' && !(e.buttons & 1) ? 'soltar' : 'mover';
+    return e.type === 'pointerup' || e.type === 'pointercancel' || e.type === 'lostpointercapture' ? 'soltar' : 'nada';
+  }
+
+  var CALC = { arrastre: arrastre };
+  if (typeof window === 'undefined' || !window.UN || !window.UN.ajustes) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   var DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -136,7 +151,7 @@
 
       /* ---------- ordenar los huecos arrastrando ---------- */
 
-      var arr = null; // { li, ol, id }
+      var arr = null; // { li, ol, a, id (el puntero) }
       function renumerar(ol) {
         var usa = c.huecos.filter(function (x) { return x.USA; }).length;
         [].forEach.call(ol.children, function (li, i) {
@@ -152,21 +167,23 @@
       }
       el.addEventListener('pointerdown', function (e) {
         var a = e.target.closest('.cal-asa');
-        if (!a || a.disabled || guardando || !c) return;
+        if (!a || a.disabled || guardando || !c || arr || (e.pointerType === 'mouse' && e.button !== 0)) return; // solo el botón principal
         e.preventDefault();
         var li = a.closest('li');
-        arr = { li: li, ol: li.parentNode, a: a };
+        arr = { li: li, ol: li.parentNode, a: a, id: e.pointerId };
         try { a.setPointerCapture(e.pointerId); } catch (x) {}
         li.classList.add('cal-mueve');
       });
       el.addEventListener('pointermove', function (e) {
-        if (!arr) return;
+        var que = arrastre(arr, e);
+        if (que === 'soltar') { soltar(e); return; }
+        if (que !== 'mover') return;
         var y = e.clientY, li = arr.li, prev = li.previousElementSibling, next = li.nextElementSibling;
         if (prev) { var rp = prev.getBoundingClientRect(); if (y < rp.top + rp.height / 2) { arr.ol.insertBefore(li, prev); renumerar(arr.ol); return; } }
         if (next) { var rn = next.getBoundingClientRect(); if (y > rn.top + rn.height / 2) { arr.ol.insertBefore(next, li); renumerar(arr.ol); } }
       });
-      function soltar() {
-        if (!arr) return;
+      function soltar(e) {
+        if (arrastre(arr, e) !== 'soltar') return;
         var x = arr; arr = null;
         x.li.classList.remove('cal-mueve');
         foco = x.li.getAttribute('data-h');
@@ -174,6 +191,7 @@
       }
       el.addEventListener('pointerup', soltar);
       el.addEventListener('pointercancel', soltar);
+      el.addEventListener('lostpointercapture', soltar);
       el.addEventListener('keydown', function (e) {
         var a = e.target.closest && e.target.closest('.cal-asa');
         if (!a || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || guardando) return;
@@ -207,6 +225,8 @@
           guardando = false;
           if (!vivo) return;
           ctx.aviso('Calendario guardado: ' + r.guardados + ' partidos. Ya está en Ligas.');
+          // T0366: se pasa a la siguiente liga sin partidos (volver a enseñar esta decía en rojo que ya los tiene).
+          liga = ''; plan.innerHTML = '';
           cargarLigas();
         }, function (err) {
           guardando = false;

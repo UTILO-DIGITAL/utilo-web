@@ -608,8 +608,9 @@
           '<p class="u-nota">Árbitros y gestores no tienen Economía: sus cobros y su nivel salen de una copia que se hace sola al apuntar un pago a staff en Economía y cada noche. Si has cambiado algo a mano en el Excel ECONOMIA, cópialos ahora.</p>' +
           '<p class="u-nota">' + texto(x.ultima) + '</p>' +
           (x.nocheMal ? '<p class="u-error">' + texto(x.nocheMal) + '</p>' : '') + (x.error ? '<p class="u-error">' + texto(x.error) + '</p>' : '') +
-          (x.avisos.length ? '<details><summary class="u-nota">' + (x.avisos.length + x.mas === 1 ? '1 pago parece de staff, pero no es de nadie de STAFF: no se copia' :
-            (x.avisos.length + x.mas) + ' pagos parecen de staff, pero no son de nadie de STAFF: no se copian') + '</summary><ul class="u-nota">' +
+          // T0374: no solo pagos de alguien que no está en STAFF: también movimientos sin ID. Cada aviso dice por qué.
+          (x.avisos.length ? '<details><summary class="u-nota">' + (x.avisos.length + x.mas === 1 ? '1 movimiento no se copia' :
+            (x.avisos.length + x.mas) + ' movimientos no se copian') + '</summary><ul class="u-nota">' +
             x.avisos.map(function (a) { return '<li>' + texto(a) + '</li>'; }).join('') + (x.mas ? '<li>y ' + x.mas + ' más</li>' : '') + '</ul></details>' : '') +
           '<p><button type="button" class="u-btn" data-accion="copiar"' + (copiando ? ' disabled' : '') + '>' + (copiando ? 'Copiando…' : 'Actualizar pagos del staff') + '</button></p>';
       }
@@ -651,8 +652,12 @@
       function nomComp(c) { return c ? String(c.NOMBRE_COMERCIAL || c.NOMBRE || c.ID) : ''; }
       function equipo(id) { var e = ix.eq[String(id || '')]; return e ? String(e.NOMBRE_EQUIPO || e.ID) : id ? String(id) : ''; }
       function persona(id) { var s = ix.staff[String(id || '')]; return s ? s.APODO : id ? String(id) : ''; }
-      function campo(id) { var c = ix.cam[String(id || '')]; return c ? String(c.ABREVIACION || c.NOMBRE) : String(id || ''); }
-      function campoLargo(id) { var c = ix.cam[String(id || '')]; return c ? String(c.NOMBRE || c.ABREVIACION) + (c.ABREVIACION && c.NOMBRE ? ' (' + c.ABREVIACION + ')' : '') : String(id || ''); }
+      // T0367: el nombre del campo (Jaula), no su sigla (JAU); el largo, con su instalación (Jaula · Colegio San Cosme).
+      function campo(id) { var c = ix.cam[String(id || '')]; return c ? String(c.NOMBRE || c.ABREVIACION) : String(id || ''); }
+      function campoLargo(id) {
+        var c = ix.cam[String(id || '')], i = c && ix.ins[String(c.ID_INSTALACION || '')];
+        return c ? [campo(id), i ? String(i.NOMBRE || '') : ''].filter(String).join(' · ') : String(id || '');
+      }
       function colorEq(id) { var e = ix.eq[String(id || '')], c = e && colores[e.ID_COLOR]; return c && c.HEX ? c.HEX : ''; }
       function nomColor(id) { var e = ix.eq[String(id || '')], c = e && colores[e.ID_COLOR]; return c ? c.NOMBRE : ''; }
       /** El punto con el color de la camiseta de un equipo (gris con borde si no se sabe). */
@@ -1164,7 +1169,7 @@
           (res && !gs.length ? '<p class="u-nota">El acta no dice quién marcó.</p>' : '') +
           '<dl class="lg-datos">' +
           fila('Cuándo', texto(p.FECHA ? fechaDia(p.FECHA) + ' · ' + fecha(p.FECHA) + (p.HORA ? ' a las ' + p.HORA : '') : 'Sin fecha')) +
-          fila('Campo', texto([campoLargo(p.ID_CAMPO), ins ? ins.NOMBRE : ''].filter(String).join(' · ')) + (ins && ins.UBICACION_URL ? ' <a href="' + texto(ins.UBICACION_URL) + '" target="_blank" rel="noopener">Cómo llegar</a>' : '')) +
+          fila('Campo', texto(campoLargo(p.ID_CAMPO)) + (ins && ins.UBICACION_URL ? ' <a href="' + texto(ins.UBICACION_URL) + '" target="_blank" rel="noopener">Cómo llegar</a>' : '')) +
           fila('Árbitro', texto(p.ID_ARBITRO ? persona(p.ID_ARBITRO) : 'Sin asignar') + (p.ID_ARBITRO_REAL ? ' · arbitró ' + texto(persona(p.ID_ARBITRO_REAL)) : '')) +
           fila('Gestor', p.ID_GESTOR ? texto(persona(p.ID_GESTOR)) + (tel ? ' <a href="' + texto(tel) + '" target="_blank" rel="noopener">WhatsApp</a>' : '') : '') +
           fila('Motivo', texto(p.MOTIVO)) +

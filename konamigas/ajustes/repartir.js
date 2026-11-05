@@ -250,7 +250,18 @@
     return { plazas: !ab.some(function (l) { return l.libres !== null; }), sinNivel: ab.length > 1 ? ab.filter(function (l) { return !entero(l.NIVEL); }) : [] };
   }
 
-  var CALC = { diasLargos: diasLargos, faltaParaProponer: faltaParaProponer, mejorOtra: mejorOtra, fuerza: fuerza, proponer: proponer, vale: vale, losDias: losDias, diasCortos: diasCortos, diasDe: diasDe, leVa: leVa, ideal: ideal, cuadra: cuadra, competiciones: competiciones, equipo: equipo, tablero: tablero };
+  /**
+   * T0367 · Lo que se pregunta antes de cerrar o volver a abrir una liga: una pregunta con lo que pasará, no algo que ya ha
+   * pasado (en la demo, «Cerrada, sus equipos quedan fijos…» parecía hecho). que: 'cerrar' o 'abrir'; l: la liga del tablero.
+   * { pregunta, aviso (lo que no cuadra, o ''), si (el botón que lo hace) }.
+   */
+  function confirmar(que, l) {
+    if (que === 'abrir') return { pregunta: '¿Volver a abrir ' + s(l.NOMBRE) + '? Se podrán mover otra vez sus equipos.', aviso: '', si: 'Sí, volver a abrirla' };
+    return { pregunta: '¿Cerrar ' + s(l.NOMBRE) + ' con ' + pl(l.ocupadas, 'equipo', 'equipos') + '? Al cerrarla, sus equipos quedarán fijos y ya se podrá generar su calendario.',
+      aviso: l.cuadra && !l.cuadra.ok ? s(l.cuadra.texto) : '', si: 'Sí, cerrarla' };
+  }
+
+  var CALC = { confirmar: confirmar, diasLargos: diasLargos, faltaParaProponer: faltaParaProponer, mejorOtra: mejorOtra, fuerza: fuerza, proponer: proponer, vale: vale, losDias: losDias, diasCortos: diasCortos, diasDe: diasDe, leVa: leVa, ideal: ideal, cuadra: cuadra, competiciones: competiciones, equipo: equipo, tablero: tablero };
   if (typeof window === 'undefined' || !window.UN || !window.UN.ajustes) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -356,12 +367,14 @@
         if (l.cerrada) {
           pie = '<p class="rp-cerrada">' + texto('Cerrada el ' + fecha(l.FECHA_CIERRE)) + (l.partidos ? texto(' · ' + pl(l.partidos, 'partido', 'partidos')) : '') + '</p>' +
             (!l.partidos && l.partidos !== null ? '<div class="rp-botones">' + (l.ocupadas >= 2 ? '<button type="button" class="u-btn u-btn-accion" data-rp-cal="' + texto(l.ID) + '">Generar calendario ›</button>' : '') +
-              (ctx.soloLeer ? '' : pide === 'abrir|' + l.ID ? '<p class="u-nota">Abierta, se pueden volver a mover sus equipos.</p><button type="button" class="u-btn u-btn-texto" data-rp-no>No</button><button type="button" class="u-btn" data-rp-abrir="' + texto(l.ID) + '">Sí, volver a abrirla</button>'
+              (ctx.soloLeer ? '' : pide === 'abrir|' + l.ID ? '<p class="u-nota">' + texto(confirmar('abrir', l).pregunta) + '</p><button type="button" class="u-btn u-btn-texto" data-rp-no>No</button><button type="button" class="u-btn" data-rp-abrir="' + texto(l.ID) + '">' + texto(confirmar('abrir', l).si) + '</button>'
                 : '<button type="button" class="u-btn u-btn-texto" data-rp-pide="abrir|' + texto(l.ID) + '">Volver a abrirla</button>') + '</div>' : '');
         } else if (!ctx.soloLeer && l.ocupadas) { // vacía: nada que cerrar (solo «Arrastra aquí sus equipos»)
           pie = (l.porQueNo ? '<p class="u-nota rp-falta">' + texto(l.porQueNo) + '</p>' : '') + '<div class="rp-botones">' +
-            (pide === 'cerrar|' + l.ID ? '<p class="u-nota">' + (l.cuadra && !l.cuadra.ok ? '<b>' + texto(l.cuadra.texto) + '</b> ' : '') + 'Cerrada, sus equipos quedan fijos y ya se puede sacar su calendario.</p>' +
-              '<button type="button" class="u-btn u-btn-texto" data-rp-no>No</button><button type="button" class="u-btn u-btn-accion" data-rp-cerrar="' + texto(l.ID) + '"' + (cerrando ? ' disabled' : '') + '>' + (cerrando === l.ID ? 'Cerrando…' : texto('Sí, cerrarla con ' + l.ocupadas + ' equipos')) + '</button>'
+            (pide === 'cerrar|' + l.ID ? (function (q) {
+              return '<p class="u-nota">' + (q.aviso ? '<b>' + texto(q.aviso) + '</b> ' : '') + texto(q.pregunta) + '</p>' +
+                '<button type="button" class="u-btn u-btn-texto" data-rp-no>No</button><button type="button" class="u-btn u-btn-accion" data-rp-cerrar="' + texto(l.ID) + '"' + (cerrando ? ' disabled' : '') + '>' + (cerrando === l.ID ? 'Cerrando…' : texto(q.si)) + '</button>';
+            })(confirmar('cerrar', l))
               : '<button type="button" class="u-btn" data-rp-pide="cerrar|' + texto(l.ID) + '"' + (l.puedeCerrar ? '' : ' disabled') + '>Cerrar la liga</button>') + '</div>';
         }
         var n = entero(l.NIVEL);

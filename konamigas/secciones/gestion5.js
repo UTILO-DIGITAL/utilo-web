@@ -27,6 +27,8 @@
   function txt(v) { return String(v == null ? '' : v).trim(); }
   function indice(filas) { var o = {}; (filas || []).forEach(function (f) { o[String(f.ID)] = f; }); return o; }
   function hoy() { var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+  /** T0343 · Ahora, 'aaaa-mm-ddThh:mm' (para la hora en que se abren los colores de una liga). */
+  function ahoraMin() { var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; }; return hoy() + 'T' + p(d.getHours()) + ':' + p(d.getMinutes()); }
   /** 'aaaa-mm-dd' → 'dd/mm/aaaa'. */
   function fecha(s) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] : String(s || ''); }
   /** Importe → céntimos (número, «1.234,56», «12 €»). */
@@ -253,12 +255,15 @@
     // T0335 (revisión, 4): un equipo que solo ha pedido días completos está en lista de espera: aún no se le pide la señal.
     var ds = txt(ie.DISPONIBILIDAD).split(/\s*,\s*/).filter(Boolean), espera = !ie.ID_LIGA && ds.length && ds.every(function (x) { return / \(lista de espera\)$/.test(x); });
     if (ie.ESTADO === 'Solicitada' && espera && ie.MENSAJE_INICIAL_ENVIADO !== true) out.push({ id: 'espera', k: 'solicitada', t: 'En lista de espera' });
-    else if (ie.ESTADO === 'Solicitada') out.push({ id: 'solicitada', k: 'solicitada', t: ie.MENSAJE_INICIAL_ENVIADO === true ? 'Esperando la señal' : 'Pedir la señal' });
+    // T0367: con la señal ya cobrada (el cobro recién apuntado, aunque el motor aún no la haya confirmado), ya no se pide: el aviso se va al momento.
+    else if (ie.ESTADO === 'Solicitada' && !senalPagada(d, ie)) out.push({ id: 'solicitada', k: 'solicitada', t: ie.MENSAJE_INICIAL_ENVIADO === true ? 'Esperando la señal' : 'Pedir la señal' });
     if (conf && !ie.ID_LIGA) out.push({ id: 'liga', k: 'liga', t: 'Sin liga' });
     // T0304: con su liga cerrada, a la capitana se le dice su liga y su día oficial (MENSAJE_LIGA).
     if (conf && ie.ID_LIGA && ctxT.cerrada && ctxT.cerrada[ie.ID_LIGA] && ie.AVISO_LIGA_ENVIADO !== true) out.push({ id: 'avisar-liga', k: 'seguimiento', t: 'Avisar de su liga' });
     if (conf && ie.MENSAJE_INICIAL_ENVIADO !== true) out.push({ id: 'mensaje', k: 'seguimiento', t: 'Sin mensaje inicial' });
     if (conf && ie.GRUPO_CREADO !== true) out.push({ id: 'grupo', k: 'seguimiento', t: 'Sin grupo de WhatsApp' });
+    // T0343: con su liga cerrada, la capitana elige el color con el enlace de su equipo (a la hora de apertura de su liga).
+    if (conf && ie.ID_LIGA && ctxT.cerrada && ctxT.cerrada[ie.ID_LIGA] && !ie.ID_COLOR) out.push({ id: 'sin-color', k: 'color', t: 'Sin color' });
     if (ie.ID_COLOR && ie.ID_LIGA && (ctxT.colorLiga[ie.ID_LIGA + '|' + ie.ID_COLOR] || 0) > 1) out.push({ id: 'color', k: 'color', t: 'Color repetido en su liga' });
     var nom = norm(ie.NOMBRE_EQUIPO);
     if (nom && (ctxT.nombre[ie.ID_COMPETICION + '|' + nom] || 0) > 1) out.push({ id: 'nombre', k: 'nombre', t: 'Nombre repetido' });
@@ -274,6 +279,28 @@
       }
     }
     return sinResueltos(out, ie.ID, ctxT);
+  }
+  /**
+   * T0367 · ¿Ha cobrado ya la señal entera? Lo cobrado con la referencia de su inscripción (con IVA, un gasto resta) llega a
+   * COMPETICIONES · SENAL. Lo mismo que mira el motor para confirmarla (GESTION5_SENAL.js); sin señal, no.
+   */
+  function senalPagada(d, ie) {
+    var c = indice(d.com)[ie.ID_COMPETICION], sen = c ? cts(c.SENAL) : 0, cobrado = 0;
+    if (!(sen > 0)) return false;
+    d.mov.forEach(function (m) {
+      if (!/^inscripci[oó]n/i.test(txt(m.REF_TIPO)) || String(m.REF_ID) !== String(ie.ID)) return;
+      cobrado += (m.TIPO === 'Ingreso' ? 1 : m.TIPO === 'Gasto' ? -1 : 0) * conIva(cts(m.BASE), m.TIPO_IVA);
+    });
+    return cobrado >= sen;
+  }
+  /**
+   * T0367 · El número de «Alertas» de arriba (Javi): suma solo lo que hay que arreglar. Lo que falta por pagar ya lo cuenta
+   * «Por pagar» y un equipo sin liga es el paso normal después de la señal (se reparte en Ajustes): salen en su grupo, pero no
+   * suman. Así, al pagar la señal las alertas bajan y no suben. n: { pago, sinConf, problemas, sinLiga, jugadoras, fotos,
+   * revisiones, buscan } (cuántos de cada grupo).
+   */
+  function alertasArriba(n) {
+    return ['sinConf', 'problemas', 'jugadoras', 'fotos', 'revisiones', 'buscan'].reduce(function (t, k) { return t + (n[k] || 0); }, 0);
   }
   /**
    * Quita los avisos que se han dado por buenos (REVISIONES con TIPO «Aviso: <id>» y RESUELTO) y los pospuestos que siguen
@@ -447,6 +474,36 @@
     return String(plantilla || '').replace(/ ?\{([A-Z_]+)\}/g, function (m, k) { return !(k in v) ? m : v[k] ? m.replace(/\{.*\}/, v[k]) : k === 'CAPITANA' ? '' : m.replace(/\{.*\}/, ''); });
   }
 
+  /**
+   * T0343 · Cuándo puede elegir el color la capitana, para el mensaje ({CUANDO}): apertura de su liga ('aaaa-mm-ddThh:mm',
+   * LIGAS · APERTURA_COLORES) frente a ahora (lo mismo). «desde el jueves 12/11 a las 20:00», «ya se puede» o, sin hora, «en
+   * cuanto abramos los colores, que lo anunciamos en Instagram».
+   */
+  function cuandoColor(apertura, ahora) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}:\d{2}))?/.exec(txt(apertura));
+    if (!m) return 'en cuanto abramos los colores, que lo anunciamos en Instagram';
+    var ap = m[1] + '-' + m[2] + '-' + m[3] + 'T' + (m[4] || '00:00');
+    if (ahora && ap <= txt(ahora)) return 'ya se puede';
+    var dia = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay()];
+    return 'desde el *' + dia + ' ' + m[3] + '/' + m[2] + (m[4] ? ' a las ' + m[4] : '') + '*';
+  }
+  /** T0343 · El enlace con el que la capitana elige el color: la página de inscripciones (FORMULARIO_JUGADORAS, si es la propia) con ?f=color&e=…&k=…. */
+  function enlaceColor(url, idIe, clave) {
+    url = txt(url);
+    var u = /\/inscripciones\/?(\?|$)/.test(url) ? url.replace(/[?#].*$/, '') : 'https://utilo-digital.github.io/utilo-web/konamigas/inscripciones/';
+    return u + (/\/$/.test(u) ? '' : '/') + '?f=color&e=' + encodeURIComponent(txt(idIe)) + '&k=' + encodeURIComponent(txt(clave));
+  }
+  /** T0343 · El mensaje con el enlace del color (config MENSAJE_COLOR): x { CAPITANA, EQUIPO, LIGA, CUANDO, ENLACE }. Como el de la liga. */
+  function mensajeColor(plantilla, x) {
+    var v = { CAPITANA: alargar(x.CAPITANA), EQUIPO: txt(x.EQUIPO), LIGA: txt(x.LIGA), CUANDO: txt(x.CUANDO), ENLACE: txt(x.ENLACE) };
+    return String(plantilla || '').replace(/ ?\{([A-Z_]+)\}/g, function (m, k) { return !(k in v) ? m : v[k] ? m.replace(/\{.*\}/, v[k]) : k === 'CAPITANA' ? '' : m.replace(/\{.*\}/, ''); });
+  }
+  /** T0343 · ¿Ya no se puede cambiar el color del equipo? Sí si alguna camiseta de sus jugadoras (ijs) ya está pedida, preparada o entregada. */
+  function colorFijo(cams, ijs) {
+    var mias = {}; (ijs || []).forEach(function (j) { mias[j.ID] = true; });
+    return (cams || []).some(function (c) { return mias[c.ID_INSCRIPCION_JUGADORA] && ['Por pedir', 'Sin camiseta'].indexOf(txt(c.ESTADO)) < 0; });
+  }
+
   /** T0300 · Las interacciones de una inscripción, de la más nueva a la más vieja. */
   function interaccionesDe(lista, idIe) {
     return (lista || []).filter(function (x) { return String(x.ID_INSCRIPCION_EQUIPO) === String(idIe); })
@@ -455,7 +512,25 @@
   /** 'aaaa-mm-ddThh:mm' → 'dd/mm/aaaa hh:mm' (sin hora, solo la fecha). */
   function fechaHora(s) { var m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(String(s || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] + (m[4] ? ' ' + m[4] + ':' + m[5] : '') : String(s || ''); }
 
-  var CALC = { ligaCerrada: ligaCerrada, horasLiga: horasLiga, primerDiaLiga: primerDiaLiga, mensajeLiga: mensajeLiga, alargar: alargar, interaccionesDe: interaccionesDe, fechaHora: fechaHora, mensajeSenal: mensajeSenal, cts: cts, eur: eur, edad: edad, fecha: fecha, ids: ids, norm: norm, temporadas: temporadas, temporadaActual: temporadaActual,
+  /**
+   * T0368 · «Sin confirmar» de Alertas: los equipos a los que aún no se ha pedido la señal (aviso solicitada sin M.I), del
+   * que pidió antes al último, van juntos en una tarjeta si son dos o más (Javi: siete tarjetas iguales se veían largas).
+   * xs: [{ i: inscripción, avs: [avisos] }]. Devuelve { pedir: [inscripciones], resto: [{ i, avs }] } (resto, con una tarjeta cada uno).
+   */
+  function porPedirSenal(xs) {
+    var sinPedir = function (x) { return x.i.MENSAJE_INICIAL_ENVIADO !== true && x.avs.some(function (a) { return a.id === 'solicitada'; }); };
+    var pedir = (xs || []).filter(sinPedir);
+    if (pedir.length < 2) return { pedir: [], resto: (xs || []).slice() };
+    return { pedir: pedir.map(function (x) { return x.i; }).sort(function (a, b) { var p = String(a.FECHA_INSCRIPCION || ''), q = String(b.FECHA_INSCRIPCION || ''); return p < q ? -1 : p > q ? 1 : String(a.ID) < String(b.ID) ? -1 : 1; }),
+      resto: xs.filter(function (x) { return !sinPedir(x); }) };
+  }
+  /** T0368 · La línea del Seguimiento plegado en la ficha: lo que falta de M.I, grupo y Xporty, o «Todo hecho». */
+  function resumenSeguimiento(ie) {
+    var falta = [['MENSAJE_INICIAL_ENVIADO', 'mensaje inicial'], ['GRUPO_CREADO', 'grupo'], ['EN_XPORTY', 'Xporty']].filter(function (x) { return ie[x[0]] !== true; }).map(function (x) { return x[1]; });
+    return (falta.length ? 'Falta: ' + falta.join(', ') : 'Todo hecho') + (txt(ie.NOTAS) ? ' · con notas' : '');
+  }
+
+  var CALC = { cuandoColor: cuandoColor, enlaceColor: enlaceColor, mensajeColor: mensajeColor, colorFijo: colorFijo, porPedirSenal: porPedirSenal, resumenSeguimiento: resumenSeguimiento, senalPagada: senalPagada, alertasArriba: alertasArriba, ligaCerrada: ligaCerrada, horasLiga: horasLiga, primerDiaLiga: primerDiaLiga, mensajeLiga: mensajeLiga, alargar: alargar, interaccionesDe: interaccionesDe, fechaHora: fechaHora, mensajeSenal: mensajeSenal, cts: cts, eur: eur, edad: edad, fecha: fecha, ids: ids, norm: norm, temporadas: temporadas, temporadaActual: temporadaActual,
     compsDe: compsDe, iesDe: iesDe, cuenta: cuenta, plantilla: plantilla, pago: pago, camisetasDe: camisetasDe, contexto: contexto, avisosEquipo: avisosEquipo,
     avisosJugadora: avisosJugadora, buscarJugadoras: buscarJugadoras, problemasJugadora: problemasJugadora, nombreJug: nombreJug,
     avisosResueltos: avisosResueltos, esAviso: esAviso, ijsValidas: ijsValidas,
@@ -773,9 +848,10 @@
        * momento (la acción va por la capa de tablas). «Dar por bueno» queda siempre como última opción. */
 
       /** Un grupo de Alertas: se despliega con sus tarjetas (hasta 40) y al final, ir a la pestaña ya filtrada. */
-      function htmlAlerta(titulo, cards, ir) {
+      /** n (opcional): la cifra del título, si no es una por tarjeta (T0368: la de pedir la señal junta varios equipos). */
+      function htmlAlerta(titulo, cards, ir, n) {
         if (!cards.length) return '<details class="gs-alt" data-vacio><summary><span>' + texto(titulo) + '</span><em class="gs-pos">0</em></summary></details>';
-        return '<details class="gs-alt" data-alt="' + texto(titulo) + '"' + (altAb[titulo] ? ' open' : '') + '><summary><span>' + texto(titulo) + '</span><em class="gs-neg">' + cards.length + '</em></summary>' +
+        return '<details class="gs-alt" data-alt="' + texto(titulo) + '"' + (altAb[titulo] ? ' open' : '') + '><summary><span>' + texto(titulo) + '</span><em class="gs-neg">' + (n || cards.length) + '</em></summary>' +
           '<div class="gs-tjs">' + cards.slice(0, 40).join('') + '</div>' + (cards.length > 40 ? '<div class="gs-mas-n">Y ' + (cards.length - 40) + ' más.</div>' : '') +
           (ir && pest.indexOf(ir[0]) >= 0 ? '<p class="gs-ir"><button type="button" class="gs-chip" data-ir="' + ir[0] + '" data-irf="' + ir[1] + '">Ver en ' + PESTANAS[ir[0]] + ' ›</button></p>' : '') + '</details>';
       }
@@ -850,7 +926,7 @@
       var NO_AVISAR = { solicitada: 'se queda sin confirmar', espera: 'se queda en espera', liga: 'va sin liga', mensaje: 'no hace falta el mensaje', grupo: 'no hace falta el grupo',
         color: 'el color se queda así', nombre: 'el nombre se queda así', 'capitana-fuera': 'la capitana se queda así', 'capitana-sin': 'va sin capitana',
         'dorsal-sin': 'juega sin dorsal', 'dorsal-rep': 'el dorsal se queda repetido', doble: 'puede jugar en los dos', acepta: 'ya lo ha aceptado de otra forma', edad: 'puede jugar igualmente',
-        pago: 'este pago no se va a cobrar', 'avisar-liga': 'no hace falta avisarla' };
+        pago: 'este pago no se va a cobrar', 'avisar-liga': 'no hace falta avisarla', 'sin-color': 'va sin color' };
       function tarjetaAviso(a, reg, enFicha) {
         var ie = ix.ie[reg], ij = ie ? null : T.fila(IJ, reg), c = { bueno: '', posponer: true, buenoEt: NO_AVISAR[a.id] ? 'No avisar más: ' + NO_AVISAR[a.id] : '' };
         var attrs = 'data-reg="' + texto(reg) + '" data-av="' + texto(a.id) + '" data-t="' + texto(a.t) + '"';
@@ -866,13 +942,14 @@
             var pedida = ie.MENSAJE_INICIAL_ENVIADO === true, sen = senalDe(ie), res = staff(ie.ID_RESPONSABLE);
             c.titulo = n + ' · ' + (pedida ? 'Esperando la señal' : 'Pedir la señal');
             c.texto = pedida ? 'Se le ha pedido la paga y señal' + (sen ? ' (' + texto(eurC(sen)) + ')' : '') + (res ? ' a ' + texto(txt(res.APODO || res.NOMBRE)) : '') +
-                '. En cuanto se apunte en Economía el cobro que la cubre (referencia «Inscripción» · ' + texto(ie.ID) + '), se confirma solo.'
+                '. En cuanto se apunte su cobro («Apuntar la señal»), se confirma solo.'
               : texto(nomIe(ie.ID)) + ' pidió inscribirse el ' + texto(fecha(ie.FECHA_INSCRIPCION)) + '. Pídele la paga y señal: hasta que la pague, no cuenta como equipo de la temporada.';
             c.datos = texto([nomComp(ie.ID_COMPETICION), cap ? 'capitana ' + nombreJug(cap) + (cap.TELEFONO ? ' (' + cap.TELEFONO + ')' : '') : 'sin capitana',
               ie.DISPONIBILIDAD ? 'puede: ' + txt(ie.DISPONIBILIDAD) : '', ie.NUM_JUGADORAS ? 'son unas ' + ie.NUM_JUGADORAS : '', // T0335: lo que dice el formulario
               cap && cap.IDIOMA && cap.IDIOMA !== 'Castellano' ? 'escribirle en ' + cap.IDIOMA : '',
               ie.BUSCA_JUGADORAS === true ? 'buscan ' + (ie.CUANTAS_BUSCA || '') + ' jugadoras' : '',
               txt(ie.FACTURA_NOMBRE) ? 'factura a ' + txt(ie.FACTURA_NOMBRE) + ' (' + txt(ie.FACTURA_NIF) + ', ' + txt(ie.FACTURA_DIRECCION) + ', ' + txt(ie.FACTURA_EMAIL) + ')' : ''].filter(Boolean).join(' · '));
+            if (enFicha) c.datos = ''; // T0368: en la ficha ya están en Inscripción
             c.sol = '<button type="button" class="' + (pedida ? 'gs-b2' : 'gs-b1') + '" data-accion="senal" data-id="' + texto(ie.ID) + '">' + (pedida ? 'Volver a pedir la señal' : 'Pedir la señal') + '</button>' +
               (PAGOS ? '<button type="button" class="' + (pedida ? 'gs-b1' : 'gs-b2') + '" data-accion="cobro-senal" data-id="' + texto(ie.ID) + '">Apuntar la señal</button>' : '') +
               btnSol('confirmar', 'Confirmar sin señal') + btnSol('baja-eq', 'Dar de baja', ' data-pide') + waCap;
@@ -892,6 +969,20 @@
               : 'No consta que se haya creado su grupo de WhatsApp (capitanas o Team Search).';
             c.datos = cap ? 'Capitana: ' + texto(nombreJug(cap)) + (cap.TELEFONO ? ' · ' + texto(cap.TELEFONO) : '') : 'Sin capitana apuntada.';
             c.sol = waCap + (a.id === 'mensaje' ? btnSol('mensaje', 'Ya se lo hemos enviado') : btnSol('grupo', 'Grupo creado'));
+          } else if (a.id === 'sin-color') {
+            var otrosC = ies.filter(function (x) { return x !== ie && x.ESTADO !== 'Baja' && String(x.ID_LIGA) === String(ie.ID_LIGA); });
+            var usadosC = {}; otrosC.forEach(function (x) { if (x.ID_COLOR) (usadosC[x.ID_COLOR] = usadosC[x.ID_COLOR] || []).push(nomIe(x.ID)); });
+            c.titulo = n + ' · Sin color';
+            c.texto = 'Su liga' + (lig ? ' (' + texto(txt(lig.NOMBRE)) + ')' : '') + ' está cerrada y el equipo aún no tiene color. ' +
+              (lig && txt(lig.APERTURA_COLORES) ? 'La capitana lo elige con el enlace de su equipo ' + texto(cuandoColor(lig.APERTURA_COLORES, ahoraMin()).replace(/\*/g, '')) + '.'
+                : 'Pon a su liga la hora en que se abren los colores (Ajustes › Preparar la temporada › Colores) y mándale a la capitana su enlace.');
+            c.datos = cap ? 'Capitana: ' + texto(nombreJug(cap)) + (cap.TELEFONO ? ' · ' + texto(cap.TELEFONO) : '') : 'Sin capitana apuntada.';
+            c.sol = '<button type="button" class="gs-b1" data-accion="enlace-color" data-id="' + texto(ie.ID) + '">Enviar el enlace del color</button>' +
+              '<div class="gs-campo gs-tj-c gs-ancho">O ponerlo desde aquí<div class="gs-chips gs-tj-cols">' + d.col.map(function (x) {
+                var u = usadosC[x.ID];
+                return '<button type="button" class="gs-chip" data-elige="' + texto(x.ID) + '" aria-pressed="false"' + (u ? ' disabled' : '') + '>' + punto(x.ID) + texto(txt(x.NOMBRE)) +
+                  ' <span class="gs-opc">' + (u ? '· lo lleva ' + texto(u.join(', ')) : '· libre') + '</span></button>';
+              }).join('') + '</div></div>' + btnSol('color', 'Ponerle este color');
           } else if (a.id === 'color') {
             var otros = ies.filter(function (x) { return x !== ie && x.ESTADO !== 'Baja' && String(x.ID_LIGA) === String(ie.ID_LIGA); });
             var mismos = otros.filter(function (x) { return String(x.ID_COLOR) === String(ie.ID_COLOR); });
@@ -907,7 +998,7 @@
           } else if (a.id === 'nombre') {
             var nn = norm(ie.NOMBRE_EQUIPO), dup = ies.filter(function (x) { return x !== ie && x.ESTADO !== 'Baja' && String(x.ID_COMPETICION) === String(ie.ID_COMPETICION) && norm(x.NOMBRE_EQUIPO) === nn; });
             c.titulo = n + ' · Nombre repetido';
-            c.texto = 'Hay otro equipo con el mismo nombre en ' + texto(nomComp(ie.ID_COMPETICION)) + ': ' + texto(dup.map(function (x) { return nomIe(x.ID) + ' (' + x.ID + ', ' + x.ESTADO + ')'; }).join(', ')) +
+            c.texto = 'Hay otro equipo con el mismo nombre en ' + texto(nomComp(ie.ID_COMPETICION)) + ': ' + texto(dup.map(function (x) { return nomIe(x.ID) + ' (' + [nom('lig', x.ID_LIGA), x.ESTADO.toLowerCase()].filter(Boolean).join(', ') + ')'; }).join(', ')) +
               '. En el calendario y en la clasificación no se sabrá cuál es cuál.';
             c.sol = inpCampo('nombre', ie.NOMBRE_EQUIPO, 'Nombre este año', ' maxlength="80"') + btnSol('nombre', 'Cambiar nombre');
           } else if (a.id === 'capitana-fuera' || a.id === 'capitana-sin') {
@@ -928,7 +1019,7 @@
               c.texto = 'Faltan ' + eurC(p.faltaCamisetas || 0) + ' de camisetas personalizadas: ' + textoCamisetas(p.camisetas || { n: 0, unidad: null }) +
                 (p.cobrado > ins && ins >= 0 ? ', y de lo cobrado ' + eurC(p.cobrado - ins) + ' ya van a camisetas' : '') + '. Lo cobrado llena primero la inscripción.';
             }
-            c.datos = 'Los cobros se apuntan en Economía con la referencia «Inscripción» · ' + texto(ie.ID) + ': cuando se apunte lo que falta, el aviso se va solo.';
+            c.datos = 'Los cobros se apuntan en Economía con la referencia de su inscripción: cuando se apunte lo que falta, el aviso se va solo.';
             c.sol = waCap + (r ? (wa(r.TELEFONO) ? aWa(r.TELEFONO, 'Escribir al responsable (' + txt(r.APODO || r.NOMBRE) + ')') : '<span class="gs-sintel">Responsable ' + texto(r.APODO || r.NOMBRE) + ': sin teléfono en STAFF</span>') : '');
             c.posponerNota = 'Úsalo si ya estáis en ello con el equipo (p. ej. pagará más tarde). El dinero sigue contando en Por pagar hasta que se apunte el cobro en Economía; ese día vuelve a avisar solo.';
           } else { c.titulo = n + ' · ' + texto(a.t); }
@@ -978,6 +1069,39 @@
         } else c.titulo = nb + ' · ' + texto(a.t);
         return tarjeta(c, attrs, enFicha, 'data-ij="' + texto(ij.ID) + '"');
       }
+      /**
+       * T0368 · Una tarjeta para todos los equipos a los que hay que pedir la señal (porPedirSenal): cada uno en su línea, con
+       * su gestor y su botón, que abre su ventana como la tarjeta de uno. Lo demás (confirmar sin señal, baja, posponer), en su ficha.
+       */
+      function tarjetaPedirSenales(xs) {
+        var lista = xs.map(function (ie) {
+          var r = staff(ie.ID_RESPONSABLE);
+          return '<div class="gs-item gs-senal-i"><div class="gs-min"><div class="gs-t">' + punto(ie.ID_COLOR) + texto(nomIe(ie.ID)) + '</div>' +
+            '<div class="gs-s">' + texto([nomComp(ie.ID_COMPETICION), 'pidió el ' + fecha(ie.FECHA_INSCRIPCION), r ? 'cobra ' + txt(r.APODO || r.NOMBRE) : 'sin gestor'].join(' · ')) + '</div></div>' +
+            '<div class="gs-acc"><button type="button" class="gs-enl" data-ie="' + texto(ie.ID) + '">Ficha</button>' +
+            '<button type="button" class="gs-b1" data-accion="senal" data-id="' + texto(ie.ID) + '">Pedir la señal</button></div></div>';
+        }).join('');
+        var c = { titulo: '<b>' + plural(xs.length, 'equipo espera', 'equipos esperan') + ' que les pidas la señal</b>', bueno: 'no',
+          texto: 'Pidieron inscribirse y todavía no se les ha pedido la paga y señal. Cada uno lleva su gestor, su fecha límite y el WhatsApp de su capitana: «Pedir la señal» abre su mensaje ya escrito.',
+          sol: '<div class="gs-lista gs-ancho">' + lista + '</div>',
+          pie: '<p class="gs-nota gs-ancho">Para confirmarlo sin señal, darlo de baja o posponer el aviso, abre su ficha.</p>' };
+        return tarjeta(c, 'data-grupo="senal"', false);
+      }
+      /**
+       * T0368 (Javi: la ficha del equipo se veía muy larga) · Un bloque de la ficha plegado, con su título y una línea de lo que
+       * tiene. Sus campos siguen dentro (los guarda el mismo pie); se abre al tocarlo y se recuerda abierto mientras dura la sesión.
+       */
+      var fichaAb = {};
+      function plegado(titulo, resumen, html, clase) {
+        var k = titulo.replace(/ \(.*$/, '');
+        return '<details class="gs-plg' + (clase ? ' ' + clase : '') + '" data-plg="' + texto(k) + '"' + (fichaAb[k] ? ' open' : '') + '><summary><span class="gs-sec">' + texto(titulo) + '</span>' +
+          (resumen ? '<span class="gs-plg-r">' + texto(resumen) + '</span>' : '') + '</summary>' + html + '</details>';
+      }
+      function resumenInteracciones(ie) {
+        if (S.inter !== 'ok') return '';
+        var xs = interaccionesDe(T.filas('INTERACCIONES'), ie.ID);
+        return xs.length ? plural(xs.length, 'apuntada', 'apuntadas') + ' · la última, ' + txt(xs[0].TIPO).toLowerCase() + ' el ' + fechaHora(xs[0].FECHA).slice(0, 10) : 'Nada apuntado';
+      }
       /** En una ficha: sus avisos en tarjetas y los ya dados por buenos. */
       function bloqueAvisos(av, reg) {
         return (av.length ? '<div class="gs-sec">Avisos</div><div class="gs-tjs">' + av.map(function (a) { return tarjetaAviso(a, reg, true); }).join('') + '</div>' : '') +
@@ -1006,7 +1130,7 @@
         return tarjeta({ titulo: '<b>' + texto(nombreJug(p) || x.ID_JUGADORA) + '</b> · busca equipo',
           texto: 'Se apuntó sin equipo el ' + texto(fecha(x.FECHA)) + ' en ' + texto(nomComp(x.ID_COMPETICION)) + '. Elige su equipo: «Colocar» lo apunta y abre WhatsApp con el enlace para que rellene la inscripción completa en él.',
           datos: texto([e !== '' ? e + ' años' : '', x.NIVEL ? 'nivel ' + x.NIVEL : '', x.PORTERA === true ? 'portera' : '', txt(x.DISPONIBILIDAD) ? 'puede: ' + txt(x.DISPONIBILIDAD) : '', p.TELEFONO ? txt(p.TELEFONO) : '',
-            interesa.length ? 'le interesa' + (interesa.length > 1 ? 'n ' : ' ') + interesa.map(nomIe).join(', ') : '', x.EN_BANCO === true ? 'sale en el banco (' + x.ID + (x.BANCO_TELEFONO === true ? ', con su teléfono' : '') + ')' : '',
+            interesa.length ? 'le interesa' + (interesa.length > 1 ? 'n ' : ' ') + interesa.map(nomIe).join(', ') : '', x.EN_BANCO === true ? 'sale en el banco' + (x.BANCO_TELEFONO === true ? ', con su teléfono' : '') : '',
             pj0.IDIOMA && pj0.IDIOMA !== 'Castellano' ? 'escribirle en ' + pj0.IDIOMA : '',
             x.COMO_NOS_CONOCIO ? 'nos conoció por ' + txt(x.COMO_NOS_CONOCIO) : '', txt(x.COMENTARIOS) ? '«' + txt(x.COMENTARIOS) + '»' : ''].filter(Boolean).join(' · ')),
           sol: selCampo('equipo', ops, ops.length ? 'Elige el equipo' : 'No hay equipos en esta competición', 'Equipo').replace('value="' + texto(interesa[0] || '-') + '"', 'value="' + texto(interesa[0] || '-') + '" selected') +
@@ -1152,10 +1276,13 @@
 
       /**
        * Guarda cambios de la inscripción de un equipo. Si cambia el ESTADO va por gestion5Equipo: al darlo de baja, el motor da
-       * de baja a sus jugadoras (y al reactivarlo vuelven las que se fueron con él), y las devuelve en otras.
+       * de baja a sus jugadoras (y al reactivarlo vuelven las que se fueron con él), y las devuelve en otras. La liga y el color,
+       * también (T0343): el motor no deja cambiar la liga de una liga cerrada ni el color con las camisetas pedidas, y pasa sus
+       * camisetas por pedir al color nuevo.
        */
       function escribirIe(ie, c) {
-        if (!('ESTADO' in c) || c.ESTADO === ie.ESTADO) return T.actualizar('INSCRIPCIONES_EQUIPOS', ie.ID, c);
+        var porMotor = ['ESTADO', 'ID_LIGA', 'ID_COLOR'].some(function (k) { return k in c && txt(c[k]) !== txt(ie[k]); });
+        if (!porMotor) return T.actualizar('INSCRIPCIONES_EQUIPOS', ie.ID, c);
         var antes = {}; Object.keys(c).forEach(function (k) { antes[k] = ie[k] === undefined ? '' : ie[k]; });
         return T.actualizar('INSCRIPCIONES_EQUIPOS', ie.ID, c, { fn: 'gestion5Equipo', args: [ie.ID, c, { antes: antes }] });
       }
@@ -1284,7 +1411,7 @@
         var cartas = function (xs) { var o = []; xs.forEach(function (x) { x.avs.forEach(function (a) { o.push(tarjetaAviso(a, x.i.ID, false)); }); }); return o; };
         var deAv = function (xs, f) { return xs.map(function (i) { return { i: i, avs: avE(i).filter(f) }; }).filter(function (x) { return x.avs.length; }); };
         var alPago = deAv(eqs, function (a) { return a.k === 'pago'; });
-        var sinConf = deAv(vis.filter(cuenta), function (a) { return a.id === 'solicitada'; });
+        var sinConf = deAv(vis.filter(cuenta), function (a) { return a.id === 'solicitada'; }), porSenal = porPedirSenal(sinConf);
         var sinLiga = deAv(eqs, function (a) { return a.id === 'liga'; });
         var problemas = deAv(eqs, function (a) { return a.k !== 'pago' && a.k !== 'liga'; });
         var jAl = [];
@@ -1292,7 +1419,7 @@
         var fotos = sinVincular();
         var revs = pest.indexOf('REVISIONES') >= 0 ? d.rev.filter(function (r) { return r.RESUELTO !== true && !esAviso(r) && !esPospuesto(r); }) : [];
         var buscan = buscanEquipo();
-        var nAl = alPago.length + sinConf.length + problemas.length + sinLiga.length + jAl.length + fotos.length + revs.length + buscan.length;
+        var nAl = alertasArriba({ pago: alPago.length, sinConf: sinConf.length, problemas: problemas.length, sinLiga: sinLiga.length, jugadoras: jAl.length, fotos: fotos.length, revisiones: revs.length, buscan: buscan.length });
 
         plegar = true;
         var h = '<div class="gs-filtrar">' + filtrosPlegables() + '</div><div class="gs-res-top">' +
@@ -1303,7 +1430,7 @@
           '<button type="button" data-kpi="alertas" class="' + (nAl ? 'gs-alerta' : '') + '"><b>' + nAl + '</b><small>Alertas</small></button></div>' +
           '<div class="gs-card gs-alts" id="gs-alts"><div class="gs-alts-t">Alertas</div>' +
           (PAGOS ? htmlAlerta('Pagos pendientes', cartas(alPago), ['EQUIPOS', 'pagar']) : '') +
-          htmlAlerta('Sin confirmar', cartas(sinConf), ['EQUIPOS', 'solicitadas']) +
+          htmlAlerta('Sin confirmar', (porSenal.pedir.length ? [tarjetaPedirSenales(porSenal.pedir)] : []).concat(cartas(porSenal.resto)), ['EQUIPOS', 'solicitadas'], sinConf.length) +
           htmlAlerta('Problemas en la inscripción', cartas(problemas), ['EQUIPOS', 'avisos']) +
           htmlAlerta('Equipos sin liga', cartas(sinLiga), ['EQUIPOS', 'sinliga']) +
           (leidas ? htmlAlerta('Jugadoras con alerta', cartas(jAl.map(function (j) { return { i: j, avs: avJ(j) }; })), ['JUGADORAS', 'avisos'])
@@ -1368,6 +1495,7 @@
         inscritos: inscrito,
         sinliga: function (i) { return inscrito(i) && !i.ID_LIGA; },
         avisar: function (i) { return inscrito(i) && avE(i).some(function (a) { return a.id === 'avisar-liga'; }); }, // T0304: con la liga cerrada y sin avisar
+        color: function (i) { return inscrito(i) && avE(i).some(function (a) { return a.id === 'sin-color'; }); }, // T0343: con la liga cerrada y sin color
         pagar: function (i) { return inscrito(i) && falta(i) > 0; },
         avisos: function (i) { return inscrito(i) && avE(i).length > 0; },
         solicitadas: function (i) { return i.ESTADO === 'Solicitada' && i.ORIGEN !== 'Clasificación'; },
@@ -1394,6 +1522,7 @@
         if (PAGOS) ls.push(['pagar', 'Por pagar', n('pagar')]);
         ls.push(['avisos', 'Avisos', n('avisos')], ['solicitadas', 'Sin confirmar', n('solicitadas')], ['bajas', 'Bajas', n('bajas')]);
         if (n('avisar') || S.eq.filtro === 'avisar') ls.splice(2, 0, ['avisar', 'Por avisar', n('avisar')]);
+        if (n('color') || S.eq.filtro === 'color') ls.splice(3, 0, ['color', 'Sin color', n('color')]);
         if (n('copas')) ls.push(['copas', 'Copas', n('copas')]);
         if (!FILTROS_EQ[S.eq.filtro] || (S.eq.filtro === 'pagar' && !PAGOS)) S.eq.filtro = 'inscritos';
         return '<div class="gs-filtrar">' + filtrosPlegables() + chips(ls, S.eq.filtro, 'eq') + buscador('eq', S.eq.q, 'Buscar: equipo, capitana, teléfono, liga, responsable…') + '</div>' +
@@ -1615,7 +1744,7 @@
       function val(id) { var e = vent && vent.querySelector('#' + id); return !e ? undefined : e.type === 'checkbox' ? e.checked : String(e.value).trim(); }
       function verError(mal) { var e = vent.querySelector('#gs-err'); e.textContent = mal.join(' '); e.hidden = !mal.length; }
       function pie(idOk, texto0) {
-        return '<div class="gs-error" id="gs-err" role="alert" hidden></div><div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-cerrar>' + (texto0 || 'Cerrar') + '</button>' +
+        return '<div class="gs-acc gs-pie"><div class="gs-error" id="gs-err" role="alert" hidden></div><button type="button" class="gs-b2" data-cerrar>' + (texto0 || 'Cerrar') + '</button>' +
           '<button type="button" class="gs-b1" id="' + idOk + '">Guardar</button></div>';
       }
       /** Lo que hay escrito en una ficha para un grupo { pre, ks }. */
@@ -1670,8 +1799,8 @@
         }).join('') + '</div>' : '<p class="gs-nota">Todavía no hay nada apuntado.</p>';
       }
       /** En la ficha: el historial y «Apuntar» (una llamada, un correo, una nota…) sin cerrar la ficha. */
-      function bloqueInteracciones(ie) {
-        return '<div class="gs-sec">Interacciones</div><div id="gs-inter">' + htmlInteracciones(ie) + '</div>' +
+      function bloqueInteracciones(ie, sinTitulo) {
+        return (sinTitulo ? '' : '<div class="gs-sec">Interacciones</div>') + '<div id="gs-inter">' + htmlInteracciones(ie) + '</div>' +
           '<div class="gs-acc gs-inscribir"><button type="button" class="gs-b2" id="gs-apuntar">Apuntar</button></div>' +
           '<div id="gs-apuntar-f" hidden><div class="gs-dos">' +
           campo({ id: 'ap-TIPO', t: 'select', et: 'Qué', v: 'Llamada', opts: [['Llamada', 'Llamada'], ['Mensaje', 'Mensaje'], ['Correo', 'Correo'], ['Nota', 'Nota']] }) +
@@ -1721,7 +1850,7 @@
           campo({ id: 'sn-msg', t: 'area', et: 'Mensaje', nota: cap && wa(cap.TELEFONO) ? 'Se abre WhatsApp con la capitana (' + texto(cap.TELEFONO) + ').' : 'Sin teléfono de la capitana: WhatsApp te deja elegir a quién enviarlo.' }) +
           '<p class="gs-nota" id="sn-editado" hidden>Has cambiado el mensaje a mano: ya no se rellena solo. <button type="button" class="gs-enl" id="sn-rehacer">Volver a rellenarlo</button></p>' +
           '<p class="gs-nota">Si WhatsApp no va: «Copiar mensaje», envíalo por donde quieras y después «Marcar como enviado». Queda en su historial (Interacciones).</p>' +
-          '<div class="gs-error" id="gs-err" role="alert" hidden></div><div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-cerrar>Cancelar</button>' +
+          '<div class="gs-acc gs-pie"><div class="gs-error" id="gs-err" role="alert" hidden></div><button type="button" class="gs-b2" data-cerrar>Cancelar</button>' +
           '<button type="button" class="gs-b2" id="sn-copiar">Copiar mensaje</button><button type="button" class="gs-b2" id="sn-hecho">Marcar como enviado</button>' +
           '<a class="gs-b1" id="sn-ok" href="#" target="_blank" rel="noopener">Enviar por WhatsApp</a></div>';
         ventana(punto(ie.ID_COLOR) + 'Pedir la señal · ' + texto(nomIe(ie.ID)), html, function () {
@@ -1741,6 +1870,8 @@
             var sinGestor = !val('sn-gestor');
             ok.style.opacity = sinGestor ? '.45' : ''; ok.style.cursor = sinGestor ? 'not-allowed' : ''; ok.setAttribute('aria-disabled', sinGestor ? 'true' : 'false');
             ok.title = sinGestor ? 'Elige antes el gestor que cobra la señal' : '';
+            // T0368: «Copiar mensaje» y «Marcar como enviado», igual: sin gestor se ven apagados (al tocarlos dicen qué falta).
+            ['#sn-copiar', '#sn-hecho'].forEach(function (q) { var b = vent.querySelector(q); b.style.opacity = sinGestor ? '.45' : ''; b.setAttribute('aria-disabled', sinGestor ? 'true' : 'false'); b.title = ok.title; });
           }
           function rehacer() { if (!editado) msg.value = texto0(); enlace(); }
           /** El error, a la vista; se quita en cuanto se cambia algo. */
@@ -1782,6 +1913,45 @@
             var mal = problemas();
             if (mal.length) return error(mal);
             error([]);
+            var b = this, bien = function () { b.textContent = 'Copiado ✓'; setTimeout(function () { if (b.isConnected) b.textContent = 'Copiar mensaje'; }, 2000); };
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(msg.value).then(bien, function () { msg.select(); document.execCommand('copy'); bien(); });
+            else { msg.select(); document.execCommand('copy'); bien(); }
+          });
+        });
+      }
+
+      /**
+       * T0343 · Ventana «Enviar el enlace del color»: el mensaje para la capitana (config MENSAJE_COLOR) con el enlace de su equipo
+       * (su clave la da el motor, gestion5ClaveColor) y cuándo se abren los colores de su liga. No marca nada: queda en su historial.
+       */
+      function ventanaColor(ie) {
+        var cap = ix.jug[ie.ID_CAPITANA], l = ix.lig[String(ie.ID_LIGA || '')] || {}, PEND = '(preparando el enlace…)';
+        var t0 = mensajeColor(cfg.MENSAJE_COLOR, { CAPITANA: cap ? cap.NOMBRE : '', EQUIPO: nomIe(ie.ID), LIGA: txt(l.NOMBRE), CUANDO: cuandoColor(l.APERTURA_COLORES, ahoraMin()), ENLACE: PEND });
+        var html = '<p class="gs-nota gs-sub">' + texto([nomComp(ie.ID_COMPETICION), txt(l.NOMBRE), cap ? 'capitana ' + nombreJug(cap) : 'sin capitana'].filter(Boolean).join(' · ')) + '</p>' +
+          campo({ id: 'co-msg', t: 'area', et: 'Mensaje', v: t0, nota: cap && wa(cap.TELEFONO) ? 'Se abre WhatsApp con la capitana (' + texto(cap.TELEFONO) + ').' : 'Sin teléfono de la capitana: WhatsApp te deja elegir a quién enviarlo.' }) +
+          '<p class="gs-nota">El enlace solo sirve para este equipo: con él, la capitana elige entre los colores que quedan libres en su liga.</p>' +
+          '<div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-cerrar>Cancelar</button>' +
+          '<button type="button" class="gs-b2" id="co-copiar">Copiar mensaje</button><a class="gs-b1" id="co-ok" href="#" target="_blank" rel="noopener">Enviar por WhatsApp</a></div>';
+        ventana(punto(ie.ID_COLOR) + 'Enlace del color · ' + texto(nomIe(ie.ID)), html, function () {
+          var msg = vent.querySelector('#co-msg'), ok = vent.querySelector('#co-ok');
+          msg.rows = esMovil() ? 12 : 10;
+          function enlace() {
+            var u = cap ? wa(cap.TELEFONO, msg.value) : '';
+            ok.href = u || 'https://wa.me/?text=' + encodeURIComponent(msg.value);
+            if (/^whatsapp:/.test(ok.href)) ok.removeAttribute('target'); else ok.setAttribute('target', '_blank');
+          }
+          msg.addEventListener('input', enlace);
+          enlace();
+          ctx.llamar('gestion5ClaveColor', [ie.ID]).then(function (k) {
+            if (!msg.isConnected) return;
+            msg.value = msg.value.replace(PEND, enlaceColor(cfg.FORMULARIO_JUGADORAS, ie.ID, k)); enlace();
+          }, function (e) { if (msg.isConnected) { msg.value = msg.value.replace(PEND, '(no se ha podido preparar el enlace: ' + String((e && e.message) || e).replace(/^\w+:\s*/, '') + ')'); enlace(); } });
+          ok.addEventListener('click', function (e) {
+            if (msg.value.indexOf(PEND) >= 0) { e.preventDefault(); return; }
+            enlace(); apuntar(ie, { TIPO: 'Mensaje', CANAL: 'WhatsApp', TEXTO: msg.value });
+          });
+          vent.querySelector('#co-copiar').addEventListener('click', function () {
+            if (msg.value.indexOf(PEND) >= 0) return;
             var b = this, bien = function () { b.textContent = 'Copiado ✓'; setTimeout(function () { if (b.isConnected) b.textContent = 'Copiar mensaje'; }, 2000); };
             if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(msg.value).then(bien, function () { msg.select(); document.execCommand('copy'); bien(); });
             else { msg.select(); document.execCommand('copy'); bien(); }
@@ -1860,8 +2030,8 @@
           campo({ id: 'cs-fecha', t: 'fecha', et: 'Fecha del cobro', v: hoy() }) +
           campo({ id: 'cs-cuenta', t: 'select', et: 'Dónde ha entrado', v: cue ? cue.ID : '', opts: d.cue.filter(function (x) { return x.TIPO !== 'Socio'; }).map(function (x) { return [x.ID, txt(x.NOMBRE)]; }), vacio: 'Elige la cuenta' }) + '</div>' +
           campo({ id: 'cs-notas', t: 'texto', et: 'Notas', v: '' }) +
-          '<p class="gs-nota">Se apunta en Economía como ingreso de «' + texto(txt(cfg.CATEGORIA_SENAL)) + '» con la referencia «Inscripción» · ' + texto(ie.ID) + '. Si llega a la señal, el equipo pasa a Confirmada.</p>' +
-          '<div class="gs-error" id="gs-err" role="alert" hidden></div><div class="gs-acc gs-pie"><button type="button" class="gs-b2" data-cerrar>Cancelar</button>' +
+          '<p class="gs-nota">Se apunta en Economía como cobro de la inscripción de ' + texto(nomIe(ie.ID)) + '. Si llega a la señal, el equipo pasa a Confirmada.</p>' +
+          '<div class="gs-acc gs-pie"><div class="gs-error" id="gs-err" role="alert" hidden></div><button type="button" class="gs-b2" data-cerrar>Cancelar</button>' +
           '<button type="button" class="gs-b1" id="cs-ok">Apuntar el cobro</button></div>';
         ventana(punto(ie.ID_COLOR) + 'Apuntar la señal · ' + texto(nomIe(ie.ID)), html, function () {
           vent.querySelector('#cs-ok').addEventListener('click', function () {
@@ -1901,34 +2071,38 @@
         if (ie.ORIGEN === 'Clasificación') t.push(tag('Copa', 'gs-tag-g'));
         var lig = ix.lig[String(ie.ID_LIGA || '')], ges = lig ? staff(lig.ID_GESTOR) : null, apodo = ges ? txt(ges.APODO || ges.NOMBRE) : '';
         var nAct = activas(ie.ID).length, cargandoPl = !jugLeidas() && esTem;
-        var html = '<p class="gs-nota gs-sub">' + texto([nomComp(ie.ID_COMPETICION), nom('lig', ie.ID_LIGA), ie.ID].filter(Boolean).join(' · ')) + '</p>' +
+        var html = '<p class="gs-nota gs-sub">' + texto([nomComp(ie.ID_COMPETICION), nom('lig', ie.ID_LIGA)].filter(Boolean).join(' · ')) + '</p>' +
           (t.length ? '<div class="gs-tags gs-sub2">' + t.join('') + '</div>' : '') +
           '<div class="gs-btns">' + (cap ? aWa(cap.TELEFONO, 'Escribir a la capitana') : '') +
           (ges ? (wa(ges.TELEFONO) ? aWa(ges.TELEFONO, 'Escribir al gestor (' + apodo + ')') : '<span class="gs-sintel">Gestor ' + texto(apodo) + ': sin teléfono en STAFF</span>') : '') +
-          (ie.ESTADO !== 'Baja' ? '<button type="button" class="gs-b2" id="gs-verjug" data-id="' + texto(ie.ID) + '">Ver jugadoras</button>' : '') + '</div>' +
+          (ie.ESTADO !== 'Baja' ? '<button type="button" class="gs-b2" id="gs-verjug" data-id="' + texto(ie.ID) + '">Ver jugadoras</button>' : '') +
+          // T0343: con su liga cerrada, el enlace con el que la capitana elige el color.
+          (ie.ESTADO !== 'Baja' && ligaCerrada(ix.lig[ie.ID_LIGA]) ? '<button type="button" class="gs-b2" data-accion="enlace-color" data-id="' + texto(ie.ID) + '">Enlace del color</button>' : '') + '</div>' +
           bloqueAvisos(av, ie.ID) +
           '<div class="gs-sec">Liga y organización</div><div class="gs-dos">' +
           (ligaCerrada(ix.lig[ie.ID_LIGA]) ? campo({ id: 'e-ID_LIGA', t: 'select', et: 'Liga', v: ie.ID_LIGA, opts: ligasDe(ie.ID_COMPETICION, ie.ID_LIGA), attrs: ' disabled', nota: 'Cerrada: sus equipos quedan fijos.' })
             : campo({ id: 'e-ID_LIGA', t: 'select', et: 'Liga', v: ie.ID_LIGA, opts: ligasDe(ie.ID_COMPETICION), vacio: '— Sin liga —' })) +
           campo({ id: 'e-NIVEL', t: 'select', et: 'Nivel', v: ie.NIVEL == null ? '' : String(ie.NIVEL), opts: NIVELES, vacio: '—' }) +
           campo({ id: 'e-ID_RESPONSABLE', t: 'select', et: 'Responsable (cobra la señal)', v: ie.ID_RESPONSABLE, opts: gestores(), vacio: '—' }) +
-          campo({ id: 'e-ID_COLOR', t: 'select', et: 'Color de camiseta', v: ie.ID_COLOR, opts: cols, vacio: '—', pre: '<i class="gs-color" id="gs-colpre" style="background:' + texto(hexDe(ie.ID_COLOR) || 'transparent') + '"></i>' }) +
+          // T0343: con sus camisetas pedidas, el color queda fijo (también en el motor).
+          campo({ id: 'e-ID_COLOR', t: 'select', et: 'Color de camiseta', v: ie.ID_COLOR, opts: cols, vacio: '—', pre: '<i class="gs-color" id="gs-colpre" style="background:' + texto(hexDe(ie.ID_COLOR) || 'transparent') + '"></i>',
+            attrs: colorFijo(d.cam, porIe[ie.ID]) ? ' disabled' : '', nota: colorFijo(d.cam, porIe[ie.ID]) ? 'Sus camisetas ya están pedidas: el color queda fijo.' : '' }) +
           campo({ id: 'e-NOMBRE_EQUIPO', t: 'texto', et: 'Nombre este año', v: ie.NOMBRE_EQUIPO, attrs: ' maxlength="80"' }) +
           campo({ id: 'e-ESTADO', t: 'select', et: 'Estado', v: ie.ESTADO, opts: [['Solicitada', 'Solicitada (sin confirmar)'], ['Confirmada', 'Confirmada'], ['Baja', 'Baja (no cuenta)']] }) +
           '</div>' +
-          '<div class="gs-sec">Seguimiento</div><div class="gs-checks">' +
-          campo({ id: 'e-MENSAJE_INICIAL_ENVIADO', t: 'si', et: 'Mensaje inicial enviado (M.I)', v: ie.MENSAJE_INICIAL_ENVIADO }) +
-          campo({ id: 'e-GRUPO_CREADO', t: 'si', et: 'Grupo de WhatsApp creado (Gr C/TS)', v: ie.GRUPO_CREADO }) +
+          plegado('Seguimiento', resumenSeguimiento(ie), '<div class="gs-checks">' +
+          campo({ id: 'e-MENSAJE_INICIAL_ENVIADO', t: 'si', et: 'Mensaje inicial enviado', v: ie.MENSAJE_INICIAL_ENVIADO }) +
+          campo({ id: 'e-GRUPO_CREADO', t: 'si', et: 'Grupo de WhatsApp creado', v: ie.GRUPO_CREADO }) +
           campo({ id: 'e-EN_XPORTY', t: 'si', et: 'Dado de alta en Xporty', v: ie.EN_XPORTY }) + '</div>' +
-          campo({ id: 'e-NOTAS', t: 'area', et: 'Notas internas', v: ie.NOTAS }) +
-          bloqueInteracciones(ie);
+          campo({ id: 'e-NOTAS', t: 'area', et: 'Notas internas', v: ie.NOTAS })) +
+          plegado('Interacciones', resumenInteracciones(ie), bloqueInteracciones(ie, true), 'gs-pl-inter');
         if (p && p.baja && !p.incluida) {
           html += '<div class="gs-sec">Pagos</div><div class="gs-dl">' +
             fila('Cobrado', eurC(p.cobrado) + (p.cobros ? ' (' + plural(p.cobros, 'movimiento', 'movimientos') + ')' : '')) +
             fila('Señal', p.senal > 0 ? '<b>' + eurC(p.senal) + ' · se queda</b>' : p.cobros ? '<span class="gs-opc">Devuelta</span>' : '<span class="gs-opc">No pagó nada</span>') + '</div>' +
             '<p class="gs-nota">Equipo de baja: no debe nada y lo que pagó se queda como ingreso (no se devuelve)' +
             (SENAL && p.senal > 0 ? ', en Economía en la categoría «' + texto(SENAL) + '»' : '') +
-            '. Si se le devuelve, se apunta en Economía como gasto con la referencia «Inscripción» · ' + texto(ie.ID) + '.</p>';
+            '. Si se le devuelve, se apunta en Economía como gasto con la referencia de su inscripción.</p>';
         } else if (p) {
           html += '<div class="gs-sec">Pagos</div>' + (p.incluida ? '<p class="gs-nota">Incluida en otra inscripción: no se cobra.</p>' : '<div class="gs-dl">' +
             fila('Precio', p.sinTarifa ? '<span class="gs-amb">Sin tarifa en TARIFAS para esta competición</span>' : eurC(p.precio)) +
@@ -1936,10 +2110,11 @@
             filaCamisetas(p) +
             fila('Cobrado', eurC(p.cobrado) + (p.cobros ? ' (' + plural(p.cobros, 'movimiento', 'movimientos') + ')' : '')) +
             (p.sinTarifa ? '' : fila('Pendiente', p.falta > 0 ? '<b class="gs-neg">Faltan ' + eurC(p.falta) + '</b>' + (p.camisetas && p.camisetas.total ? ' · ' + texto(desglose(p)) : '') : p.falta < 0 ? '<b class="gs-pos">Ha pagado ' + eurC(-p.falta) + ' de más</b>' : '<span class="gs-pos">Al día</span>')) + '</div>' +
-            '<p class="gs-nota">Los cobros se apuntan en Economía con la referencia «Inscripción» · ' + texto(ie.ID) + ', también los de las camisetas personalizadas' +
+            '<p class="gs-nota">Los cobros se apuntan en Economía con la referencia de su inscripción, también los de las camisetas personalizadas' +
               (txt(cfg.CAMISETAS) ? ': lo que pasa del precio de la inscripción se pasa solo a «' + texto(txt(cfg.CAMISETAS)) + '»' : '') + '.</p>');
         }
-        html += '<div class="gs-sec">Plantilla (' + (cargandoPl ? '…' : nAct) + ')</div>' +
+        var capN = nombreJug(cap);
+        html += plegado('Plantilla (' + (cargandoPl ? '…' : nAct) + ')', capN ? 'Capitana: ' + capN : 'Sin capitana', 
           campo({ id: 'e-ID_CAPITANA', t: 'select', et: 'Capitana', v: ie.ID_CAPITANA, opts: capis, vacio: capis.length ? '— Sin capitana —' : 'Todavía no tiene jugadoras' }) +
           (cargandoPl ? '<p class="gs-nota">Cargando las jugadoras…</p>' : '') +
           (pl.length ? '<div class="gs-lista gs-plantilla">' + pl.map(function (j) {
@@ -1947,29 +2122,33 @@
             return '<button type="button" class="gs-item' + (baja ? ' gs-err' : '') + '" data-ij="' + texto(j.ID) + '"><div class="gs-min"><div class="gs-t">' + texto(nombreJug(q) || j.ID_JUGADORA) + '</div>' +
               '<div class="gs-tags">' + (String(j.ID_JUGADORA) === String(ie.ID_CAPITANA) ? tag('Capitana', 'gs-tag-v') : '') + (baja ? tag('Baja', 'gs-tag-err') : '') + guardando(j) + '</div></div>' +
               '<div class="gs-d">' + (txt(j.DORSAL) ? texto(txt(j.DORSAL)) : '<span class="gs-opc">Sin dorsal</span>') + '</div></button>';
-          }).join('') + '</div>' : (cargandoPl ? '' : '<p class="gs-nota">Sin jugadoras inscritas.</p>')) +
-''; 
-        html += '<div class="gs-sec">El equipo</div>' + (e.ID ? '<div class="gs-dos">' +
+          }).join('') + '</div>' : (cargandoPl ? '' : '<p class="gs-nota">Sin jugadoras inscritas.</p>')));
+        html += plegado('El equipo', [txt(e.NOMBRE), otras.length ? plural(otras.length, 'temporada más', 'temporadas más') : ''].filter(Boolean).join(' · '), (e.ID ? '<div class="gs-dos">' +
           campo({ id: 'q-NOMBRE', t: 'texto', et: 'Nombre (todos los años)', v: e.NOMBRE, attrs: ' maxlength="80"' }) +
           campo({ id: 'q-TIPO', t: 'select', et: 'Tipo', v: e.TIPO, opts: [['Liga', 'Liga'], ['Kopa di Mondo', 'Kopa di Mondo']] }) + '</div>' +
           campo({ id: 'q-NOTAS', t: 'area', et: 'Notas del equipo', v: e.NOTAS }) +
-          '<div class="gs-dl">' + fila('Alta', texto(fecha(e.FECHA_ALTA))) + fila('ID', texto(e.ID)) + '</div>' : '<p class="gs-nota">No encuentro el equipo ' + texto(ie.ID_EQUIPO) + ' en EQUIPOS.</p>');
-        if (otras.length) html += '<p class="gs-nota">Otras temporadas:</p><div class="gs-lista">' + otras.map(function (x) {
+          '<div class="gs-dl">' + fila('Alta', texto(fecha(e.FECHA_ALTA))) + fila('ID', texto(e.ID)) + '</div>' : '<p class="gs-nota">No encuentro el equipo ' + texto(ie.ID_EQUIPO) + ' en EQUIPOS.</p>') +
+          (otras.length ? '<p class="gs-nota">Otras temporadas:</p><div class="gs-lista">' + otras.map(function (x) {
           var cc = ix.com[x.ID_COMPETICION] || {};
           return '<button type="button" class="gs-item' + (x.ESTADO === 'Baja' ? ' gs-err' : '') + '" data-ie="' + texto(x.ID) + '"><div class="gs-min"><div class="gs-t">' + punto(x.ID_COLOR) + texto(x.NOMBRE_EQUIPO || x.ID) + '</div>' +
             '<div class="gs-s">' + texto([nom('tem', cc.ID_TEMPORADA) || cc.ID_TEMPORADA, nomComp(x.ID_COMPETICION), nom('lig', x.ID_LIGA), x.ESTADO].filter(Boolean).join(' · ')) + '</div></div></button>';
-        }).join('') + '</div>';
-        html += '<div class="gs-sec">Inscripción</div><div class="gs-dl">' + fila('Fecha', texto(fecha(ie.FECHA_INSCRIPCION))) + fila('Origen', texto(ie.ORIGEN)) +
-          (ie.ID_INSCRIPCION_ORIGEN ? fila('Viene de', texto(nomIe(ie.ID_INSCRIPCION_ORIGEN)) + ' (' + texto(ie.ID_INSCRIPCION_ORIGEN) + ')') : '') +
+        }).join('') + '</div>' : ''));
+        html += plegado('Inscripción', [fecha(ie.FECHA_INSCRIPCION) ? 'el ' + fecha(ie.FECHA_INSCRIPCION) : '', txt(ie.ORIGEN)].filter(Boolean).join(' · '), '<div class="gs-dl">' + fila('Fecha', texto(fecha(ie.FECHA_INSCRIPCION))) + fila('Origen', texto(ie.ORIGEN)) +
+          (ie.ID_INSCRIPCION_ORIGEN ? fila('Viene de', texto([nomIe(ie.ID_INSCRIPCION_ORIGEN), nomComp((ix.ie[ie.ID_INSCRIPCION_ORIGEN] || {}).ID_COMPETICION)].filter(Boolean).join(' · '))) : '') +
           fila('Capitana', texto(nombreJug(cap))) + fila('Teléfono', texto(cap && cap.TELEFONO)) + fila('Correo', texto(cap && cap.EMAIL)) +
           fila('Experiencia', texto(ie.EXPERIENCIA)) + fila('Disponibilidad', texto(ie.DISPONIBILIDAD)) + fila('Horario preferido', texto(ie.PREFERENCIA_HORARIA)) +
-          (jugLeidas() || !esTem ? fila('Edad media', edad1(edadMedia(ie.ID)) ? texto(edad1(edadMedia(ie.ID)) + ' años') : '') : '') + '</div>' +
-          (txt(ie.COMENTARIOS) ? '<div class="gs-dtx"><b>Comentarios</b><p>' + texto(ie.COMENTARIOS) + '</p></div>' : '') +
+          (jugLeidas() || !esTem ? fila('Edad media', edad1(edadMedia(ie.ID)) ? texto(edad1(edadMedia(ie.ID)) + ' años') : '') : '') +
+          // T0368: lo que la tarjeta de la señal decía del formulario (T0335) está aquí, para no repetirlo arriba.
+          (ie.NUM_JUGADORAS ? fila('Son unas', texto(ie.NUM_JUGADORAS)) : '') + (cap && cap.IDIOMA && cap.IDIOMA !== 'Castellano' ? fila('Escribirle en', texto(cap.IDIOMA)) : '') +
+          (ie.BUSCA_JUGADORAS === true ? fila('Buscan jugadoras', texto(ie.CUANTAS_BUSCA || 'sí')) : '') +
+          (txt(ie.FACTURA_NOMBRE) ? fila('Factura a', texto([txt(ie.FACTURA_NOMBRE), txt(ie.FACTURA_NIF), txt(ie.FACTURA_DIRECCION), txt(ie.FACTURA_EMAIL)].filter(Boolean).join(', '))) : '') + '</div>' +
+          (txt(ie.COMENTARIOS) ? '<div class="gs-dtx"><b>Comentarios</b><p>' + texto(ie.COMENTARIOS) + '</p></div>' : '')) +
           pie('e-guardar');
         var gIe = { f: ie, pre: 'e-', ks: ['ID_LIGA', 'NIVEL', 'ID_RESPONSABLE', 'ID_COLOR', 'NOMBRE_EQUIPO', 'ESTADO', 'MENSAJE_INICIAL_ENVIADO', 'GRUPO_CREADO', 'EN_XPORTY', 'NOTAS', 'ID_CAPITANA'] };
         var gEq = { f: e, pre: 'q-', ks: e.ID ? ['NOMBRE', 'TIPO', 'NOTAS'] : [] };
         ventana(punto(ie.ID_COLOR) + texto(nomIe(ie.ID)), html, function () {
           vent.setAttribute('data-ficha', ie.ID); montarInteracciones(ie);
+          [].forEach.call(vent.querySelectorAll('details.gs-plg'), function (x) { x.addEventListener('toggle', function () { fichaAb[x.getAttribute('data-plg')] = x.open; }); });
           var sc = vent.querySelector('#e-ID_COLOR'), pre = vent.querySelector('#gs-colpre');
           sc.addEventListener('change', function () { pre.style.background = hexDe(sc.value) || 'transparent'; });
           guardable('e-guardar', [gIe, gEq], {
@@ -1998,7 +2177,7 @@
         var ie = ij ? ix.ie[ij.ID_INSCRIPCION_EQUIPO] || {} : null, av = ij ? avisosJugadora(d, ij, cx) : [], e = edad(p.FECHA_NACIMIENTO);
         var t = [];
         if (ij && !ijCuenta(ij)) t.push(tag('Baja: esta inscripción no cuenta', 'gs-tag-r'));
-        var html = '<p class="gs-nota gs-sub">' + texto([ij ? nomIe(ij.ID_INSCRIPCION_EQUIPO) : '', ij ? nomComp(ie.ID_COMPETICION) : '', p.ID, e !== '' ? e + ' años' : ''].filter(Boolean).join(' · ')) + '</p>' +
+        var html = '<p class="gs-nota gs-sub">' + texto([ij ? nomIe(ij.ID_INSCRIPCION_EQUIPO) : '', ij ? nomComp(ie.ID_COMPETICION) : '', e !== '' ? e + ' años' : ''].filter(Boolean).join(' · ')) + '</p>' +
           (t.length ? '<div class="gs-tags gs-sub2">' + t.join('') + '</div>' : '') +
           '<div class="gs-btns">' + aWa(p.TELEFONO, 'WhatsApp') +
           (ie && ie.ID ? '<button type="button" class="gs-b2" data-ie="' + texto(ie.ID) + '">Ver el equipo</button>' : '') + '</div>' +
@@ -2347,6 +2526,7 @@
           if (ac === 'vermas') { S.ju.n += VER; repintarLista(); }
           else if (ac === 'senal') { var is = ix.ie[b.getAttribute('data-id')]; if (is) ventanaSenal(is); }
           else if (ac === 'avisar-liga') { var il = ix.ie[b.getAttribute('data-id')]; if (il) ventanaLiga(il); }
+          else if (ac === 'enlace-color') { var ico = ix.ie[b.getAttribute('data-id')]; if (ico) ventanaColor(ico); }
           else if (ac === 'cobro-senal') { var ic = ix.ie[b.getAttribute('data-id')]; if (ic) ventanaCobroSenal(ic); }
           return;
         }

@@ -9,7 +9,9 @@
  * - ?f=equipo (&c=COM…): la capitana inscribe al equipo; al acabar, el enlace para sus jugadoras;
  * - ?f=jugadora (&c=COM…&e=IE…: el enlace de la capitana, que ya trae el equipo; &i=IE…: «Me interesa» del banco): cada
  *   jugadora en su equipo, o «busco equipo» (el formulario corto);
- * - ?f=banco: equipos que buscan jugadoras y jugadoras que buscan equipo (sin nada que las identifique).
+ * - ?f=banco: equipos que buscan jugadoras y jugadoras que buscan equipo (sin nada que las identifique);
+ * - ?f=color&e=IE…&k=… (T0343): la capitana elige el color de su equipo entre los libres de su liga, con el enlace que le
+ *   manda Konamigas (la clave k es solo de su equipo), a la hora en que se abren los colores de su liga.
  * Idiomas (Javi): castellano, catalán e inglés; los textos, en textos.js (window.INS_TEXTOS). El elegido se guarda en el
  * dispositivo (o ?lang=ca). Lo que se escribe se guarda en el dispositivo como borrador hasta que se envía.
  * En el ordenador, el formulario va con un resumen fijo al lado (cada línea lleva a su campo); en el móvil, una barra abajo
@@ -17,6 +19,20 @@
  */
 (function () {
   'use strict';
+  var BUSCAR_MIN = 2, BUSCAR_MAX = 8; // T0370: la lista de equipos de otros años, vacía hasta 2 letras y como mucho 8
+
+  /**
+   * Los equipos de otros años que casan con lo escrito (T0370): ninguno con menos de BUSCAR_MIN letras y como mucho
+   * BUSCAR_MAX, en el orden del motor (primero los de la última temporada jugada). El elegido (sel) sale siempre, aunque
+   * cambie la búsqueda.
+   */
+  function buscarAnteriores(lista, texto, sel) {
+    var q = norm(texto), elegido = (lista || []).filter(function (e) { return e.id === sel; });
+    var casan = q.length < BUSCAR_MIN ? [] : (lista || []).filter(function (e) { return e.id !== sel && norm(e.nombre).indexOf(q) >= 0; });
+    return elegido.concat(casan).slice(0, Math.max(BUSCAR_MAX, elegido.length));
+  }
+  if (typeof window === 'undefined') { if (typeof module !== 'undefined') module.exports = { buscarAnteriores: buscarAnteriores }; return; }
+
   var C = window.KANBAN || {};
   var TT = window.INS_TEXTOS || {};
   var raiz = document.getElementById('ins');
@@ -310,6 +326,7 @@
     if (p.f === 'equipo') return pintarEquipo(p);
     if (p.f === 'jugadora') return pintarJugadora(p);
     if (p.f === 'banco') return pintarBanco(p);
+    if (p.f === 'color') return pintarColor(p);
     if (p.f === 'privacidad') return pintarPrivacidad();
     pintarPortada();
   }
@@ -391,7 +408,7 @@
     raiz.innerHTML = conResumen(t('equipo.titulo'), '<p>' + esc(t('equipo.para')) + '</p><div id="ins-aviso-borrador"></div>',
       '<form id="ins-form" novalidate>' + elegirCompeticion(p.c || '', t('equipo.competicionAyuda')) +
       grupo('jugado', t('equipo.jugado'), '<div class="ins-opciones">' + ficha('radio', 'jugado', 'si', esc(t('equipo.jugadoSi'))) + ficha('radio', 'jugado', 'no', esc(t('equipo.jugadoNo'))) + '</div>') +
-      '<div id="ins-anterior" hidden>' + grupo('ID_EQUIPO', t('equipo.anterior'), '<input type="search" id="buscar-anterior" placeholder="' + esc(t('general.buscar')) + '" autocomplete="off">' +
+      '<div id="ins-anterior" hidden>' + grupo('ID_EQUIPO', t('equipo.anterior'), '<input type="search" id="buscar-anterior" placeholder="' + esc(t('equipo.buscarAnterior')) + '" autocomplete="off">' +
         '<div class="ins-equipos ins-opciones lista" id="lista-anterior"></div>', t('equipo.anteriorAyuda')) + '</div>' +
       campo('NOMBRE_EQUIPO', t('equipo.nombre'), texto('NOMBRE_EQUIPO', 'text', ' maxlength="40" autocomplete="off" autocapitalize="characters"') + '<div class="ins-cuenta" id="cuenta-nombre">0 / 20</div><p class="ins-nota-mal" id="nota-NOMBRE_EQUIPO" hidden></p>', t('equipo.nombreAyuda')) +
       '<div class="ins-fila">' + campo('CAPITANA', t('equipo.capitana'), texto('CAPITANA', 'text', ' autocomplete="name"')) +
@@ -445,12 +462,12 @@
     }
     function anteriores() {
       var q = norm(document.getElementById('buscar-anterior').value), sel = marcadas(f, 'ID_EQUIPO')[0], c = elegida();
-      var lista = (datos.anteriores || []).filter(function (e) { return !q || norm(e.nombre).indexOf(q) >= 0 || e.id === sel; }).slice(0, 80);
+      var lista = buscarAnteriores(datos.anteriores, q, sel);
       document.getElementById('lista-anterior').innerHTML = lista.map(function (e) {
         var ya = c && (e.en || []).indexOf(c.id) >= 0;
         var det = ya ? t('equipo.yaInscrito') : [e.temporada, e.liga].filter(Boolean).join(' · ') || t('equipo.sinTemporadas');
         return ficha('radio', 'ID_EQUIPO', e.id, esc(e.nombre) + '<small>' + esc(det) + '</small>', e.id === sel && !ya, ya ? ' disabled' : '');
-      }).join('') || '<p class="ins-ayuda">' + esc(t('equipo.noAnterior')) + '</p>';
+      }).join('') || (q.length < BUSCAR_MIN ? '' : '<p class="ins-ayuda">' + esc(t('equipo.noAnterior')) + '</p>');
     }
     function contar() {
       var n = f.elements.NOMBRE_EQUIPO.value.length, c = document.getElementById('cuenta-nombre');
@@ -1024,6 +1041,55 @@
       '<text x="100" y="132" text-anchor="middle" font-family="Montserrat, sans-serif" font-weight="800" font-size="' + (dorsal.length > 1 ? 70 : 78) + '" fill="' + tinta + '">' + esc(dorsal || '?') + '</text>' +
       '<text x="100" y="168" text-anchor="middle" font-family="Montserrat, sans-serif" font-weight="800" font-size="12" letter-spacing="1.5" fill="' + tinta + '">KONAMIGAS</text></svg>';
   }
+
+  /* ---------- T0343 · el color del equipo ---------- */
+
+  var colorDe = null, eligiendo = false;
+  /** «13/11» y «20:00» de 'aaaa-mm-ddThh:mm'. */
+  function diaHora(fh) { var m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d:\d\d)/.exec(String(fh || '')); return m ? { D: m[3] + '/' + m[2], H: m[4] } : { D: '', H: '' }; }
+  /** Los errores del motor que puede ver la capitana, en su idioma (los demás, como llegan). */
+  function errorColor(e) {
+    var m = String((e && e.message) || e || '');
+    if (/enlace no es válido/.test(m)) return t('color.noEnlace');
+    if (/acaba de coger/.test(m)) return t('color.cogidoYa');
+    if (/ya están pedidas/.test(m)) return t('color.fijo');
+    if (/aún no se han abierto/.test(m)) return t('color.aunNo');
+    return mensaje(e);
+  }
+  function pintarColor(p) {
+    if (!p.e || !p.k) { raiz.innerHTML = volver() + '<h1>' + esc(t('color.titulo')) + '</h1><p class="ins-error">' + esc(t('color.noEnlace')) + '</p>'; return; }
+    raiz.innerHTML = volver() + '<h1>' + esc(t('color.titulo')) + '</h1><div id="ins-color"><div class="ins-carga" role="status"><span class="ins-punto"></span> ' + esc(t('color.mirando')) + '</div></div>';
+    llamar('inscripcionesColor', [p.e, p.k]).then(function (r) { colorDe = r; pintarColor2(p, ''); })
+      .catch(function (e) { var d = document.getElementById('ins-color'); if (d) d.innerHTML = '<p class="ins-error">' + esc(errorColor(e)) + '</p>'; });
+  }
+  function pintarColor2(p, hecho, error) {
+    var d = document.getElementById('ins-color'), r = colorDe;
+    if (!d || !r) return;
+    var h = '<p class="ins-color-eq">' + esc(t('color.para', { E: r.equipo, L: opcionTxt(r.liga) })) + '</p>';
+    if (r.mio) h += '<figure class="ins-cam ins-color-mio">' + dibujoCamiseta(r.mio, ' ') + '<figcaption>' + esc(t('color.vuestro', { C: r.mio.nombre })) + '</figcaption></figure>' +
+      '<p class="ins-ayuda">' + esc(t(r.fijo ? 'color.fijo' : 'color.cambiar')) + '</p>';
+    if (hecho) h += '<p class="ins-aviso ins-color-hecho" role="status">' + esc(hecho) + '</p>';
+    if (error) h += '<p class="ins-error" role="alert">' + esc(error) + '</p>';
+    if (r.estado !== 'abierto') h += '<p class="ins-aviso">' + esc(t('color.' + r.estado, diaHora(r.abre))) + '</p>' +
+      (r.estado === 'pronto' ? '<p><button type="button" class="ins-boton secundario" data-color-ver>' + esc(t('color.actualizar')) + '</button></p>' : '');
+    else if (!r.fijo) h += '<p>' + esc(t('color.elige')) + '</p><div class="ins-colores">' + r.colores.map(function (c) {
+        var mio = r.mio && r.mio.id === c.id, cogido = !!c.de && !mio;
+        return '<button type="button" class="ins-color' + (mio ? ' mio' : '') + '" data-color="' + esc(c.id) + '" data-nombre="' + esc(c.nombre) + '"' + (cogido || mio || eligiendo ? ' disabled' : '') + '>' +
+          '<span class="ins-color-cam">' + dibujoCamiseta(c, ' ') + '</span><b>' + esc(c.nombre) + '</b><small>' + esc(mio ? t('color.vuestroCorto') : cogido ? t('color.cogido', { E: c.de }) : t('color.libre')) + '</small></button>';
+      }).join('') + '</div><p><button type="button" class="ins-boton secundario" data-color-ver>' + esc(t('color.actualizar')) + '</button></p>';
+    d.innerHTML = h;
+  }
+  raiz.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-color], [data-color-ver]'), p = parametros();
+    if (!b || p.f !== 'color' || eligiendo) return;
+    if (b.hasAttribute('data-color-ver')) { pintarColor(p); return; }
+    var nombre = b.getAttribute('data-nombre');
+    eligiendo = true; b.querySelector('small').textContent = t('color.guardando'); [].forEach.call(raiz.querySelectorAll('[data-color]'), function (x) { x.disabled = true; });
+    llamar('inscripcionesElegirColor', [{ e: p.e, k: p.k, color: b.getAttribute('data-color') }])
+      .then(function (r) { eligiendo = false; colorDe = r; pintarColor2(p, t('color.hecho', { C: nombre })); })
+      // Si otro equipo lo ha cogido antes, se vuelve a mirar cómo está la liga y se dice por qué.
+      .catch(function (x) { eligiendo = false; var m = errorColor(x); llamar('inscripcionesColor', [p.e, p.k]).then(function (r) { colorDe = r; pintarColor2(p, '', m); }, function () { pintarColor2(p, '', m); }); });
+  });
 
   /* ---------- enviar y avisar ---------- */
 

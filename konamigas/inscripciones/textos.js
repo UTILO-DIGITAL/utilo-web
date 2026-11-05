@@ -56,7 +56,7 @@ window.INS_TEXTOS.es = {
     competicion: 'Competición', competicionAyuda: '¿En qué liga os queréis inscribir?',
     jugado: '¿Habéis jugado antes en Konamigas?', jugadoSi: 'Sí', jugadoNo: 'No, somos nuevas',
     anterior: '¿Cuál era vuestro equipo?', anteriorAyuda: 'Sale con la última temporada y la liga en que jugó, por si hay dos con el mismo nombre. Si sois la unión de varios equipos, elegid uno y contadlo en los comentarios.',
-    yaInscrito: 'Ya está inscrito en esta competición', sinTemporadas: 'Sin temporadas jugadas', noAnterior: 'No encontramos ese equipo. Escribe otra parte del nombre o marca «No, somos nuevas».',
+    buscarAnterior: 'Escribe el nombre de tu equipo', yaInscrito: 'Ya está inscrito en esta competición', sinTemporadas: 'Sin temporadas jugadas', noAnterior: 'No encontramos ese equipo. Escribe otra parte del nombre o marca «No, somos nuevas».',
     nombre: 'Nombre del equipo', nombreAyuda: 'Máximo 20 caracteres, espacios incluidos. Se podrá cambiar más adelante. Si dos equipos eligen el mismo nombre, se queda el que antes complete la inscripción. Por ejemplo: AMIGAS DEL COLE ✅, PELOTUDAS ✅, LAS MAS AMAS DE BCN FC ❌ (22 caracteres).',
     capitana: 'Nombre y apellido de la capitana', telefono: 'Teléfono de la capitana', email: 'Email de la capitana', emailAyuda: 'Te enviaremos aquí lo de la inscripción.',
     cuantas: '¿Cuántas sois?', cuantasAyuda: 'Más o menos: nos ayuda a saber si os llega y a prever las camisetas.',
@@ -170,6 +170,19 @@ window.INS_TEXTOS.es = {
     apuntate: '¿Buscas equipo?', apuntateBoton: 'Apuntarme sin equipo', equipoBusca: '¿A tu equipo le faltan jugadoras?', equipoBuscaTexto: 'Márcalo al inscribir el equipo («¿Buscáis jugadoras?») o pídenoslo y os sacamos aquí.'
   },
 
+  // T0343 · La capitana elige el color de su equipo (?f=color&e=…&k=…, el enlace que le manda Konamigas).
+  color: {
+    titulo: 'El color de vuestra camiseta', para: '{E} · {L}', mirando: 'Mirando los colores de tu liga…',
+    sinLiga: 'Vuestra liga todavía no está cerrada. Cuando lo esté, Konamigas os dirá cuándo se eligen los colores.',
+    sinHora: 'Todavía no sabemos cuándo se abren los colores de vuestra liga. Lo anunciaremos en Instagram: ¡estad atentas!',
+    pronto: 'Los colores de vuestra liga se abren el {D} a las {H}. Volved a este enlace a esa hora: el primer equipo que coge un color se lo queda.',
+    sinColores: 'Todavía no hay colores para elegir en vuestra liga. Escríbenos y lo miramos.',
+    elige: 'Elegid el color de vuestro equipo entre los que quedan libres en vuestra liga. El primero que coge un color se lo queda.',
+    vuestro: 'Vuestro color: {C}', cambiar: 'Podéis cambiarlo mientras no se pidan las camisetas.', fijo: 'Vuestras camisetas ya están pedidas: el color ya no se puede cambiar.',
+    libre: 'Libre', cogido: 'Lo tiene {E}', vuestroCorto: 'El vuestro', boton: 'Quedarnos el {C}', guardando: 'Guardando…', hecho: '¡Hecho! Vuestro color es el {C}.',
+    actualizar: 'Ver cómo está ahora', noEnlace: 'Este enlace no es válido. Pedid el vuestro a Konamigas.', cogidoYa: 'Otro equipo acaba de coger ese color. Elegid otro.', aunNo: 'Los colores de vuestra liga aún no se han abierto.'
+  },
+
   despedida: '¡VIVA LA VIDA! ¡VIVA KONAMI Y, SOBRE TODO, VIVA VOSOTRAS!',
   animo: '¡Asegura la plaza de tu equipo!'
 };
@@ -216,7 +229,7 @@ window.INS_TEXTOS.ca = {
     competicion: 'Competició', competicionAyuda: 'A quina lliga us voleu inscriure?',
     jugado: 'Heu jugat abans a Konamigas?', jugadoSi: 'Sí', jugadoNo: 'No, som noves',
     anterior: 'Quin era el vostre equip?', anteriorAyuda: "Surt amb l'última temporada i la lliga on va jugar, per si n'hi ha dos amb el mateix nom. Si sou la unió de diversos equips, trieu-ne un i expliqueu-ho als comentaris.",
-    yaInscrito: 'Ja està inscrit en aquesta competició', sinTemporadas: 'Sense temporades jugades', noAnterior: "No trobem aquest equip. Escriu una altra part del nom o marca «No, som noves».",
+    buscarAnterior: 'Escriu el nom del teu equip', yaInscrito: 'Ja està inscrit en aquesta competició', sinTemporadas: 'Sense temporades jugades', noAnterior: "No trobem aquest equip. Escriu una altra part del nom o marca «No, som noves».",
     nombre: "Nom de l'equip", nombreAyuda: "Màxim 20 caràcters, espais inclosos. Es podrà canviar més endavant. Si dos equips trien el mateix nom, es queda el que abans completi la inscripció. Per exemple: AMIGAS DEL COLE ✅, PELOTUDAS ✅, LAS MAS AMAS DE BCN FC ❌ (22 caràcters).",
     capitana: 'Nom i cognom de la capitana', telefono: 'Telèfon de la capitana', email: 'Email de la capitana', emailAyuda: "T'enviarem aquí tot el de la inscripció.",
     cuantas: 'Quantes sou?', cuantasAyuda: 'Més o menys: ens ajuda a saber si us arriba i a preveure les samarretes.',
@@ -330,6 +343,19 @@ window.INS_TEXTOS.ca = {
     apuntate: 'Busques equip?', apuntateBoton: "Apuntar-me sense equip", equipoBusca: 'Al teu equip li falten jugadores?', equipoBuscaTexto: "Marca-ho en inscriure l'equip («Busqueu jugadores?») o demana-ho i us hi traiem."
   },
 
+  // T0343 · La capitana tria el color del seu equip.
+  color: {
+    titulo: 'El color de la vostra samarreta', para: '{E} · {L}', mirando: 'Mirant els colors de la teva lliga…',
+    sinLiga: 'La vostra lliga encara no està tancada. Quan ho estigui, Konamigas us dirà quan es trien els colors.',
+    sinHora: 'Encara no sabem quan s’obren els colors de la vostra lliga. Ho anunciarem a Instagram: estigueu atentes!',
+    pronto: 'Els colors de la vostra lliga s’obren el {D} a les {H}. Torneu a aquest enllaç a aquella hora: el primer equip que agafa un color se’l queda.',
+    sinColores: 'Encara no hi ha colors per triar a la vostra lliga. Escriviu-nos i ho mirem.',
+    elige: 'Trieu el color del vostre equip entre els que queden lliures a la vostra lliga. El primer que agafa un color se’l queda.',
+    vuestro: 'El vostre color: {C}', cambiar: 'El podeu canviar mentre no es demanin les samarretes.', fijo: 'Les vostres samarretes ja estan demanades: el color ja no es pot canviar.',
+    libre: 'Lliure', cogido: 'El té {E}', vuestroCorto: 'El vostre', boton: 'Quedar-nos el {C}', guardando: 'Desant…', hecho: 'Fet! El vostre color és el {C}.',
+    actualizar: 'Veure com està ara', noEnlace: 'Aquest enllaç no és vàlid. Demaneu el vostre a Konamigas.', cogidoYa: 'Un altre equip acaba d’agafar aquest color. Trieu-ne un altre.', aunNo: 'Els colors de la vostra lliga encara no s’han obert.'
+  },
+
   despedida: 'VISCA LA VIDA! VISCA KONAMI I, SOBRETOT, VISQUEU VOSALTRES!',
   animo: "Assegura la plaça del teu equip!"
 };
@@ -376,7 +402,7 @@ window.INS_TEXTOS.en = {
     competicion: 'Competition', competicionAyuda: 'Which league do you want to join?',
     jugado: 'Have you played in Konamigas before?', jugadoSi: 'Yes', jugadoNo: "No, we're new",
     anterior: 'What was your team called?', anteriorAyuda: 'Shown with its last season and league, in case two share a name. If you are several teams joining together, choose one and tell us in the comments.',
-    yaInscrito: 'Already registered in this competition', sinTemporadas: 'No seasons played', noAnterior: 'We can\'t find that team. Type another part of the name or choose "No, we\'re new".',
+    buscarAnterior: 'Type your team\'s name', yaInscrito: 'Already registered in this competition', sinTemporadas: 'No seasons played', noAnterior: 'We can\'t find that team. Type another part of the name or choose "No, we\'re new".',
     nombre: 'Team name', nombreAyuda: 'Up to 20 characters, spaces included. You can change it later. If two teams choose the same name, the first to complete the registration keeps it. For example: AMIGAS DEL COLE ✅, PELOTUDAS ✅, LAS MAS AMAS DE BCN FC ❌ (22 characters).',
     capitana: "Captain's first and last name", telefono: "Captain's phone", email: "Captain's email", emailAyuda: "We'll send the registration details here.",
     cuantas: 'How many of you are there?', cuantasAyuda: "Roughly: it helps us know if you have enough players and plan the shirts.",
@@ -488,6 +514,19 @@ window.INS_TEXTOS.en = {
     marcado: 'Interested', teInteresaUno: "You're interested in 1 team", teInteresan: "You're interested in {N} teams", apuntarme: 'Sign me up',
     otraComp: 'You can only pick teams from one competition at a time: we started again with this one.',
     apuntate: 'Looking for a team?', apuntateBoton: 'Sign me up without a team', equipoBusca: 'Is your team short of players?', equipoBuscaTexto: 'Tick it when registering the team ("Are you looking for players?") or ask us and we\'ll list you here.'
+  },
+
+  // T0343 · The captain chooses her team's colour.
+  color: {
+    titulo: 'Your shirt colour', para: '{E} · {L}', mirando: 'Looking at the colours in your league…',
+    sinLiga: 'Your league is not closed yet. When it is, Konamigas will tell you when colours are chosen.',
+    sinHora: 'We don’t know yet when colours open in your league. We will announce it on Instagram: stay tuned!',
+    pronto: 'Colours in your league open on {D} at {H}. Come back to this link then: the first team to take a colour keeps it.',
+    sinColores: 'There are no colours to choose in your league yet. Write to us and we will look into it.',
+    elige: 'Choose your team’s colour from the ones still free in your league. The first team to take a colour keeps it.',
+    vuestro: 'Your colour: {C}', cambiar: 'You can change it until the shirts are ordered.', fijo: 'Your shirts are already ordered: the colour can no longer be changed.',
+    libre: 'Free', cogido: '{E} has it', vuestroCorto: 'Yours', boton: 'Take {C}', guardando: 'Saving…', hecho: 'Done! Your colour is {C}.',
+    actualizar: 'See how it is now', noEnlace: 'This link is not valid. Ask Konamigas for yours.', cogidoYa: 'Another team has just taken that colour. Choose another one.', aunNo: 'Colours in your league are not open yet.'
   },
 
   despedida: 'LONG LIVE LIFE! LONG LIVE KONAMI AND, ABOVE ALL, LONG LIVE YOU!',

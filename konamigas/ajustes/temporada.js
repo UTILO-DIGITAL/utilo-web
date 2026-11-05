@@ -4,10 +4,12 @@
  * Va en la primera pestaña de Ajustes (la otra, «Todas las tablas»). Preparar una temporada no es rellenar una fila: es crear sus competiciones, sus ligas, los campos, los horarios, las
  * tarifas, las camisetas y los premios, y después apuntar a los equipos, repartirlos y sacar el calendario. Es un asistente
  * (Javi): se elige la temporada y se va pantalla a pantalla («‹ Anterior» y «Siguiente ›», o tocando la barra de pasos),
- * cada una con una pregunta, lo que hay (✓) y cada aviso con el botón que lo resuelve. Los pasos 1 a 4 se hacen aquí;
- * 5 a 8, juntos en «Y después». Salen todas las temporadas; las acabadas, aparte y con un aviso (son para revisar). El estado de cada uno sale de los datos (hecho, a medias, sin empezar):
+ * cada una con una pregunta, lo que hay (✓) y cada aviso con el botón que lo resuelve. Los pasos 1 a 4 preparan la
+ * temporada; después, el recorrido de la temporada fase a fase (T0343, Javi), cada fase con lo que falta para pasar a la
+ * siguiente y lo que se puede cambiar todavía. Salen todas las temporadas; las acabadas, aparte y con un aviso (son para revisar). El estado de cada uno sale de los datos (hecho, a medias, sin empezar):
  *   1 Temporada · 2 Competiciones y ligas · 3 Campos y horarios · 4 Tarifas, camisetas y premios · 5 Inscripciones ·
- *   6 Repartir los equipos y cerrar las ligas · 7 Calendario de cada liga · 8 Avisar a las capitanas.
+ *   6 Cada equipo en su liga (repartir y cerrar) · 7 Avisar a las capitanas · 8 Colores de camiseta · 9 Pedido de camisetas ·
+ *   10 Calendario de cada liga · 11 En juego · 12 Fase final y 13 Cierre (próximamente).
  * La temporada anterior va plegada debajo, como referencia. Nada se copia
  * solo (Javi, T0296): cada «Añadir» abre la ficha de Ajustes con lo de partida (la temporada, la competición o la liga) y
  * lo guarda la capa de tablas, con su LOG. Sirve igual para una temporada entera y para una competición suelta a mitad.
@@ -332,7 +334,7 @@
    */
   function enMarcha(d, x, compDe, tem) {
     var ctp = {}; x.ctps.forEach(function (c) { if (c.ESTADO === 'Contratado') ctp[s(c.ID_CAMPO)] = c; });
-    var items = x.ligas.map(function (l) {
+    var items = x.ligas.filter(function (l) { return !masAdelante(d, compDe[s(l.ID_COMPETICION)]); }).map(function (l) {
       var hs = x.huecos.filter(function (h) { return s(h.ID_LIGA) === s(l.ID); }), comp = compDe[s(l.ID_COMPETICION)] || {};
       var conf = x.ins.filter(function (i) { return s(i.ID_LIGA) === s(l.ID) && i.ESTADO === 'Confirmada'; }).length;
       var id = ideal(hs.length, comp.PARTIDOS_EQUIPO), nj = entero(l.NUM_JORNADAS), dura = entero(l.MINUTOS_PARTIDO) || 45, fa = [], ar = {};
@@ -352,8 +354,11 @@
       });
       return { titulo: s(l.NOMBRE || l.ID), ficha: ['LIGAS', l.ID], faltan: fa, arreglos: ar, sub: '' };
     }).filter(function (it) { return it.faltan.length; });
-    return { n: 9, id: 'MARCHA', titulo: 'Ligas en marcha', estado: items.length ? 'medias' : 'hecho',
-      resumen: items.length ? pl(items.length, 'liga con algo que no cuadra', 'ligas con algo que no cuadra') : 'Todo cuadra', items: items, ref: [] };
+    return { n: 11, id: 'MARCHA', titulo: 'Ligas en marcha', estado: items.length ? 'medias' : 'hecho',
+      resumen: items.length ? pl(items.length, 'liga con algo que no cuadra', 'ligas con algo que no cuadra') : 'Todo cuadra', items: items, ref: [],
+      pasar: 'Cada liga jugada hasta su última jornada; después, la fase final.',
+      cambiar: ['Un partido que no se puede jugar se aplaza y se recupera en Ligas.', 'Un equipo se puede dar de baja en Gestión; sus partidos los dice Ligas.',
+        'Los horarios y los campos de una liga se cambian en «Campos y horarios», mirando que no se pisen.'] };
   }
   /**
    * T0294 · Los festivos y descansos de la temporada anterior, un año después, para traerlos (Javi: casi todos se repiten).
@@ -437,6 +442,122 @@
   function aviso(t) { AVISOS[t] = true; return t; }
   function esAviso(t) { return AVISOS[String(t)] === true; }
 
+  /** 'aaaa-mm-ddThh:mm' (o 'aaaa-mm-dd hh:mm') → la misma forma, o ''. */
+  function fechaHora(v) { var m = /^(\d{4}-\d\d-\d\d)(?:[T ](\d\d:\d\d))?/.exec(s(v)); return m ? m[1] + 'T' + (m[2] || '00:00') : ''; }
+  /** 'aaaa-mm-ddThh:mm' → «13/11 a las 20:00». */
+  function cuando(fh) { return fh ? fecha(fh.slice(0, 10)).slice(0, 5) + ' a las ' + fh.slice(11, 16) : ''; }
+  /** T0343 · Los colores que se pueden elegir en una competición: los del catálogo (activos) de su modelo, sin repetir. */
+  function coloresDe(d, comp) {
+    var mc = (d.modelosComp || []).filter(function (m) { return s(m.ID_COMPETICION) === s(comp && comp.ID); })[0], vistos = {};
+    if (!mc) return [];
+    return (d.catalogo || []).filter(function (c) {
+      var k = s(c.ID_COLOR);
+      if (s(c.ID_MODELO) !== s(mc.ID_MODELO) || c.ACTIVO !== true || !k || vistos[k]) return false;
+      vistos[k] = true; return true;
+    }).map(function (c) { return s(c.ID_COLOR); });
+  }
+  /**
+   * T0343 · El paso de los colores: cada liga cerrada (de las que se reparten) con la hora en que se abren sus colores y cuántos
+   * equipos confirmados tienen ya el suyo. Falta la hora (si alguno no tiene color), el color de los que no lo han elegido
+   * cuando ya están abiertos, y avisa si hay menos colores en el catálogo que equipos o dos con el mismo. d.ahora:
+   * 'aaaa-mm-ddThh:mm'.
+   */
+  function colores(d, x, compDe, reparten, cerrada, tem) {
+    var ahora = s(d.ahora), nCon = 0, nSin = 0, nLigas = 0, nFa = 0;
+    var items = x.ligas.filter(function (l) { return cerrada(l) && reparten.indexOf(compDe[s(l.ID_COMPETICION)]) >= 0; }).map(function (l) {
+      var comp = compDe[s(l.ID_COMPETICION)], is = x.ins.filter(function (i) { return s(i.ID_LIGA) === s(l.ID) && i.ESTADO === 'Confirmada'; });
+      var sin = is.filter(function (i) { return !s(i.ID_COLOR); }), ab = fechaHora(l.APERTURA_COLORES), cols = coloresDe(d, comp), fa = [], ar = {}, cuenta = {};
+      is.forEach(function (i) { if (s(i.ID_COLOR)) cuenta[s(i.ID_COLOR)] = (cuenta[s(i.ID_COLOR)] || 0) + 1; });
+      var ges = '?s=gestion&tem=' + encodeURIComponent(s(tem.ID)) + '&comp=' + encodeURIComponent(s(comp.ID)) + '&filtro=';
+      nLigas++; nCon += is.length - sin.length; nSin += sin.length;
+      if (sin.length && !ab) { var t1 = 'Sin hora para abrir los colores.'; fa.push(t1); ar[t1] = { texto: 'Ponerla', tabla: 'LIGAS', id: s(l.ID) }; }
+      if (sin.length && ab && ab <= ahora) { var t2 = pl(sin.length, 'equipo sin color', 'equipos sin color') + '.'; fa.push(t2); ar[t2] = { texto: 'Verlos en Gestión', seccion: 'GESTION', href: ges + 'color' }; }
+      // Antes de la hora no es un aviso, pero tampoco está hecho: lo eligen a esa hora (se puede cambiar la hora).
+      if (sin.length && ab && ab > ahora) { var t5 = pl(sin.length, 'equipo lo elige', 'equipos lo eligen') + ' el ' + cuando(ab) + '.'; fa.push(t5); ar[t5] = { texto: 'Cambiar la hora', tabla: 'LIGAS', id: s(l.ID) }; }
+      if (cols.length < is.length) {
+        var t3 = aviso(cols.length ? 'Hay ' + pl(cols.length, 'color', 'colores') + ' en el catálogo de su modelo y ' + is.length + ' equipos.' : 'Su modelo no tiene colores en el catálogo.');
+        fa.push(t3); ar[t3] = { texto: 'Añadir colores al catálogo', tabla: 'CATALOGO', valores: {} };
+      }
+      if (Object.keys(cuenta).some(function (k) { return cuenta[k] > 1; })) { var t4 = aviso('Dos equipos con el mismo color.'); fa.push(t4); ar[t4] = { texto: 'Verlos en Gestión', seccion: 'GESTION', href: ges + 'avisos' }; }
+      nFa += fa.length;
+      return { titulo: s(l.NOMBRE || l.ID), ficha: ['LIGAS', l.ID], faltan: fa, arreglos: ar,
+        sub: [ab ? (ab <= ahora ? 'Abiertos desde el ' : 'Se abren el ') + cuando(ab) : sin.length ? '' : 'Sin hora', (is.length - sin.length) + ' de ' + pl(is.length, 'equipo con color', 'equipos con color')].filter(String).join(' · '),
+        botones: [] };
+    });
+    return { n: 8, id: 'COLORES', titulo: 'Colores de camiseta', estado: !nLigas ? 'pendiente' : nSin || nFa ? 'medias' : 'hecho',
+      resumen: !nLigas ? 'Cuando haya ligas cerradas' : nCon + ' de ' + pl(nCon + nSin, 'equipo con color', 'equipos con color'), items: items, ref: [],
+      nota: 'A cada liga cerrada se le pone el día y la hora en que se abren sus colores (anúncialo en Instagram). A esa hora, cada capitana elige con el enlace de su equipo, que se manda desde Gestión, entre los colores que quedan libres en su liga; el primero que lo coge se lo queda.',
+      pasar: 'Cada equipo de una liga cerrada con su color.',
+      cambiar: ['El color de un equipo se puede cambiar hasta que se piden sus camisetas (en Gestión o con su enlace); después queda fijo.'] };
+  }
+  /**
+   * T0343 · El paso del pedido de camisetas: por cada modelo de las competiciones de la temporada, las camisetas por pedir
+   * (d.camisetas, de camisetas5PorPedir: { MOD: { porPedir, pedidas, ultimoPedido } }; undefined mientras se mira, null si no
+   * se ha podido), el mínimo que compensa pedir (MODELOS · PEDIDO_MINIMO) y lo que tarda el proveedor (DIAS_ENTREGA): avisa al
+   * llegar al mínimo o, antes de empezar, cuando la primera jornada menos esos días ya ha llegado.
+   */
+  function pedido(d, x, tem) {
+    var C = d.camisetas, hoy = s(d.ahora).slice(0, 10), mods = [], porPedir = 0, pedidas = 0, nFa = 0;
+    x.comps.forEach(function (c) { if (!masAdelante(d, c)) (d.modelosComp || []).forEach(function (m) { if (s(m.ID_COMPETICION) === s(c.ID) && mods.indexOf(s(m.ID_MODELO)) < 0) mods.push(s(m.ID_MODELO)); }); });
+    var items = mods.map(function (mid) {
+      var m = (d.modelos || []).filter(function (y) { return s(y.ID) === mid; })[0] || { ID: mid };
+      var comps = x.comps.filter(function (c) { return (d.modelosComp || []).some(function (y) { return s(y.ID_COMPETICION) === s(c.ID) && s(y.ID_MODELO) === mid; }); });
+      var primera = '';
+      x.ligas.forEach(function (l) {
+        var c = comps.filter(function (y) { return s(y.ID) === s(l.ID_COMPETICION); })[0], f = c ? s(l.FECHA_INICIO) || primerDia(c.FECHA_INICIO, l.DIA_SEMANA) : '';
+        if (f && (!primera || f < primera)) primera = f;
+      });
+      var min = entero(m.PEDIDO_MINIMO), dias = entero(m.DIAS_ENTREGA), k = (C && C[mid]) || { porPedir: 0, pedidas: 0, ultimoPedido: '' };
+      var limite = primera && dias ? masDias(primera, -dias) : '', fa = [], ar = {}, cam = { texto: 'Hacer el pedido en Camisetas', seccion: 'CAMISETAS', href: '?s=camisetas' };
+      porPedir += k.porPedir; pedidas += k.pedidas;
+      if (!min || !dias) {
+        var t1 = !min && !dias ? 'Faltan las camisetas a partir de las que compensa pedir y los días que tarda el proveedor.' : !min ? 'Faltan las camisetas a partir de las que compensa pedir.' : 'Faltan los días que tarda el proveedor.';
+        fa.push(t1); ar[t1] = { texto: 'Poner ' + [min ? '' : PEDIDO_MINIMO + ' camisetas', dias ? '' : DIAS_ENTREGA + ' días'].filter(String).join(' y '), tabla: 'MODELOS', id: mid,
+          cambios: Object.assign({}, min ? {} : { PEDIDO_MINIMO: PEDIDO_MINIMO }, dias ? {} : { DIAS_ENTREGA: DIAS_ENTREGA }) };
+      }
+      if (C && k.porPedir) {
+        if (limite && hoy >= limite && hoy < primera) { var t2 = aviso('Hay que pedir ya: la primera jornada es el ' + fecha(primera) + ' y el proveedor tarda ' + dias + ' días.'); fa.push(t2); ar[t2] = cam; }
+        else if (min && k.porPedir >= min) { var t3 = 'Ya hay ' + k.porPedir + ' por pedir: compensa hacer el pedido.'; fa.push(t3); ar[t3] = cam; }
+      }
+      nFa += fa.length;
+      // Esperando a juntar bastantes (por debajo del mínimo y con tiempo): ni hecho ni aviso.
+      return { titulo: s(m.NOMBRE || mid), ficha: ['MODELOS', mid], faltan: fa, arreglos: ar, espera: !!(C && k.porPedir && !fa.length),
+        sub: C === undefined ? 'mirando…' : C === null ? 'no se ha podido mirar' : [pl(k.porPedir, 'camiseta por pedir', 'camisetas por pedir') + (min ? ' (se pide a partir de ' + min + ')' : ''),
+          k.pedidas ? k.pedidas + ' ya pedidas' : '', limite && hoy < primera ? 'pedir como tarde el ' + fecha(limite) : ''].filter(String).join(' · ') };
+    });
+    return { n: 9, id: 'CAMISETAS', titulo: 'Pedido de camisetas', items: items, ref: [],
+      estado: !mods.length ? 'pendiente' : C === undefined ? 'mirando' : C === null ? 'pendiente' : porPedir || nFa ? 'medias' : pedidas ? 'hecho' : 'pendiente',
+      resumen: !mods.length ? 'Sin modelo de camiseta' : C === undefined ? 'Mirando…' : C === null ? 'No se ha podido mirar' : pl(porPedir, 'camiseta por pedir', 'camisetas por pedir') + (pedidas ? ' · ' + pedidas + ' ya pedidas' : ''),
+      nota: 'Las camisetas de cada jugadora se crean al tener su equipo color. Se piden juntas, de todas las ligas, cuando hay bastantes o antes de que se acabe el tiempo; las que llegan después van al siguiente pedido.',
+      pasar: 'Las camisetas por pedir, pedidas a tiempo para la primera jornada.',
+      cambiar: ['Con sus camisetas pedidas, el color del equipo queda fijo.', 'Las jugadoras que se apuntan después tienen su camiseta por pedir, para el siguiente pedido.'] };
+  }
+  var PEDIDO_MINIMO = 300, DIAS_ENTREGA = 20; // T0343 (Javi, 02/11/2026): lo de partida; cada modelo dice el suyo
+
+  /**
+   * T0343 (Javi): una competición avisa de lo que le falta desde MESES_ANTES meses antes de empezar (la Kopa di Mondo, en
+   * mayo, se prepara desde enero; la liga, en octubre, desde junio). Antes sale en gris, «Se prepara desde el …», con lo que
+   * le falta plegado y sin contar como pendiente. masAdelante: desde cuándo ('aaaa-mm-dd'), o '' si ya toca (o sin d.ahora).
+   */
+  var MESES_ANTES = 4;
+  function masAdelante(d, c) {
+    var m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(s(c && c.FECHA_INICIO)), hoy = s(d.ahora).slice(0, 10);
+    if (!m || !hoy) return '';
+    var x = new Date(Date.UTC(+m[1], +m[2] - 1 - MESES_ANTES, 1)), ult = new Date(Date.UTC(x.getUTCFullYear(), x.getUTCMonth() + 1, 0)).getUTCDate();
+    x.setUTCDate(Math.min(+m[3], ult));
+    var f = x.toISOString().slice(0, 10);
+    return hoy < f ? f : '';
+  }
+  /** Una fila de una competición que aún no toca preparar: sin avisos (lo que le falta, en pendientes) y con desde cuándo. */
+  function aplazar(d, it, c) {
+    var f = it && masAdelante(d, c);
+    if (!f) return it;
+    var una = function (y) { y.desde = f; y.pendientes = (y.faltan || []).slice(); y.faltan = []; (y.hijas || []).forEach(una); };
+    una(it);
+    it.sub = 'Se prepara desde el ' + fecha(f) + (it.sub ? ' · ' + it.sub : '');
+    return it;
+  }
+
   function estadoDe(hay, faltan) { return !hay ? 'pendiente' : faltan ? 'medias' : 'hecho'; }
   function nFaltan(items) { return items.reduce(function (n, it) { return n + (it.faltan || []).length + nFaltan(it.hijas || []); }, 0); }
 
@@ -453,7 +574,6 @@
     if (!tem) return { tem: null, ant: null, pasos: [] };
     var ant = anterior(temps, tem), x = deTemporada(d, tem.ID), xa = ant ? deTemporada(d, ant.ID) : null;
     var nomC = function (c) { return s(c.NOMBRE_COMERCIAL || c.NOMBRE || c.ID); };
-    var corto = function (c) { return s(c.NOMBRE || c.NOMBRE_COMERCIAL || c.ID); };
     var pasos = [];
 
     /* 1 · Temporada: nombre y fechas, sin pisarse con otra. */
@@ -514,15 +634,16 @@
           ''].filter(String).join(' · '),
         botones: ls.length ? [{ texto: 'Otra liga', tabla: 'LIGAS', valores: { ID_COMPETICION: s(c.ID) } }] : [] };
     });
+    items2.forEach(function (it) { aplazar(d, it, it.comp); });
     pasos.push({ n: 2, id: 'COMPETICIONES', titulo: 'Competiciones y ligas', estado: estadoDe(x.comps.length, nFaltan(items2)),
       resumen: x.comps.length ? pl(x.comps.length, 'competición', 'competiciones') + ' · ' + pl(x.ligas.length, 'liga', 'ligas') : 'Ninguna todavía',
       items: items2, botones: [{ texto: 'Añadir competición', tabla: 'COMPETICIONES', valores: { ID_TEMPORADA: s(tem.ID), SENAL: 100 } }], traerComps: paraTraerComps(d, xa, x),
       nota: 'Una copa o un torneo a mitad de temporada también se añade aquí. La señal propuesta es de 100 €: cámbiala si hace falta.',
       ref: xa ? xa.comps.map(function (c) {
         var ls = xa.ligas.filter(function (l) { return s(l.ID_COMPETICION) === s(c.ID); });
-        return corto(c) + ' (' + s(c.TIPO).toLowerCase() + (c.INCLUIDA === true ? ', incluida' : '') + (entero(c.PARTIDOS_EQUIPO) ? ', ' + c.PARTIDOS_EQUIPO + ' partidos' : '') + ')' +
+        return nomC(c) + ' (' + s(c.TIPO).toLowerCase() + (c.INCLUIDA === true ? ', incluida' : '') + (entero(c.PARTIDOS_EQUIPO) ? ', ' + c.PARTIDOS_EQUIPO + ' partidos' : '') + ')' +
           (ls.length ? ': ' + ls.map(function (l) { return s(l.NOMBRE) + (l.DIA_SEMANA ? ' (' + s(l.DIA_SEMANA).toLowerCase() + ')' : ''); }).join(', ') : ': sin ligas');
-      }) : [], refCorto: xa ? lista(xa.comps.map(corto)) : '' });
+      }) : [], refCorto: xa ? lista(xa.comps.map(nomC)) : '' });
 
     /* 3 · Campos y horarios. */
     // El precio por hora de un campo el año pasado (para proponerlo, Javi), o null.
@@ -561,10 +682,11 @@
         ar[k] = c ? { texto: 'Contratarlo', tabla: 'CAMPOS_TEMPORADA', id: s(c.ID) } : { texto: 'Contratarlo' + (pa ? ' a ' + euros(pa.PRECIO_HORA) + '/hora, como en ' + s(ant.NOMBRE) : ''), tabla: 'CAMPOS_TEMPORADA', ya: pa ? true : undefined,
           valores: Object.assign({ ID_TEMPORADA: s(tem.ID), ID_CAMPO: e.campos[k], ESTADO: 'Contratado' }, pa ? { PRECIO_HORA: Number(pa.PRECIO_HORA), TIPO_IVA: s(pa.TIPO_IVA) } : {}) };
       });
-      return { titulo: s(l.NOMBRE || l.ID) + (repetida(l) && compDe[s(l.ID_COMPETICION)] ? ' · ' + corto(compDe[s(l.ID_COMPETICION)]) : ''), ficha: ['LIGAS', l.ID], faltan: e.faltan, ideal: e.ideal, arreglos: ar, quitar: quitarLiga(d, l),
+      return { titulo: s(l.NOMBRE || l.ID) + (repetida(l) && compDe[s(l.ID_COMPETICION)] ? ' · ' + nomC(compDe[s(l.ID_COMPETICION)]) : ''), ficha: ['LIGAS', l.ID], faltan: e.faltan, ideal: e.ideal, arreglos: ar, quitar: quitarLiga(d, l),
         sub: [s(l.DIA_SEMANA), pl(e.horarios, 'horario', 'horarios'), e.cabe].filter(String).join(' · '),
         botones: e.horarios ? [Object.assign({}, nuevo, { texto: 'Cambiar sus horarios' })] : [], liga: l, comp: compDe[s(l.ID_COMPETICION)] };
     });
+    items3l.forEach(function (it) { aplazar(d, it, it.comp); });
     var hayCampos = x.ctps.filter(function (c) { return c.ESTADO === 'Contratado'; }).length;
     pasos.push({ n: 3, id: 'CAMPOS', titulo: 'Campos y horarios', estado: estadoDe(x.ctps.length || x.huecos.length, nFaltan(items3) + nFaltan(items3l) + (x.ctps.length && !hayCampos ? 1 : 0)),
       resumen: x.ctps.length || x.huecos.length ? pl(hayCampos, 'campo contratado', 'campos contratados') + ' · ' + pl(x.huecos.length, 'horario', 'horarios') : 'Ninguno todavía',
@@ -602,7 +724,7 @@
       ar['Sin premios.'] = { texto: 'Añadir un premio', tabla: 'PREMIOS', valores: { ID_COMPETICION: s(c.ID) } };
       var modDe = function (id) { return (d.modelos || []).filter(function (x) { return s(x.ID) === s(id); })[0] || {}; };
       var enl = ta.map(function (t) { return { texto: 'Inscripción ' + euros(t.PRECIO) + (ta.length > 1 && t.FECHA_DESDE ? ' desde el ' + fecha(t.FECHA_DESDE) : ''), ficha: ['TARIFAS', s(t.ID)] }; })
-        .concat(mo.map(function (m) { var x = modDe(m.ID_MODELO); return { texto: 'Modelo ' + (x.NOMBRE || m.ID_MODELO) + (x.DISENO_URL ? '' : ' · sin diseño'), ficha: ['MODELOS', s(m.ID_MODELO)], falta: !x.DISENO_URL }; }))
+        .concat(mo.map(function (m) { var x = modDe(m.ID_MODELO); return { texto: 'Modelo ' + (x.NOMBRE || m.ID_MODELO) + (x.DISENO_URL ? '' : ' · sin diseño'), ficha: ['MODELOS', s(m.ID_MODELO)] }; })) // T0367: «sin diseño» no es un error (se sube en su ficha cuando lo haya)
         .concat(pk.length ? [{ texto: 'Pack: ' + pl(pk.length, 'dorsal', 'dorsales'), ficha: ['COMPETICIONES', s(c.ID)] }] : [])
         .concat(pr.map(function (p) { return { texto: 'Premio: ' + s(p.NOMBRE), ficha: ['PREMIOS', s(p.ID)] }; }));
       return { titulo: nomC(c), ficha: ['COMPETICIONES', c.ID], faltan: fa, arreglos: ar, enlaces: enl,
@@ -615,16 +737,17 @@
       arreglos: { 'Sin tarifa de camiseta personalizada.': { texto: camAnt ? 'Poner ' + euros(camAnt.PRECIO) + ', como en ' + s(ant.NOMBRE) : 'Poner el precio', tabla: 'TARIFAS', ya: camAnt ? true : undefined,
         valores: Object.assign({ ID_TEMPORADA: s(tem.ID), CONCEPTO: 'Camiseta', FECHA_DESDE: s(tem.FECHA_INICIO) }, camAnt ? { PRECIO: Number(camAnt.PRECIO), TIPO_IVA: s(camAnt.TIPO_IVA) } : {}) } } });
     // Las tarifas del staff valen por sus fechas y no se revisan al preparar la temporada (Javi).
+    x.comps.forEach(function (c, i) { aplazar(d, items4[i], c); });
     pasos.push({ n: 4, id: 'TARIFAS', titulo: 'Tarifas, camisetas y premios', estado: estadoDe(x.comps.length, nFaltan(items4)),
       resumen: x.comps.length ? (nFaltan(items4) ? pl(nFaltan(items4), 'cosa por hacer', 'cosas por hacer') : 'Todo puesto') : 'Primero, las competiciones',
       items: x.comps.length ? items4 : [], botones: [], modelo: modeloTemporada(d, xa, x),
       nota: 'Un modelo nuevo por los sponsors de la temporada; después se pone en cada competición con «Añadir modelo».',
       ref: xa ? xa.comps.map(function (c) {
         var ta = tarifa(xa.tarifas, c), mo = de(d.modelosComp, c), pr = de(d.premios, c);
-        return corto(c) + ': ' + [c.INCLUIDA === true ? 'incluida' : ta.length ? 'inscripción ' + ta.map(function (t) { return euros(t.PRECIO); }).join(' / ') : 'sin tarifa',
+        return nomC(c) + ': ' + [c.INCLUIDA === true ? 'incluida' : ta.length ? 'inscripción ' + ta.map(function (t) { return euros(t.PRECIO); }).join(' / ') : 'sin tarifa',
           mo.length ? mo.map(function (m) { return d.nombre('MODELOS', m.ID_MODELO); }).join(', ') : '', pr.length ? pr.map(function (p) { return s(p.NOMBRE); }).join(', ') : ''].filter(String).join(' · ');
       }).concat(xa.tarifas.filter(function (t) { return t.CONCEPTO === 'Camiseta'; }).map(function (t) { return 'Camiseta personalizada: ' + euros(t.PRECIO); })) : [],
-      refCorto: xa ? lista(xa.comps.map(function (c) { var ta = tarifa(xa.tarifas, c); return ta.length ? corto(c) + ' ' + euros(ta[ta.length - 1].PRECIO) : ''; }).filter(String)) : '' });
+      refCorto: xa ? lista(xa.comps.map(function (c) { var ta = tarifa(xa.tarifas, c); return ta.length ? nomC(c) + ' ' + euros(ta[ta.length - 1].PRECIO) : ''; }).filter(String)) : '' });
 
     /* 5 · Inscripciones: las competiciones a las que se apuntan equipos (no las incluidas ni las que salen de otra). */
     var abiertas = x.comps.filter(function (c) { return seApuntan(d, c); });
@@ -643,50 +766,42 @@
       }
       return { titulo: nomC(c), faltan: fa, arreglos: ar, sub: pl(k.conf, 'confirmado', 'confirmados') + (k.sol ? ' · ' + k.sol + ' por confirmar' : '') };
     });
+    abiertas.forEach(function (c, i) { aplazar(d, items5[i], c); });
     var nIns = x.ins.length;
     pasos.push({ n: 5, id: 'INSCRIPCIONES', titulo: 'Inscripciones', estado: estadoDe(nIns, nFaltan(items5)),
       resumen: nIns ? pl(x.ins.filter(function (i) { return i.ESTADO === 'Confirmada'; }).length, 'equipo confirmado', 'equipos confirmados') : 'Ningún equipo todavía',
       items: items5, nota: 'Los equipos se apuntan con los formularios y se confirman en Gestión, al pagar la señal.',
-      ref: xa ? xa.comps.filter(function (c) { return seApuntan(d, c); }).map(function (c) { return corto(c) + ': ' + pl(cuenta(xa, c).conf, 'equipo', 'equipos'); }) : [] });
+      pasar: 'Cada equipo confirmado (con la señal pagada) o dado de baja.',
+      cambiar: ['Se siguen apuntando equipos mientras haya ligas abiertas de los días que pueden; si todas las de su día están cerradas, entran en la lista de espera.',
+        'Cada equipo puede cambiar su nombre, su capitana y sus jugadoras.'],
+      ref: xa ? xa.comps.filter(function (c) { return seApuntan(d, c); }).map(function (c) { return nomC(c) + ': ' + pl(cuenta(xa, c).conf, 'equipo', 'equipos'); }) : [] });
 
     /* 6 · Repartir los equipos y cerrar las ligas (T0304, la acción REPARTIR): cada equipo en una liga de su competición
        y cada liga cerrada con sus equipos (LIGAS · FECHA_CIERRE). Las copas no se reparten: sus equipos salen de otra. */
     var cerrada = function (l) { return !vacio(l.FECHA_CIERRE) && s(l.FECHA_CIERRE).trim() !== ''; };
-    var reparten = abiertas.filter(function (c) { return SIN_GENERAR.indexOf(s(c.TIPO)) < 0; });
-    var REP = { texto: 'Repartirlos', accion: 'REPARTIR' }, nSin = 0, nAb = 0, nCer = 0, nEq6 = 0;
+    var reparten = abiertas.filter(function (c) { return SIN_GENERAR.indexOf(s(c.TIPO)) < 0 && !masAdelante(d, c); }); // T0343: las que aún no tocan, no
+    // T0368 (Javi): «Repartirlos», «Cerrarla» y el botón del paso abrían los tres el mismo tablero. Se queda el del paso;
+    // lo que falta de cada competición sigue diciéndose, sin botón.
+    var nSin = 0, nAb = 0, nCer = 0, nEq6 = 0;
     var items6 = reparten.map(function (c) {
       var ls = x.ligas.filter(function (l) { return s(l.ID_COMPETICION) === s(c.ID); }), is = x.ins.filter(function (i) { return s(i.ID_COMPETICION) === s(c.ID); });
-      var sinL = is.filter(function (i) { return !i.ID_LIGA; }), ab = ls.filter(function (l) { return !cerrada(l); }), fa = [], ar = {};
+      var sinL = is.filter(function (i) { return !i.ID_LIGA; }), ab = ls.filter(function (l) { return !cerrada(l); }), fa = [];
       nSin += sinL.length; nAb += ab.length; nCer += ls.length - ab.length; nEq6 += is.length;
-      if (sinL.length) { var t6 = pl(sinL.length, 'equipo sin liga', 'equipos sin liga') + '.'; fa.push(t6); ar[t6] = REP; }
+      if (sinL.length) fa.push(pl(sinL.length, 'equipo sin liga', 'equipos sin liga') + '.');
       if (ab.length && (is.length || ls.length - ab.length)) {
-        var t6b = ab.length === 1 ? 'La liga ' + s(ab[0].NOMBRE || ab[0].ID) + ' sigue abierta.' : ab.length + ' ligas siguen abiertas: ' + lista(ab.map(function (l) { return s(l.NOMBRE || l.ID); })) + '.';
-        fa.push(t6b); ar[t6b] = { texto: ab.length === 1 ? 'Cerrarla' : 'Cerrarlas', accion: 'REPARTIR' };
+        fa.push(ab.length === 1 ? 'La liga ' + s(ab[0].NOMBRE || ab[0].ID) + ' sigue abierta.' : ab.length + ' ligas siguen abiertas: ' + lista(ab.map(function (l) { return s(l.NOMBRE || l.ID); })) + '.');
       }
-      return { titulo: nomC(c), faltan: fa, arreglos: ar, sub: pl(is.length, 'equipo', 'equipos') + ' · ' + (ls.length - ab.length) + ' de ' + pl(ls.length, 'liga cerrada', 'ligas cerradas') };
+      return { titulo: nomC(c), faltan: fa, arreglos: {}, sub: pl(is.length, 'equipo', 'equipos') + ' · ' + (ls.length - ab.length) + ' de ' + pl(ls.length, 'liga cerrada', 'ligas cerradas') };
     }).filter(function (it) { return it.faltan.length; });
     pasos.push({ n: 6, id: 'REPARTIR', titulo: 'Cada equipo en su liga', estado: !nEq6 && !nCer ? 'pendiente' : nSin || nAb ? 'medias' : 'hecho',
       resumen: !nEq6 && !nCer ? 'Sin equipos todavía' : [nSin ? pl(nSin, 'equipo sin liga', 'equipos sin liga') : 'Todos los equipos tienen liga', nCer + ' de ' + pl(nCer + nAb, 'liga cerrada', 'ligas cerradas')].join(' · '),
       items: items6, botones: reparten.length ? [{ texto: 'Repartir los equipos y cerrar las ligas', accion: 'REPARTIR' }] : [],
-      nota: 'Se reparten arrastrando, con las plazas de cada liga y los días que puede cada equipo. Una liga se cierra con todos sus equipos confirmados (la señal pagada) y entonces queda fija.', ref: [] });
+      nota: 'Se reparten arrastrando, con las plazas de cada liga y los días que puede cada equipo. Una liga se cierra con todos sus equipos confirmados (la señal pagada) y entonces queda fija.', ref: [],
+      pasar: 'Cada equipo en su liga y cada liga cerrada.',
+      cambiar: ['En una liga abierta, los equipos se mueven de una a otra.', 'Una liga cerrada tiene sus equipos fijos; se puede volver a abrir mientras no tenga partidos.',
+        'Un equipo que llega con las ligas de su día cerradas va a la lista de espera: después, a una liga abierta o a una que se vuelve a abrir.'] });
 
-    /* 7 · Calendario de cada liga (las de eliminatorias no se generan). */
-    var gen = x.ligas.filter(function (l) { var c = compDe[s(l.ID_COMPETICION)]; return c && SIN_GENERAR.indexOf(s(c.TIPO)) < 0; });
-    var P = d.partidos, items7 = gen.map(function (l) {
-      var n = P ? P[s(l.ID)] || 0 : 0;
-      return { titulo: s(l.NOMBRE || l.ID), faltan: P && !n ? [cerrada(l) ? 'Sin calendario.' : 'Sin cerrar: primero se cierra con sus equipos.'] : [],
-        sub: P === undefined ? 'mirando…' : P === null ? 'no se ha podido mirar' : n ? pl(n, 'partido', 'partidos') : cerrada(l) ? 'cerrada' : 'sin cerrar' };
-    });
-    var conCal = P ? gen.filter(function (l) { return P[s(l.ID)]; }).length : 0;
-    pasos.push({ n: 7, id: 'CALENDARIO', titulo: 'Calendario de cada liga', estado: P === undefined && gen.length ? 'mirando' : !gen.length || !conCal ? 'pendiente' : conCal < gen.length ? 'medias' : 'hecho',
-      resumen: !gen.length ? 'Sin ligas' : P === undefined ? 'Mirando…' : P === null ? 'No se ha podido mirar' : conCal + ' de ' + pl(gen.length, 'liga', 'ligas') + ' con calendario',
-      items: items7, botones: gen.length ? [{ texto: 'Generar el calendario de una liga', accion: 'CALENDARIO' }] : [],
-      nota: 'Solo el de una liga cerrada (paso anterior). Las copas y las supercopas no se generan: dependen de quién pasa.', ref: [] });
-
-    /* 9 · Las ligas en marcha: lo que no cuadra en una liga que ya se juega (va en «Y después», Javi). */
-    pasos.push(enMarcha(d, x, compDe, tem));
-
-    /* 8 · Avisar a las capitanas (T0304): con la liga cerrada, a cada capitana su liga y su día oficial (Gestión, «Avisar de
+    /* 7 · Avisar a las capitanas (T0304): con la liga cerrada, a cada capitana su liga y su día oficial (Gestión, «Avisar de
        su liga», INSCRIPCIONES_EQUIPOS · AVISO_LIGA_ENVIADO) y el grupo de WhatsApp del equipo (GRUPO_CREADO). */
     var ligaCerrada = {}; x.ligas.forEach(function (l) { if (cerrada(l)) ligaCerrada[s(l.ID)] = true; });
     var nAv = 0, nAvisar = 0, nGrupo = 0;
@@ -699,9 +814,45 @@
       if (sinGr) { var t8b = pl(sinGr, 'equipo sin grupo de WhatsApp', 'equipos sin grupo de WhatsApp') + '.'; fa.push(t8b); ar[t8b] = { texto: 'Verlos en Gestión', seccion: 'GESTION', href: ges + 'avisos' }; }
       return { titulo: nomC(c), faltan: fa, arreglos: ar, sub: is.length ? (is.length - sinAv) + ' de ' + pl(is.length, 'capitana avisada', 'capitanas avisadas') : 'Ninguna liga cerrada' };
     }).filter(function (it) { return it.faltan.length; });
-    pasos.push({ n: 8, id: 'AVISAR', titulo: 'Avisar a las capitanas', estado: !nAv ? 'pendiente' : nAvisar || nGrupo ? 'medias' : 'hecho',
+    pasos.push({ n: 7, id: 'AVISAR', titulo: 'Avisar a las capitanas', estado: !nAv ? 'pendiente' : nAvisar || nGrupo ? 'medias' : 'hecho',
       resumen: !nAv ? 'Cuando sus ligas estén cerradas' : (nAv - nAvisar) + ' de ' + pl(nAv, 'capitana avisada', 'capitanas avisadas') + (nGrupo ? ' · ' + pl(nGrupo, 'equipo sin grupo', 'equipos sin grupo') : ''),
-      items: items8, nota: 'Con su liga cerrada, se avisa a cada capitana de su liga y su día oficial desde Gestión, y se crea el grupo de WhatsApp del equipo.', ref: [] });
+      items: items8, nota: 'Con su liga cerrada, se avisa a cada capitana de su liga y su día oficial desde Gestión, y se crea el grupo de WhatsApp del equipo.', ref: [],
+      pasar: 'Cada capitana de una liga cerrada avisada de su liga y con el grupo de WhatsApp del equipo.',
+      cambiar: ['El mensaje se puede volver a enviar desde la ficha del equipo en Gestión.'] });
+
+    /* 8 · Colores (T0343): con su liga cerrada, cada capitana elige el color de su equipo con el enlace de su equipo a la hora
+       en que se abren los colores de su liga (LIGAS · APERTURA_COLORES, Konamigas lo anuncia en Instagram), entre los del
+       catálogo de su modelo que nadie de su liga tiene. */
+    pasos.push(colores(d, x, compDe, reparten, cerrada, tem));
+
+    /* 9 · Pedido de camisetas (T0343): lo que hay por pedir de cada modelo, con aviso al llegar al mínimo o cuando se acerca la
+       primera jornada menos lo que tarda el proveedor. El pedido se hace en Camisetas, de todas las ligas a la vez. */
+    pasos.push(pedido(d, x, tem));
+
+    /* 10 · Calendario de cada liga (las de eliminatorias no se generan). */
+    var gen = x.ligas.filter(function (l) { var c = compDe[s(l.ID_COMPETICION)]; return c && SIN_GENERAR.indexOf(s(c.TIPO)) < 0 && !masAdelante(d, c); });
+    var P = d.partidos, items7 = gen.map(function (l) {
+      var n = P ? P[s(l.ID)] || 0 : 0;
+      return { titulo: s(l.NOMBRE || l.ID), faltan: P && !n ? [cerrada(l) ? 'Sin calendario.' : 'Sin cerrar: primero se cierra con sus equipos.'] : [],
+        sub: P === undefined ? 'mirando…' : P === null ? 'no se ha podido mirar' : n ? pl(n, 'partido', 'partidos') : cerrada(l) ? 'cerrada' : 'sin cerrar' };
+    });
+    var conCal = P ? gen.filter(function (l) { return P[s(l.ID)]; }).length : 0;
+    pasos.push({ n: 10, id: 'CALENDARIO', titulo: 'Calendario de cada liga', estado: P === undefined && gen.length ? 'mirando' : !gen.length || !conCal ? 'pendiente' : conCal < gen.length ? 'medias' : 'hecho',
+      resumen: !gen.length ? 'Sin ligas' : P === undefined ? 'Mirando…' : P === null ? 'No se ha podido mirar' : conCal + ' de ' + pl(gen.length, 'liga', 'ligas') + ' con calendario',
+      items: items7, botones: gen.length ? [{ texto: 'Generar el calendario de una liga', accion: 'CALENDARIO' }] : [],
+      nota: 'Solo el de una liga cerrada. Las copas y las supercopas no se generan: dependen de quién pasa.', ref: [],
+      pasar: 'Cada liga cerrada con su calendario.',
+      cambiar: ['Con el calendario hecho, el día y los horarios de la liga quedan fijos: un partido que no se puede jugar se aplaza y se recupera en Ligas.',
+        'Una liga sin calendario todavía se puede volver a abrir en «Cada equipo en su liga».'] });
+
+    /* 11 · Las ligas en marcha: lo que no cuadra en una liga que ya se juega (Javi: lo pendiente, en el asistente). */
+    pasos.push(enMarcha(d, x, compDe, tem));
+
+    /* 12 y 13 · Fase final y cierre de la temporada: aún no están en la web (T0313, T0312, T0298 y T0295). */
+    pasos.push({ n: 12, id: 'FINAL', titulo: 'Fase final', estado: 'luego', resumen: 'Próximamente', items: [], ref: [],
+      nota: 'Oro y Plata, la copa y la supercopa con los equipos que pasan, y los premios. Mientras tanto, se preparan a mano.' });
+    pasos.push({ n: 13, id: 'CIERRE', titulo: 'Cierre de la temporada', estado: 'luego', resumen: 'Próximamente', items: [], ref: [],
+      nota: 'Cerrar la temporada y pasar a la siguiente lo que se debe. Mientras tanto, la temporada acaba con su fecha de fin.' });
 
     // Sin claves vacías en los botones (ya: undefined).
     pasos.forEach(function (p) { [].concat(p.items, [].concat.apply([], (p.grupos || []).map(function (g) { return g.items; }))).forEach(function limpia(it) {
@@ -718,17 +869,23 @@
    */
   function porPreparar(lista, hoy) { return lista.filter(function (p) { return !p.hasta || p.hasta >= hoy; }); }
 
-  var CALC = { ideal: ideal, anterior: anterior, camino: camino, horariosLiga: horariosLiga, porDefecto: porDefecto, porPreparar: porPreparar, primerDia: primerDia, calendarioTemporada: calendarioTemporada, periodosCal: periodosCal, masDias: masDias, paraTraerFestivos: paraTraerFestivos, enMarcha: enMarcha, modeloTemporada: modeloTemporada, masUnAno: masUnAno, subirAnos: subirAnos, paraTraerComps: paraTraerComps, paraTraerCampos: paraTraerCampos, cuadranteDia: cuadranteDia, cabeEn: cabeEn, parecida: parecida, paraTraer: paraTraer, choque: choque, esAviso: esAviso, quitarComp: quitarComp, quitarLiga: quitarLiga };
+  var CALC = { masAdelante: masAdelante, coloresDe: coloresDe, colores: colores, pedido: pedido, fechaHora: fechaHora, ideal: ideal, anterior: anterior, camino: camino, horariosLiga: horariosLiga, porDefecto: porDefecto, porPreparar: porPreparar, primerDia: primerDia, calendarioTemporada: calendarioTemporada, periodosCal: periodosCal, masDias: masDias, paraTraerFestivos: paraTraerFestivos, enMarcha: enMarcha, modeloTemporada: modeloTemporada, masUnAno: masUnAno, subirAnos: subirAnos, paraTraerComps: paraTraerComps, paraTraerCampos: paraTraerCampos, cuadranteDia: cuadranteDia, cabeEn: cabeEn, parecida: parecida, paraTraer: paraTraer, choque: choque, esAviso: esAviso, quitarComp: quitarComp, quitarLiga: quitarLiga };
   if (typeof window === 'undefined' || !window.UN || !window.UN.ajustes) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
 
+  // T0343 (Javi): iconos de línea, como los del menú, en lugar de ✓ y ! de texto.
+  var ICONO = { si: '<svg class="aj-as-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    ojo: '<svg class="aj-as-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5v7"/><path d="M12 17.5h.01"/></svg>',
+    luego: '<svg class="aj-as-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4.5l3 2"/></svg>' };
+  /** «2026-2027» con un guion que no se parte al final de la línea (los botones de traer). */
+  function sinCorte(x) { return s(x).replace(/-/g, '\u2011'); }
   function texto(v) { return s(v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function guardado(k, v) { try { if (v === undefined) return localStorage.getItem('kon_cam_' + k) || ''; localStorage.setItem('kon_cam_' + k, v); } catch (e) {} return ''; }
   var TABLAS = ['TEMPORADAS', 'COMPETICIONES', 'COMPETICIONES_ORIGEN', 'LIGAS', 'HUECOS', 'CAMPOS_TEMPORADA', 'DISPONIBILIDAD_CAMPOS', 'CAMPOS', 'TARIFAS',
-    'MODELOS', 'MODELOS_COMPETICION', 'PACKS', 'PREMIOS', 'INSCRIPCIONES_EQUIPOS', 'STAFF', 'CALENDARIO'];
+    'MODELOS', 'MODELOS_COMPETICION', 'PACKS', 'PREMIOS', 'INSCRIPCIONES_EQUIPOS', 'STAFF', 'CALENDARIO', 'CATALOGO'];
   var ESTADO = { hecho: ['Hecho', 'aj-as-hecho'], medias: ['A medias', 'aj-as-medias'], pendiente: ['Sin empezar', 'aj-as-pendiente'], luego: ['Próximamente', 'aj-as-luego'], mirando: ['Mirando…', 'aj-as-luego'] };
-  // Las pantallas del asistente: los cuatro pasos que se hacen aquí y «Y después» con lo que va fuera (5 a 8).
+  // Las pantallas del asistente: los cuatro pasos de preparar la temporada y, después, sus fases (T0343).
   var PANTALLAS = [
     { id: 'TEMPORADA', corto: 'Temporada', pregunta: function () { return '¿Cuándo empieza y acaba la temporada?'; },
       ayuda: 'Del primer al último día. No puede pisarse con otra temporada.' },
@@ -738,12 +895,27 @@
       ayuda: 'Los campos contratados, lo que da cada uno y los horarios de cada liga. Cada liga dice cuántos equipos le caben.' },
     { id: 'TARIFAS', corto: 'Precios y camisetas', pregunta: function () { return '¿Cuánto cuesta y qué incluye?'; },
       ayuda: 'El precio de la inscripción y los premios de cada competición; el modelo de camiseta (los sponsors) y el pack (las camisetas que entran con la inscripción: cada dorsal con su talla). La camiseta personalizada es la que se paga aparte.' },
-    { id: 'DESPUES', corto: 'Y después', pregunta: function () { return 'Equipos, calendario y ligas en marcha'; },
-      ayuda: 'Cuando la temporada está preparada: los equipos se apuntan y se confirman (en Gestión), cada uno va a su liga y se saca el calendario. Si una liga en marcha tiene algo que no cuadra, sale aquí.' }
+    // T0343 · El recorrido de la temporada, fase a fase (Javi): cada una dice qué falta para pasar a la siguiente y qué se
+    // puede cambiar todavía (pasar y cambiar de cada paso).
+    { id: 'INSCRIPCIONES', corto: 'Inscripciones', pregunta: function () { return '¿Qué equipos se han apuntado?'; },
+      ayuda: 'Se apuntan con el formulario de inscripción y se confirman solos al pagar la señal (Gestión pide la señal y la apunta).' },
+    { id: 'REPARTIR', corto: 'Ligas', pregunta: function () { return '¿En qué liga juega cada equipo?'; },
+      ayuda: 'Cada equipo a una liga de su competición, con sus plazas y los días que puede. Con todos sus equipos confirmados, la liga se cierra y sus equipos quedan fijos.' },
+    { id: 'AVISAR', corto: 'Avisar', pregunta: function () { return '¿Sabe cada capitana dónde juega?'; },
+      ayuda: 'Con su liga cerrada, a cada capitana su liga y su día oficial (desde Gestión), y el grupo de WhatsApp del equipo.' },
+    { id: 'COLORES', corto: 'Colores', pregunta: function () { return '¿De qué color es cada equipo?'; },
+      ayuda: 'Cada liga cerrada abre sus colores a una hora que se anuncia en Instagram; cada capitana elige el suyo con el enlace de su equipo.' },
+    { id: 'CAMISETAS', corto: 'Pedido', pregunta: function () { return '¿Cuándo se piden las camisetas?'; },
+      ayuda: 'Las camisetas de las jugadoras de los equipos con color, juntas en un pedido cuando hay bastantes o antes de que no lleguen a la primera jornada.' },
+    { id: 'CALENDARIO', corto: 'Calendario', pregunta: function () { return '¿Cuándo juega cada equipo?'; },
+      ayuda: 'El calendario de cada liga cerrada, con sus horarios y los festivos.' },
+    { id: 'MARCHA', corto: 'En juego', pregunta: function () { return '¿Va todo bien en las ligas?'; },
+      ayuda: 'Con la temporada en juego, lo que no cuadra en una liga: equipos de más, jornadas o horarios fuera de lo que da el colegio. Los partidos, las actas y los aplazados van en Ligas.' },
+    { id: 'FINAL', corto: 'Fase final', pregunta: function () { return '¿Quién pasa a la fase final?'; },
+      ayuda: 'Oro y Plata, la copa y la supercopa, con los equipos que pasan, y los premios.' },
+    { id: 'CIERRE', corto: 'Cierre', pregunta: function () { return '¿Está todo cerrado?'; },
+      ayuda: 'Lo que queda al acabar la temporada: lo que se debe pasa a la siguiente.' }
   ];
-  var DESPUES = { INSCRIPCIONES: 'Se apuntan con los formularios y se confirman en Gestión, al pagar la señal.', REPARTIR: 'Cada equipo a una liga de su competición, con sus plazas y los días que puede; con todos confirmados, la liga se cierra y queda fija.',
-    CALENDARIO: 'Solo el de una liga cerrada. Las copas y las supercopas no se generan: dependen de quién pasa.', AVISAR: 'Con su liga cerrada, a cada capitana su liga y su día oficial (desde Gestión), y el grupo de WhatsApp del equipo.',
-    MARCHA: 'Lo que no cuadra en una liga que ya se juega: equipos de más, jornadas o horarios fuera de lo que da el colegio.' };
   var fin = null;
 
   window.UN.ajustes('TEMPORADA', {
@@ -755,7 +927,8 @@
         return { temporadas: T.filas('TEMPORADAS') || [], comps: T.filas('COMPETICIONES') || [], origen: T.filas('COMPETICIONES_ORIGEN') || [], ligas: T.filas('LIGAS') || [],
           huecos: T.filas('HUECOS') || [], calendario: T.filas('CALENDARIO') || [], ctps: T.filas('CAMPOS_TEMPORADA') || [], dispo: T.filas('DISPONIBILIDAD_CAMPOS') || [], tarifas: T.filas('TARIFAS') || [],
           modelosComp: T.filas('MODELOS_COMPETICION') || [], modelos: T.filas('MODELOS') || [], packs: T.filas('PACKS') || [], premios: T.filas('PREMIOS') || [], ins: T.filas('INSCRIPCIONES_EQUIPOS') || [],
-          partidos: partidos, partidosDia: partidosDia[tid], nombre: A.nombre };
+          partidos: partidos, partidosDia: partidosDia[tid], nombre: A.nombre,
+          catalogo: T.filas('CATALOGO') || [], camisetas: camisetas, ahora: ahoraMin() };
       }
       /** Los partidos de la temporada, por día (ligasPartidosTemporada), para el calendario del paso 1. Una vez por temporada. */
       var partidosDia = {}, pidiendoDia = {};
@@ -765,6 +938,15 @@
         ctx.llamar('ligasPartidosTemporada', [t]).then(function (r) { partidosDia[t] = r || {}; pidiendoDia[t] = false; if (vivo) pintar(); },
           function () { pidiendoDia[t] = false; });
       }
+      /** T0343 · Las camisetas por pedir de cada modelo las cuenta el motor (camisetas5PorPedir): CAMISETAS no se baja. */
+      var camisetas, pidiendoCam = false;
+      function mirarCamisetas() {
+        if (pidiendoCam) return;
+        pidiendoCam = true;
+        ctx.llamar('camisetas5PorPedir', []).then(function (r) { pidiendoCam = false; camisetas = r || {}; if (vivo) pintar(); },
+          function () { pidiendoCam = false; camisetas = null; if (vivo) pintar(); });
+      }
+      function ahoraMin() { var h = new Date(), dd = function (n) { return (n < 10 ? '0' : '') + n; }; return h.getFullYear() + '-' + dd(h.getMonth() + 1) + '-' + dd(h.getDate()) + 'T' + dd(h.getHours()) + ':' + dd(h.getMinutes()); }
       /** Los partidos de cada liga los cuenta el motor (ligasCalendarioLigas, la misma del calendario): PARTIDOS no se baja. */
       function mirarPartidos() {
         if (pidiendo) return;
@@ -798,8 +980,8 @@
       }
       /** Una fila: su nombre (abre su ficha), lo que es, ✓ si está bien o cada aviso con el botón que lo resuelve. */
       function fila(it) {
-        var fa = it.faltan || [], ok = !fa.length, mal = fa.some(esAviso);
-        return '<li class="aj-as-f' + (ok ? ' aj-as-ok' : mal ? ' aj-as-mal' : ' aj-as-falta') + '"><span class="aj-as-i" aria-hidden="true">' + (ok ? '✓' : mal ? '!' : '') + '</span><div class="aj-as-c">' +
+        var fa = it.faltan || [], luego = !!it.desde, ok = !fa.length && !luego && !it.espera, mal = fa.some(esAviso);
+        return '<li class="aj-as-f' + (luego ? ' aj-as-luegof' : ok ? ' aj-as-ok' : mal ? ' aj-as-mal' : ' aj-as-falta') + '"><span class="aj-as-i" aria-hidden="true">' + (luego ? ICONO.luego : ok ? ICONO.si : mal ? ICONO.ojo : '') + '</span><div class="aj-as-c">' +
           '<div class="aj-as-t">' + (it.ficha ? '<button type="button" class="u-btn u-btn-texto aj-as-nom" data-as-ficha="' + texto(it.ficha[0]) + '" data-as-id="' + texto(it.ficha[1]) + '">' + texto(it.titulo) + '</button>' :
             '<b class="aj-as-nom">' + texto(it.titulo) + '</b>') + (it.sub ? '<small>' + texto(it.sub) + '</small>' : '') + '</div>' +
           (it.calendario ? calendarioHtml(it.calendario) + panelDia(it.calendario) + (tp && tp.tipo === 'dias' ? panelDias() : '') : '') +
@@ -809,9 +991,12 @@
             return '<button type="button" class="aj-as-chipe' + (e.falta ? ' aj-as-chipf' : '') + '" data-as-ficha="' + texto(e.ficha[0]) + '" data-as-id="' + texto(e.ficha[1]) + '">' + texto(e.texto) + ' ›</button>';
           }).join('') + '</div>' : '') +
           (fa.length ? '<ul class="aj-as-av">' + fa.map(function (f) { return '<li' + (esAviso(f) ? ' class="aj-as-aviso"' : '') + '><span>' + texto(f) + '</span>' + boton((it.arreglos || {})[f]) + '</li>'; }).join('') + '</ul>' : '') +
+          // T0343: lo que le falta a una competición que aún no toca, plegado y sin avisar (se puede adelantar).
+          (luego && (it.pendientes || []).length ? '<details class="aj-as-ref"><summary>' + texto('Lo que le falta (' + it.pendientes.length + ')') + '</summary><ul class="aj-as-av">' + it.pendientes.map(function (f) {
+            return '<li><span>' + texto(f) + '</span>' + boton((it.arreglos || {})[f]) + '</li>'; }).join('') + '</ul></details>' : '') +
           (it.liga && hz === s(it.liga.ID) ? panelHorarios(it) : '') +
           (it.traer && !ctx.soloLeer ? (tr && tr.comp === s(it.comp.ID) ? panelTraer(it) : '<p class="aj-as-mas"><button type="button" class="u-btn aj-as-btn" data-as-traer="' + texto(it.comp.ID) + '">' +
-            texto('Traer las ligas de la ' + (ultimo.ant ? ultimo.ant.NOMBRE : 'temporada anterior') + ' (' + it.traer.ligas.length + ')') + '</button></p>') : '') +
+            texto('Traer las ligas de la ' + (ultimo.ant ? sinCorte(ultimo.ant.NOMBRE) : 'temporada anterior') + ' (' + it.traer.ligas.length + ')') + '</button></p>') : '') +
           (it.porQue ? '<p class="u-nota aj-as-dn">' + texto(it.porQue) + (it.verEquipos && ve('GESTION') ? ' <a href="?s=gestion&tem=' + encodeURIComponent(it.verEquipos.tem) + '&comp=' +
             encodeURIComponent(it.verEquipos.comp) + '" data-sx="GESTION">Ver sus equipos en Gestión ›</a>' : '') + '</p>' : '') +
           (it.hijas && it.hijas.length ? '<ul class="aj-as-lista aj-as-hijas">' + it.hijas.map(fila).join('') + '</ul>' : '') +
@@ -827,7 +1012,7 @@
           function (e) { if (vivo) { ctx.aviso(String((e && e.message) || e).replace(/^\w+:\s*/, '')); pintar(); } throw e; });
       }
       function lineaHecho() {
-        return hecho ? '<p class="aj-as-hecho" role="status">✓ ' + texto(hecho.texto) + (hecho.deshacer && !ctx.soloLeer ? ' <button type="button" class="u-btn u-btn-texto" data-as-deshacer>Deshacer</button>' : '') + '</p>' : '';
+        return hecho ? '<p class="aj-as-hecho" role="status">' + ICONO.si + texto(hecho.texto) + (hecho.deshacer && !ctx.soloLeer ? ' <button type="button" class="u-btn u-btn-texto" data-as-deshacer>Deshacer</button>' : '') + '</p>' : '';
       }
       /** Lo que se trae en bloque se deshace en el motor (ligasDeshacer: solo filas traídas). tablas: las que hay que volver a leer. */
       function deshacerTraido(ids, tablas) {
@@ -865,7 +1050,7 @@
       function calendarioHtml(c) {
         if (!c.meses.length) return '<p class="u-nota">La temporada no tiene fechas de inicio y fin.</p>';
         var nom = function (l) { return A.nombre('LIGAS', l.ID); };
-        return '<p class="aj-cal-ley"><span class="aj-cal-fes">Festivo</span><span class="aj-cal-des">Descanso</span><span><i class="aj-cal-p"></i> hay partidos</span><span class="aj-as-calmal aj-as-calley">!</span><span>partidos en un día sin jugar</span></p>' +
+        return '<p class="aj-cal-ley"><span class="aj-cal-fes">Festivo</span><span class="aj-cal-des">Descanso</span><span><i class="aj-cal-p"></i> hay partidos</span><span class="aj-as-calleyg"><span class="aj-as-calmal aj-as-calley">' + ICONO.ojo + '</span> partidos en un día sin jugar</span></p>' +
           // Plegado: no es un problema (el calendario pasa esa jornada a la semana siguiente), solo para mirarlo.
           (c.perdidas.length ? '<details class="aj-cal-perdidas aj-as-ref"><summary>' + texto(pl(c.perdidas.length, 'día sin jugar cae', 'días sin jugar caen') + ' en días con ligas: esas jornadas pasan a la semana siguiente. Ver cuáles') + '</summary><ul>' + c.perdidas.map(function (dd) {
             return '<li><button type="button" class="u-btn u-btn-texto" data-as-cal="' + dd.fecha + '">' + dd.fecha.split('-').reverse().join('/') + '</button> ' +
@@ -930,10 +1115,10 @@
       function panelTraerPaso(p) {
         if (p.id === 'TARIFAS') return tp && tp.tipo === 'modelo' && p.modelo ? panelModelo(p.modelo) : '';
         if (p.id === 'TEMPORADA') { var tf = (p.items[1] || {}).traerFestivos; return tf && !ctx.soloLeer ? (tp && tp.tipo === 'festivos' ? panelFestivos() : '<p class="aj-as-mas"><button type="button" class="u-btn aj-as-btn" data-as-tp="festivos">' +
-          texto('Traer los festivos de la ' + (ultimo.ant ? ultimo.ant.NOMBRE : 'temporada anterior') + ' (' + tf.length + ')') + '</button></p>') : ''; }
+          texto('Traer los festivos de la ' + (ultimo.ant ? sinCorte(ultimo.ant.NOMBRE) : 'temporada anterior') + ' (' + tf.length + ')') + '</button></p>') : ''; }
         var lista = p.id === 'COMPETICIONES' ? p.traerComps : p.id === 'CAMPOS' ? p.traerCampos : null, tipo = p.id === 'COMPETICIONES' ? 'comps' : 'campos';
         if (!lista || ctx.soloLeer) return '';
-        var antN = ultimo.ant ? ultimo.ant.NOMBRE : 'la temporada anterior', n0 = tipo === 'comps' ? lista.comps.length : lista.length;
+        var antN = ultimo.ant ? sinCorte(ultimo.ant.NOMBRE) : 'la temporada anterior', n0 = tipo === 'comps' ? lista.comps.length : lista.length;
         if (!tp || tp.tipo !== tipo) return '<p class="aj-as-mas"><button type="button" class="u-btn aj-as-btn" data-as-tp="' + tipo + '">' +
           texto((tipo === 'comps' ? 'Traer las competiciones de la ' : 'Traer los campos de la ') + antN + ' (' + n0 + ')') + '</button></p>';
         var n = tp.filas.filter(function (f) { return f.sel; }).length, cab, filas;
@@ -1213,25 +1398,29 @@
 
       function pantallaPaso(p, c) {
         var n = cuantas(p), vacia = !p.items.length && !(p.grupos || []).some(function (g) { return g.items.length; });
-        var h = lineaHecho() + panelTraerPaso(p) + '<p class="aj-as-estado ' + ESTADO[p.estado][1] + '">' + (p.estado === 'hecho' ? '✓ Listo' : vacia ? 'Todavía no hay nada' : faltanTxt(n[0]) +
+        var h = lineaHecho() + panelTraerPaso(p) + '<p class="aj-as-estado ' + ESTADO[p.estado][1] + '">' + (p.estado === 'hecho' ? ICONO.si + 'Listo' : vacia ? 'Todavía no hay nada' : faltanTxt(n[0]) +
           (n[1] ? ' <span class="aj-as-navisos">· ' + (n[1] === 1 ? '1 aviso' : n[1] + ' avisos') + '</span>' : '')) + '</p>';
         if (p.items.length) h += '<ul class="aj-as-lista">' + p.items.map(fila).join('') + '</ul>';
         (p.grupos || []).forEach(function (g) { if (g.items.length) h += '<h3 class="aj-as-g">' + texto(g.titulo) + '</h3><ul class="aj-as-lista">' + g.items.map(fila).join('') + '</ul>'; });
         if ((p.botones || []).length) h += '<div class="aj-as-anadir">' + p.botones.map(function (b) { return boton(Object.assign({}, b, { texto: '+ ' + b.texto }), 'u-btn-texto aj-as-btn'); }).join('') + '</div>';
         return h + referencia(p, c);
       }
-      function pantallaDespues(c) {
-        // Las ligas en marcha, solo si alguna tiene algo (Javi: lo pendiente, aquí; nada en las tablas).
-        return lineaHecho() + '<ul class="aj-as-lista aj-as-despues">' + c.pasos.slice(4).filter(function (p) { return !(p.id === 'MARCHA' && !p.items.length); }).map(function (p) {
-          var e = ESTADO[p.estado], ok = p.estado === 'hecho';
-          return '<li class="aj-as-f ' + e[1] + (ok ? ' aj-as-ok' : ' aj-as-falta') + '"><span class="aj-as-i" aria-hidden="true">' + (ok ? '✓' : '') + '</span><div class="aj-as-c"><div class="aj-as-t"><b class="aj-as-nom">' + texto(p.titulo) + '</b>' +
-            '<small>' + texto(p.resumen) + '</small></div><p class="u-nota aj-as-dn">' + texto(DESPUES[p.id]) + '</p>' +
-            // Qué le falta, competición por competición, con lo que lo resuelve (Gestión).
-            (p.items.some(function (it) { return (it.faltan || []).length; }) && p.id !== 'CALENDARIO' ? '<ul class="aj-as-av">' + p.items.filter(function (it) { return (it.faltan || []).length; }).map(function (it) {
-              return it.faltan.map(function (f) { return '<li><span>' + texto(it.titulo + ': ' + f.replace(/\.$/, '')) + '</span>' + boton((it.arreglos || {})[f]) + '</li>'; }).join('');
-            }).join('') + '</ul>' : '') + ((p.botones || []).length ? '<div class="aj-as-mas">' + p.botones.map(function (b) { return boton(b, 'aj-as-btn'); }).join('') + '</div>' : '') +
-            '</div><span class="u-chip aj-as-chip">' + e[0] + '</span></li>';
-        }).join('') + '</ul>';
+      /**
+       * T0343 · La pantalla de una fase de la temporada (de las inscripciones al cierre): lo que hay, lo que falta con lo que lo
+       * resuelve y, abajo, qué falta para pasar a la siguiente y qué se puede cambiar todavía.
+       */
+      function pantallaFase(p) {
+        if (p.estado === 'luego') return '<p class="aj-as-estado aj-as-pendiente">Próximamente</p><p class="u-nota">' + texto(p.nota || '') + '</p>';
+        var n = cuantas(p);
+        var h = lineaHecho() + '<p class="aj-as-estado ' + ESTADO[p.estado][1] + '">' + (p.estado === 'hecho' ? ICONO.si + texto(p.resumen) : p.estado === 'mirando' ? 'Mirando…' :
+          texto(p.resumen) + (n[0] ? ' · ' + faltanTxt(n[0]).toLowerCase() : '') + (n[1] ? ' <span class="aj-as-navisos">· ' + (n[1] === 1 ? '1 aviso' : n[1] + ' avisos') + '</span>' : '')) + '</p>';
+        if (p.items.length) h += '<ul class="aj-as-lista">' + p.items.map(fila).join('') + '</ul>';
+        if ((p.botones || []).length) h += '<div class="aj-as-anadir">' + p.botones.map(function (b) { return boton(b, 'aj-as-btn'); }).join('') + '</div>';
+        if (p.nota) h += '<p class="u-nota">' + texto(p.nota) + '</p>';
+        if (p.pasar || (p.cambiar || []).length) h += '<div class="aj-as-fase">' +
+          (p.pasar ? '<div><h3 class="aj-as-g">Para pasar a la siguiente</h3><p>' + texto(p.pasar) + '</p></div>' : '') +
+          ((p.cambiar || []).length ? '<div><h3 class="aj-as-g">Todavía se puede cambiar</h3><ul>' + p.cambiar.map(function (x) { return '<li>' + texto(x) + '</li>'; }).join('') + '</ul></div>' : '') + '</div>';
+        return h;
       }
 
       function pintar() {
@@ -1255,29 +1444,30 @@
         porQuitar = {};
         c.pasos.forEach(function (p) { [].concat(p.items, [].concat.apply([], (p.grupos || []).map(function (g) { return g.items; }))).forEach(function mira(it) { if (it.quitar) porQuitar[it.quitar.tabla + '|' + it.quitar.id] = it.quitar; (it.hijas || []).forEach(mira); }); });
         c.pasos.forEach(function (p) { de[p.id] = p; });
-        // «Y después», en la barra: hecho si todo lo que enseña lo está; si no, a medias (y si no ha empezado nada, sin color).
-        var despues = c.pasos.slice(4).filter(function (p) { return !(p.id === 'MARCHA' && !p.items.length); });
-        var estD = despues.every(function (p) { return p.estado === 'hecho'; }) ? 'hecho' : despues.some(function (p) { return p.estado === 'hecho' || p.estado === 'medias'; }) ? 'medias' : '';
-        var est = function (id) { return id === 'DESPUES' ? estD : de[id].estado; };
-        // Al entrar (o al cambiar de temporada), el primer paso sin hacer; si están todos, «Y después».
-        if (!PANTALLAS.some(function (x) { return x.id === paso; })) paso = (PANTALLAS.filter(function (x) { return x.id !== 'DESPUES' && est(x.id) !== 'hecho'; })[0] || PANTALLAS[4]).id;
+        var est = function (id) { return de[id].estado; };
+        // Al entrar (o al cambiar de temporada), la primera fase sin hacer (sin contar las que aún no están); si están todas, «En juego».
+        if (!PANTALLAS.some(function (x) { return x.id === paso; })) paso = (PANTALLAS.filter(function (x) { return est(x.id) !== 'hecho' && est(x.id) !== 'luego'; })[0] || PANTALLAS.filter(function (x) { return x.id === 'MARCHA'; })[0]).id;
         var i = PANTALLAS.map(function (x) { return x.id; }).indexOf(paso), P = PANTALLAS[i], nomT = s(c.tem.NOMBRE || c.tem.ID);
         el.innerHTML = '<section class="aj-as">' +
           '<div class="aj-as-cab"><label class="u-campo"><span class="u-etiqueta">Temporada</span><select id="as-temp">' + [['En curso y por venir', lista], ['Acabadas', acabadas]].filter(function (g) { return g[1].length; }).map(function (g) {
             return '<optgroup label="' + texto(g[0]) + '">' + g[1].map(function (p) { return '<option value="' + texto(p.id) + '"' + (p.id === tid ? ' selected' : '') + '>' + texto(p.nombre) + '</option>'; }).join('') + '</optgroup>';
           }).join('') + '</select></label>' + (puedeTemp ? boton({ texto: '+ Nueva temporada', tabla: 'TEMPORADAS', valores: {} }) : '') + '</div>' +
           (acabada ? '<p class="aj-as-acabada">' + texto('La ' + nomT + ' ya acabó: lo que sale es para revisar y corregir; no hace falta completarlo todo (lo que no existía entonces, como los partidos por equipo o la señal, puede quedarse vacío).') + '</p>' : '') +
-          '<ol class="aj-as-barra">' + PANTALLAS.map(function (x, j) {
-            var e = est(x.id), cl = e ? ESTADO[e][1] : '';
-            return '<li><button type="button" class="aj-as-p ' + cl + (j === i ? ' aj-as-actual' : '') + '" data-as-paso="' + x.id + '"' + (j === i ? ' aria-current="step"' : '') + '>' +
-              '<span class="aj-as-pn" aria-hidden="true">' + (e === 'hecho' ? '✓' : x.id === 'DESPUES' ? '…' : j + 1) + '</span><span class="aj-as-pt">' + texto(x.corto) + '</span>' +
-              (e ? '<span class="u-oculto"> · ' + ESTADO[e][0] + '</span>' : '') + '</button></li>';
-          }).join('') + '</ol>' +
-          '<div class="aj-as-pant"><p class="aj-as-num-paso">' + (P.id === 'DESPUES' ? 'Y después' : 'Paso ' + (i + 1) + ' de 4 · ' + texto(P.corto)) + '</p>' +
+          // T0343 (Javi): una fila de pastillas, «Preparar» y «La temporada» separadas; el estado, un punto de color.
+          '<nav class="aj-as-pasos" aria-label="Pasos">' + PANTALLAS.map(function (x, j) {
+            var e = est(x.id);
+            return (j === 0 || j === 4 ? '<span class="aj-as-gt' + (j ? ' aj-as-gt2' : '') + '">' + (j ? 'La temporada' : 'Preparar') + '</span>' : '') +
+              '<button type="button" class="aj-as-pp' + (e ? ' aj-as-pp-' + e : '') + (j === i ? ' aj-as-actual' : '') + '" data-as-paso="' + x.id + '"' + (j === i ? ' aria-current="step"' : '') +
+              ' title="' + texto((j + 1) + '. ' + x.corto + (e ? ' · ' + ESTADO[e][0] : '')) + '"><span class="aj-as-dot" aria-hidden="true"></span>' + texto(x.corto) +
+              (e ? '<span class="u-oculto"> · ' + ESTADO[e][0] + '</span>' : '') + '</button>';
+          }).join('') + '</nav>' +
+          '<div class="aj-as-pant"><p class="aj-as-num-paso">' + (i < 4 ? 'Preparar · paso ' + (i + 1) + ' de 4' : 'La temporada · ' + texto(P.corto)) + ' · ' + (i + 1) + ' de ' + PANTALLAS.length + '</p>' +
           '<h2 class="aj-as-preg">' + texto(P.pregunta(nomT)) + '</h2><p class="u-nota">' + texto(P.ayuda) + '</p>' +
-          (P.id === 'DESPUES' ? pantallaDespues(c) : pantallaPaso(de[P.id], c)) + '</div>' +
+          (i < 4 ? pantallaPaso(de[P.id], c) : pantallaFase(de[P.id], c)) + '</div>' +
           '<div class="aj-as-nav">' + (i > 0 ? '<button type="button" class="u-btn" data-as-paso="' + PANTALLAS[i - 1].id + '">‹ Anterior</button>' : '<span></span>') +
           (i < PANTALLAS.length - 1 ? '<button type="button" class="u-btn u-btn-accion" data-as-paso="' + PANTALLAS[i + 1].id + '"><span class="aj-as-sig">' + texto('Siguiente: ' + PANTALLAS[i + 1].corto.toLowerCase()) + ' ›</span><span class="aj-as-sigc">Siguiente ›</span></button>' : '') + '</div></section>';
+        var pa = el.querySelector('.aj-as-pp.aj-as-actual'), nav = el.querySelector('.aj-as-pasos');
+        if (pa && nav && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = Math.max(0, pa.offsetLeft - nav.offsetLeft - 40);
         var st = el.querySelector('#as-temp');
         st.onchange = function () { tid = st.value; guardado('temp', tid); paso = ''; tr = null; A.ponerPeriodo(tid); pintar(); };
       }
@@ -1329,7 +1519,7 @@
         }
         if (b.hasAttribute('data-as-horarios')) {
           hz = hz === b.getAttribute('data-as-horarios') && paso === 'CAMPOS' ? '' : b.getAttribute('data-as-horarios'); hzQuitar = '';
-          if (paso !== 'CAMPOS') { paso = 'CAMPOS'; hecho = null; } // desde «Y después»: al paso de los horarios, con su cuadrante abierto
+          if (paso !== 'CAMPOS') { paso = 'CAMPOS'; hecho = null; } // desde «En juego»: al paso de los horarios, con su cuadrante abierto
           pintar();
           var cz = el.querySelector('.aj-as-cuad'); if (cz && cz.scrollIntoView) cz.scrollIntoView({ block: 'center' });
           return;
@@ -1398,7 +1588,7 @@
         if (pend) clearTimeout(pend);
         pend = setTimeout(function () { pend = null; pintar(); }, 50);
       });
-      T.leer(TABLAS).then(function () { pintar(); mirarPartidos(); }, function () { pintar(); mirarPartidos(); });
+      T.leer(TABLAS).then(function () { pintar(); mirarPartidos(); mirarCamisetas(); }, function () { pintar(); mirarPartidos(); mirarCamisetas(); });
       pintar();
     },
     cerrar: function () { if (fin) fin(); fin = null; }
