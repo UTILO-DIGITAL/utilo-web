@@ -77,17 +77,25 @@
   function hoyISO() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
   function lineas(s) { return String(s || '').split('\n').map(function (l) { return l.replace(/\s+$/, ''); }).filter(function (l) { return l.trim(); }); }
 
-  /** Una vez por página: la hoja del tablero y la ficha (la del Kanban). */
-  function estilos() {
-    if (document.getElementById('kb-css')) return;
-    var l = document.createElement('link');
-    l.id = 'kb-css'; l.rel = 'stylesheet'; l.href = RAIZ + 'estilos/kanban.css?v=' + encodeURIComponent(VERSION);
-    document.head.appendChild(l);
+  /** La hoja del tablero, una vez por página. Mientras llega, la sección no se ve (sin ella se pintaría sin estilos un momento). */
+  function estilos(el) {
+    var l = document.getElementById('kb-css');
+    if (l && l.getAttribute('data-lista')) return;
+    if (!l) {
+      l = document.createElement('link');
+      l.id = 'kb-css'; l.rel = 'stylesheet'; l.href = RAIZ + 'estilos/kanban.css?v=' + encodeURIComponent(VERSION);
+      l.addEventListener('load', function () { l.setAttribute('data-lista', '1'); });
+      document.head.appendChild(l);
+    }
+    el.style.visibility = 'hidden';
+    var ver = function () { el.style.visibility = ''; };
+    l.addEventListener('load', ver); l.addEventListener('error', ver);
+    setTimeout(ver, 3000); // si tarda mucho, mejor sin estilos que en blanco
   }
 
   window.UN.registrar('TABLERO', {
     abrir: function (el, ctx) {
-      estilos();
+      estilos(el);
       var C = ctx.config || {};
       var DIAS = Number(C.DIAS_CERRADAS) || 30;
       var CLAVE = 'tb_' + ctx.id + '_' + String(ctx.correo || ctx.persona || '').toLowerCase().replace(/\W+/g, '');

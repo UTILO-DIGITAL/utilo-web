@@ -41,16 +41,25 @@
   }
   function grupoDe(e) { return e.ESTADO === 'Entregada' ? 'Entregadas' : e.ESTADO === 'Aplazada' ? 'Aplazadas' : e.ESTADO === 'Descartada' ? '' : 'En marcha'; }
 
-  function estilos() {
-    if (document.getElementById('kb-css')) return;
-    var l = document.createElement('link');
-    l.id = 'kb-css'; l.rel = 'stylesheet'; l.href = RAIZ + 'estilos/kanban.css?v=' + encodeURIComponent(VERSION);
-    document.head.appendChild(l);
+  /** La hoja del tablero, una vez por página. Mientras llega, la sección no se ve (sin ella se pintaría sin estilos un momento). */
+  function estilos(el) {
+    var l = document.getElementById('kb-css');
+    if (l && l.getAttribute('data-lista')) return;
+    if (!l) {
+      l = document.createElement('link');
+      l.id = 'kb-css'; l.rel = 'stylesheet'; l.href = RAIZ + 'estilos/kanban.css?v=' + encodeURIComponent(VERSION);
+      l.addEventListener('load', function () { l.setAttribute('data-lista', '1'); });
+      document.head.appendChild(l);
+    }
+    el.style.visibility = 'hidden';
+    var ver = function () { el.style.visibility = ''; };
+    l.addEventListener('load', ver); l.addEventListener('error', ver);
+    setTimeout(ver, 3000); // si tarda mucho, mejor sin estilos que en blanco
   }
 
   window.UN.registrar('ENTREGAS', {
     abrir: function (el, ctx) {
-      estilos();
+      estilos(el);
       var C = ctx.config || {};
       var CLAVE = 'en_' + String(ctx.correo || ctx.persona || '').toLowerCase().replace(/\W+/g, '');
       var F = leerLocal(CLAVE + '_f', {});
@@ -78,7 +87,7 @@
           '<div class="en-top"><span class="en-corto">' + texto(corto) + '</span><span class="en-est">' + texto(e.ESTADO) + '</span>' +
           (i && ctx.tablas.filas(TI).length > 1 ? '<span class="en-cli">' + texto(i.NOMBRE || i.ID) + '</span>' : '') + '</div>' +
           '<h3 class="en-t">' + texto(e.NOMBRE) + '</h3>' +
-          '<div class="en-pct">' + (total ? '<b>' + hechas + ' de ' + total + '</b> tareas entregadas<span class="en-num">' + pct + ' %</span>' : 'Sin tareas todavía') + '</div>' +
+          '<div class="en-pct">' + (total ? '<b>' + hechas + ' de ' + total + '</b> ' + (total === 1 ? 'tarea entregada' : 'tareas entregadas') + '<span class="en-num">' + pct + ' %</span>' : 'Sin tareas todavía') + '</div>' +
           '<div class="en-barra" role="img" aria-label="' + texto(total ? pct + ' % entregado: ' + GRUPOS.filter(function (g) { return n[g.id]; }).map(function (g) { return cuantas(n[g.id], g); }).join(', ') : 'Sin tareas') + '">' +
             GRUPOS.map(function (g) { return n[g.id] ? '<span class="' + g.cls + '" style="flex-grow:' + n[g.id] + '" title="' + texto(cuantas(n[g.id], g)) + '"></span>' : ''; }).join('') + '</div>' +
           (total ? '<ul class="en-ley">' + GRUPOS.filter(function (g) { return n[g.id]; }).map(function (g) { return '<li class="' + g.cls + '">' + texto(cuantas(n[g.id], g)) + '</li>'; }).join('') + '</ul>' : '');
@@ -116,10 +125,14 @@
         sel.innerHTML = '<option value="">Todas</option>' + IS.map(function (i) { return '<option value="' + texto(i.ID) + '"' + (i.ID === F.ini ? ' selected' : '') + '>' + texto(i.NOMBRE || i.ID) + '</option>'; }).join('');
         $('en-lini').style.display = IS.length > 1 ? '' : 'none';
         var ls = EL.filter(function (e) { return (F.ver === 'Todas' || grupoDe(e) === F.ver) && (!F.ini || e.INICIATIVA === F.ini); });
-        // Primero las de fecha prevista más cercana; las entregadas, la última arriba.
+        // Primero las que están en marcha, después las aplazadas, las entregadas y las descartadas. Las que aún se hacen, por
+        // fecha prevista (la más cercana arriba); las cerradas, por número, de la última a la primera.
+        var orden = { 'En marcha': 0, 'Aplazadas': 1, 'Entregadas': 2, '': 3 };
         ls.sort(function (a, b) {
-          if (a.ESTADO === 'Entregada' && b.ESTADO === 'Entregada') return String(b.FECHA_ENTREGA || '').localeCompare(String(a.FECHA_ENTREGA || ''));
-          return String(a.FECHA_PREVISTA || '9999').localeCompare(String(b.FECHA_PREVISTA || '9999')) || String(a.ID).localeCompare(String(b.ID));
+          var ga = orden[grupoDe(a)], gb = orden[grupoDe(b)];
+          if (ga !== gb) return ga - gb;
+          if (ga >= 2) return String(a.INICIATIVA).localeCompare(String(b.INICIATIVA)) || Number(b.NUMERO) - Number(a.NUMERO);
+          return String(a.FECHA_PREVISTA || '9999').localeCompare(String(b.FECHA_PREVISTA || '9999')) || Number(a.NUMERO) - Number(b.NUMERO);
         });
         var l = $('en-lista');
         if (!EL.length) l.innerHTML = '<div class="en-msg">' + (leido ? 'No ves ninguna entrega todavía.' : 'Cargando las entregas…') + '</div>';
