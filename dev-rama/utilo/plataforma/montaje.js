@@ -27,6 +27,19 @@ window.NUCLEO_MONTAJE = {
     "anotar",
     "personas_gestion"
    ]
+  },
+  {
+   "id": "ENTREGAS",
+   "modulo": "entregas",
+   "titulo": "Entregas",
+   "icono": "<path d=\"M3 7l9-4 9 4-9 4-9-4z\"/><path d=\"M3 7v10l9 4 9-4V7\"/><path d=\"M12 11v10\"/>",
+   "web": "utilo/secciones/entregas.js",
+   "version": "dcbe80ee17",
+   "perfiles": "todos",
+   "config": {
+    "VER": "En marcha"
+   },
+   "api": []
   }
  ],
  "supabase": {
