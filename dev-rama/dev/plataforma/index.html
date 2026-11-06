@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Utilo DEV</title>
+<link rel="icon" href="data:,">
+<!-- T0386: web de DEV de la plataforma de Utilo sobre Supabase (la de producción es utilo/plataforma/). En utilo-web/dev-rama/
+     va al Supabase de DEV (utilo-dev, con la copia del DAILY de verdad) con el montaje de la rama (utilo/plataforma/montaje.js).
+     Entrar con Google pide que esta dirección esté en Authentication › URL Configuration › Redirect URLs de utilo-dev.
+     No la carga ninguna página de producción. -->
+<link rel="stylesheet" href="../../utilo/marca.css?v=47">
+<link rel="stylesheet" href="../../estilos/base.css?v=85">
+<script>
+  window.KANBAN = {
+    clave: 'dev-plataforma',
+    marca: 'utilo',
+    nombreApp: 'Utilo DEV',
+    supabase: true
+  };
+</script>
+</head>
+<body class="u">
+<div class="kz"><div class="kz-caja kz-centro" role="status"><div class="u-carga"></div><p>Cargando…</p></div></div>
+<script src="../../utilo/plataforma/montaje.js?v=1"></script>
+<script src="../../kanban4/tablas.js?v=53"></script>
+<script src="../../nucleo/supabase.js?v=1"></script>
+<script src="../../nucleo/acceso-supabase.js?v=1"></script>
+<script src="../../nucleo/nucleo.js?v=7"></script>
+</body>
+</html>
