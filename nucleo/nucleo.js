@@ -450,6 +450,7 @@
    * - llamar(fn, args): una función de su «api» del motor (recibe ctx en el motor). Devuelve una promesa.
    * - aviso(texto): mensaje corto abajo de la pantalla. ponerTitulo(texto): cambia el título de la cabecera.
    * - abierta(): si la sección sigue abierta (para no pintar tarde en otra).
+   * - enDirecto(tablas, f) (T0386, solo con Supabase; si no, null): f(tabla) en cuanto cambia algo en esas tablas de la base.
    */
   function ctxDe(s) {
     return {
@@ -465,7 +466,9 @@
       llamar: llamar,
       aviso: aviso,
       ponerTitulo: function (t) { if (actual === s.id) $('n-titulo').textContent = t; },
-      abierta: function () { return actual === s.id; }
+      abierta: function () { return actual === s.id; },
+      // T0386: con Supabase, enDirecto(tablas, f): f(tabla) en cuanto cambia algo en esas tablas de la base (null si no se puede).
+      enDirecto: window.UG && typeof window.UG.enDirecto === 'function' ? function (ts, f) { return window.UG.enDirecto(ts, f); } : null
     };
   }
 

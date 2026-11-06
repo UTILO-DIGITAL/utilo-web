@@ -16,7 +16,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Tareas",
    "icono": "<rect x=\"3\" y=\"4\" width=\"5\" height=\"16\" rx=\"1\"/><rect x=\"10\" y=\"4\" width=\"5\" height=\"11\" rx=\"1\"/><rect x=\"17\" y=\"4\" width=\"4\" height=\"7\" rx=\"1\"/>",
    "web": "utilo/secciones/tablero.js",
-   "version": "3bc8785706",
+   "version": "d7a9b47155",
    "perfiles": "todos",
    "config": {
     "VISTA": "ocho",
@@ -25,7 +25,8 @@ window.NUCLEO_MONTAJE = {
    "api": [
     "mover_tarea",
     "anotar",
-    "personas_gestion"
+    "personas_gestion",
+    "ordenar_tareas"
    ]
   },
   {
@@ -434,6 +435,10 @@ window.NUCLEO_MONTAJE = {
       "nombre": "CREADA",
       "tipo": "fecha_hora",
       "obligatoria": true
+     },
+     {
+      "nombre": "ORDEN",
+      "tipo": "numero"
      }
     ],
     "restricciones": {
@@ -788,6 +793,10 @@ window.NUCLEO_MONTAJE = {
       "nombre": "CREADA",
       "tipo": "fecha_hora",
       "obligatoria": true
+     },
+     {
+      "nombre": "ORDEN",
+      "tipo": "numero"
      },
      {
       "nombre": "ENTREGA_CORTA",

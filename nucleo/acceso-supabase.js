@@ -190,6 +190,10 @@
     },
     /** T0386: la capa de Supabase (para las pruebas y el modo local). */
     capa: capa,
+    /** T0386: avisos en directo de los cambios en unas tablas de la base (Realtime, con la sesión de quien ha entrado). */
+    enDirecto: function (tablas, alCambiar) {
+      return window.US.directo({ url: URL_SB, clave: P.clave, token: token, tablas: tablas, alCambiar: alCambiar });
+    },
     _: { alVolver: alVolver, sesionDe: sesionDe, entrar: entrar, token: token }
   };
   window.UG = S;

@@ -9,6 +9,9 @@
  * - Vista (arriba): «8 columnas» (todas menos Aplazada y Descartada), «Todas» (los diez estados) o «Agrupadas» (Necesita tu
  *   respuesta con Bloqueada y Para revisar con Aprobada; el estado exacto, en la tarjeta). La primera vez, la de
  *   config.VISTA; después, la última de este dispositivo. Entregadas y Descartadas, solo las de los últimos días (Filtros).
+ * - En directo: con Supabase, lo que cambie otra persona (o el agente) sale solo en un segundo (Realtime); ↻ sigue para forzarlo.
+ * - Ordenar a mano: arrastrada dentro de su columna, la tarjeta se queda donde se suelta (el mismo orden para todos; las que no
+ *   se han tocado, debajo, con el de siempre). Al cambiar de estado, vuelve al de siempre. Las cerradas, por fecha.
  * - Filtros: iniciativa, entrega, persona (en manos de, asignada, pide o revisa), épica y prioridad; y buscar.
  * - Las personas son su id en la base: el nombre sale de personas_gestion().
  * - Se pinta al momento con lo guardado en el dispositivo y se refresca por detrás.
@@ -42,6 +45,23 @@
     'Aprobada': ['Entregada'],
     'Aplazada': ['En cola', 'Esperando', 'Descartada']
   };
+  /** Qué abarca cada estado: sale al pasar el ratón por la cabecera de su columna. */
+  var QUE_ES = {
+    'Esperando': 'Espera a otra tarea de la que depende: todavía no se puede empezar.',
+    'En cola': 'No espera nada: lista para empezar cuando alguien la coja.',
+    'En curso': 'Alguien está trabajando en ella ahora.',
+    'Necesita tu respuesta': 'Parada hasta que quien la pidió conteste una pregunta concreta.',
+    'Bloqueada': 'Parada por algo de fuera: material del cliente, un acceso, un problema técnico o un tercero.',
+    'Para revisar': 'Hecha: falta que quien la revisa la mire.',
+    'Aprobada': 'Revisada y bien: falta publicarla o entregarla.',
+    'Entregada': 'Hecha y funcionando. Se cierra con su fecha.',
+    'Aplazada': 'Se deja para más adelante: se vuelve a mirar en la fecha que diga.',
+    'Descartada': 'No se va a hacer.'
+  };
+  /** El texto de la cabecera de una columna: el de su estado o, si junta varios, el de cada uno. */
+  function queEs(c) {
+    return c.estados.length === 1 ? QUE_ES[c.estados[0]] || '' : c.estados.map(function (e) { return e + ': ' + (QUE_ES[e] || ''); }).join('\n');
+  }
   var MOTIVOS_BLOQUEO = ['Falta material del cliente', 'Falta un acceso', 'Problema técnico', 'Un tercero'];
   var HERRAMIENTAS = ['Chat', 'Cowork', 'Claude Code'];
   /** Las columnas de cada vista: [{ id, titulo, estados }]. */
@@ -110,6 +130,7 @@
       var TACTIL = window.matchMedia && matchMedia('(hover: none)').matches;
       // Solo lee: lector en todo (las reglas de la base lo dicen igual; aquí, para no ofrecer lo que no puede).
       var SOLO_LEE = !ctx.admin && /^Lector/.test(ctx.perfil || '');
+      var ORDENA = !SOLO_LEE; // T0386: ordenar a mano en su columna (la base dice quién puede: ordenar_tareas)
 
       el.classList.add('kb');
       el.innerHTML =
@@ -226,9 +247,17 @@
         var dl = function (t) { var d = dias(t.DEADLINE); return d === null ? 1e9 : d; };
         var ur = function (t) { return t.URGENTE || dl(t) <= 7 ? 1 : 0; };
         var pn = function (t) { return String(t.P || '').length; };
+        // T0386: las ordenadas a mano (ORDEN), antes y en su orden; las demás, debajo, con el de siempre.
+        var om = function (t) { var o = ordenDe(t); return o === null ? Infinity : o; };
         return ts.sort(function (a, b) {
-          return (ur(b) - ur(a)) || (ur(a) ? dl(a) - dl(b) : 0) || (pn(b) - pn(a)) || (dl(a) - dl(b)) || String(a.ID).localeCompare(String(b.ID));
+          return (om(a) - om(b) || 0) || (ur(b) - ur(a)) || (ur(a) ? dl(a) - dl(b) : 0) || (pn(b) - pn(a)) || (dl(a) - dl(b)) || String(a.ID).localeCompare(String(b.ID));
         });
+      }
+      /** El orden a mano de una tarea (null si no tiene): el que se acaba de poner aquí, hasta que llega el de la base. */
+      var ORDEN_AQUI = {};
+      function ordenDe(t) {
+        var o = Object.prototype.hasOwnProperty.call(ORDEN_AQUI, t.ID) ? ORDEN_AQUI[t.ID] : t.ORDEN;
+        return o === null || o === undefined || o === '' || isNaN(Number(o)) ? null : Number(o);
       }
       function tarjeta(t, col) {
         var id = String(t.ID), m = [], x = [], varias = variasIniciativas();
@@ -265,7 +294,7 @@
           var ts = ordenar(lista.filter(function (t) { return c.estados.indexOf(t.ESTADO) >= 0; }), CERRADOS.indexOf(c.id) >= 0);
           var pl = !!PL[c.id] && !F.busca;
           return '<section class="col' + (pl ? ' plegada' : '') + '" data-est="' + texto(c.id) + '">' +
-            '<h2 class="' + cls(c.estados[0], c) + ' ch" role="button" tabindex="0" aria-expanded="' + (pl ? 'false' : 'true') + '" data-plegar="' + texto(c.id) + '">' + texto(c.titulo) +
+            '<h2 class="' + cls(c.estados[0], c) + ' ch" title="' + texto(queEs(c)) + '" role="button" tabindex="0" aria-expanded="' + (pl ? 'false' : 'true') + '" data-plegar="' + texto(c.id) + '">' + texto(c.titulo) +
             '<span class="n">' + ts.length + '</span><span class="fl"></span></h2>' +
             '<div class="lista">' + (ts.length ? ts.map(function (t) { return tarjeta(t, c); }).join('') : '<div class="vacio">Ninguna tarea con estos filtros.</div>') + '</div></section>';
         }).join('');
@@ -292,26 +321,96 @@
         var c = e.target.closest && e.target.closest('.card[draggable]');
         if (!c) return;
         arr = c.getAttribute('data-id'); c.classList.add('arrastrando');
+        // Las columnas a las que puede pasar se marcan enteras, de arriba abajo; las demás se apagan.
+        var t = tarea(arr), pasos = (t && PASOS[t.ESTADO]) || [];
+        tab.classList.add('kb-arrastre');
+        [].forEach.call(tab.querySelectorAll('.col'), function (x) {
+          var col = columna(x.getAttribute('data-est'));
+          var suya = col && t && col.estados.indexOf(t.ESTADO) >= 0, puede = col && !suya && col.estados.some(function (e) { return pasos.indexOf(e) >= 0; });
+          x.classList.add(suya ? 'kb-suya' : puede ? 'kb-puede' : 'kb-no');
+          if (suya && ORDENA && CERRADOS.indexOf(col.estados[0]) < 0) x.classList.add('kb-ordena');
+        });
         try { e.dataTransfer.setData('text/plain', arr); e.dataTransfer.effectAllowed = 'move'; } catch (x) {}
       });
-      tab.addEventListener('dragend', function () { arr = ''; [].forEach.call(tab.querySelectorAll('.arrastrando,.destino'), function (x) { x.classList.remove('arrastrando', 'destino'); }); });
-      tab.addEventListener('dragover', function (e) {
-        var c = arr && e.target.closest('.col');
+      tab.addEventListener('dragend', function () {
+        arr = ''; tab.classList.remove('kb-arrastre'); hueco(null);
+        [].forEach.call(tab.querySelectorAll('.arrastrando,.destino,.kb-suya,.kb-puede,.kb-no'), function (x) { x.classList.remove('arrastrando', 'destino', 'kb-suya', 'kb-puede', 'kb-no'); });
+      });
+      function columna(id) { return VISTAS[F.vista].cols.filter(function (x) { return x.id === id; })[0]; }
+      /** Dónde caería al soltarla en su columna: la tarjeta de debajo (null, al final). Se marca con una raya. */
+      function debajo(c, y) {
+        var cs = [].filter.call(c.querySelectorAll('.card[data-id]'), function (x) { return x.getAttribute('data-id') !== arr; });
+        for (var i = 0; i < cs.length; i++) { var r = cs[i].getBoundingClientRect(); if (y < r.top + r.height / 2) return cs[i]; }
+        return null;
+      }
+      function hueco(c, antes) {
+        [].forEach.call(tab.querySelectorAll('.kb-antes,.kb-al-final'), function (x) { x.classList.remove('kb-antes', 'kb-al-final'); });
         if (!c) return;
+        if (antes) antes.classList.add('kb-antes'); else c.querySelector('.lista').classList.add('kb-al-final');
+      }
+      tab.addEventListener('dragover', function (e) {
+        var o = arr && e.target.closest('.col.kb-ordena');
+        if (o) { e.preventDefault(); [].forEach.call(tab.querySelectorAll('.destino'), function (x) { x.classList.remove('destino'); }); hueco(o, debajo(o, e.clientY)); return; }
+        hueco(null);
+        var c = arr && e.target.closest('.col');
+        if (!c || !c.classList.contains('kb-puede')) { // solo se suelta donde puede pasar
+          if (arr) [].forEach.call(tab.querySelectorAll('.destino'), function (x) { x.classList.remove('destino'); });
+          return;
+        }
         e.preventDefault();
         [].forEach.call(tab.querySelectorAll('.destino'), function (x) { if (x !== c) x.classList.remove('destino'); });
         c.classList.add('destino');
       });
       tab.addEventListener('drop', function (e) {
+        var o = arr && e.target.closest('.col.kb-ordena');
+        if (o) {
+          e.preventDefault();
+          var ab = debajo(o, e.clientY), quien = arr; arr = ''; hueco(null);
+          colocar(quien, columna(o.getAttribute('data-est')), ab ? ab.getAttribute('data-id') : null);
+          return;
+        }
         var c = arr && e.target.closest('.col');
         if (!c) return;
         e.preventDefault();
         var id = arr, t = tarea(id); arr = '';
-        var col = VISTAS[F.vista].cols.filter(function (x) { return x.id === c.getAttribute('data-est'); })[0];
+        var col = columna(c.getAttribute('data-est'));
         if (!t || !col || col.estados.indexOf(t.ESTADO) >= 0) return;
         var a = col.estados.filter(function (x) { return (PASOS[t.ESTADO] || []).indexOf(x) >= 0; })[0];
         mover(id, a || col.estados[0]);
       });
+
+      /* ---------- ordenar a mano en su columna (al momento en la pantalla; ordenar_tareas, por detrás) ---------- */
+
+      /** Pone la tarea id justo encima de la tarea «antes» de su columna (null: al final de las que se ven). Numera de arriba abajo
+       *  las que hace falta (hasta ella y las ya ordenadas a mano), contando también las que ocultan los filtros; las de debajo, como siempre. */
+      function colocar(id, col, antes) {
+        var t = tarea(id);
+        if (!t || !col || id === antes) return;
+        var todas = ordenar(tareas().filter(function (x) { return col.estados.indexOf(x.ESTADO) >= 0 && String(x.ID) !== id; }), false);
+        var vistas = todas.filter(pasa), i;
+        if (antes) i = todas.map(function (x) { return String(x.ID); }).indexOf(antes);
+        else i = vistas.length ? todas.indexOf(vistas[vistas.length - 1]) + 1 : 0;
+        if (i < 0) return;
+        todas.splice(i, 0, t);
+        var hasta = i;
+        todas.forEach(function (x, k) { if (ordenDe(x) !== null) hasta = Math.max(hasta, k); });
+        var cambios = [];
+        for (var k = 0; k <= hasta; k++) {
+          if (ordenDe(todas[k]) !== k + 1) cambios.push({ tarea: String(todas[k].ID), orden: k + 1 });
+        }
+        if (!cambios.length) return;
+        cambios.forEach(function (c) { ORDEN_AQUI[c.tarea] = c.orden; });
+        pintarTablero();
+        ctx.llamar('ordenar_tareas', [{ orden: cambios }]).then(function () {
+          return ctx.tablas.refrescar([T], true);
+        }, function (e) {
+          if (ctx.abierta()) ctx.aviso('No se ha podido guardar el orden: ' + String(e.message).replace(/^\w+:\s*/, ''));
+          return ctx.tablas.refrescar([T], true);
+        }).catch(function () {}).then(function () {
+          cambios.forEach(function (c) { if (ORDEN_AQUI[c.tarea] === c.orden) delete ORDEN_AQUI[c.tarea]; });
+          if (ctx.abierta()) pintarTablero();
+        });
+      }
 
       /* ---------- mover (al momento en la pantalla; mover_tarea, por detrás) ---------- */
 
@@ -711,7 +810,31 @@
         tab.innerHTML = '<p class="u-error kb-vacio">No se han podido leer las tareas.</p><p class="u-nota kb-vacio">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Pulsa ↻ o vuelve a abrir la sección.</p>';
       });
       gente().catch(function () {});
-      this._cerrar = function () { el.classList.remove('kb'); document.documentElement.classList.remove('fv-abierta'); urlFicha(''); };
+
+      // T0386: en directo. Cuando alguien (otra persona, el agente, Telegram) cambia una tarea, sus dependencias o la bitácora,
+      // la base avisa (Realtime) y el tablero se pone al día solo, en un segundo; si es la de la ficha abierta, también su bitácora.
+      // Los avisos de un momento se juntan en una lectura; mientras se arrastra una tarjeta, espera a que se suelte.
+      var directo = null, tDirecto = null, pendiente = {};
+      function alDirecto() {
+        tDirecto = null;
+        if (!ctx.abierta()) { pendiente = {}; return; }
+        if (arr) { tDirecto = setTimeout(alDirecto, 1000); return; }
+        var p = pendiente; pendiente = {};
+        var todo = p['*'], ts = [];
+        if (todo || p.tareas || p.dependencias) ts.push(T, TD);
+        if (ts.length) ctx.tablas.refrescar(ts, true).catch(function () {});
+        if (abiertaId && (todo || p.bitacora || p.tareas)) bitacora(abiertaId, true).catch(function () {});
+      }
+      if (ctx.enDirecto) {
+        directo = ctx.enDirecto(['tareas', 'dependencias', 'bitacora'], function (tabla) {
+          pendiente[tabla] = 1;
+          if (!tDirecto) tDirecto = setTimeout(alDirecto, 800);
+        });
+      }
+      this._cerrar = function () {
+        if (directo) { directo.cerrar(); directo = null; }
+        if (tDirecto) { clearTimeout(tDirecto); tDirecto = null; }
+        el.classList.remove('kb'); document.documentElement.classList.remove('fv-abierta'); urlFicha(''); };
     },
     cerrar: function () { if (this._cerrar) this._cerrar(); }
   });
