@@ -110,8 +110,17 @@
   }
 
   /** Quién eres y qué ves, como lo da «entrar» del motor (lo que lee credDe de nucleo.js). */
+  /** T0386: la versión publicada y sus novedades (versiones.json, que deja «Publicar» junto a la página). Sin él (local, DEV), ninguna. */
+  function versiones() {
+    try {
+      return fetch(new URL('versiones.json', location.href).href, { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) { return j && Array.isArray(j.versiones) ? j : null; }, function () { return null; });
+    } catch (e) { return Promise.resolve(null); }
+  }
   function entrar() {
-    return capa().rpc('mi_acceso', {}).then(function (yo) {
+    var vs = versiones();
+    return capa().rpc('mi_acceso', {}).then(function (yo) { return vs.then(function (v) { return [yo, v]; }); }).then(function (x) {
+      var yo = x[0], ver = x[1];
       var correo = bajo((leer() || {}).correo || S.correoLocal || '');
       if (!yo) throw accesoError('ACCESO: ' + (correo ? 'la cuenta ' + correo : 'tu cuenta') + ' no tiene acceso a ' + (M.negocio || 'esta web') + '. Pide que te lo den.');
       var roles = yo.roles || [], orden = M.perfiles || [];
@@ -130,7 +139,7 @@
       return {
         persona: yo.nombre, correo: bajo(yo.correo || correo), perfil: alto.nombre + (alto.ambito !== 'todo' && alto.ambito_id ? ' en ' + alto.ambito_id : ''),
         admin: admin, negocio: M.negocio || '', dev: ENTORNO === 'prod' ? '' : (ENTORNO === 'dev' ? 'DEV' : 'Local') + ' · Supabase ' + (P.nombre || 'de pruebas') + (M.commit ? ' · ' + M.commit : ''),
-        secciones: secciones, version: M.version || '', versiones: [], persona_id: yo.persona, roles: roles
+        secciones: secciones, version: (ver && ver.version) || M.version || '', versiones: (ver && ver.versiones) || [], persona_id: yo.persona, roles: roles
       };
     });
   }

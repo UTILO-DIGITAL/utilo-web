@@ -1,0 +1,35 @@
+{
+  "version": "5.7-1.2",
+  "versiones": [
+    {
+      "v": "5.7-1.2",
+      "fecha": "06/11/2026",
+      "novedades": [
+        "En el Perfil vuelves a ver qué versión tienes, y al entrar te avisa de las novedades."
+      ]
+    },
+    {
+      "v": "5.6-1.1",
+      "fecha": "06/11/2026",
+      "novedades": [
+        "Al pasar el ratón por la cabecera de una columna ves qué abarca ese estado, y al arrastrar una tarea se marcan las columnas a las que puede ir.",
+        "Puedes ordenar a mano las tareas de una columna arrastrándolas, y el tablero se pone al día solo cuando alguien cambia algo."
+      ]
+    },
+    {
+      "v": "5.5.3-1.0.2",
+      "fecha": "06/11/2026",
+      "novedades": []
+    },
+    {
+      "v": "5.5.2-1.0.1",
+      "fecha": "06/11/2026",
+      "novedades": []
+    },
+    {
+      "v": "5.5.1-1.0",
+      "fecha": "06/11/2026",
+      "novedades": []
+    }
+  ]
+}
