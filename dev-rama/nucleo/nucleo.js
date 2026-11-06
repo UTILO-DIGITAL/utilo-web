@@ -29,6 +29,8 @@
  *   franja «Viendo como …» con «Volver a mi cuenta» (data-n-volver). Se recuerda en la pestaña (sessionStorage): al
  *   recargar sigue igual y al cerrarla se vuelve a la cuenta propia. Su copia de las tablas va aparte
  *   (<correo de quien administra>><correo de ella>) y se borra al volver.
+ * - T0386 · Sin motor: con nucleo/acceso-supabase.js en lugar de kanban4/google.js, «inicio», «entrar» y lo que piden las
+ *   secciones van a Supabase (UG.inicio, UG.volviendo al volver de Google); sin «entrar como otra persona» (UG.sinComo).
  * - T0283 · Versiones: «entrar» trae la versión que se ve («5.0-1.2») y las publicadas con sus novedades. Perfil enseña
  *   el bloque «Versión» (UN.htmlVersion) con «Ver las novedades» (data-n-versiones), que abre la ventana con la lista. Si
  *   hay una versión con novedades que no se ha visto en este dispositivo, la ventana se abre sola una vez al entrar.
@@ -76,6 +78,7 @@
     return window.UG.llamar(C.api, como ? { fn: 'entrar', como: como } : { fn: 'entrar' });
   }
   function inicio() {
+    if (window.UG.inicio) return window.UG.inicio(); // T0386: sin motor (acceso-supabase.js)
     return fetch(C.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: 'inicio' }) })
       .then(function (r) { if (!r.ok) throw new Error('No hay conexión con el motor del negocio (' + r.status + ').'); return r.json(); })
       .then(function (o) { if (!o.ok) throw new Error(String(o.error || 'Error')); return o.r; });
@@ -311,7 +314,7 @@
 
   /** La ventana para elegir como quién entrar: las personas de la tabla de accesos (solo quien administra; lo comprueba el motor). */
   function verComo() {
-    if (!cred || !cred.admin || cred.como || $('n-como-velo')) return;
+    if (!cred || !cred.admin || cred.como || window.UG.sinComo || $('n-como-velo')) return;
     var velo = document.createElement('div');
     velo.className = 'u-velo abierto'; velo.id = 'n-como-velo';
     velo.innerHTML = '<div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="n-como-t"><div class="n-ventana">' +
@@ -453,7 +456,7 @@
       id: s.id, titulo: s.titulo, persona: cred.persona, perfil: cred.perfil, admin: cred.admin, config: s.config || {},
       // T0259: las secciones que ves, en orden; T0269: con enPerfil (y su icono) las que van dentro de Perfil.
       // T0273: como, quien administra si está viendo como esta persona ({ correo, persona }); verComo, la ventana para elegir (solo quien administra).
-      como: cred.como || null, verComo: cred.admin && !cred.como ? verComo : null,
+      como: cred.como || null, verComo: cred.admin && !cred.como && !window.UG.sinComo ? verComo : null, // T0386: con Supabase, no
       // T0273: el nombre con el que se apunta lo que hace (HISTORIAL…), como en el motor: «Javi Canela como Ana».
       autor: cred.como ? cred.como.persona + ' como ' + cred.persona : cred.persona,
       correo: cred.correo || '', secciones: todas().map(function (x) { return x.enPerfil ? { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true } : { id: x.id, titulo: x.titulo }; }),
@@ -485,7 +488,7 @@
       '<dt>Secciones</dt><dd>' + texto(ves || 'Ninguna') + '</dd>' +
       '<dt>Dispositivo</dt><dd>' + (cred.como ? 'Viendo como ' + texto(cred.persona) + ' desde la cuenta de ' + texto(cred.como.persona) : 'Sesión guardada en este dispositivo') + '</dd></dl>' +
       (cred.como ? '<button type="button" class="u-btn" data-n-volver>Volver a mi cuenta</button>' :
-        '<div class="n-botones">' + (cred.admin ? '<button type="button" class="u-btn" data-n-como>Entrar como otra persona</button>' : '') +
+        '<div class="n-botones">' + (cred.admin && !window.UG.sinComo ? '<button type="button" class="u-btn" data-n-como>Entrar como otra persona</button>' : '') +
         '<a class="u-btn" href="?salir">Cerrar sesión</a></div>' +
         '<p class="u-nota">Al cerrar la sesión tendrás que volver a entrar con tu cuenta de Google.</p>') +
       (dentro.length ? '<div class="n-botones">' + dentro.map(function (s) {
@@ -532,7 +535,27 @@
 
   /* ---------- arranque ---------- */
 
+  /** T0386 · Entrar sin el botón (ya hay sesión): «entrar», y el marco; si no deja, la pantalla de entrada con el motivo. */
+  function entrarYa() {
+    entrar().then(function (r) {
+      window.UG.recordarCorreo(r.correo || '');
+      var c = credDe(r);
+      if (cred && copiaDe(cred) !== copiaDe(c)) soltarTablas();
+      guardar(c); borrarComo(); marco(c);
+    }, function (e) { borrar(); acceso(String(e.message).replace(/^ACCESO:\s*/, '')); });
+  }
+
   function arrancar() {
+    // T0386: con Supabase (acceso-supabase.js), si se vuelve de Google se espera a tener la sesión y se entra.
+    if (window.UG.volviendo) {
+      var v = window.UG.volviendo;
+      window.UG.volviendo = null;
+      cargando('Entrando…');
+      v.then(function (vuelve) { if (vuelve) entrarYa(); else arrancar(); }, function (e) { acceso(String(e.message).replace(/^ACCESO:\s*/, '')); });
+      return;
+    }
+    // T0386: con la sesión de Supabase guardada pero sin saber aún quién eres (otro dispositivo, otra persona), se entra solo.
+    if (window.UG.supabase && window.UG.tieneSesion() && !(leer() || {}).persona) { cargando('Entrando…'); entrarYa(); return; }
     if (new URLSearchParams(location.search).get('salir') !== null) {
       soltarTablas((leer() || {}).correo, true);  // T0275: la copia de quien sale no se queda en el dispositivo (T0273: ni la de «como»)
       borrar(); borrarComo(); window.UG.salir(); history.replaceState(null, '', location.pathname);
