@@ -145,7 +145,8 @@
       var FILTROS = [
         { k: 'INICIATIVA', t: 'Iniciativa', vs: function () { return ctx.tablas.filas(TI).map(function (i) { return [i.ID, i.NOMBRE || i.ID]; }); } },
         { k: 'ENTREGA', t: 'Entrega', vs: function () {
-          var usadas = {}; tareas().forEach(function (t) { if (t.ENTREGA) usadas[t.ENTREGA] = t.ENTREGA_CORTA || t.ENTREGA; });
+          // Con una iniciativa elegida, solo sus entregas.
+          var usadas = {}; tareas().forEach(function (t) { if (t.ENTREGA && (!F.INICIATIVA || t.INICIATIVA === F.INICIATIVA)) usadas[t.ENTREGA] = t.ENTREGA_CORTA || t.ENTREGA; });
           return ctx.tablas.filas(TE).filter(function (e) { return usadas[e.ID]; }).map(function (e) { return [e.ID, usadas[e.ID] + ' · ' + (e.NOMBRE || '')]; }).concat([['-', 'Sin entrega']]);
         } },
         { k: 'PERSONA', t: 'Persona', vs: function () {
@@ -176,6 +177,12 @@
       $('kb-mas').addEventListener('change', function (e) {
         var s = e.target.closest('[data-f]');
         if (s) F[s.getAttribute('data-f')] = s.value;
+        // Otra iniciativa: la entrega elegida puede no ser suya; y el desplegable de entregas cambia.
+        if (s && s.getAttribute('data-f') === 'INICIATIVA') {
+          var en = F.ENTREGA && F.ENTREGA !== '-' ? ctx.tablas.fila(TE, F.ENTREGA) : null;
+          if (en && F.INICIATIVA && en.INICIATIVA !== F.INICIATIVA) F.ENTREGA = '';
+          guardarLocal(CLAVE + '_f', F); pintarFiltros(); pintarTablero(); return;
+        }
         if (e.target.id === 'kb-dias') { var n = parseInt(e.target.value, 10); F.dias = isNaN(n) || n < 0 ? DIAS : n; e.target.value = F.dias; }
         guardarLocal(CLAVE + '_f', F); cuenta(); pintarTablero();
       });
@@ -653,7 +660,7 @@
           '<div class="cab"><div class="id"><span class="n">' + texto(id) + '</span></div><h1 id="kb-f-tit">' + texto(t.TITULO) + '</h1></div>' +
           '<div class="fmeta">' + tags.join('') + '</div>' + estado +
           (motivo.length ? '<div class="bloque">' + motivo.join('') + '</div>' : '') +
-          '<div class="ffechas">' + fs.join('') + '</div>' +
+          '<div class="datos"><div class="fila"><b>Fechas</b><div class="ffechas">' + fs.join('') + '</div></div></div>' +
           bloque(ETIQUETA.DESCRIPCION, lineas(t.DESCRIPCION)) +
           (personas.length ? '<div class="bloque"><h3>Personas</h3>' + personas.join('') + '</div>' : '') +
           (deps.length ? '<div class="bloque"><h3>Espera a</h3>' + deps.map(rel).join('') + '</div>' : '') +
