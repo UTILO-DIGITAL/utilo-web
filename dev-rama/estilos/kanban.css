@@ -836,9 +836,35 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
 .u .mp-lim span svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .u .mp-lim.vencida { border-left-color: var(--estado-bl); }
 .u .mp-lim.vencida span { background: var(--estado-bl); }
-.u .mp-fn { position: absolute; z-index: 4; transform: translate(-50%, -50%); min-width: 24px; height: 24px; padding: 0 6px; border-radius: 12px; cursor: pointer;
-  border: 2px solid var(--color-texto); background: var(--color-superficie); color: var(--color-texto); font: 800 12px/1 var(--fuente-texto); }
+.u .mp-fn { position: absolute; z-index: 4; transform: translate(-50%, -50%); height: 24px; padding: 0 var(--e2); border-radius: 12px; cursor: pointer; white-space: nowrap;
+  border: 1.5px solid var(--color-texto); background: var(--color-superficie); color: var(--color-texto); font: 700 12px/1 var(--fuente-texto); }
 .u .mp-fn.sel { background: var(--color-texto); color: var(--color-superficie); }
 .u .mp-lienzo.con-sel .mp-fn:not(.sel) { opacity: .35; }
 .u .mp-ley .mp-ley-lim::before { width: 3px; height: 14px; border-radius: 0; background: var(--color-principal-oscuro); }
-.u .mp-ayuda { margin: var(--e2) 0 0; max-width: 90ch; font-size: 13px; color: var(--color-suave); }
+/* Lo oculto, oculto de verdad: .en-lista lleva display: grid, que pisaría el atributo hidden. */
+.u .mp [hidden] { display: none !important; }
+.u .mp-ley { gap: var(--e2) var(--e5); margin-top: var(--e3); }
+.u .mp-ayuda { margin: var(--e3) 0 0; font-size: 14px; color: var(--color-suave); }
+.u .mp-ayuda summary { cursor: pointer; min-height: 32px; display: inline-flex; align-items: center; font-weight: 700; color: var(--color-principal-oscuro); }
+.u .mp-ayuda ul { margin: var(--e1) 0 0; padding-left: var(--e5); max-width: 80ch; display: grid; gap: var(--e1); }
+/* T0415 · El detalle de una entrega, para leerlo de un vistazo: tres cifras arriba, qué incluye, las esperas (solo las
+ * entregas) y las tareas por estado, una por línea (el color del estado, en el título del grupo). */
+.u .mp-det .en-t { margin-bottom: var(--e3); }
+.u .mp-dcifras { display: grid; gap: var(--e2); margin: 0 0 var(--e3); }
+.u .mp-dcifras > div { display: flex; justify-content: space-between; gap: var(--e3); padding-bottom: var(--e2); border-bottom: 1px solid var(--color-linea); }
+.u .mp-dcifras dt { font: 700 12px/1.6 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; }
+.u .mp-dcifras dd { margin: 0; text-align: right; font-size: 15px; }
+.u .mp-dcifras .mp-rojo dd { color: var(--estado-bl); font-weight: 700; }
+.u .mp-dinc { margin: var(--e3) 0 0; font-size: 14px; line-height: 1.5; color: var(--color-suave); }
+.u .mp-det .mp-dh { margin: var(--e5) 0 var(--e2); }
+.u .mp-desp { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--e1); }
+.u .mp-desp small { color: var(--color-suave); font-size: 13px; }
+.u .mp-det h5 { display: flex; align-items: center; gap: var(--e2); margin: var(--e3) 0 var(--e1); font: 700 13px/1.4 var(--fuente-texto); color: var(--color-texto); }
+.u .mp-det h5::before { content: ''; width: 10px; height: 10px; border-radius: var(--radio-peq); background: var(--estado); }
+.u .mp-det .mp-ts li { border: 0; border-bottom: 1px solid var(--color-linea); margin: 0; padding: var(--e2) 0 var(--e2) 18px; }
+.u .mp-det .mp-ts li:last-child { border-bottom: 0; }
+.u .mp-det .mp-ts a { display: block; font-size: 14px; line-height: 1.4; }
+.u .mp-det .mp-ts small { display: block; margin-top: 2px; font-size: 12px; color: var(--color-suave); }
+.u .mp-det .mp-ts small.mp-rojo { color: var(--estado-bl); font-weight: 700; }
+.u .mp-dcerr { margin-top: var(--e3); border-top: 1px solid var(--color-linea); padding-top: var(--e2); }
+.u .mp-dcerr summary { cursor: pointer; min-height: 32px; display: inline-flex; align-items: center; font-weight: 700; color: var(--color-principal-oscuro); }

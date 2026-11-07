@@ -9,7 +9,9 @@
  *   el tiempo (meses arriba) y una línea Hoy.
  * - Cada entrega, una caja de su FECHA_INICIO a su FECHA_PREVISTA (su fecha límite, con una bandera encima mientras está en
  *   marcha; la Entregada, hasta su FECHA_ENTREGA), con qué incluye y su barra de avance por grupos de estados (las Descartadas
- *   no cuentan). Sin fecha de inicio, empieza el día que se creó su primera tarea (sin tareas, dos semanas antes de la
+ *   no cuentan). Sin fecha de inicio, empieza cuando se empezó a trabajar en ella: la primera vez que una de sus tareas
+ *   pasó a En curso o más allá (las líneas de la bitácora que lo dicen; si no hay, el cierre de una entregada) o, si aún no
+ *   se ha empezado, dos semanas antes de la
  *   prevista) y lleva el borde izquierdo de puntos; sin prevista, el derecho; sin ninguna, va junto al nombre del carril.
  *   Una Planificada con tareas que ya se mueven se ve como empezada.
  * - Lo vencido: una entrega en marcha cuya prevista ya pasó lleva una cola roja hasta Hoy y «Vencida hace N días»; las tareas
@@ -20,21 +22,23 @@
  * - Al pulsar una caja, su detalle (fechas, avance, qué incluye, qué espera y quién la espera) y sus tareas, que abren su
  *   ficha en Tareas. En una pantalla grande, al lado del mapa; si no, debajo.
  * - En una pantalla muy ancha ocupa todo el ancho; en el móvil se desliza de lado (los nombres de los carriles se quedan a la
- *   vista) y se abre con Hoy cerca de la izquierda. Ver: en marcha, con las entregadas de los últimos 60 días o todas.
+ *   vista) y se abre con Hoy cerca de la izquierda.
  * Lista (T0386, como la sección Entregas del kanban 4.x, T0399): una tarjeta por entrega con su nombre corto (U19), estado e
  * iniciativa; las tareas entregadas de su total con una barra por estados; la fecha prevista con los días que faltan (o la de
- * entrega); qué incluye, el criterio de terminado y, al desplegar, sus tareas por estado. Ver: en marcha, aplazadas,
- * entregadas o todas.
- * Las dos, con el filtro Iniciativa. Solo lee (ENTREGAS, INICIATIVAS, la vista TABLERO y DEPENDENCIAS), con la sesión de quien
+ * entrega); qué incluye, el criterio de terminado y, al desplegar, sus tareas por estado.
+ * Los filtros valen para las dos vistas: Ver (en marcha, aplazadas, entregadas o todas) e Iniciativa. Solo lee (ENTREGAS, INICIATIVAS, la vista TABLERO y DEPENDENCIAS), con la sesión de quien
  * ha entrado: lo que ve lo dicen sus roles. Se pone al día sola cuando cambia una tarea o una dependencia (Realtime; las
  * entregas, con ↻). Las cuentas y la colocación del mapa (CALC) se prueban en node (herramientas/probar-plataforma.js).
  * Estilos: estilos/kanban.css (.mp-* el mapa, .en-* la lista), con los colores de base.css.
  */
 (function () {
   'use strict';
-  var TE = 'ENTREGAS', TI = 'INICIATIVAS', T = 'TABLERO', TD = 'DEPENDENCIAS';
-  var VER = ['En marcha', 'Con las entregadas', 'Todas'];
-  var RECIENTES = 60;          // días que se ven las entregadas en «Con las entregadas»
+  var TE = 'ENTREGAS', TI = 'INICIATIVAS', T = 'TABLERO', TD = 'DEPENDENCIAS', TB = 'BITACORA';
+  /** Los estados que dicen que ya se trabaja en una tarea: de la bitácora se leen solo las líneas que la pasan a uno de ellos. */
+  var TRABAJO = ['En curso', 'Para revisar', 'Aprobada', 'Entregada'];
+  var PARTE_TRABAJO = { clave: 'trabajo', col: 'ESTADO_DESPUES', valores: TRABAJO };
+  /** El filtro Ver, el mismo en las dos vistas: en marcha (planificadas y en curso), aplazadas, entregadas o todas (también las descartadas). */
+  var VER = ['En marcha', 'Aplazadas', 'Entregadas', 'Todas'];
   var SIN_FECHA = 14;          // días que se dibujan hacia atrás (sin inicio) o hacia delante (sin prevista)
   // Medidas del dibujo, en px.
   // fila deja encima de cada caja sitio para la bandera de su fecha límite.
@@ -52,7 +56,6 @@
     'Aprobada': 's-co', 'Entregada': 's-co', 'Aplazada': 's-x', 'Descartada': 's-x' };
   var CERRADA = { 'Entregada': 1, 'Descartada': 1 };
   var VISTAS = ['Mapa', 'Lista'];
-  var VER_LISTA = ['En marcha', 'Aplazadas', 'Entregadas', 'Todas'];
   var DESPLEGAR = ['En curso', 'Necesita tu respuesta', 'Bloqueada', 'Para revisar', 'Aprobada', 'En cola', 'Esperando', 'Aplazada', 'Entregada', 'Descartada'];
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
@@ -70,10 +73,28 @@
 
   function enMarcha(e) { return e.ESTADO === 'Planificada' || e.ESTADO === 'En curso'; }
 
-  /** La primera tarea de una entrega (su CREADA más antigua, sin las descartadas): desde cuándo hay trabajo en ella. */
-  function primeraTarea(ts) {
+  /** El primer día que se trabajó en cada tarea, de las líneas de la bitácora que la pasan a En curso o más allá: { T0001: 'aaaa-mm-dd' }. */
+  function trabajoPorTarea(lineas) {
+    var o = {};
+    (lineas || []).forEach(function (l) {
+      var c = dia(l.CUANDO);
+      if (c && l.TAREA && TRABAJO.indexOf(l.ESTADO_DESPUES) >= 0 && (!o[l.TAREA] || c < o[l.TAREA])) o[l.TAREA] = c;
+    });
+    return o;
+  }
+  /**
+   * Desde cuándo se trabaja en una entrega: el primer día que una de sus tareas pasó a En curso (o más allá), según la
+   * bitácora; sin esa línea, el día que se cerró una entregada o, si está en marcha (en curso, en revisión o atascada), desde
+   * cuándo está en ese estado (ESTADO_DESDE). '' si todavía no se ha empezado (no cuenta cuándo se creó).
+   */
+  function inicioTrabajo(ts, porTarea) {
     var p = '';
-    (ts || []).forEach(function (t) { var c = dia(t.CREADA); if (c && t.ESTADO !== 'Descartada' && (!p || c < p)) p = c; });
+    (ts || []).forEach(function (t) {
+      if (t.ESTADO === 'Descartada') return;
+      var c = (porTarea || {})[t.ID] || (t.ESTADO === 'Entregada' ? dia(t.FECHA_CIERRE) :
+        ['En cola', 'Esperando', 'Aplazada'].indexOf(t.ESTADO) < 0 ? dia(t.ESTADO_DESDE) : '');
+      if (c && (!p || c < p)) p = c;
+    });
     return p;
   }
   /** Si una entrega ya está empezada: En curso, o Planificada con alguna tarea que ya se mueve (en curso, en revisión, atascada o hecha). */
@@ -84,14 +105,15 @@
 
   /**
    * De qué día a qué día va la caja de una entrega: { ini, fin, sinIni, iniDe, sinFin, retraso } o null si no tiene ninguna fecha.
-   * fin es el último día (incluido). Sin FECHA_INICIO, empieza el día que se creó su primera tarea (iniDe: 'tareas') o, sin
-   * tareas, dos semanas antes de la prevista (iniDe: 'prevista'). retraso: los días que lleva vencida una entrega en marcha.
+   * fin es el último día (incluido). Sin FECHA_INICIO, empieza cuando se empezó a trabajar en ella (empezo, de inicioTrabajo;
+   * iniDe: 'trabajo') o, si aún no, dos semanas antes de la prevista (iniDe: 'prevista'). retraso: los días que lleva vencida
+   * una entrega en marcha.
    */
-  function tramo(e, hoy, ts) {
+  function tramo(e, hoy, empezo) {
     var ini = dia(e.FECHA_INICIO), fin = e.ESTADO === 'Entregada' ? (dia(e.FECHA_ENTREGA) || dia(e.FECHA_PREVISTA)) : dia(e.FECHA_PREVISTA);
-    var pri = ini ? '' : primeraTarea(ts);
+    var pri = ini ? '' : dia(empezo);
     if (!ini && !fin && !pri) return null;
-    var r = { ini: ini, fin: fin, sinIni: !ini, iniDe: ini ? '' : pri ? 'tareas' : 'prevista', sinFin: !fin, retraso: 0 };
+    var r = { ini: ini, fin: fin, sinIni: !ini, iniDe: ini ? '' : pri ? 'trabajo' : 'prevista', sinFin: !fin, retraso: 0 };
     if (!ini) r.ini = pri || mas(fin, -SIN_FECHA);
     if (!fin) r.fin = mas(mayor(ini, hoy), SIN_FECHA);
     if (r.fin < r.ini) r.fin = r.ini; // prevista antes del inicio: una caja de un día (la fecha se lee en el detalle)
@@ -109,7 +131,7 @@
   /** Lo atascado y lo vencido de una entrega: preguntas, bloqueos, tareas abiertas con el DEADLINE pasado y su retraso. */
   function marcas(e, ts, hoy) {
     ts = ts || [];
-    var t = tramo(e, hoy, ts);
+    var t = tramo(e, hoy);
     return {
       preguntas: ts.filter(function (x) { return x.ESTADO === 'Necesita tu respuesta'; }).length,
       bloqueos: ts.filter(function (x) { return x.ESTADO === 'Bloqueada'; }).length,
@@ -119,15 +141,8 @@
   }
 
   /** Si una entrega sale con ese filtro: en marcha; con las entregadas de los últimos días; o todas. */
-  function seVe(e, ver, hoy) {
-    if (enMarcha(e)) return true;
-    if (ver === 'Todas') return true;
-    if (ver === 'Con las entregadas' && e.ESTADO === 'Entregada') {
-      var f = dia(e.FECHA_ENTREGA) || dia(e.FECHA_PREVISTA);
-      return !f || diasEntre(f, hoy) <= RECIENTES;
-    }
-    return false;
-  }
+  function grupoDe(e) { return e.ESTADO === 'Entregada' ? 'Entregadas' : e.ESTADO === 'Aplazada' ? 'Aplazadas' : e.ESTADO === 'Descartada' ? '' : 'En marcha'; }
+  function seVe(e, ver) { return ver === 'Todas' || grupoDe(e) === ver; }
 
   /**
    * Las esperas entre entregas: [{ de, a, n, abiertas, pares: [{ tarea, de }] }] (de y a, IDs de entrega; la flecha va de
@@ -198,7 +213,7 @@
    */
   function plano(d, o) {
     o = o || {};
-    var hoy = dia(o.hoy) || hoyIso(), ver = VER.indexOf(o.ver) >= 0 ? o.ver : VER[1];
+    var hoy = dia(o.hoy) || hoyIso(), ver = VER.indexOf(o.ver) >= 0 ? o.ver : VER[0];
     var ES = (d.entregas || []).filter(function (e) { return seVe(e, ver, hoy) && (!o.ini || e.INICIATIVA === o.ini); });
     // Los carriles: las iniciativas activas primero; entre ellas, la que tiene más entregas en marcha arriba; a igualdad, en su orden.
     var IS = (d.iniciativas || []).slice(), orden = {}, vivas = {};
@@ -214,7 +229,8 @@
 
     // El tiempo: del mes de lo primero al de lo último, con Hoy dentro y al menos tres meses.
     var tr = {}, desde = hoy, hasta = hoy;
-    ES.forEach(function (e) { var t = tramo(e, hoy, tareasDe[e.ID]); if (t) { tr[e.ID] = t; desde = menor(desde, t.ini); hasta = mayor(hasta, t.fin); } });
+    var porTarea = trabajoPorTarea(d.bitacora), empiezo = {};
+    ES.forEach(function (e) { empiezo[e.ID] = inicioTrabajo(tareasDe[e.ID], porTarea); var t = tramo(e, hoy, empiezo[e.ID]); if (t) { tr[e.ID] = t; desde = menor(desde, t.ini); hasta = mayor(hasta, t.fin); } });
     desde = mas(desde, -7).slice(0, 8) + '01';
     hasta = mas(hasta, 7);
     if (diasEntre(desde, hasta) < 90) hasta = mas(desde, 90);
@@ -287,8 +303,8 @@
     };
   }
 
-  var CALC = { plano: plano, tramo: tramo, empezada: empezada, primeraTarea: primeraTarea, progreso: progreso, marcas: marcas, seVe: seVe, esperas: esperas, enFilas: enFilas, linea: linea,
-    diasEntre: diasEntre, mas: mas, M: M, VER: VER, VER_LISTA: VER_LISTA, VISTAS: VISTAS, RECIENTES: RECIENTES };
+  var CALC = { plano: plano, tramo: tramo, empezada: empezada, trabajoPorTarea: trabajoPorTarea, inicioTrabajo: inicioTrabajo, TRABAJO: TRABAJO, progreso: progreso, marcas: marcas, seVe: seVe, esperas: esperas, enFilas: enFilas, linea: linea,
+    diasEntre: diasEntre, mas: mas, M: M, VER: VER, VISTAS: VISTAS, grupoDe: grupoDe };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ===================== la pantalla ===================== */
@@ -335,7 +351,6 @@
   }
 
   /** Lista: en qué grupo del filtro Ver va una entrega. */
-  function grupoDe(e) { return e.ESTADO === 'Entregada' ? 'Entregadas' : e.ESTADO === 'Aplazada' ? 'Aplazadas' : e.ESTADO === 'Descartada' ? '' : 'En marcha'; }
   /** Días de hoy a esa fecha: «faltan 9 días», «es hoy», «venció hace 2 días». */
   function cuanto(s) {
     var n = diasEntre(hoyIso(), s);
@@ -348,12 +363,12 @@
       estilos(el);
       var C = ctx.config || {};
       var CLAVE = 'en_' + String(ctx.correo || ctx.persona || '').toLowerCase().replace(/\W+/g, '');
-      var F = leerLocal(CLAVE + '_f', {});   // { vista, ver (lista), verMapa, ini }
+      var F = leerLocal(CLAVE + '_f', {});   // { vista, ver, ini }: los filtros valen para las dos vistas
       var pedida = String(new URLSearchParams(location.search).get('v') || '').toLowerCase();
       if (pedida === 'mapa' || pedida === 'lista') F.vista = pedida === 'mapa' ? 'Mapa' : 'Lista';
       if (VISTAS.indexOf(F.vista) < 0) F.vista = VISTAS.indexOf(C.VISTA) >= 0 ? C.VISTA : 'Mapa';
-      if (VER_LISTA.indexOf(F.ver) < 0) F.ver = VER_LISTA.indexOf(C.VER) >= 0 ? C.VER : 'En marcha';
-      if (VER.indexOf(F.verMapa) < 0) F.verMapa = VER.indexOf(C.VER_MAPA) >= 0 ? C.VER_MAPA : VER[1];
+      if (VER.indexOf(F.ver) < 0) F.ver = VER.indexOf(C.VER) >= 0 ? C.VER : 'En marcha';
+      delete F.verMapa;
       var leido = false, sel = '', P = null, primera = true, anchoVisto = 0;
       // Sin la clase «en»: en kanban.css es la vista de la 4.x, que solo se ve con body.ver-entregas.
       el.innerHTML = '<section class="mp en-nucleo"><div class="en-fil">' +
@@ -368,15 +383,18 @@
         '<div class="mp-cuerpo"><div class="mp-izq"><div id="mp-marco" class="mp-marco" tabindex="0" aria-label="Mapa de las entregas en el tiempo"></div>' +
         '<ul class="mp-ley">' + GRUPOS.map(function (g) { return '<li class="' + g.cls + '">' + texto(g.varias) + '</li>'; }).join('') +
         '<li class="mp-ley-lim">fecha límite</li><li class="mp-ley-cola">vencida</li><li class="mp-ley-f">espera a</li><li class="mp-ley-sin">fecha calculada</li></ul>' +
-        '<p class="mp-ayuda">Cada caja es una entrega, desde que empieza hasta su fecha límite (la bandera). Si no tiene fecha de inicio, empieza el día que se creó su primera tarea. ' +
-        'Una flecha de una entrega a otra quiere decir que la segunda tiene tareas que no pueden empezar hasta que se acaben tareas de la primera; el número dice cuántas. Pulsa una caja para ver sus tareas.</p></div>' +
+        '<details class="mp-ayuda"><summary>Cómo se lee el mapa</summary><ul>' +
+        '<li>Cada caja es una entrega: empieza en su fecha de inicio y acaba en su fecha límite (la bandera).</li>' +
+        '<li>Si no tiene fecha de inicio, empieza cuando se empezó a trabajar en ella (borde de puntos).</li>' +
+        '<li>«K5 espera a U19»: K5 tiene tareas que no pueden empezar hasta que se acaben tareas de U19.</li>' +
+        '<li>Pulsa una caja para ver sus tareas y qué espera.</li></ul></details></div>' +
         '<aside id="mp-det" class="mp-det" hidden></aside></div></div>' +
         '<div id="en-lista" class="en-lista" hidden></div></section>';
       var $ = function (id) { return el.querySelector('#' + id); };
       var sec = el.querySelector('.mp'), marco = $('mp-marco'), det = $('mp-det');
 
       function datos() {
-        return { entregas: ctx.tablas.filas(TE), iniciativas: ctx.tablas.filas(TI), tareas: ctx.tablas.filas(T), deps: ctx.tablas.filas(TD) };
+        return { entregas: ctx.tablas.filas(TE), iniciativas: ctx.tablas.filas(TI), tareas: ctx.tablas.filas(T), deps: ctx.tablas.filas(TD), bitacora: ctx.tablas.filas(TB) };
       }
 
       function caja(c) {
@@ -402,7 +420,7 @@
       function pintarMapa() {
         var ancho = marco.clientWidth || 0;
         anchoVisto = ancho;
-        P = plano(datos(), { hoy: hoyIso(), ancho: ancho, ver: F.verMapa, ini: F.ini });
+        P = plano(datos(), { hoy: hoyIso(), ancho: ancho, ver: F.ver, ini: F.ini });
         if (sel && !P.cajas.some(function (c) { return c.id === sel; })) cerrarDetalle(true);
         var r = P.resumen, partes = [];
         if (r.entregas) {
@@ -439,11 +457,12 @@
             var c = 'mp-f' + (f.abiertas ? '' : ' hecha') + (sel && (f.de === sel || f.a === sel) ? ' sel' : '');
             return '<path class="' + c + '" d="' + f.d + '" marker-end="url(#mp-punta)"></path>';
           }).join('') + '</svg>';
-        // En medio de cada flecha, cuántas tareas esperan (al pulsarlo, la entrega que espera).
+        // En medio de cada flecha, quién espera a quién («K5 espera a U19»); cuántas tareas y cuáles, al pasar por encima y en el detalle.
         h += P.flechas.filter(function (f) { return f.d && f.mx != null; }).map(function (f) {
           var t = nombreCorto(f.a).split(' · ')[0] + ' espera a ' + nombreCorto(f.de).split(' · ')[0] + ': ' +
             (f.abiertas === 1 ? '1 tarea espera' : f.abiertas + ' tareas esperan') + ' (' + f.pares.filter(function (q) { return !CERRADA[q.de.ESTADO]; }).map(function (q) { return q.tarea.ID + ' a ' + q.de.ID; }).join(', ') + ')';
-          return '<button type="button" class="mp-fn' + (sel && (f.de === sel || f.a === sel) ? ' sel' : '') + '" data-e="' + texto(f.a) + '" style="left:' + f.mx + 'px;top:' + f.my + 'px" title="' + texto(t) + '" aria-label="' + texto(t) + '">' + f.abiertas + '</button>';
+          return '<button type="button" class="mp-fn' + (sel && (f.de === sel || f.a === sel) ? ' sel' : '') + '" data-e="' + texto(f.a) + '" style="left:' + f.mx + 'px;top:' + f.my + 'px" title="' + texto(t) + '" aria-label="' + texto(t) + '">' +
+            texto(nombreCorto(f.a).split(' · ')[0] + ' espera a ' + nombreCorto(f.de).split(' · ')[0]) + '</button>';
         }).join('');
         h += '</div>';
         marco.innerHTML = h;
@@ -456,70 +475,65 @@
         var c = P && P.cajas.filter(function (x) { return x.id === id; })[0];
         return c ? c.corto + ' · ' + c.e.NOMBRE : id;
       }
-      function tareaTxt(t) {
-        return '<a href="?s=tablero&amp;t=' + encodeURIComponent(t.ID) + '" data-sx="TABLERO"><span class="id">' + texto(t.ID) + '</span> ' + texto(t.TITULO) + '</a>' +
-          ' <span class="mp-est ' + (CLS[t.ESTADO] || 's-x') + '">' + texto(t.ESTADO) + '</span>';
+      /** Una tarea en el detalle: su ID y su título, que abren su ficha; quién la tiene y, si venció, su deadline, debajo y en pequeño. */
+      function tareaLi(x, hoy) {
+        var v = !CERRADA[x.ESTADO] && x.ESTADO !== 'Aplazada' && dia(x.DEADLINE) && dia(x.DEADLINE) < hoy;
+        var bajo = [x.EN_MANOS_NOMBRE || '', v ? 'venció el ' + fechaEs(x.DEADLINE).slice(0, 5) : ''].filter(Boolean);
+        return '<li><a href="?s=tablero&amp;t=' + encodeURIComponent(x.ID) + '" data-sx="TABLERO"><span class="id">' + texto(x.ID) + '</span> ' + texto(x.TITULO) + '</a>' +
+          (bajo.length ? '<small' + (v ? ' class="mp-rojo"' : '') + '>' + texto(bajo.join(' · ')) + '</small>' : '') + '</li>';
       }
 
+      /**
+       * El detalle de una entrega, para leerlo de un vistazo: arriba el avance, la fecha límite y desde cuándo se trabaja;
+       * sus avisos, qué incluye, a qué entregas espera y cuáles la esperan (solo lo abierto, sin el detalle de cada tarea) y
+       * sus tareas por estado, una por línea (las entregadas y descartadas, plegadas).
+       */
       function pintarDetalle() {
         var c = P && P.cajas.filter(function (x) { return x.id === sel; })[0];
         if (!c) { det.hidden = true; sec.classList.remove('con-det'); return; }
-        var e = c.e, p = c.prog, i = P.iniciativas[e.INICIATIVA], t = c.tramo, hoy = P.hoy;
-        var h = '<div class="mp-dcab"><div class="en-top"><span class="en-corto">' + texto(c.corto) + '</span><span class="en-est">' + texto(e.ESTADO) + '</span>' +
-          (i ? '<span class="en-cli">' + texto(i.NOMBRE || i.ID) + '</span>' : '') + '</div>' +
+        var e = c.e, p = c.prog, t = c.tramo, hoy = P.hoy;
+        var estado = e.ESTADO === 'Planificada' && c.empezada ? 'Empezada' : e.ESTADO;
+        var h = '<div class="mp-dcab"><div class="en-top"><span class="en-corto">' + texto(c.corto) + '</span><span class="en-est">' + texto(estado) + '</span></div>' +
           '<button id="mp-cer" type="button" class="sec recarga" title="Cerrar" aria-label="Cerrar el detalle">' + ICO_CERRAR + '</button></div>' +
           '<h3 class="en-t">' + texto(e.NOMBRE) + '</h3>';
-        // Fechas.
-        var fs = [];
-        if (e.ESTADO === 'Entregada') fs.push(e.FECHA_ENTREGA ? 'Entregada el ' + fechaEs(e.FECHA_ENTREGA) : 'Entregada');
-        if (dia(e.FECHA_INICIO)) fs.push((dia(e.FECHA_INICIO) > hoy ? 'Empieza el ' : 'Empezó el ') + fechaEs(e.FECHA_INICIO));
-        else if (e.ESTADO !== 'Entregada') fs.push(t && t.iniDe === 'tareas' ? 'Sin fecha de inicio: en el mapa empieza el ' + fechaEs(t.ini) + ', cuando se creó su primera tarea' :
-          'Sin fecha de inicio' + (t ? ': en el mapa, dos semanas antes de su fecha límite' : ''));
-        if (e.ESTADO === 'Planificada' && c.empezada) fs.push('Planificada, pero ya tiene tareas en marcha o hechas');
-        if (e.ESTADO !== 'Entregada') {
-          if (dia(e.FECHA_PREVISTA)) {
-            var n = CALC.diasEntre(hoy, e.FECHA_PREVISTA);
-            fs.push('Fecha límite: ' + fechaEs(e.FECHA_PREVISTA) + (enMarcha(e) ? ' · ' + (n === 0 ? 'es hoy' : n > 0 ? (n === 1 ? 'falta 1 día' : 'faltan ' + n + ' días') : 'venció hace ' + diasTxt(-n)) : ''));
-          } else fs.push('Sin fecha límite');
-        }
-        h += '<div class="en-fecha' + (t && t.retraso ? ' vencida' : '') + '">' + fs.map(texto).join('<br>') + '</div>';
-        // Avance.
-        h += '<div class="en-pct">' + (p.total ? '<b>' + p.hechas + ' de ' + p.total + '</b> ' + (p.total === 1 ? 'tarea entregada' : 'tareas entregadas') + '<span class="en-num">' + p.pct + ' %</span>' : 'Sin tareas todavía') + '</div>';
-        if (p.total) {
-          h += '<div class="en-barra">' + GRUPOS.map(function (g) { return p.n[g.id] ? '<span class="' + g.cls + '" style="flex-grow:' + p.n[g.id] + '"></span>' : ''; }).join('') + '</div>' +
-            '<ul class="en-ley">' + GRUPOS.filter(function (g) { return p.n[g.id]; }).map(function (g) { return '<li class="' + g.cls + '">' + texto(cuantas(p.n[g.id], g)) + '</li>'; }).join('') + '</ul>';
-        }
+        // Las tres cifras: avance, fecha límite y desde cuándo.
+        var limite = '', inicio = '';
+        if (e.ESTADO === 'Entregada') limite = e.FECHA_ENTREGA ? 'Entregada el ' + fechaEs(e.FECHA_ENTREGA) : 'Entregada';
+        else if (dia(e.FECHA_PREVISTA)) {
+          var n = diasEntre(hoy, e.FECHA_PREVISTA);
+          limite = fechaEs(e.FECHA_PREVISTA) + (enMarcha(e) ? ' · ' + (n === 0 ? 'es hoy' : n > 0 ? (n === 1 ? 'falta 1 día' : 'faltan ' + n + ' días') : 'venció hace ' + diasTxt(-n)) : '');
+        } else limite = 'Sin fecha';
+        if (dia(e.FECHA_INICIO)) inicio = fechaEs(e.FECHA_INICIO);
+        else if (t && t.iniDe === 'trabajo') inicio = fechaEs(t.ini) + ' (primera tarea en marcha)';
+        else inicio = 'Aún no';
+        h += '<dl class="mp-dcifras">' +
+          '<div><dt>Avance</dt><dd>' + (p.total ? '<b>' + p.hechas + ' de ' + p.total + '</b> hechas · ' + p.pct + ' %' : 'Sin tareas') + '</dd></div>' +
+          '<div' + (t && t.retraso ? ' class="mp-rojo"' : '') + '><dt>Fecha límite</dt><dd>' + texto(limite) + '</dd></div>' +
+          '<div><dt>Empezó</dt><dd>' + texto(inicio) + '</dd></div></dl>';
+        if (p.total) h += '<div class="en-barra">' + GRUPOS.map(function (g) { return p.n[g.id] ? '<span class="' + g.cls + '" style="flex-grow:' + p.n[g.id] + '"></span>' : ''; }).join('') + '</div>';
         var av = avisosDe(c);
         if (av.length) h += '<p class="mp-avs mp-davs">' + av.map(function (a) { return '<span class="' + a.cls + '">' + texto(a.txt) + '</span>'; }).join('') + '</p>';
-        if (e.QUE_INCLUYE) h += '<p class="en-inc">' + texto(e.QUE_INCLUYE) + '</p>';
-        if (e.CRITERIO) h += '<p class="en-inc"><b>Terminada cuando:</b> ' + texto(e.CRITERIO) + '</p>';
-        // Esperas.
-        var espera = P.flechas.filter(function (f) { return f.a === c.id; }), esperan = P.flechas.filter(function (f) { return f.de === c.id; }), su = P.sueltas[c.id];
-        function bloque(titulo, fl, otra) {
+        if (e.QUE_INCLUYE) h += '<p class="mp-dinc">' + texto(e.QUE_INCLUYE) + '</p>';
+        // Esperas: solo las abiertas y solo las entregas (qué tareas, en la ficha de cada una).
+        function esperas(titulo, fl, otra) {
+          fl = fl.filter(function (f) { return f.abiertas; });
           if (!fl.length) return '';
-          return '<h4 class="mp-dh">' + titulo + '</h4><ul class="mp-esp">' + fl.map(function (f) {
-            return '<li><button type="button" class="mp-ir" data-e="' + texto(f[otra]) + '">' + texto(nombreCorto(f[otra])) + '</button>' +
-              (f.abiertas ? '' : ' <small class="mp-nota">ya cumplida</small>') + '<ul>' + f.pares.map(function (q) {
-              return '<li>' + tareaTxt(q.tarea) + ' <span class="mp-espera">espera a</span> ' + tareaTxt(q.de) + '</li>';
-            }).join('') + '</ul></li>';
+          return '<h4 class="mp-dh">' + titulo + '</h4><ul class="mp-desp">' + fl.map(function (f) {
+            return '<li><button type="button" class="mp-ir" data-e="' + texto(f[otra]) + '">' + texto(nombreCorto(f[otra])) + '</button> <small>' +
+              (f.abiertas === 1 ? '1 tarea' : f.abiertas + ' tareas') + '</small></li>';
           }).join('') + '</ul>';
         }
-        h += bloque('Espera a', espera, 'de') + bloque('La esperan', esperan, 'a');
-        if (su && (su.pares.length || su.noVes)) {
-          h += '<h4 class="mp-dh">Espera a otras tareas</h4><ul class="mp-esp"><li><ul>' + su.pares.map(function (q) {
-            return '<li>' + tareaTxt(q.tarea) + ' <span class="mp-espera">espera a</span> ' + tareaTxt(q.de) + (q.de.ENTREGA_CORTA ? ' <small>(' + texto(q.de.ENTREGA_CORTA) + ')</small>' : ' <small>(sin entrega)</small>') + '</li>';
-          }).join('') + (su.noVes ? '<li class="mp-nota">' + (su.noVes === 1 ? '1 espera a una tarea que no ves' : su.noVes + ' esperan a tareas que no ves') + '.</li>' : '') + '</ul></li></ul>';
-        }
-        // Tareas.
+        h += esperas('Espera a', P.flechas.filter(function (f) { return f.a === c.id; }), 'de') + esperas('La esperan', P.flechas.filter(function (f) { return f.de === c.id; }), 'a');
+        // Tareas, por estado (como en la lista): lo abierto a la vista, lo cerrado plegado.
         if (c.tareas.length) {
-          h += '<h4 class="mp-dh">' + (c.tareas.length === 1 ? 'Su tarea' : 'Sus ' + c.tareas.length + ' tareas') + '</h4><ul class="mp-ts">' +
-            ORDEN_TAREAS.map(function (s) {
-              return c.tareas.filter(function (x) { return x.ESTADO === s; }).sort(function (a, b) { return String(a.ID).localeCompare(String(b.ID)); }).map(function (x) {
-                var v = !CERRADA[x.ESTADO] && x.ESTADO !== 'Aplazada' && dia(x.DEADLINE) && dia(x.DEADLINE) < hoy;
-                return '<li class="' + (CLS[x.ESTADO] || 's-x') + '">' + tareaTxt(x) + (x.EN_MANOS_NOMBRE ? '<span class="en-quien">' + texto(x.EN_MANOS_NOMBRE) + '</span>' : '') +
-                  (v ? '<span class="en-quien mp-rojo">Deadline ' + fechaEs(x.DEADLINE) + '</span>' : '') + '</li>';
-              }).join('');
-            }).join('') + '</ul>';
+          var abiertas = ORDEN_TAREAS.filter(function (s) { return !CERRADA[s]; }), cerradas = ORDEN_TAREAS.filter(function (s) { return CERRADA[s]; });
+          var grupo = function (s) {
+            var de = c.tareas.filter(function (x) { return x.ESTADO === s; }).sort(function (a, b) { return String(a.ID).localeCompare(String(b.ID)); });
+            return de.length ? '<h5 class="' + (CLS[s] || 's-x') + '">' + texto(s) + ' · ' + de.length + '</h5><ul class="mp-ts">' + de.map(function (x) { return tareaLi(x, hoy); }).join('') + '</ul>' : '';
+          };
+          var nc = c.tareas.filter(function (x) { return CERRADA[x.ESTADO]; }).length;
+          h += '<h4 class="mp-dh">Tareas</h4>' + abiertas.map(grupo).join('') +
+            (nc ? '<details class="mp-dcerr"><summary>' + (nc === 1 ? 'Ver la cerrada' : 'Ver las ' + nc + ' cerradas') + '</summary>' + cerradas.map(grupo).join('') + '</details>' : '');
         }
         det.innerHTML = h;
         det.hidden = false;
@@ -604,8 +618,7 @@
         if (F.ini && !ctx.tablas.fila(TI, F.ini)) F.ini = '';
         sl.innerHTML = '<option value="">Todas</option>' + IS.map(function (i) { return '<option value="' + texto(i.ID) + '"' + (i.ID === F.ini ? ' selected' : '') + '>' + texto(i.NOMBRE || i.ID) + '</option>'; }).join('');
         $('en-lini').style.display = IS.length > 1 ? '' : 'none';
-        var ver = esMapa() ? VER : VER_LISTA, actual = esMapa() ? F.verMapa : F.ver;
-        $('en-ver').innerHTML = ver.map(function (v) { return '<option' + (v === actual ? ' selected' : '') + '>' + v + '</option>'; }).join('');
+        $('en-ver').innerHTML = VER.map(function (v) { return '<option' + (v === F.ver ? ' selected' : '') + '>' + v + '</option>'; }).join('');
         [].forEach.call(el.querySelectorAll('[data-vista]'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-vista') === F.vista)); });
         $('en-vmapa').hidden = !esMapa();
         $('en-lista').hidden = esMapa();
@@ -628,15 +641,15 @@
         if (s) s.textContent = (d.open ? 'Ocultar ' : 'Ver ') + s.getAttribute('data-que');
       }, true);
       el.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && sel) cerrarDetalle(); });
-      $('en-ver').onchange = function () { if (esMapa()) F.verMapa = this.value; else F.ver = this.value; guardarLocal(CLAVE + '_f', F); pintar(); };
+      $('en-ver').onchange = function () { F.ver = this.value; guardarLocal(CLAVE + '_f', F); pintar(); };
       $('en-ini').onchange = function () { F.ini = this.value; guardarLocal(CLAVE + '_f', F); pintar(); };
       $('en-rec').onclick = function () {
         var b = this; b.disabled = true; b.classList.add('girando');
-        ctx.tablas.refrescar([TE, TI, T, TD], true).then(function () { if (ctx.abierta()) ctx.aviso('Entregas al día.'); }, function (e) {
+        ctx.tablas.refrescar([TE, TI, T, TD, TB], true).then(function () { if (ctx.abierta()) ctx.aviso('Entregas al día.'); }, function (e) {
           if (ctx.abierta()) ctx.aviso('No se ha podido actualizar: ' + String(e.message).replace(/^\w+:\s*/, ''));
         }).then(function () { b.disabled = false; b.classList.remove('girando'); });
       };
-      ctx.alCambiar(function (t) { if ([TE, TI, T, TD].indexOf(t) >= 0) pintar(); });
+      ctx.alCambiar(function (t) { if ([TE, TI, T, TD, TB].indexOf(t) >= 0) pintar(); });
 
       // Si cambia el ancho del marco (llega la hoja de estilos, se gira el móvil, se pliega el menú, se abre el detalle), se
       // vuelve a colocar. Sin ResizeObserver, al cambiar la ventana.
@@ -649,7 +662,8 @@
       else window.addEventListener('resize', alRedimensionar);
 
       pintar();
-      ctx.tablas.leer([TE, TI, T, TD]).then(function () { leido = true; if (ctx.abierta()) pintar(); }, function (e) {
+      // De la bitácora, solo las líneas que pasan una tarea a En curso o más allá: de ahí sale cuándo empezó cada entrega.
+      ctx.tablas.leer([TE, TI, T, TD, TB], { partes: { BITACORA: PARTE_TRABAJO } }).then(function () { leido = true; if (ctx.abierta()) pintar(); }, function (e) {
         leido = true;
         var m = '<p class="u-error">No se han podido leer las entregas.</p><p class="u-nota">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Pulsa ↻ o vuelve a abrir la sección.</p>';
         marco.innerHTML = m; $('en-lista').innerHTML = m;
@@ -658,9 +672,9 @@
       // En directo (como Tareas): si alguien cambia una tarea o una dependencia, se vuelve a leer (las entregas no van por
       // Realtime: cambian poco y ↻ las trae).
       var directo = null, tDirecto = null;
-      if (ctx.enDirecto) directo = ctx.enDirecto(['tareas', 'dependencias'], function () {
+      if (ctx.enDirecto) directo = ctx.enDirecto(['tareas', 'dependencias', 'bitacora'], function () {
         if (tDirecto) return;
-        tDirecto = setTimeout(function () { tDirecto = null; if (ctx.abierta()) ctx.tablas.refrescar([T, TD], true).catch(function () {}); }, 800);
+        tDirecto = setTimeout(function () { tDirecto = null; if (ctx.abierta()) ctx.tablas.refrescar([T, TD, TB], true).catch(function () {}); }, 800);
       });
       this._cerrar = function () {
         if (obs) { obs.disconnect(); obs = null; } else window.removeEventListener('resize', alRedimensionar);

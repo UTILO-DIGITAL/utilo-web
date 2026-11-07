@@ -292,6 +292,34 @@
     $('n-ver-cerrar').focus();
   }
 
+  /**
+   * T0415 · Con Perfil fuera del menú (perfilEnMenu: false), el nombre de la cabecera abre el Perfil del marco en una ventana
+   * encima de la sección en la que estás: se cierra con ✕, con Escape o pulsando fuera, y sigues donde estabas.
+   */
+  function verPerfil() {
+    if (!cred || $('n-perfil-velo')) return;
+    var antes = document.activeElement, velo = document.createElement('div');
+    velo.className = 'u-velo abierto'; velo.id = 'n-perfil-velo';
+    velo.innerHTML = '<div class="u-ventana n-perfil-ventana" role="dialog" aria-modal="true" aria-labelledby="n-perfil-t"><div class="n-ventana">' +
+      '<div class="n-perfil-cab"><h2 id="n-perfil-t">Tu perfil</h2><button type="button" class="n-perfil-x" id="n-perfil-cerrar" aria-label="Cerrar" title="Cerrar">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' + htmlPerfil() + '</div></div>';
+    document.body.appendChild(velo);
+    function cerrar() {
+      document.removeEventListener('keydown', tecla, true);
+      if (velo.parentNode) velo.parentNode.removeChild(velo);
+      if (antes && antes.focus && document.body.contains(antes)) antes.focus();
+    }
+    // Escape cierra solo esta ventana (si encima está la de las novedades, primero esa).
+    function tecla(e) { if (e.key === 'Escape' && !$('n-ver-velo')) { e.stopPropagation(); e.preventDefault(); cerrar(); } }
+    document.addEventListener('keydown', tecla, true);
+    velo.addEventListener('click', function (e) {
+      if (e.target === velo || (e.target.closest && e.target.closest('#n-perfil-cerrar'))) { cerrar(); return; }
+      // Lo que lleva a otra parte (entrar como otra persona, una sección de dentro de Perfil) cierra la ventana antes.
+      if (e.target.closest && e.target.closest('[data-n-como], [data-n-volver], a[data-sx]')) cerrar();
+    });
+    $('n-perfil-cerrar').focus();
+  }
+
   /** Al entrar: si hay novedades sin ver, la ventana se abre sola (una vez; viendo como otra persona, no). */
   function avisarVersiones() {
     if (cred && !cred.como && sinVer().length) verVersiones();
@@ -538,6 +566,8 @@
     var a = e.target.closest && e.target.closest('a[data-sx]');
     if (!a || !cred || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
     e.preventDefault();
+    // T0415: sin Perfil en el menú, el Perfil del marco es una ventana, no una sección.
+    if (a.getAttribute('data-sx') === 'PERFIL' && sinPerfil() && (seccion('PERFIL') || {}).propia) { verPerfil(); return; }
     abrir(a.getAttribute('data-sx'), true, a.getAttribute('href'));
   });
   window.addEventListener('popstate', function () { if (cred) abrir(pedida() || menu()[0].id, false); });

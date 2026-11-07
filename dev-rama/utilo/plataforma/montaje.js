@@ -50,11 +50,10 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Entregas",
    "icono": "<path d=\"M3 7l9-4 9 4-9 4-9-4z\"/><path d=\"M3 7v10l9 4 9-4V7\"/><path d=\"M12 11v10\"/>",
    "web": "utilo/secciones/entregas.js",
-   "version": "dba069ec6a",
+   "version": "8481ba9d74",
    "perfiles": "todos",
    "config": {
     "VISTA": "Mapa",
-    "VER_MAPA": "Con las entregadas",
     "VER": "En marcha"
    },
    "api": []
