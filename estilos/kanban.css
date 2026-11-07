@@ -904,3 +904,9 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
 @media (hover: none) {
   .u .kb-ficha .fed-abierto select, .u .kb-ficha .fed-abierto input, .u .kb-ficha .fed-abierto textarea { font-size: 16px; }
 }
+/* T0417 · En el móvil, un dato de lista de la ficha (entrega, prioridad, personas…) se elige en una ventanita: una opción por botón. */
+.u .tb-elegir { display: flex; flex-direction: column; gap: var(--e2); }
+.u .tb-op { min-height: 52px; padding: var(--e2) var(--e4); text-align: left; border: 1px solid var(--color-linea); border-radius: var(--radio);
+  background: var(--color-superficie); color: var(--color-texto); font: 600 16px/1.3 var(--fuente-texto); cursor: pointer; }
+.u .tb-op.es { border: 2px solid var(--color-principal-oscuro); background: var(--color-bloque); }
+.u .tb-op.es::after { content: ' ✓'; color: var(--color-principal-oscuro); }

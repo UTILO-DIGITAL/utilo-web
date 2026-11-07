@@ -739,11 +739,20 @@
         if (k === 'DEADLINE' || k === 'DISPONIBLE_DESDE') return '<input type="date" id="fed" value="' + texto(v) + '"' + lab + '>';
         if (LARGO[k]) return '<textarea id="fed" rows="' + LARGO[k] + '"' + lab + '>' + texto(v) + '</textarea>' +
           '<div class="pie"><button type="button" class="sec" data-fed-no>Cancelar</button><button type="button" class="accion" data-fed-ok>Guardar</button></div>';
+        var o = opcionesDe(t, k);
+        if (k === 'DEPENDE') return '<select id="fed" aria-label="Añadir una tarea a la que espera">' + opciones(o.vs, '', o.vacio) + '</select>';
+        return '<select id="fed"' + lab + '>' + opciones(o.vs, o.v, o.vacio) + '</select>';
+      }
+      /** Los datos que se eligen de una lista (en el ordenador, un desplegable; en el móvil, la ventanita de elegir). */
+      var DE_LISTA = { INICIATIVA: 1, ENTREGA: 1, ASIGNADO: 1, REVISA: 1, P: 1, T: 1, DEPENDE: 1 };
+      /** Las opciones de un dato de lista: { vs: [[valor, texto]], v: el de ahora, vacio: el texto de la opción vacía o false }. */
+      function opcionesDe(t, k) {
+        var v = t[k] == null ? '' : String(t[k]), vs = [], vacio = false;
         if (k === 'DEPENDE') {
           var ya = esperaA(String(t.ID));
           vs = tareas().filter(function (x) { return CERRADOS.indexOf(x.ESTADO) < 0 && !x._nueva && String(x.ID) !== String(t.ID) && ya.indexOf(String(x.ID)) < 0; })
             .sort(function (a, b) { return String(b.ID).localeCompare(String(a.ID)); }).map(function (x) { return [String(x.ID), x.ID + ' · ' + x.TITULO]; });
-          return '<select id="fed" aria-label="Añadir una tarea a la que espera">' + opciones(vs, '', 'Elige la tarea…') + '</select>';
+          return { vs: vs, v: '', vacio: 'Elige la tarea…' };
         }
         if (k === 'INICIATIVA') vs = ctx.tablas.filas(TI).map(function (i) { return [i.ID, i.NOMBRE || i.ID]; });
         else if (k === 'ENTREGA') { vs = entregasDe(t.INICIATIVA); if (v && !vs.some(function (x) { return x[0] === v; })) vs.unshift([v, t.ENTREGA_CORTA || v]); vacio = 'Sin entrega'; }
@@ -752,9 +761,36 @@
         else if (k === 'P') vs = ['!!!!', '!!!', '!!', '!'].map(function (x) { return [x, x]; });
         else if (k === 'T') vs = ['XS', 'S', 'M', 'L', 'XL'].map(function (x) { return [x, x]; });
         if (!vacio && !v) vacio = 'Elige…';
-        return '<select id="fed"' + lab + '>' + opciones(vs || [], v, vacio) + '</select>';
+        return { vs: vs, v: v, vacio: vacio };
       }
+      /**
+       * T0417 · En el móvil, un dato de lista se elige en una ventanita con una opción por botón, no con el desplegable del
+       * navegador: en algunos móviles no se abría o no dejaba elegir, y además salía arriba del todo, lejos de donde se tocó.
+       */
+      function elegir(k) {
+        var t = tarea(abiertaId);
+        if (!t) return;
+        var o = opcionesDe(t, k), dep = k === 'DEPENDE';
+        var vs = (o.vacio && !dep && o.vacio !== 'Elige…' ? [['', o.vacio]] : []).concat(o.vs);
+        altaForm.innerHTML = '<h2 data-k="' + texto(k) + '">' + texto(dep ? 'Espera a…' : ETIQUETA[k] || k) + '</h2>' +
+          (vs.length ? '<div class="tb-elegir" role="listbox" aria-label="' + texto(ETIQUETA[k] || k) + '">' + vs.map(function (x) {
+            var es = !dep && x[0] === o.v;
+            return '<button type="button" role="option" class="tb-op' + (es ? ' es' : '') + '" aria-selected="' + es + '" data-elegir="' + texto(x[0]) + '">' + texto(x[1]) + '</button>';
+          }).join('') + '</div>' : '<p class="u-nota">' + (k === 'ENTREGA' ? 'Su iniciativa no tiene entregas abiertas.' : 'No hay nada que elegir.') + '</p>') +
+          '<div class="botones"><button type="button" class="sec" data-cancelar-alta>Cancelar</button></div>';
+        altaForm.onsubmit = function (e) { e.preventDefault(); };
+        abrirVelo();
+        var b = altaForm.querySelector('.tb-op.es') || altaForm.querySelector('.tb-op'); if (b) b.focus();
+      }
+      altaForm.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-elegir]');
+        if (!b || !altaForm.querySelector('.tb-elegir')) return;
+        var k = altaForm.querySelector('h2').getAttribute('data-k');
+        cerrarVelo();
+        guardarCampo(k, b.getAttribute('data-elegir'));
+      });
       function abrirCampo(k) {
+        if (TACTIL && DE_LISTA[k]) { elegir(k); return; }
         cambiando = k; pintarFicha();
         var x = caja.querySelector('#fed');
         if (!x) return;
