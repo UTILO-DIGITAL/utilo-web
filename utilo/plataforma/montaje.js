@@ -11,12 +11,26 @@ window.NUCLEO_MONTAJE = {
  ],
  "secciones": [
   {
+   "id": "PARAMI",
+   "modulo": "parami",
+   "titulo": "Para mí",
+   "icono": "<path d=\"M4 13h4l2 3h4l2-3h4\"/><path d=\"M6.5 5h11L20 13v6H4v-6z\"/>",
+   "web": "utilo/secciones/parami.js",
+   "version": "fd11417245",
+   "perfiles": "todos",
+   "config": {},
+   "api": [
+    "responder",
+    "personas_gestion"
+   ]
+  },
+  {
    "id": "TABLERO",
    "modulo": "tablero",
    "titulo": "Tareas",
    "icono": "<rect x=\"3\" y=\"4\" width=\"5\" height=\"16\" rx=\"1\"/><rect x=\"10\" y=\"4\" width=\"5\" height=\"11\" rx=\"1\"/><rect x=\"17\" y=\"4\" width=\"4\" height=\"7\" rx=\"1\"/>",
    "web": "utilo/secciones/tablero.js",
-   "version": "92870056dc",
+   "version": "ef2cf09a81",
    "perfiles": "todos",
    "config": {
     "VISTA": "ocho",
@@ -26,7 +40,8 @@ window.NUCLEO_MONTAJE = {
     "mover_tarea",
     "anotar",
     "personas_gestion",
-    "ordenar_tareas"
+    "ordenar_tareas",
+    "responder"
    ]
   },
   {
@@ -819,6 +834,14 @@ window.NUCLEO_MONTAJE = {
      {
       "nombre": "EN_MANOS_NOMBRE",
       "tipo": "texto"
+     },
+     {
+      "nombre": "ESTADO_DESDE",
+      "tipo": "fecha_hora"
+     },
+     {
+      "nombre": "DESBLOQUEA",
+      "tipo": "numero"
      }
     ],
     "restricciones": {}

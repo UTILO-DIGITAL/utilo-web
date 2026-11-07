@@ -23,6 +23,8 @@
  *   «Añadir». «Editar tarea» sigue para cambiar varios a la vez.
  * - Crear y editar escriben TAREAS (y sus DEPENDENCIAS) con la capa de tablas; la tarjeta sale al momento con «Guardando».
  *   Una nota va a la bitácora con anotar(). Después se trae el tablero (en manos de, lo que la base mueve sola).
+ * - T0387 · Una tarea en Necesita tu respuesta se responde en su ficha (responder() de la base, como en Para mí): quien la
+ *   pidió o quien lleva la iniciativa. Lo escrito se guarda aunque la ficha se repinte.
  */
 (function () {
   'use strict';
@@ -780,6 +782,26 @@
         guardarDeps(id, deps).then(function () { if (ctx.abierta()) ctx.aviso(id + ' guardada.'); return alDia(id); });
       }
 
+      /** T0387 · Responder la pregunta de la tarea abierta: a la DESCRIPCION y a la bitácora, y vuelve a la cola. */
+      var respuestas = {};   // lo escrito en la respuesta de cada tarea, para que repintar la ficha no lo borre
+      function puedeResponder(t) {
+        return t.ESTADO === 'Necesita tu respuesta' && !SOLO_LEE && !t._nueva &&
+          (ctx.admin || (ctx.personaId && t.PIDE === ctx.personaId) || /^responsable/.test(ctx.perfil || ''));
+      }
+      function responder(id, txt, b) {
+        b.disabled = true; b.textContent = 'Enviando…';
+        var auto = !!(tarea(id) || {}).AUTONOMA;
+        ctx.llamar('responder', [{ tarea: id, texto: txt }]).then(function (estado) {
+          delete respuestas[id];
+          if (ctx.abierta()) ctx.aviso('Respondida: ' + id + ' vuelve a ' + (typeof estado === 'string' && estado ? estado : 'la cola') + '.' +
+            (auto && estado === 'En cola' ? ' Es autónoma: lanza «Autónomo» en GitHub para que siga.' : ''));
+          return Promise.all([ctx.tablas.refrescar([T], true), abiertaId === id ? bitacora(id, true) : null]);
+        }, function (e) {
+          if (ctx.abierta()) ctx.aviso('No se ha enviado la respuesta: ' + String(e.message).replace(/^\w+:\s*/, ''));
+          b.disabled = false; b.textContent = 'Responder';
+        }).then(function () { if (ctx.abierta() && abiertaId === id && !ocupado()) pintarFicha(); });
+      }
+
       /** Una nota en la bitácora de la tarea abierta. */
       function anotar(id, txt, b) {
         b.disabled = true;
@@ -836,9 +858,12 @@
         if (d && !e.target.closest('a')) { abrirCampo(d.getAttribute('data-ed')); return; }
         if (e.target.closest('[data-editar]')) { editando = true; cambiando = ''; pintarFicha(); return; }
         if (e.target.closest('[data-cancelar]')) { editando = false; pintarFicha(); return; }
+        var rb = e.target.closest('[data-responder]');
+        if (rb) { var ra = caja.querySelector('#tb-resp'), rt = ra ? ra.value.trim() : ''; if (rt) responder(abiertaId, rt, rb); else if (ra) { ra.focus(); ctx.aviso('Escribe la respuesta antes de enviarla.'); } return; }
         var b = e.target.closest('[data-anotar]');
         if (b) { var a = caja.querySelector('#tb-nota'), txt = a ? a.value.trim() : ''; if (txt) anotar(abiertaId, txt, b); else if (a) a.focus(); }
       });
+      fv.addEventListener('input', function (e) { if (e.target.id === 'tb-resp' && abiertaId) respuestas[abiertaId] = e.target.value; });
       fv.addEventListener('change', function (e) {
         if (e.target.id === 'kb-f-est') { mover(abiertaId, e.target.value); return; }
         if (e.target.id === 'fed' && e.target.tagName === 'SELECT' && cambiando) guardarCampo(cambiando, e.target.value);
@@ -951,6 +976,9 @@
           return '<button type="button" class="fmas" data-ed="' + x[0] + '">+ ' + texto(ETIQUETA[x[0]]) + '</button>'; }).join('') + '</div>' : '';
         var motivo = [];
         if (t.PREGUNTA) motivo.push('<p><b>Pregunta:</b> ' + texto(t.PREGUNTA) + '</p>');
+        if (puedeResponder(t)) motivo.push('<div class="fresp"><label class="u-oculto" for="tb-resp">Tu respuesta</label>' +
+          '<textarea id="tb-resp" rows="3" placeholder="Tu respuesta…">' + texto(respuestas[id] || '') + '</textarea>' +
+          '<div class="pie"><button type="button" class="u-btn" data-responder>Responder</button></div></div>');
         if (t.MOTIVO_BLOQUEO) motivo.push('<p><b>Bloqueada:</b> ' + texto(t.MOTIVO_BLOQUEO) + '</p>');
         if (t.MOTIVO) motivo.push('<p><b>Motivo:</b> ' + texto(t.MOTIVO) + '</p>');
         caja.innerHTML =

@@ -1,6 +1,14 @@
 {
-  "version": "5.8-1.3",
+  "version": "5.9-1.4",
   "versiones": [
+    {
+      "v": "5.9-1.4",
+      "fecha": "07/11/2026",
+      "novedades": [
+        "Al entrar, Para mí te enseña lo que espera tu respuesta o tu revisión, lo siguiente de tu cola y lo que va tarde.",
+        "Puedes responder las preguntas de las tareas ahí mismo, sin salir de la plataforma."
+      ]
+    },
     {
       "v": "5.8-1.3",
       "fecha": "07/11/2026",
