@@ -16,7 +16,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Para mí",
    "icono": "<path d=\"M4 13h4l2 3h4l2-3h4\"/><path d=\"M6.5 5h11L20 13v6H4v-6z\"/>",
    "web": "utilo/secciones/parami.js",
-   "version": "fd11417245",
+   "version": "f1add10e47",
    "perfiles": "todos",
    "config": {},
    "api": [
@@ -54,6 +54,19 @@ window.NUCLEO_MONTAJE = {
    "perfiles": "todos",
    "config": {
     "VER": "En marcha"
+   },
+   "api": []
+  },
+  {
+   "id": "MAPA",
+   "modulo": "mapa",
+   "titulo": "Mapa",
+   "icono": "<path d=\"M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z\"/><path d=\"M9 4v14\"/><path d=\"M15 6v14\"/>",
+   "web": "utilo/secciones/mapa.js",
+   "version": "da4333003e",
+   "perfiles": "todos",
+   "config": {
+    "VER": "Con las entregadas"
    },
    "api": []
   }

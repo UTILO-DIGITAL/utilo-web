@@ -730,3 +730,96 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
   .u .tb .card.kb-cogida { opacity: 1; transform: scale(1.03); box-shadow: 0 8px 24px rgba(0, 0, 0, .22); position: relative; z-index: 2; }
 }
 @media (max-width: 640px) { .u .tb .tablero.kb-arrastre .col { min-height: 0; } }
+
+/* ===================== Mapa (T0415, plataforma sobre Supabase: utilo/secciones/mapa.js) =====================
+ * Un lienzo que se desliza de lado (.mp-marco): meses de fondo, un carril por iniciativa con su nombre siempre a la vista
+ * (.mp-titulos, sticky), las cajas de las entregas colocadas por el JS, la línea Hoy y las flechas en un SVG encima.
+ * En una pantalla grande, el detalle de la entrega pulsada va al lado; si no, debajo. Colores: los de estado de base.css. */
+.u .n-main:has(> .mp) { max-width: none; } /* toda la pantalla, como el tablero */
+.u .mp { max-width: none; }
+.u .mp-res { margin: 0 0 var(--e3); font-size: 14px; color: var(--color-suave); min-height: 1.45em; }
+.u .mp-rojo { color: var(--estado-bl); }
+.u .mp-ambar { color: var(--estado-pr); }
+.u .mp-cuerpo { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--e4); align-items: start; }
+@media (min-width: 1200px) { .u .mp.con-det .mp-cuerpo { grid-template-columns: minmax(0, 1fr) 380px; } .u .mp-det { position: sticky; top: var(--e4); max-height: calc(100vh - 2 * var(--e4)); overflow: auto; } }
+.u .mp-izq { min-width: 0; }
+.u .mp-marco { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
+  background: var(--color-superficie); border: 1px solid var(--color-linea); border-radius: var(--radio); }
+.u .mp-marco > .en-msg, .u .mp-marco > .u-error, .u .mp-marco > .u-nota { padding: var(--e4); margin: 0; }
+.u .mp-lienzo { position: relative; }
+.u .mp-titulos { position: sticky; left: 0; width: 0; z-index: 4; pointer-events: none; }
+.u .mp-ct { position: absolute; left: var(--e2); display: flex; align-items: center; gap: var(--e2); white-space: nowrap; pointer-events: auto;
+  padding: 2px var(--e2); border-radius: var(--radio-peq); background: color-mix(in srgb, var(--color-superficie) 88%, transparent); font-size: 13px; }
+.u .mp-ct b { font: 600 15px/1.3 var(--fuente-titulos); color: var(--color-principal-oscuro); }
+.u .mp-ct small { color: var(--color-suave); }
+.u .mp-sinf { display: inline-flex; align-items: center; gap: var(--e1); color: var(--color-suave); }
+.u .mp-chip { min-height: 24px; padding: 0 var(--e2); border: 1px dashed var(--color-borde-campo); border-radius: var(--radio-peq); background: var(--color-superficie);
+  color: var(--color-texto); font: 700 12px/1.6 var(--fuente-texto); cursor: pointer; }
+.u .mp-chip.sel { outline: 2px solid var(--color-texto); outline-offset: 1px; }
+.u .mp-mes { position: absolute; top: 0; border-left: 1px solid var(--color-linea); }
+.u .mp-mes.par { background: color-mix(in srgb, var(--color-fondo) 60%, transparent); }
+.u .mp-mes span { display: block; padding: var(--e2) var(--e2) 0; font: 700 12px/1.4 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; white-space: nowrap; }
+.u .mp-sep { position: absolute; left: 0; right: 0; border-top: 1px solid var(--color-linea); }
+.u .mp-hoy { position: absolute; top: 16px; border-left: 2px dashed var(--color-principal-oscuro); z-index: 2; pointer-events: none; }
+.u .mp-hoy span { position: absolute; top: -2px; left: 4px; padding: 0 var(--e1); border-radius: var(--radio-peq); background: var(--color-superficie);
+  font: 800 12px/1.4 var(--fuente-texto); color: var(--color-principal-oscuro); white-space: nowrap; }
+.u .mp-caja { position: absolute; z-index: 3; display: flex; flex-direction: column; gap: 3px; padding: 6px var(--e2) 6px 10px; text-align: left; cursor: pointer; overflow: hidden;
+  background: var(--color-superficie); color: var(--color-texto); border: 1px solid var(--color-borde-campo); border-left: 4px solid var(--color-borde-campo);
+  border-radius: var(--radio); font: inherit; box-shadow: 0 1px 2px color-mix(in srgb, var(--color-texto) 10%, transparent); transition: opacity .15s; }
+.u .mp-caja:hover { border-color: var(--color-texto); }
+.u .mp-caja.mp-encurso { border-left-color: var(--estado-ec); }
+.u .mp-caja.mp-entregada { border-left-color: var(--estado-co); background: color-mix(in srgb, var(--estado-co) 7%, var(--color-superficie)); }
+.u .mp-caja.mp-aplazada { border-style: dashed; color: var(--color-suave); }
+.u .mp-caja.mp-vencida { border-left-color: var(--estado-bl); }
+.u .mp-caja.mp-sin-ini { border-left-style: dotted; }
+.u .mp-caja.mp-sin-fin { border-right: 2px dotted var(--color-borde-campo); }
+.u .mp-caja.sel { outline: 3px solid var(--color-texto); outline-offset: 1px; z-index: 5; }
+.u .mp-lienzo.con-sel .mp-caja.lejos { opacity: .45; }
+.u .mp-cn { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; }
+.u .mp-cn b { font: 600 14px var(--fuente-titulos); color: var(--color-principal-oscuro); }
+.u .mp-barra { display: flex; gap: 2px; height: 8px; overflow: hidden; border-radius: var(--radio-peq); background: var(--color-linea); flex: 0 0 auto; }
+.u .mp-barra span { flex: 1 1 0; min-width: 3px; background: var(--estado); }
+.u .mp-pie { display: flex; gap: var(--e2); justify-content: space-between; font-size: 12px; color: var(--color-suave); white-space: nowrap; }
+.u .mp-num { font-weight: 700; color: var(--color-texto); font-variant-numeric: tabular-nums; }
+.u .mp-fe { overflow: hidden; text-overflow: ellipsis; }
+.u .mp-caja > * { flex-shrink: 0; }
+/* En la caja, los avisos en una línea (si no caben, «…»: el detalle los dice todos). */
+.u .mp-avs { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 800; line-height: 1.3; }
+.u .mp-avs span + span::before { content: ' · '; color: var(--color-suave); }
+.u .mp-davs { display: flex; flex-wrap: wrap; gap: 2px var(--e3); margin: var(--e2) 0; font-size: 13px; white-space: normal; }
+.u .mp-davs span + span::before { content: none; }
+.u .mp-cola { position: absolute; z-index: 2; border-radius: 0 var(--radio-peq) var(--radio-peq) 0; pointer-events: none;
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--estado-bl) 35%, transparent) 0 4px, color-mix(in srgb, var(--estado-bl) 12%, transparent) 4px 9px); }
+.u .mp-flechas { position: absolute; left: 0; top: 0; z-index: 2; /* por debajo de las cajas: una flecha no tapa otra caja */ pointer-events: none; overflow: visible; }
+.u .mp-flechas marker path { fill: var(--color-texto); }
+.u .mp-f { fill: none; stroke: var(--color-texto); stroke-width: 2; }
+.u .mp-f.hecha { stroke-dasharray: 5 5; opacity: .45; }
+.u .mp-lienzo.con-sel .mp-f { opacity: .25; }
+.u .mp-lienzo.con-sel .mp-f.sel { opacity: 1; stroke-width: 3; }
+.u .mp-ley { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e4); margin: var(--e2) 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--color-suave); }
+.u .mp-ley li { display: inline-flex; align-items: center; gap: var(--e1); }
+.u .mp-ley li::before { content: ''; width: 12px; height: 10px; border-radius: var(--radio-peq); background: var(--estado); }
+.u .mp-ley .mp-ley-cola::before { width: 18px; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--estado-bl) 45%, transparent) 0 3px, transparent 3px 6px); }
+.u .mp-ley .mp-ley-f::before { width: 18px; height: 0; border-top: 2px solid var(--color-texto); border-radius: 0; background: none; }
+.u .mp-ley .mp-ley-sin::before { width: 14px; height: 10px; border: 2px dotted var(--color-borde-campo); background: none; }
+.u .mp-det { background: var(--color-superficie); border: 1px solid var(--color-linea); border-top: 4px solid var(--color-principal); border-radius: var(--radio); padding: var(--e3) var(--e4); min-width: 0; scroll-margin-top: var(--e4); }
+.u .mp-dcab { display: flex; align-items: flex-start; gap: var(--e2); }
+.u .mp-dcab .en-top { flex: 1; }
+.u .mp-dcab .recarga svg { stroke-width: 2; }
+.u .mp-dh { margin: var(--e4) 0 var(--e1); font: 700 13px/1.4 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; }
+.u .mp-esp, .u .mp-esp ul, .u .mp-ts { margin: 0; padding: 0; list-style: none; }
+.u .mp-esp > li { padding: var(--e1) 0 var(--e2); border-bottom: 1px solid var(--color-linea); }
+.u .mp-esp ul li { padding: 2px 0; font-size: 13px; }
+.u .mp-ir { min-height: 32px; padding: 0; border: 0; background: none; color: var(--color-principal-oscuro); font: 700 14px var(--fuente-texto); text-decoration: underline; cursor: pointer; text-align: left; }
+.u .mp-espera { color: var(--color-suave); }
+.u .mp-nota { color: var(--color-suave); }
+.u .mp-ts li { padding: var(--e1) 0 var(--e1) var(--e2); border-left: 3px solid var(--estado); border-bottom: 1px solid var(--color-linea); margin-bottom: 2px; }
+.u .mp-det a { color: var(--color-texto); text-decoration: none; font-size: 14px; }
+.u .mp-det a:hover { text-decoration: underline; }
+.u .mp-det a .id { font: 600 13px var(--fuente-titulos); color: var(--color-principal-oscuro); }
+.u .mp-est { display: inline-block; padding: 0 6px; border-radius: var(--radio-peq); background: var(--estado); color: var(--color-superficie); font: 700 11px/1.6 var(--fuente-texto); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .u .mp-caja { transition: none; } }
+/* T0415 · Para mí: el enlace al Mapa, al lado de ↻. */
+.u .pm-acc { display: flex; align-items: center; gap: var(--e2); flex: 0 0 auto; }
+.u .pm-mapa svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+@media (max-width: 400px) { .u .pm-mapa { padding: 0 var(--e3); } }
