@@ -26,10 +26,11 @@
  * Lista (T0386, como la sección Entregas del kanban 4.x, T0399): una tarjeta por entrega con su nombre corto (U19), estado e
  * iniciativa; las tareas entregadas de su total con una barra por estados; la fecha prevista con los días que faltan (o la de
  * entrega); qué incluye, el criterio de terminado y, al desplegar, sus tareas por estado.
- * Los filtros valen para las dos vistas: Ver (en marcha, aplazadas, entregadas o todas) e Iniciativa. Lee ENTREGAS, INICIATIVAS,
- * la vista TABLERO y DEPENDENCIAS con la sesión de quien ha entrado: lo que ve lo dicen sus roles. Se pone al día sola cuando
- * cambia una tarea o una dependencia (Realtime; las entregas, con ↻).
- * Crear, cambiar y mover (T0417), quien lleva la iniciativa (responsable o admin): «Nueva entrega» arriba (iniciativa, nombre,
+ * Los filtros valen para las dos vistas: Ver (en marcha, aplazadas, entregadas o todas) e Iniciativa, en una hoja que abre
+ * «Filtros» (T0422; su número dice cuántos hay puestos). Lee ENTREGAS, INICIATIVAS, la vista TABLERO y DEPENDENCIAS con la
+ * sesión de quien ha entrado: lo que ve lo dicen sus roles. Se pone al día sola cuando cambia una entrega, una tarea o una
+ * dependencia (Realtime; sin ↻ desde T0422).
+ * Crear, cambiar y mover (T0417), quien lleva la iniciativa (responsable o admin): «Nueva entrega» (el botón flotante; en el móvil, +) (iniciativa, nombre,
  * fecha límite, qué incluye y cuándo estará terminada) y la ficha de cada entrega («Cambiar o mover» en el detalle del mapa y
  * en la lista; ?e=E0023 la abre), donde cada dato se cambia pulsándolo y el estado, arriba; y sus tareas: «+ Añadir tareas»
  * (las de su iniciativa sin entrega y sin cerrar) y × para sacar una, con cambiar_tarea() (cada tarea lo apunta en su bitácora). Escriben crear_entrega(),
@@ -396,10 +397,10 @@
   /* ===================== la pantalla ===================== */
   var RAIZ = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/utilo\/secciones\/[^/]*$/, '') : '../../'; })();
   var VERSION = (function () { var s = document.currentScript && document.currentScript.src; var m = s && /[?&]v=([^&]+)/.exec(s); return m ? m[1] : '1'; })();
-  var ICO_RECARGAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>';
   var ICO_BANDERA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg>';
   var ICO_CERRAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   var ICO_VOLVER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>';
+  var ICO_FILTROS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>';
 
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function leerLocal(k, d) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
@@ -462,10 +463,10 @@
         '<div class="mp-vistas" role="group" aria-label="Vista">' + VISTAS.map(function (v) {
           return '<button type="button" class="sec" data-vista="' + v + '" aria-pressed="' + (v === F.vista) + '">' + v + '</button>';
         }).join('') + '</div>' +
-        '<label>Ver<select id="en-ver"></select></label>' +
-        '<label id="en-lini">Iniciativa<select id="en-ini"></select></label>' +
-        '<span class="act"><button id="en-nueva" class="u-btn u-btn-accion" type="button" hidden>Nueva entrega</button>' +
-        '<button id="en-rec" class="sec recarga" type="button" title="Traer lo último" aria-label="Traer lo último">' + ICO_RECARGAR + '</button></span>' +
+        // T0422 (decidido por Javi): en una línea, la vista y «Filtros», que abre una hoja con Ver e Iniciativa. Sin ↻: las
+        // entregas también van en directo. Crear, con el botón flotante (+), como «Añadir tarea» en Tareas.
+        '<button id="en-filtros" class="sec en-filtros" type="button" aria-haspopup="dialog">' + ICO_FILTROS + '<span>Filtros</span>' +
+          '<span id="en-fil-n" class="k-fil-n" hidden></span></button>' +
         '</div>' +
         '<div id="en-vmapa"><p id="mp-res" class="mp-res" aria-live="polite"></p>' +
         '<div class="mp-cuerpo"><div class="mp-izq"><div id="mp-marco" class="mp-marco" tabindex="0" aria-label="Mapa de las entregas en el tiempo"></div>' +
@@ -480,7 +481,8 @@
         '<div id="en-lista" class="en-lista" hidden></div>' +
         // T0417: la ficha de una entrega (como la de una tarea) y la ventanita para crearla o para lo que pide un estado.
         '<div class="fv-velo" id="en-fv"><div class="fv-caja kb-ficha" role="dialog" aria-modal="true" aria-labelledby="en-f-tit" id="en-ficha"></div></div>' +
-        '<div id="alta-velo"><form id="alta-form" novalidate></form></div></section>';
+        '<div id="alta-velo"><form id="alta-form" novalidate></form></div>' +
+        '<button id="alta-btn" class="en-mas" type="button" hidden aria-label="Nueva entrega" title="Nueva entrega"><span class="en-mas-mas" aria-hidden="true">+</span><span class="en-mas-t">Nueva entrega</span></button></section>';
       var $ = function (id) { return el.querySelector('#' + id); };
       var sec = el.querySelector('.mp'), marco = $('mp-marco'), det = $('mp-det');
       var fv = $('en-fv'), fcaja = $('en-ficha'), altaVelo = $('alta-velo'), altaForm = $('alta-form');
@@ -860,7 +862,7 @@
         document.documentElement.classList.add('fv-abierta');
         var p = altaForm.querySelector('input,textarea,select'); if (p) p.focus();
       }
-      function cerrarVelo() { altaVelo.classList.remove('abierto'); if (!fichaId) document.documentElement.classList.remove('fv-abierta'); altaForm.onsubmit = null; }
+      function cerrarVelo() { altaVelo.classList.remove('abierto', 'en-hoja'); if (!fichaId) document.documentElement.classList.remove('fv-abierta'); altaForm.onsubmit = null; }
       altaVelo.addEventListener('click', function (ev) { if (ev.target === altaVelo || ev.target.closest('[data-cancelar-alta]')) cerrarVelo(); });
       altaVelo.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') { ev.stopPropagation(); cerrarVelo(); } });
 
@@ -911,7 +913,7 @@
           });
         };
       }
-      $('en-nueva').onclick = abrirNueva;
+      $('alta-btn').onclick = abrirNueva;
 
       /** Pone (o quita, con entrega '') la entrega de unas tareas con cambiar_tarea() de la base, la de los chats: cada tarea
        *  lo apunta en su bitácora. Al momento en la pantalla; si la base dice que no, vuelve. de: la entrega de la ficha. */
@@ -1088,13 +1090,49 @@
 
       /* ---------- las dos vistas ---------- */
       function esMapa() { return F.vista === 'Mapa'; }
+      /* ---------- T0422 · los filtros, en una hoja que sube desde abajo ---------- */
+      var VER_DEF = VER.indexOf(C.VER) >= 0 ? C.VER : 'En marcha';
+      /** Cuántos filtros hay puestos (distintos de los de siempre), para el número de «Filtros». */
+      function filtrosPuestos() { return (F.ver !== VER_DEF ? 1 : 0) + (F.ini ? 1 : 0); }
+      function cuantasSeVen() { return ctx.tablas.filas(TE).filter(function (e) { return seVe(e, F.ver) && (!F.ini || e.INICIATIVA === F.ini); }).length; }
+      function pintarHoja() {
+        var IS = ctx.tablas.filas(TI), n = cuantasSeVen();
+        var chips = function (grupo, vs, actual) {
+          return '<div class="en-chips" role="group" aria-label="' + texto(grupo) + '">' + vs.map(function (x) {
+            return '<button type="button" class="en-chip" data-' + (grupo === 'Ver' ? 'ver' : 'ini') + '="' + texto(x[0]) + '" aria-pressed="' + (x[0] === actual) + '">' + texto(x[1]) + '</button>';
+          }).join('') + '</div>';
+        };
+        altaForm.innerHTML = '<div class="en-hoja-cab"><h2>Filtros</h2><button type="button" class="en-hoja-x" data-cancelar-alta aria-label="Cerrar" title="Cerrar">' + ICO_CERRAR + '</button></div>' +
+          '<h3 class="en-hoja-h">Ver</h3>' + chips('Ver', VER.map(function (v) { return [v, v]; }), F.ver) +
+          (IS.length > 1 ? '<h3 class="en-hoja-h">Iniciativa</h3>' + chips('Iniciativa', [['', 'Todas']].concat(IS.map(function (i) { return [i.ID, i.NOMBRE || i.ID]; })), F.ini || '') : '') +
+          '<div class="botones"><button type="button" class="sec" data-quitar-filtros' + (filtrosPuestos() ? '' : ' disabled') + '>Quitar filtros</button>' +
+          '<button type="submit" class="pri">' + (n === 1 ? 'Ver 1 entrega' : 'Ver ' + n + ' entregas') + '</button></div>';
+      }
+      function abrirFiltros() {
+        pintarHoja();
+        altaForm.onsubmit = function (ev) { ev.preventDefault(); cerrarVelo(); };
+        altaVelo.classList.add('en-hoja');
+        abrirVelo();
+        var b = altaForm.querySelector('.en-chip[aria-pressed=true]'); if (b) b.focus();
+      }
+      altaForm.addEventListener('click', function (ev) {
+        if (!altaVelo.classList.contains('en-hoja')) return;
+        var v = ev.target.closest('[data-ver]'), i = ev.target.closest('[data-ini]');
+        if (v) F.ver = v.getAttribute('data-ver');
+        else if (i) F.ini = i.getAttribute('data-ini');
+        else if (ev.target.closest('[data-quitar-filtros]')) { F.ver = VER_DEF; F.ini = ''; }
+        else return;
+        guardarLocal(CLAVE + '_f', F); pintar(); pintarHoja();
+        var foco = altaForm.querySelector(v ? '[data-ver="' + F.ver + '"]' : i ? '[data-ini="' + F.ini + '"]' : '.pri'); if (foco) foco.focus();
+      });
+      $('en-filtros').onclick = abrirFiltros;
+
       function pintar() {
-        var IS = ctx.tablas.filas(TI), sl = $('en-ini');
         if (F.ini && !ctx.tablas.fila(TI, F.ini)) F.ini = '';
-        sl.innerHTML = '<option value="">Todas</option>' + IS.map(function (i) { return '<option value="' + texto(i.ID) + '"' + (i.ID === F.ini ? ' selected' : '') + '>' + texto(i.NOMBRE || i.ID) + '</option>'; }).join('');
-        $('en-lini').style.display = IS.length > 1 ? '' : 'none';
-        $('en-nueva').hidden = !iniciativasQueLlevo().length; // T0417: solo quien lleva alguna iniciativa
-        $('en-ver').innerHTML = VER.map(function (v) { return '<option' + (v === F.ver ? ' selected' : '') + '>' + v + '</option>'; }).join('');
+        var k = filtrosPuestos(), fn = $('en-fil-n');
+        fn.textContent = k ? String(k) : ''; fn.hidden = !k;
+        $('en-filtros').title = k ? (k === 1 ? '1 filtro puesto: ' : k + ' filtros puestos: ') + [F.ver !== VER_DEF ? F.ver : '', F.ini ? ((ctx.tablas.fila(TI, F.ini) || {}).NOMBRE || F.ini) : ''].filter(Boolean).join(', ') : 'Sin filtros: ' + VER_DEF.toLowerCase();
+        $('alta-btn').hidden = !iniciativasQueLlevo().length; // T0417: solo quien lleva alguna iniciativa
         [].forEach.call(el.querySelectorAll('[data-vista]'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-vista') === F.vista)); });
         $('en-vmapa').hidden = !esMapa();
         $('en-lista').hidden = esMapa();
@@ -1119,14 +1157,6 @@
         if (s) s.textContent = (d.open ? 'Ocultar ' : 'Ver ') + s.getAttribute('data-que');
       }, true);
       el.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && sel && !fichaId && !altaVelo.classList.contains('abierto')) cerrarDetalle(); });
-      $('en-ver').onchange = function () { F.ver = this.value; guardarLocal(CLAVE + '_f', F); pintar(); };
-      $('en-ini').onchange = function () { F.ini = this.value; guardarLocal(CLAVE + '_f', F); pintar(); };
-      $('en-rec').onclick = function () {
-        var b = this; b.disabled = true; b.classList.add('girando');
-        ctx.tablas.refrescar([TE, TI, T, TD, TB], true).then(function () { if (ctx.abierta()) ctx.aviso('Entregas al día.'); }, function (e) {
-          if (ctx.abierta()) ctx.aviso('No se ha podido actualizar: ' + String(e.message).replace(/^\w+:\s*/, ''));
-        }).then(function () { b.disabled = false; b.classList.remove('girando'); });
-      };
       ctx.alCambiar(function (t) {
         if ([TE, TI, T, TD, TB].indexOf(t) >= 0) pintar();
         if (fichaId && !cambiando && [TE, TI, T, TB].indexOf(t) >= 0) pintarFicha();
@@ -1152,16 +1182,24 @@
         if (pedidaE && ctx.tablas.fila(TE, pedidaE)) abrirFicha(pedidaE, true);
       }, function (e) {
         leido = true;
-        var m = '<p class="u-error">No se han podido leer las entregas.</p><p class="u-nota">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Pulsa ↻ o vuelve a abrir la sección.</p>';
+        var m = '<p class="u-error">No se han podido leer las entregas.</p><p class="u-nota">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Vuelve a abrir la sección.</p>';
         marco.innerHTML = m; $('en-lista').innerHTML = m;
       });
 
-      // En directo (como Tareas): si alguien cambia una tarea o una dependencia, se vuelve a leer (las entregas no van por
-      // Realtime: cambian poco y ↻ las trae).
-      var directo = null, tDirecto = null;
-      if (ctx.enDirecto) directo = ctx.enDirecto(['tareas', 'dependencias', 'bitacora'], function () {
+      // En directo (como Tareas): si alguien cambia una entrega (T0422), una tarea o una dependencia, se vuelve a leer; los
+      // avisos de un momento se juntan en una lectura.
+      var directo = null, tDirecto = null, pendientes = {};
+      if (ctx.enDirecto) directo = ctx.enDirecto(['entregas', 'tareas', 'dependencias', 'bitacora'], function (tabla) {
+        pendientes[tabla || '*'] = 1;
         if (tDirecto) return;
-        tDirecto = setTimeout(function () { tDirecto = null; if (ctx.abierta()) ctx.tablas.refrescar([T, TD, TB], true).catch(function () {}); }, 800);
+        tDirecto = setTimeout(function () {
+          tDirecto = null;
+          var p = pendientes; pendientes = {};
+          if (!ctx.abierta()) return;
+          var ts = p['*'] ? [TE, T, TD, TB] : [].concat(p.entregas ? [TE] : [], p.tareas || p.dependencias || p.bitacora ? [T, TD, TB] : []);
+          ctx.tablas.refrescar(ts, true).catch(function () {});
+          if (fichaId && (p['*'] || p.entregas || p.bitacora)) bitacoraE(fichaId, true);
+        }, 800);
       });
       this._cerrar = function () {
         if (obs) { obs.disconnect(); obs = null; } else window.removeEventListener('resize', alRedimensionar);

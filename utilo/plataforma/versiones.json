@@ -1,6 +1,13 @@
 {
-  "version": "5.11.2-1.6.2",
+  "version": "5.12-1.7",
   "versiones": [
+    {
+      "v": "5.12-1.7",
+      "fecha": "07/11/2026",
+      "novedades": [
+        "En Entregas, los filtros están en un solo botón, se crea con el botón + y las entregas se ponen al día solas, sin recargar."
+      ]
+    },
     {
       "v": "5.11.2-1.6.2",
       "fecha": "07/11/2026",
