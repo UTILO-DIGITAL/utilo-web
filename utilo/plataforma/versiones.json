@@ -1,6 +1,14 @@
 {
-  "version": "5.9-1.4",
+  "version": "5.10-1.5",
   "versiones": [
+    {
+      "v": "5.10-1.5",
+      "fecha": "07/11/2026",
+      "novedades": [
+        "Entregas tiene un mapa: todas las entregas de cada iniciativa en el tiempo, desde que se empezó a trabajar en ellas hasta su fecha límite, con lo que va tarde, lo atascado y qué espera a qué; al pulsar una, su resumen y sus tareas. Las tarjetas de siempre siguen en «Lista».",
+        "El menú es más corto: Para mí, Tareas y Entregas; tu perfil se abre pulsando tu nombre, arriba a la derecha, y se cierra sin perder dónde estabas."
+      ]
+    },
     {
       "v": "5.9-1.4",
       "fecha": "07/11/2026",

@@ -142,6 +142,7 @@
     var o = { persona: r.persona, correo: r.correo || '', perfil: r.perfil || '', admin: !!r.admin, negocio: r.negocio || '', dev: r.dev || '', secciones: r.secciones || [],
       version: r.version || '', versiones: Array.isArray(r.versiones) ? r.versiones : [] }; // T0283
     if (r.persona_id) o.persona_id = r.persona_id; // T0387: con Supabase, el id de la persona (acceso.personas)
+    if (r.perfilEnMenu === false) o.perfilEnMenu = false; // T0415: Perfil fuera del menú (se abre con el nombre de la cabecera)
     if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
     return o;
   }
@@ -191,8 +192,10 @@
     var p = (cred.secciones || []).filter(function (s) { return s.id === 'PERFIL'; })[0] || { id: 'PERFIL', titulo: 'Perfil', icono: ICONO_PERFIL, propia: true };
     return ss.concat([p]);
   }
-  /** Las del menú: todas menos las que van dentro de Perfil (T0269). */
-  function menu() { return todas().filter(function (s) { return !s.enPerfil; }); }
+  /** Las del menú: todas menos las que van dentro de Perfil (T0269) y, si el proyecto lo dice (perfilEnMenu: false, T0415),
+   *  sin Perfil: se abre con el nombre de la cabecera, que entonces se ve también en el ordenador. */
+  function sinPerfil() { return cred && cred.perfilEnMenu === false; }
+  function menu() { return todas().filter(function (s) { return !s.enPerfil && !(s.id === 'PERFIL' && sinPerfil()); }); }
   function seccion(id) { return todas().filter(function (s) { return s.id === id; })[0] || null; }
 
   function htmlMenu() {
@@ -214,7 +217,7 @@
     if (T && T.persona() !== copiaDe(c)) soltarTablas();  // T0275: otra persona, otra copia
     if (cerrarVersiones) cerrarVersiones(false);           // T0283: la ventana de novedades se va con el body; sin darla por vista
     cred = c;
-    document.body.className = 'u u-con-barra' + (cred.como ? ' n-viendo-como' : '');
+    document.body.className = 'u u-con-barra' + (cred.como ? ' n-viendo-como' : '') + (sinPerfil() ? ' n-perfil-arriba' : '');
     document.body.innerHTML = bandaDev(cred.dev) + htmlMenu() +
       '<div id="sx-panel">' + htmlComo() + '<header class="u-cab n-cab"><h1 id="n-titulo"></h1>' +
       '<a class="n-quien" href="?s=perfil" data-sx="PERFIL"><span>' + texto(cred.persona) + '</span>' + (cred.perfil ? '<small>' + texto(cred.perfil) + '</small>' : '') + '</a></header>' +
@@ -287,6 +290,34 @@
     cerrarVersiones = cerrar;
     velo.addEventListener('click', function (e) { if (e.target === velo || e.target.id === 'n-ver-cerrar') cerrar(); });
     $('n-ver-cerrar').focus();
+  }
+
+  /**
+   * T0415 · Con Perfil fuera del menú (perfilEnMenu: false), el nombre de la cabecera abre el Perfil del marco en una ventana
+   * encima de la sección en la que estás: se cierra con ✕, con Escape o pulsando fuera, y sigues donde estabas.
+   */
+  function verPerfil() {
+    if (!cred || $('n-perfil-velo')) return;
+    var antes = document.activeElement, velo = document.createElement('div');
+    velo.className = 'u-velo abierto'; velo.id = 'n-perfil-velo';
+    velo.innerHTML = '<div class="u-ventana n-perfil-ventana" role="dialog" aria-modal="true" aria-labelledby="n-perfil-t"><div class="n-ventana">' +
+      '<div class="n-perfil-cab"><h2 id="n-perfil-t">Tu perfil</h2><button type="button" class="n-perfil-x" id="n-perfil-cerrar" aria-label="Cerrar" title="Cerrar">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' + htmlPerfil() + '</div></div>';
+    document.body.appendChild(velo);
+    function cerrar() {
+      document.removeEventListener('keydown', tecla, true);
+      if (velo.parentNode) velo.parentNode.removeChild(velo);
+      if (antes && antes.focus && document.body.contains(antes)) antes.focus();
+    }
+    // Escape cierra solo esta ventana (si encima está la de las novedades, primero esa).
+    function tecla(e) { if (e.key === 'Escape' && !$('n-ver-velo')) { e.stopPropagation(); e.preventDefault(); cerrar(); } }
+    document.addEventListener('keydown', tecla, true);
+    velo.addEventListener('click', function (e) {
+      if (e.target === velo || (e.target.closest && e.target.closest('#n-perfil-cerrar'))) { cerrar(); return; }
+      // Lo que lleva a otra parte (entrar como otra persona, una sección de dentro de Perfil) cierra la ventana antes.
+      if (e.target.closest && e.target.closest('[data-n-como], [data-n-volver], a[data-sx]')) cerrar();
+    });
+    $('n-perfil-cerrar').focus();
   }
 
   /** Al entrar: si hay novedades sin ver, la ventana se abre sola (una vez; viendo como otra persona, no). */
@@ -535,6 +566,8 @@
     var a = e.target.closest && e.target.closest('a[data-sx]');
     if (!a || !cred || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
     e.preventDefault();
+    // T0415: sin Perfil en el menú, el Perfil del marco es una ventana, no una sección.
+    if (a.getAttribute('data-sx') === 'PERFIL' && sinPerfil() && (seccion('PERFIL') || {}).propia) { verPerfil(); return; }
     abrir(a.getAttribute('data-sx'), true, a.getAttribute('href'));
   });
   window.addEventListener('popstate', function () { if (cred) abrir(pedida() || menu()[0].id, false); });

@@ -16,7 +16,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Para mí",
    "icono": "<path d=\"M4 13h4l2 3h4l2-3h4\"/><path d=\"M6.5 5h11L20 13v6H4v-6z\"/>",
    "web": "utilo/secciones/parami.js",
-   "version": "fd11417245",
+   "version": "e912070281",
    "perfiles": "todos",
    "config": {},
    "api": [
@@ -50,14 +50,16 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Entregas",
    "icono": "<path d=\"M3 7l9-4 9 4-9 4-9-4z\"/><path d=\"M3 7v10l9 4 9-4V7\"/><path d=\"M12 11v10\"/>",
    "web": "utilo/secciones/entregas.js",
-   "version": "78c9998b75",
+   "version": "8481ba9d74",
    "perfiles": "todos",
    "config": {
+    "VISTA": "Mapa",
     "VER": "En marcha"
    },
    "api": []
   }
  ],
+ "perfilEnMenu": false,
  "supabase": {
   "prod": {
    "url": "https://vguojgqeoaaowktbagbm.supabase.co",

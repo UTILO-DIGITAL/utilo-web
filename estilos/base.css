@@ -260,7 +260,7 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
   color: inherit; text-decoration: none; font: 700 14px/1.25 var(--fuente-texto); text-align: right; }
 .u .n-quien span, .u .n-quien small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .u .n-quien small { font-weight: 400; font-size: 13px; }
-@media (min-width: 900px) { .u .n-quien { display: none; } }
+@media (min-width: 900px) { .u .n-quien { display: none; } .u.n-perfil-arriba .n-quien { display: flex; } } /* T0415: sin Perfil en el menú, el nombre lleva a él */
 /* T0270 · Todas las secciones usan el ancho que deja el menú, con un tope para pantallas muy grandes (en el móvil no llega).
  * Ninguna sección lo quita por su cuenta: la que tiene sitio lo reparte en columnas o rejillas, no estirándose. */
 .u .n-main { max-width: 1600px; }
@@ -270,6 +270,12 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .n-grupo:first-child { margin-top: 0; }
 .u .n-grupo .u-cifra { font-family: var(--fuente-texto); font-weight: 400; color: var(--color-suave); }
 .u .n-ventana { padding: var(--e5) var(--e4); display: flex; flex-direction: column; gap: var(--e4); }
+/* T0415 · El Perfil en una ventana (perfilEnMenu: false): título y ✕ arriba. */
+.u .n-perfil-cab { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); }
+.u .n-perfil-x { flex: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer;
+  border: 1.5px solid var(--color-borde-campo); border-radius: var(--radio); background: transparent; color: var(--color-texto); }
+.u .n-perfil-x svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+.u .n-perfil-ventana .u-perfil-quien { padding-bottom: var(--e2); }
 .u .n-ventana h2 { font-size: 20px; }
 .u .n-ventana textarea { width: 100%; }
 .u .n-botones { display: flex; flex-wrap: wrap; gap: var(--e2); }

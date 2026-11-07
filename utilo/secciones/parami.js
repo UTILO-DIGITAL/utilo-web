@@ -12,7 +12,7 @@
  * Si la respondida es AUTÓNOMA y vuelve a En cola, un recuadro (hasta cerrarlo) lleva a lanzar «Autónomo» en GitHub: con el
  * agente en la fase 1 nadie la coge sola. En Lo siguiente, las autónomas llevan su etiqueta.
  * - En curso: lo demás que tiene entre manos (sin las vencidas), con su fase y quién la lleva.
- * Arriba, el saludo y tres cifras (te esperan, en curso, tu cola). Debajo, en una pantalla grande tres columnas (Te espera |
+ * Arriba, el saludo, un enlace al mapa de Entregas (T0415, si se ve) y tres cifras (te esperan, en curso, tu cola). Debajo, en una pantalla grande tres columnas (Te espera |
  * Lo siguiente | Avisos y En curso), en una mediana dos (Te espera | lo demás) y en el móvil una. Cada tarjeta dice de quién viene (quién la hace o
  * pregunta), su iniciativa si se ven varias y, en una revisión, su PR. Los nombres, de personas_gestion() (guardados).
  * Cada tarea abre su ficha en Tareas. Lee la vista TABLERO, con la sesión de quien ha entrado (lo que ve lo dicen sus
@@ -116,6 +116,7 @@
 
   var RAIZ = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/utilo\/secciones\/[^/]*$/, '') : '../../'; })();
   var VERSION = (function () { var s = document.currentScript && document.currentScript.src; var m = s && /[?&]v=([^&]+)/.exec(s); return m ? m[1] : '1'; })();
+  var ICO_MAPA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14"/><path d="M15 6v14"/></svg>';
   var ICO_RECARGAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>';
   var ICO_BIEN = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>';
   var ICO_FUERA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';
@@ -157,6 +158,8 @@
     abrir: function (el, ctx) {
       estilos(el);
       var yo = ctx.personaId || '';
+      // T0415 · Un enlace al mapa de Entregas, si quien ha entrado tiene Entregas en su menú.
+      var MAPA = (ctx.secciones || []).some(function (s) { return s && s.id === 'ENTREGAS'; });
       var CLAVE = 'pm_' + String(ctx.correo || ctx.persona || '').toLowerCase().replace(/\W+/g, '');
       var GENTE = leerLocal(CLAVE + '_gente', {});   // id de persona → nombre (personas_gestion), guardado en el dispositivo
       var leido = false;
@@ -198,7 +201,8 @@
 
         var h = '<header class="pm-cab"><div><p class="pm-hola">' + texto(saludo(d) + ', ' + String(ctx.persona || '').split(' ')[0]) + '</p>' +
           '<p class="pm-fecha">' + texto(hoyLargo(d)) + '</p></div>' +
-          '<button id="pm-rec" class="sec recarga" type="button" title="Traer lo último" aria-label="Traer lo último">' + ICO_RECARGAR + '</button></header>';
+          '<span class="pm-acc">' + (MAPA ? '<a class="sec pm-mapa" href="?s=entregas&amp;v=mapa" data-sx="ENTREGAS">' + ICO_MAPA + 'Ver el mapa</a>' : '') +
+          '<button id="pm-rec" class="sec recarga" type="button" title="Traer lo último" aria-label="Traer lo último">' + ICO_RECARGAR + '</button></span></header>';
         h += '<div class="pm-res">' +
           cifra('pm-espera', r.esperan, r.esperan === 1 ? 'te espera' : 'te esperan',
             [r.respuestas ? uno(r.respuestas, 'respuesta', 'respuestas') : '', r.revisiones ? uno(r.revisiones, 'revisión', 'revisiones') : ''].filter(String).join(' · '), r.esperan ? ' pm-cifra-pr' : '') +
