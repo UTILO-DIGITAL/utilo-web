@@ -575,7 +575,8 @@
       }
       function gentes() { return Object.keys(GENTE).map(function (k) { return [k, GENTE[k]]; }).sort(function (a, b) { return a[1].localeCompare(b[1]); }); }
       function entregasDe(ini) {
-        return ctx.tablas.filas(TE).filter(function (e) { return e.INICIATIVA === ini && e.ESTADO !== 'Entregada'; })
+        // T0417: a una entrega Entregada o Descartada no se le añaden tareas (lo dice la base).
+        return ctx.tablas.filas(TE).filter(function (e) { return e.INICIATIVA === ini && e.ESTADO !== 'Entregada' && e.ESTADO !== 'Descartada'; })
           .map(function (e) { var i = ctx.tablas.fila(TI, ini); return [e.ID, ((i && i.INICIAL) || '') + e.NUMERO + ' · ' + (e.NOMBRE || '')]; });
       }
       function chipDep(x) {
