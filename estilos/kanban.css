@@ -900,3 +900,7 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
 .u .kb-ficha .mp-ts li:has(.fquitar) small { order: 3; flex: 1 1 100%; }
 .u .kb-ficha .mp-ts .fquitar { order: 2; }
 .u .kb-ficha .bloque > .fmas[data-anadir-tareas] { margin-top: var(--e3); }
+/* T0417 · En el móvil, lo que se cambia en una ficha va a 16 px: con menos, el iPhone acerca la página al tocarlo. */
+@media (hover: none) {
+  .u .kb-ficha .fed-abierto select, .u .kb-ficha .fed-abierto input, .u .kb-ficha .fed-abierto textarea { font-size: 16px; }
+}

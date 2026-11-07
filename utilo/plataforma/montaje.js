@@ -30,7 +30,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Tareas",
    "icono": "<rect x=\"3\" y=\"4\" width=\"5\" height=\"16\" rx=\"1\"/><rect x=\"10\" y=\"4\" width=\"5\" height=\"11\" rx=\"1\"/><rect x=\"17\" y=\"4\" width=\"4\" height=\"7\" rx=\"1\"/>",
    "web": "utilo/secciones/tablero.js",
-   "version": "69b2cd1f64",
+   "version": "67de34726d",
    "perfiles": "todos",
    "config": {
     "VISTA": "ocho",
@@ -50,7 +50,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Entregas",
    "icono": "<path d=\"M3 7l9-4 9 4-9 4-9-4z\"/><path d=\"M3 7v10l9 4 9-4V7\"/><path d=\"M12 11v10\"/>",
    "web": "utilo/secciones/entregas.js",
-   "version": "8236909c89",
+   "version": "1fc228cd0d",
    "perfiles": "todos",
    "config": {
     "VISTA": "Mapa",

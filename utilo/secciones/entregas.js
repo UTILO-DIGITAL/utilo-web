@@ -1048,6 +1048,9 @@
 
       fv.addEventListener('click', function (ev) {
         if (ev.target === fv || ev.target.closest('[data-cerrar]')) { cerrarFicha(); return; }
+        if (TACTIL && cambiando && fcaja.querySelector('input[type=date]#fed') && !ev.target.closest('.fed-abierto')) {
+          cerrarCampo(); if (!ev.target.closest('[data-ed],button,a,select,input,textarea')) return;
+        }
         if (ev.target.closest('[data-fed-ok]')) { var a0 = fcaja.querySelector('#fed'); if (a0) guardarCampo(cambiando, a0.value); return; }
         if (ev.target.closest('[data-fed-no]')) { cerrarCampo(); return; }
         var d = ev.target.closest('[data-ed]');
@@ -1060,13 +1063,17 @@
         // Una tarea abre su ficha en Tareas: se cierra esta antes de irse.
         if (ev.target.closest('a[data-sx]')) cerrarFicha();
       });
+      // En el móvil (sin ratón), una fecha se guarda al elegirla: su calendario le quita el foco, y guardarla al salir la
+      // cerraba antes de elegir el día. Se cierra sin cambiarla tocando fuera.
+      var TACTIL = !!(window.matchMedia && matchMedia('(hover: none)').matches);
       fv.addEventListener('change', function (ev) {
         if (ev.target.id === 'en-f-est' && ev.target.value) moverE(fichaId, ev.target.value);
+        if (TACTIL && ev.target.id === 'fed' && ev.target.type === 'date' && cambiando) guardarCampo(cambiando, ev.target.value);
       });
       // Una fecha o el nombre se guardan al salir (o con Intro); un texto largo, con «Guardar».
       fv.addEventListener('focusout', function (ev) {
         var x = ev.target;
-        if (x.id === 'fed' && cambiando && x.isConnected && x.tagName === 'INPUT') guardarCampo(cambiando, x.value);
+        if (x.id === 'fed' && cambiando && x.isConnected && x.tagName === 'INPUT' && !(TACTIL && x.type === 'date')) guardarCampo(cambiando, x.value);
       });
       fv.addEventListener('keydown', function (ev) {
         if (cambiando && ev.target.id === 'fed') {

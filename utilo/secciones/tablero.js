@@ -760,7 +760,8 @@
         if (!x) return;
         x.focus();
         if (x.type === 'text') x.select();
-        if (x.tagName === 'SELECT' && x.showPicker) { try { x.showPicker(); } catch (e) {} }
+        // Con ratón, la lista se abre sola; en el móvil, se toca el desplegable (abrirla desde aquí no siempre deja elegir).
+        if (x.tagName === 'SELECT' && x.showPicker && !TACTIL) { try { x.showPicker(); } catch (e) {} }
       }
       function cerrarCampo() {
         var k = cambiando; cambiando = ''; pintarFicha();
@@ -849,6 +850,9 @@
       }
       fv.addEventListener('click', function (e) {
         if (e.target === fv || e.target.closest('[data-cerrar]')) { cerrarFicha(); return; }
+        // Un desplegable abierto se cierra al tocar fuera de él (si el toque no abre otra cosa, no hace nada más).
+        var abierto = cambiando && caja.querySelector('select#fed' + (TACTIL ? ', input[type=date]#fed' : ''));
+        if (abierto && !e.target.closest('.fed-abierto')) { cerrarCampo(); if (!e.target.closest('[data-ed],[data-rel],button,a,select,input,textarea')) return; }
         var r = e.target.closest('[data-rel]');
         if (r && !(e.metaKey || e.ctrlKey || e.shiftKey)) { e.preventDefault(); if (tarea(r.getAttribute('data-rel'))) abrirFicha(r.getAttribute('data-rel')); return; }
         if (e.target.closest('[data-fed-ok]')) { var a0 = caja.querySelector('#fed'); if (a0) guardarCampo(cambiando, a0.value); return; }
@@ -867,14 +871,16 @@
       fv.addEventListener('input', function (e) { if (e.target.id === 'tb-resp' && abiertaId) respuestas[abiertaId] = e.target.value; });
       fv.addEventListener('change', function (e) {
         if (e.target.id === 'kb-f-est') { mover(abiertaId, e.target.value); return; }
-        if (e.target.id === 'fed' && e.target.tagName === 'SELECT' && cambiando) guardarCampo(cambiando, e.target.value);
+        if (e.target.id === 'fed' && cambiando && (e.target.tagName === 'SELECT' || (TACTIL && e.target.type === 'date'))) guardarCampo(cambiando, e.target.value);
       });
-      // Un dato de una línea se guarda al salir de él (o con Intro); un desplegable que se deja sin cambiar, se cierra.
+      // Un dato de una línea se guarda al salir de él (o con Intro). Un desplegable que se deja sin cambiar se cierra al tocar
+      // fuera de él (abajo, en el clic) o con Escape, no al perder el foco: en el móvil, abrir su lista de opciones le quita el
+      // foco, y cerrarlo entonces dejaba la lista sin nada detrás (T0417: no se podía elegir la entrega en el móvil).
       fv.addEventListener('focusout', function (e) {
         var x = e.target;
         if (x.id !== 'fed' || !cambiando || !x.isConnected) return;
-        if (x.tagName === 'INPUT') guardarCampo(cambiando, x.value);
-        else if (x.tagName === 'SELECT') setTimeout(function () { if (cambiando && x.isConnected && document.activeElement !== x) cerrarCampo(); }, 0);
+        // En el móvil, una fecha se guarda al elegirla (change, abajo): su calendario también le quita el foco.
+        if (x.tagName === 'INPUT' && !(TACTIL && x.type === 'date')) guardarCampo(cambiando, x.value);
       });
       fv.addEventListener('keydown', function (e) {
         if (cambiando && e.target.id === 'fed') {
