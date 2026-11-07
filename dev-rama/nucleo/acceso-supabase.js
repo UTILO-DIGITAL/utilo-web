@@ -139,7 +139,8 @@
       return {
         persona: yo.nombre, correo: bajo(yo.correo || correo), perfil: alto.nombre + (alto.ambito !== 'todo' && alto.ambito_id ? ' en ' + alto.ambito_id : ''),
         admin: admin, negocio: M.negocio || '', dev: ENTORNO === 'prod' ? '' : (ENTORNO === 'dev' ? 'DEV' : 'Local') + ' · Supabase ' + (P.nombre || 'de pruebas') + (M.commit ? ' · ' + M.commit : ''),
-        secciones: secciones, version: (ver && ver.version) || M.version || '', versiones: (ver && ver.versiones) || [], persona_id: yo.persona, roles: roles
+        secciones: secciones, version: (ver && ver.version) || M.version || '', versiones: (ver && ver.versiones) || [], persona_id: yo.persona, roles: roles,
+        perfilEnMenu: M.perfilEnMenu !== false   // T0415: false, Perfil fuera del menú (con el nombre de la cabecera)
       };
     });
   }

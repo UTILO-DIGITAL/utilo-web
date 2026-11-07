@@ -142,6 +142,7 @@
     var o = { persona: r.persona, correo: r.correo || '', perfil: r.perfil || '', admin: !!r.admin, negocio: r.negocio || '', dev: r.dev || '', secciones: r.secciones || [],
       version: r.version || '', versiones: Array.isArray(r.versiones) ? r.versiones : [] }; // T0283
     if (r.persona_id) o.persona_id = r.persona_id; // T0387: con Supabase, el id de la persona (acceso.personas)
+    if (r.perfilEnMenu === false) o.perfilEnMenu = false; // T0415: Perfil fuera del menú (se abre con el nombre de la cabecera)
     if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
     return o;
   }
@@ -191,8 +192,10 @@
     var p = (cred.secciones || []).filter(function (s) { return s.id === 'PERFIL'; })[0] || { id: 'PERFIL', titulo: 'Perfil', icono: ICONO_PERFIL, propia: true };
     return ss.concat([p]);
   }
-  /** Las del menú: todas menos las que van dentro de Perfil (T0269). */
-  function menu() { return todas().filter(function (s) { return !s.enPerfil; }); }
+  /** Las del menú: todas menos las que van dentro de Perfil (T0269) y, si el proyecto lo dice (perfilEnMenu: false, T0415),
+   *  sin Perfil: se abre con el nombre de la cabecera, que entonces se ve también en el ordenador. */
+  function sinPerfil() { return cred && cred.perfilEnMenu === false; }
+  function menu() { return todas().filter(function (s) { return !s.enPerfil && !(s.id === 'PERFIL' && sinPerfil()); }); }
   function seccion(id) { return todas().filter(function (s) { return s.id === id; })[0] || null; }
 
   function htmlMenu() {
@@ -214,7 +217,7 @@
     if (T && T.persona() !== copiaDe(c)) soltarTablas();  // T0275: otra persona, otra copia
     if (cerrarVersiones) cerrarVersiones(false);           // T0283: la ventana de novedades se va con el body; sin darla por vista
     cred = c;
-    document.body.className = 'u u-con-barra' + (cred.como ? ' n-viendo-como' : '');
+    document.body.className = 'u u-con-barra' + (cred.como ? ' n-viendo-como' : '') + (sinPerfil() ? ' n-perfil-arriba' : '');
     document.body.innerHTML = bandaDev(cred.dev) + htmlMenu() +
       '<div id="sx-panel">' + htmlComo() + '<header class="u-cab n-cab"><h1 id="n-titulo"></h1>' +
       '<a class="n-quien" href="?s=perfil" data-sx="PERFIL"><span>' + texto(cred.persona) + '</span>' + (cred.perfil ? '<small>' + texto(cred.perfil) + '</small>' : '') + '</a></header>' +

@@ -823,3 +823,22 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
 .u .pm-acc { display: flex; align-items: center; gap: var(--e2); flex: 0 0 auto; }
 .u .pm-mapa svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 400px) { .u .pm-mapa { padding: 0 var(--e3); } }
+/* T0415 · Entregas en dos vistas (Mapa | Lista), la bandera de la fecha límite, el número de cada flecha y la ayuda. */
+.u .mp-vistas { display: inline-flex; align-self: flex-end; }
+.u .mp-vistas .sec { border-radius: 0; min-width: 76px; }
+.u .mp-vistas .sec:first-child { border-radius: var(--radio) 0 0 var(--radio); }
+.u .mp-vistas .sec + .sec { border-radius: 0 var(--radio) var(--radio) 0; margin-left: -1.5px; }
+.u .mp-vistas .sec[aria-pressed=true] { background: var(--color-principal-oscuro); color: var(--color-superficie); }
+.u .mp-sub { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--color-suave); min-height: 1.3em; }
+.u .mp-lim { position: absolute; z-index: 2; /* por debajo de la caja: si la caja es más ancha que sus días, la línea no cruza el texto */ border-left: 2px solid var(--color-principal-oscuro); pointer-events: none; }
+.u .mp-lim span { position: absolute; top: 0; right: 2px; display: inline-flex; align-items: center; gap: 2px; padding: 0 4px; border-radius: var(--radio-peq);
+  background: var(--color-principal-oscuro); color: var(--color-superficie); font: 800 11px/16px var(--fuente-texto); white-space: nowrap; }
+.u .mp-lim span svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.u .mp-lim.vencida { border-left-color: var(--estado-bl); }
+.u .mp-lim.vencida span { background: var(--estado-bl); }
+.u .mp-fn { position: absolute; z-index: 4; transform: translate(-50%, -50%); min-width: 24px; height: 24px; padding: 0 6px; border-radius: 12px; cursor: pointer;
+  border: 2px solid var(--color-texto); background: var(--color-superficie); color: var(--color-texto); font: 800 12px/1 var(--fuente-texto); }
+.u .mp-fn.sel { background: var(--color-texto); color: var(--color-superficie); }
+.u .mp-lienzo.con-sel .mp-fn:not(.sel) { opacity: .35; }
+.u .mp-ley .mp-ley-lim::before { width: 3px; height: 14px; border-radius: 0; background: var(--color-principal-oscuro); }
+.u .mp-ayuda { margin: var(--e2) 0 0; max-width: 90ch; font-size: 13px; color: var(--color-suave); }
