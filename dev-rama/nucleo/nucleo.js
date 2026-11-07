@@ -584,6 +584,8 @@
    * - abierta(): si la sección sigue abierta (para no pintar tarde en otra).
    * - enDirecto(tablas, f) (T0386, solo con Supabase; si no, null): f(tabla) en cuanto cambia algo en esas tablas de la base.
    * - personaId (T0387, solo con Supabase; si no, ''): el id de quien ha entrado, el de las columnas persona (ASIGNADO…).
+   * - roles (T0417, solo con Supabase; si no, []): sus roles, [{ rol, ambito, ambito_id }], para no ofrecer lo que la base no le
+   *   deja (en qué iniciativas es responsable). La que manda sigue siendo la base.
    */
   function ctxDe(s) {
     return {
@@ -594,6 +596,7 @@
       // T0273: el nombre con el que se apunta lo que hace (HISTORIAL…), como en el motor: «Javi Canela como Ana».
       autor: cred.como ? cred.como.persona + ' como ' + cred.persona : cred.persona,
       personaId: cred.persona_id || '', // T0387
+      roles: cred.roles || [], // T0417
       correo: cred.correo || '', secciones: todas().map(function (x) { return x.enPerfil ? { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true } : { id: x.id, titulo: x.titulo }; }),
       tablas: tablas(),
       alCambiar: function (f) { (oyentes[s.id] = oyentes[s.id] || []).push(f); },

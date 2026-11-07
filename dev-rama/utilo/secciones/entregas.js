@@ -26,9 +26,17 @@
  * Lista (T0386, como la sección Entregas del kanban 4.x, T0399): una tarjeta por entrega con su nombre corto (U19), estado e
  * iniciativa; las tareas entregadas de su total con una barra por estados; la fecha prevista con los días que faltan (o la de
  * entrega); qué incluye, el criterio de terminado y, al desplegar, sus tareas por estado.
- * Los filtros valen para las dos vistas: Ver (en marcha, aplazadas, entregadas o todas) e Iniciativa. Solo lee (ENTREGAS, INICIATIVAS, la vista TABLERO y DEPENDENCIAS), con la sesión de quien
- * ha entrado: lo que ve lo dicen sus roles. Se pone al día sola cuando cambia una tarea o una dependencia (Realtime; las
- * entregas, con ↻). Las cuentas y la colocación del mapa (CALC) se prueban en node (herramientas/probar-plataforma.js).
+ * Los filtros valen para las dos vistas: Ver (en marcha, aplazadas, entregadas o todas) e Iniciativa, en una hoja que abre
+ * «Filtros» (T0422; su número dice cuántos hay puestos). Lee ENTREGAS, INICIATIVAS, la vista TABLERO y DEPENDENCIAS con la
+ * sesión de quien ha entrado: lo que ve lo dicen sus roles. Se pone al día sola cuando cambia una entrega, una tarea o una
+ * dependencia (Realtime; sin ↻ desde T0422).
+ * Crear, cambiar y mover (T0417), quien lleva la iniciativa (responsable o admin): «Nueva entrega» (el botón flotante; en el móvil, +) (iniciativa, nombre,
+ * fecha límite, qué incluye y cuándo estará terminada) y la ficha de cada entrega («Cambiar o mover» en el detalle del mapa y
+ * en la lista; ?e=E0023 la abre), donde cada dato se cambia pulsándolo y el estado, arriba; y sus tareas: «+ Añadir tareas»
+ * (las de su iniciativa sin entrega y sin cerrar) y × para sacar una, con cambiar_tarea() (cada tarea lo apunta en su bitácora). Escriben crear_entrega(),
+ * cambiar_entrega() y mover_entrega() de la base, las mismas que usan los chats; la base pone el número, pide el criterio,
+ * deja 2 En curso por iniciativa, pide el resumen al entregar y solo deja corregir una entregada o descartada a admin.
+ * Las cuentas y la colocación del mapa y las reglas de la ficha (CALC) se prueban en node (herramientas/probar-plataforma.js).
  * Estilos: estilos/kanban.css (.mp-* el mapa, .en-* la lista), con los colores de base.css.
  */
 (function () {
@@ -303,16 +311,96 @@
     };
   }
 
+  /* ---------- crear, cambiar y mover (T0417): lo que dice la base (gestion.pasos_entrega, antes_entrega), para no ofrecer
+   * lo que no dejará; la que manda sigue siendo ella ---------- */
+  var PASOS_E = {
+    'Planificada': ['En curso', 'Aplazada', 'Descartada'],
+    'En curso': ['Entregada', 'Planificada', 'Aplazada', 'Descartada'],
+    'Aplazada': ['Planificada', 'En curso', 'Descartada']
+  };
+  /** Entregada y Descartada solo vuelven atrás para corregir un error, y solo admin. */
+  var CORRIGE = { 'Entregada': 'En curso', 'Descartada': 'Planificada' };
+  var MAX_EN_CURSO = 2;
+  /** A qué estados puede pasar una entrega: [{ estado, corrige }]. */
+  function pasosEntrega(estado, admin) {
+    if (CORRIGE[estado]) return admin ? [{ estado: CORRIGE[estado], corrige: true }] : [];
+    return (PASOS_E[estado] || []).map(function (s) { return { estado: s, corrige: false }; });
+  }
+  /** Qué pide pasar de un estado a otro: 'corregir' (el motivo), 'resumen' (Entregada), 'motivo' (Aplazada, Descartada) o ''. */
+  function pideEntrega(de, a) {
+    return CORRIGE[de] ? 'corregir' : a === 'Entregada' ? 'resumen' : a === 'Aplazada' || a === 'Descartada' ? 'motivo' : '';
+  }
+  /** Las entregas En curso de una iniciativa, sin contar «menos» (la que se va a mover). */
+  function enCursoDe(entregas, ini, menos) {
+    return (entregas || []).filter(function (e) { return e.INICIATIVA === ini && e.ESTADO === 'En curso' && e.ID !== menos; });
+  }
+  /** El número que tendrá la próxima entrega de una iniciativa (lo pone la base: el siguiente al más alto). */
+  function siguienteNumero(entregas, ini) {
+    return (entregas || []).reduce(function (n, e) { return e.INICIATIVA === ini ? Math.max(n, Number(e.NUMERO) || 0) : n; }, 0) + 1;
+  }
+  var NOMBRE_E = { NOMBRE: 'Nombre', CRITERIO: 'Terminada cuando', FECHA_INICIO: 'Empieza', FECHA_PREVISTA: 'Fecha límite', FECHA_ENTREGA: 'Entregada el',
+    QUE_INCLUYE: 'Qué incluye', RESUMEN: 'Cómo fue', INICIATIVA: 'Iniciativa' };
+  var LARGO_MAX = 60;
+  /**
+   * Lo que se guarda al cambiar el dato k de la entrega e desde su ficha: { cambios: { COLUMNA: v }, campos: { columna: v } }
+   * (los de cambiar_entrega), { mal } si no vale, o null si no cambia nada. Fechas 'aaaa-mm-dd'; vacío, ''.
+   */
+  function cambioEntrega(e, k, v) {
+    v = String(v == null ? '' : v).trim();
+    var fecha = /^FECHA_/.test(k);
+    if (fecha) v = dia(v);
+    if ((k === 'NOMBRE' || k === 'CRITERIO') && !v) return { mal: NOMBRE_E[k] + ': no se queda vacío.' };
+    if (k === 'NOMBRE' && v.length > LARGO_MAX) return { mal: 'Nombre: pasa de ' + LARGO_MAX + ' caracteres.' };
+    if (k === 'RESUMEN' && !v && e.ESTADO === 'Entregada') return { mal: 'Una entrega entregada lleva su resumen: cómo fue.' };
+    if (k === 'FECHA_ENTREGA' && !v) return { mal: 'Una entrega entregada lleva su fecha de entrega.' };
+    var antes = e[k] == null ? '' : fecha ? dia(e[k]) : String(e[k]);
+    if (antes === v) return null;
+    if (k === 'FECHA_INICIO' || k === 'FECHA_PREVISTA') {
+      var ini = k === 'FECHA_INICIO' ? v : dia(e.FECHA_INICIO), fin = k === 'FECHA_PREVISTA' ? v : dia(e.FECHA_PREVISTA);
+      if (ini && fin && fin < ini) return { mal: 'La fecha límite (' + fechaEs(fin) + ') es antes de la de inicio (' + fechaEs(ini) + ').' };
+    }
+    var c = {}, cs = {};
+    c[k] = v; cs[k.toLowerCase()] = v;
+    return { cambios: c, campos: cs };
+  }
+  /** Lo del formulario de una entrega nueva ({ INICIATIVA, NOMBRE, FECHA_PREVISTA, QUE_INCLUYE, CRITERIO }): { campos, mal: [] }. */
+  function nuevaEntrega(v) {
+    var o = {}, mal = [];
+    ['INICIATIVA', 'NOMBRE', 'FECHA_PREVISTA', 'QUE_INCLUYE', 'CRITERIO'].forEach(function (k) { o[k] = String(v[k] == null ? '' : v[k]).trim(); });
+    if (!o.INICIATIVA) mal.push('Elige la iniciativa.');
+    if (!o.NOMBRE) mal.push('Ponle nombre.');
+    else if (o.NOMBRE.length > LARGO_MAX) mal.push('El nombre pasa de ' + LARGO_MAX + ' caracteres.');
+    if (!o.CRITERIO) mal.push('Di cuándo estará terminada: algo que se pueda comprobar.');
+    if (o.FECHA_PREVISTA && !dia(o.FECHA_PREVISTA)) mal.push('La fecha límite no es una fecha.');
+    var campos = {};
+    Object.keys(o).forEach(function (k) { if (o[k]) campos[k.toLowerCase()] = k === 'FECHA_PREVISTA' ? dia(o[k]) : o[k]; });
+    return { campos: campos, mal: mal };
+  }
+
+  /** Las tareas que se pueden añadir a una entrega de la iniciativa ini: de esa iniciativa, sin entrega y sin cerrar, la más
+   *  nueva arriba; con busca, solo las que lo tienen en el ID o el título (sin mayúsculas ni tildes). */
+  function candidatas(tareas, ini, busca) {
+    var plano = function (x) { return String(x == null ? '' : x).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); };
+    var ps = plano(busca).split(/\s+/).filter(Boolean);
+    return (tareas || []).filter(function (t) {
+      if (t.INICIATIVA !== ini || t.ENTREGA || CERRADA[t.ESTADO] || t._nueva) return false;
+      var hay = plano(t.ID + ' ' + t.TITULO);
+      return ps.every(function (p) { return hay.indexOf(p) >= 0; });
+    }).sort(function (a, b) { return String(b.ID).localeCompare(String(a.ID)); });
+  }
+
   var CALC = { plano: plano, tramo: tramo, empezada: empezada, trabajoPorTarea: trabajoPorTarea, inicioTrabajo: inicioTrabajo, TRABAJO: TRABAJO, progreso: progreso, marcas: marcas, seVe: seVe, esperas: esperas, enFilas: enFilas, linea: linea,
-    diasEntre: diasEntre, mas: mas, M: M, VER: VER, VISTAS: VISTAS, grupoDe: grupoDe };
+    diasEntre: diasEntre, mas: mas, M: M, VER: VER, VISTAS: VISTAS, grupoDe: grupoDe,
+    pasosEntrega: pasosEntrega, pideEntrega: pideEntrega, enCursoDe: enCursoDe, siguienteNumero: siguienteNumero, cambioEntrega: cambioEntrega, nuevaEntrega: nuevaEntrega, candidatas: candidatas, MAX_EN_CURSO: MAX_EN_CURSO };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ===================== la pantalla ===================== */
   var RAIZ = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/utilo\/secciones\/[^/]*$/, '') : '../../'; })();
   var VERSION = (function () { var s = document.currentScript && document.currentScript.src; var m = s && /[?&]v=([^&]+)/.exec(s); return m ? m[1] : '1'; })();
-  var ICO_RECARGAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>';
   var ICO_BANDERA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg>';
   var ICO_CERRAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  var ICO_VOLVER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>';
+  var ICO_FILTROS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>';
 
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function leerLocal(k, d) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
@@ -375,9 +463,10 @@
         '<div class="mp-vistas" role="group" aria-label="Vista">' + VISTAS.map(function (v) {
           return '<button type="button" class="sec" data-vista="' + v + '" aria-pressed="' + (v === F.vista) + '">' + v + '</button>';
         }).join('') + '</div>' +
-        '<label>Ver<select id="en-ver"></select></label>' +
-        '<label id="en-lini">Iniciativa<select id="en-ini"></select></label>' +
-        '<span class="act"><button id="en-rec" class="sec recarga" type="button" title="Traer lo último" aria-label="Traer lo último">' + ICO_RECARGAR + '</button></span>' +
+        // T0422 (decidido por Javi): en una línea, la vista y «Filtros», que abre una hoja con Ver e Iniciativa. Sin ↻: las
+        // entregas también van en directo. Crear, con el botón flotante (+), como «Añadir tarea» en Tareas.
+        '<button id="en-filtros" class="sec en-filtros" type="button" aria-haspopup="dialog">' + ICO_FILTROS + '<span>Filtros</span>' +
+          '<span id="en-fil-n" class="k-fil-n" hidden></span></button>' +
         '</div>' +
         '<div id="en-vmapa"><p id="mp-res" class="mp-res" aria-live="polite"></p>' +
         '<div class="mp-cuerpo"><div class="mp-izq"><div id="mp-marco" class="mp-marco" tabindex="0" aria-label="Mapa de las entregas en el tiempo"></div>' +
@@ -389,9 +478,14 @@
         '<li>«K5 espera a U19»: K5 tiene tareas que no pueden empezar hasta que se acaben tareas de U19.</li>' +
         '<li>Pulsa una caja para ver sus tareas y qué espera.</li></ul></details></div>' +
         '<aside id="mp-det" class="mp-det" hidden></aside></div></div>' +
-        '<div id="en-lista" class="en-lista" hidden></div></section>';
+        '<div id="en-lista" class="en-lista" hidden></div>' +
+        // T0417: la ficha de una entrega (como la de una tarea) y la ventanita para crearla o para lo que pide un estado.
+        '<div class="fv-velo" id="en-fv"><div class="fv-caja kb-ficha" role="dialog" aria-modal="true" aria-labelledby="en-f-tit" id="en-ficha"></div></div>' +
+        '<div id="alta-velo"><form id="alta-form" novalidate></form></div>' +
+        '<button id="alta-btn" class="en-mas" type="button" hidden aria-label="Nueva entrega" title="Nueva entrega"><span class="en-mas-mas" aria-hidden="true">+</span><span class="en-mas-t">Nueva entrega</span></button></section>';
       var $ = function (id) { return el.querySelector('#' + id); };
       var sec = el.querySelector('.mp'), marco = $('mp-marco'), det = $('mp-det');
+      var fv = $('en-fv'), fcaja = $('en-ficha'), altaVelo = $('alta-velo'), altaForm = $('alta-form');
 
       function datos() {
         return { entregas: ctx.tablas.filas(TE), iniciativas: ctx.tablas.filas(TI), tareas: ctx.tablas.filas(T), deps: ctx.tablas.filas(TD), bitacora: ctx.tablas.filas(TB) };
@@ -495,7 +589,8 @@
         var estado = e.ESTADO === 'Planificada' && c.empezada ? 'Empezada' : e.ESTADO;
         var h = '<div class="mp-dcab"><div class="en-top"><span class="en-corto">' + texto(c.corto) + '</span><span class="en-est">' + texto(estado) + '</span></div>' +
           '<button id="mp-cer" type="button" class="sec recarga" title="Cerrar" aria-label="Cerrar el detalle">' + ICO_CERRAR + '</button></div>' +
-          '<h3 class="en-t">' + texto(e.NOMBRE) + '</h3>';
+          '<h3 class="en-t">' + texto(e.NOMBRE) + '</h3>' +
+          '<p class="mp-dficha"><button type="button" class="u-btn" data-ficha="' + texto(c.id) + '">' + (lleva(e.INICIATIVA) ? 'Cambiar o mover' : 'Abrir la ficha') + '</button></p>';
         // Las tres cifras: avance, fecha límite y desde cuándo.
         var limite = '', inicio = '';
         if (e.ESTADO === 'Entregada') limite = e.FECHA_ENTREGA ? 'Entregada el ' + fechaEs(e.FECHA_ENTREGA) : 'Entregada';
@@ -578,6 +673,7 @@
         if (e.QUE_INCLUYE) h += '<p class="en-inc">' + texto(e.QUE_INCLUYE) + '</p>';
         if (e.CRITERIO) h += '<p class="en-inc"><b>Terminada cuando:</b> ' + texto(e.CRITERIO) + '</p>';
         if (e.RESUMEN) h += '<p class="en-inc en-res">' + texto(e.RESUMEN) + '</p>';
+        h += '<p class="en-acc"><button type="button" class="sec" data-ficha="' + texto(e.ID) + '">' + (lleva(e.INICIATIVA) ? 'Cambiar o mover' : 'Abrir la ficha') + '</button></p>';
         if (ts.length) {
           var que = ts.length === 1 ? 'la tarea' : 'las ' + ts.length + ' tareas';
           h += '<details class="en-tareas"><summary data-que="' + texto(que) + '">Ver ' + texto(que) + '</summary>' +
@@ -611,14 +707,432 @@
         else l.innerHTML = ls.map(tarjeta).join('');
       }
 
+      /* ---------- T0417 · crear, cambiar y mover: la ficha de una entrega ----------
+       * Como la ficha de una tarea: cada dato se cambia pulsándolo (cambiar_entrega), el estado desde arriba (mover_entrega, que
+       * pide el resumen al entregar y el motivo al aplazar, descartar o corregir) y su bitácora debajo. Crea, cambia y mueve
+       * quien lleva la iniciativa (responsable o admin); corregir una entregada o descartada, solo admin. La base es la que
+       * dice que no: aquí solo se evita ofrecer lo que no dejará. */
+      var ROLES = ctx.roles || [];
+      function lleva(ini) {
+        return !!ctx.admin || ROLES.some(function (r) {
+          return (r.rol === 'admin' || r.rol === 'responsable') && (r.ambito === 'todo' || (r.ambito === 'iniciativa' && r.ambito_id === ini));
+        });
+      }
+      function iniciativasQueLlevo() { return ctx.tablas.filas(TI).filter(function (i) { return lleva(i.ID) && i.ESTADO !== 'Cerrada'; }); }
+      function cortoDe(e) { var i = ctx.tablas.fila(TI, e.INICIATIVA); return ((i && i.INICIAL) || '') + (e.NUMERO == null ? '' : e.NUMERO); }
+      function sinPrefijo(m) { return String(m || '').replace(/^\w+:\s*/, ''); }
+      var fichaId = '', cambiando = '';
+      var CLS_E = { 'Planificada': 's-ni', 'En curso': 's-ec', 'Entregada': 's-co', 'Aplazada': 's-x', 'Descartada': 's-x' };
+      var LARGOS = { QUE_INCLUYE: 3, CRITERIO: 3, RESUMEN: 4 };
+
+      function abrirFicha(id, sinUrl) {
+        if (!ctx.tablas.fila(TE, id)) return;
+        fichaId = id; cambiando = '';
+        pintarFicha();
+        fv.classList.add('abierto');
+        document.documentElement.classList.add('fv-abierta');
+        if (!sinUrl) urlFicha(id);
+        var b = fcaja.querySelector('.volver'); if (b) b.focus();
+        bitacoraE(id);
+      }
+      function cerrarFicha() {
+        if (!fichaId) return;
+        fichaId = ''; cambiando = '';
+        fv.classList.remove('abierto');
+        if (!altaVelo.classList.contains('abierto')) document.documentElement.classList.remove('fv-abierta');
+        urlFicha('');
+      }
+      function urlFicha(id) {
+        try {
+          var u = new URL(location.href);
+          if (id) u.searchParams.set('e', id); else u.searchParams.delete('e');
+          history.replaceState(history.state, '', u.pathname + u.search);
+        } catch (x) {}
+      }
+      /** La bitácora de esta entrega, solo la suya. */
+      function bitacoraE(id, fresco) {
+        var p = { BITACORA: { clave: 'E:' + id, col: 'ENTREGA', valores: [id] } };
+        return (fresco ? ctx.tablas.leer([TB], { partes: p, fresco: true }) : ctx.tablas.leer([TB], { partes: p })).then(function () {
+          if (ctx.abierta() && fichaId === id && !cambiando) pintarFicha();
+        }, function (e) { if (ctx.abierta() && fichaId === id) ctx.aviso('No se ha podido leer la bitácora: ' + sinPrefijo(e.message)); });
+      }
+      /** Tras escribir: las entregas y, si está abierta, su bitácora. */
+      function alDia(id) {
+        return Promise.all([ctx.tablas.refrescar([TE], true), fichaId === id ? bitacoraE(id, true) : null]).catch(function () {});
+      }
+
+      /** El control con el que se cambia el dato k. */
+      function control(e, k) {
+        var lab = ' aria-label="' + texto(NOMBRE_E[k] || k) + '"';
+        if (/^FECHA_/.test(k)) return '<input type="date" id="fed" value="' + texto(dia(e[k])) + '"' + lab + '>';
+        if (LARGOS[k]) return '<textarea id="fed" rows="' + LARGOS[k] + '"' + lab + '>' + texto(e[k] || '') + '</textarea>' +
+          '<div class="pie"><button type="button" class="sec" data-fed-no>Cancelar</button><button type="button" class="accion" data-fed-ok>Guardar</button></div>';
+        return '<input type="text" id="fed" autocomplete="off" maxlength="' + (LARGO_MAX + 20) + '" value="' + texto(e[k] || '') + '"' + lab + '>';
+      }
+      function abrirCampo(k) {
+        cambiando = k; pintarFicha();
+        var x = fcaja.querySelector('#fed');
+        if (!x) return;
+        x.focus();
+        if (x.type === 'text') x.select();
+      }
+      function cerrarCampo() {
+        var k = cambiando; cambiando = ''; pintarFicha();
+        var x = fcaja.querySelector('[data-ed="' + k + '"]'); if (x) x.focus();
+      }
+      function guardarCampo(k, v) {
+        var e = ctx.tablas.fila(TE, fichaId);
+        if (!e || !k) return;
+        var r = cambioEntrega(e, k, v);
+        if (r && r.mal) { ctx.aviso(r.mal); var x = fcaja.querySelector('#fed'); if (x) x.focus(); return; }
+        var id = e.ID, corto = cortoDe(e);
+        if (r) ctx.tablas.actualizar(TE, id, r.cambios, { fn: 'cambiar_entrega', args: [{ entrega: id, campos: r.campos }] }).then(function () {
+          if (ctx.abierta()) ctx.aviso(corto + ' guardada.');
+          return alDia(id);
+        }, function () {});
+        cerrarCampo();
+      }
+      function anotarE(id, txt, b) {
+        b.disabled = true;
+        ctx.llamar('cambiar_entrega', [{ entrega: id, nota: txt }]).then(function () {
+          if (!ctx.abierta()) return;
+          var a = fcaja.querySelector('#en-nota'); if (a) a.value = '';
+          return bitacoraE(id, true);
+        }, function (e) { if (ctx.abierta()) ctx.aviso('No se ha apuntado: ' + sinPrefijo(e.message)); })
+          .then(function () { b.disabled = false; });
+      }
+
+      /** Mover: lo que no dejará la base se dice aquí; lo que pide el estado, en la ventanita; lo demás, al momento. */
+      function moverE(id, nuevo) {
+        var e = ctx.tablas.fila(TE, id);
+        if (!e || e.ESTADO === nuevo) return;
+        if (nuevo === 'En curso') {
+          var ya = enCursoDe(ctx.tablas.filas(TE), e.INICIATIVA, id);
+          if (ya.length >= MAX_EN_CURSO) {
+            ctx.aviso('Como mucho ' + MAX_EN_CURSO + ' entregas En curso por iniciativa, y ya lo están ' + ya.map(function (x) { return cortoDe(x) + ' · ' + x.NOMBRE; }).join(' y ') +
+              '. Pasa antes una de ellas a Entregada, Planificada o Aplazada.');
+            pintarFicha(); return;
+          }
+        }
+        var q = pideEntrega(e.ESTADO, nuevo);
+        if (q) { pedir(e, nuevo, q); pintarFicha(); return; }
+        enviar(e, nuevo, {});
+      }
+      function enviar(e, nuevo, x) {
+        var id = e.ID, corto = cortoDe(e), args = { entrega: id, estado: nuevo }, local = { ESTADO: nuevo, FECHA_ENTREGA: nuevo === 'Entregada' ? hoyIso() : '' };
+        if (x.texto) args.texto = x.texto;
+        if (x.resumen) { args.resumen = x.resumen; local.RESUMEN = x.resumen; }
+        ctx.tablas.actualizar(TE, id, local, { fn: 'mover_entrega', args: [args] }).then(function () {
+          if (ctx.abierta()) ctx.aviso(corto + ' pasa a ' + nuevo + '.');
+          return alDia(id);
+        }, function () {});
+      }
+      /** La ventanita con lo que pide el estado: el resumen al entregar, el motivo al aplazar, descartar o corregir. */
+      function pedir(e, nuevo, q) {
+        var corto = cortoDe(e), ts = ctx.tablas.filas(T).filter(function (t) { return t.ENTREGA === e.ID && !CERRADA[t.ESTADO]; });
+        var tit = q === 'resumen' ? 'Entregar ' + corto : q === 'corregir' ? 'Corregir ' + corto : (nuevo === 'Aplazada' ? 'Aplazar ' : 'Descartar ') + corto;
+        var ayuda = q === 'resumen' ? 'Pasa a Entregada cuando se cumple su criterio, no al acabar sus tareas. No vuelve atrás.' :
+          q === 'corregir' ? 'Solo si se marcó como ' + e.ESTADO.toLowerCase() + ' por error: vuelve a ' + nuevo + ' y queda en la bitácora.' :
+          nuevo === 'Aplazada' ? 'Se deja para más adelante; sus tareas siguen como están.' : 'No se va a hacer. Solo se corrige si fue un error.';
+        var h = '';
+        if (q === 'resumen') {
+          if (e.CRITERIO) h += '<div class="campo"><span class="lab">Terminada cuando</span><p class="u-nota">' + texto(e.CRITERIO) + '</p></div>';
+          if (ts.length) h += '<p class="u-nota"><b>' + (ts.length === 1 ? 'Le queda 1 tarea sin cerrar' : 'Le quedan ' + ts.length + ' tareas sin cerrar') + '</b>: siguen como están.</p>';
+          h += '<div class="campo"><label class="lab" for="en-d-res">Cómo fue</label><textarea id="en-d-res" rows="4" required>' + texto(e.RESUMEN || '') + '</textarea>' +
+            '<div class="ayuda">Lo que se entregó y lo que quedó fuera, en dos o tres líneas.</div></div>';
+        } else {
+          h = '<div class="campo"><label class="lab" for="en-d-mo">' + (q === 'corregir' ? 'Qué se marcó por error' : 'Por qué') + '</label><textarea id="en-d-mo" rows="3" required></textarea></div>';
+        }
+        altaForm.innerHTML = '<h2>' + texto(tit) + '</h2><p class="u-nota">' + texto(ayuda) + '</p><div class="edit">' + h + '</div><div id="alta-error" role="alert"></div>' +
+          '<div class="botones"><button type="button" class="sec" data-cancelar-alta>Cancelar</button><button type="submit" class="pri">' +
+          texto(q === 'corregir' ? 'Volver a ' + nuevo : 'Pasar a ' + nuevo) + '</button></div>';
+        abrirVelo();
+        altaForm.onsubmit = function (ev) {
+          ev.preventDefault();
+          var v = function (i) { var x = altaForm.querySelector('#' + i); return x ? x.value.trim() : ''; };
+          var x = { resumen: v('en-d-res'), texto: v('en-d-mo') };
+          var mal = q === 'resumen' && !x.resumen ? 'Escribe cómo fue.' : q !== 'resumen' && !x.texto ? (q === 'corregir' ? 'Di qué se marcó por error.' : 'Di por qué.') : '';
+          if (mal) { altaForm.querySelector('#alta-error').textContent = mal; return; }
+          cerrarVelo();
+          enviar(e, nuevo, x);
+        };
+      }
+      function abrirVelo() {
+        altaVelo.classList.add('abierto');
+        document.documentElement.classList.add('fv-abierta');
+        var p = altaForm.querySelector('input,textarea,select'); if (p) p.focus();
+      }
+      function cerrarVelo() { altaVelo.classList.remove('abierto', 'en-hoja'); if (!fichaId) document.documentElement.classList.remove('fv-abierta'); altaForm.onsubmit = null; }
+      altaVelo.addEventListener('click', function (ev) { if (ev.target === altaVelo || ev.target.closest('[data-cancelar-alta]')) cerrarVelo(); });
+      altaVelo.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') { ev.stopPropagation(); cerrarVelo(); } });
+
+      /** «Nueva entrega»: iniciativa (las que llevas), nombre, fecha límite, qué incluye y cuándo estará terminada. */
+      function abrirNueva() {
+        var IS = iniciativasQueLlevo();
+        if (!IS.length) { ctx.aviso('Crea entregas quien lleva la iniciativa (responsable o admin).'); return; }
+        var ini = IS.some(function (i) { return i.ID === F.ini; }) ? F.ini : IS.some(function (i) { return i.ID === 'UTILO'; }) ? 'UTILO' : IS[0].ID;
+        var numero = function (x) { var i = ctx.tablas.fila(TI, x); return ((i && i.INICIAL) || '') + siguienteNumero(ctx.tablas.filas(TE), x); };
+        altaForm.innerHTML = '<h2>Nueva entrega</h2><div class="edit">' +
+          '<div class="campo"><label class="lab" for="en-n-ini">Iniciativa</label><select id="en-n-ini">' + IS.map(function (i) {
+            return '<option value="' + texto(i.ID) + '"' + (i.ID === ini ? ' selected' : '') + '>' + texto(i.NOMBRE || i.ID) + '</option>'; }).join('') + '</select>' +
+            '<div class="ayuda" id="en-n-num">Será la ' + texto(numero(ini)) + ' (el número lo pone la base).</div></div>' +
+          '<div class="campo"><label class="lab" for="en-n-nom">Nombre</label><input type="text" id="en-n-nom" autocomplete="off" required data-limite="' + LARGO_MAX + '">' +
+            '<div class="ayuda"><span class="contador" data-cuenta="en-n-nom">0 / ' + LARGO_MAX + '</span> · Corto: «Base nueva», «Temporada 2027».</div></div>' +
+          '<div class="campo"><label class="lab" for="en-n-pre">Fecha límite <span class="opc">(opcional)</span></label><input type="date" id="en-n-pre"></div>' +
+          '<div class="campo"><label class="lab" for="en-n-inc">Qué incluye <span class="opc">(opcional)</span></label><textarea id="en-n-inc" rows="2"></textarea></div>' +
+          '<div class="campo"><label class="lab" for="en-n-cri">Terminada cuando</label><textarea id="en-n-cri" rows="3" required></textarea>' +
+            '<div class="ayuda">Algo que se pueda comprobar: «Javi crea una entrega desde la plataforma sin tocar la tabla».</div></div>' +
+          '</div><div id="alta-error" role="alert"></div>' +
+          '<div class="botones"><button type="button" class="sec" data-cancelar-alta>Cancelar</button><button type="submit" class="pri">Crear entrega</button></div>';
+        abrirVelo();
+        altaForm.querySelector('#en-n-ini').onchange = function () { altaForm.querySelector('#en-n-num').textContent = 'Será la ' + numero(this.value) + ' (el número lo pone la base).'; };
+        altaForm.querySelector('#en-n-nom').oninput = function () {
+          var k = altaForm.querySelector('[data-cuenta="en-n-nom"]'), n = this.value.trim().length;
+          k.textContent = n + ' / ' + LARGO_MAX; k.classList.toggle('mal', n > LARGO_MAX);
+        };
+        altaForm.onsubmit = function (ev) {
+          ev.preventDefault();
+          var v = function (i) { return altaForm.querySelector('#' + i).value; };
+          var r = nuevaEntrega({ INICIATIVA: v('en-n-ini'), NOMBRE: v('en-n-nom'), FECHA_PREVISTA: v('en-n-pre'), QUE_INCLUYE: v('en-n-inc'), CRITERIO: v('en-n-cri') });
+          var er = altaForm.querySelector('#alta-error'), b = altaForm.querySelector('.pri');
+          if (r.mal.length) { er.textContent = r.mal.join(' '); return; }
+          b.disabled = true; b.textContent = 'Creando…'; er.textContent = '';
+          ctx.llamar('crear_entrega', [{ campos: r.campos }]).then(function (id) {
+            return ctx.tablas.refrescar([TE], true).then(function () {
+              if (!ctx.abierta()) return;
+              cerrarVelo();
+              var e = ctx.tablas.fila(TE, id);
+              ctx.aviso('Creada ' + (e ? cortoDe(e) + ' · ' + e.NOMBRE : id) + '.');
+              if (e && F.ver !== 'En marcha' && F.ver !== 'Todas') { F.ver = 'En marcha'; guardarLocal(CLAVE + '_f', F); }
+              pintar();
+              abrirFicha(id);
+            });
+          }, function (e) {
+            er.textContent = 'No se ha creado: ' + sinPrefijo(e.message);
+            b.disabled = false; b.textContent = 'Crear entrega';
+          });
+        };
+      }
+      $('alta-btn').onclick = abrirNueva;
+
+      /** Pone (o quita, con entrega '') la entrega de unas tareas con cambiar_tarea() de la base, la de los chats: cada tarea
+       *  lo apunta en su bitácora. Al momento en la pantalla; si la base dice que no, vuelve. de: la entrega de la ficha. */
+      function ponerEntrega(ids, entrega, de) {
+        var e = ctx.tablas.fila(TE, de), corto = e ? cortoDe(e) : de;
+        return Promise.all(ids.map(function (id) {
+          return ctx.tablas.actualizar(T, id, { ENTREGA: entrega, ENTREGA_CORTA: entrega ? corto : '' },
+            { fn: 'cambiar_tarea', args: [{ tarea: id, campos: { entrega: entrega || null } }] }).then(function () { return null; }, function (x) { return id + ': ' + sinPrefijo(x.message); });
+        })).then(function (mal) {
+          mal = mal.filter(Boolean);
+          var bien = ids.length - mal.length;
+          if (ctx.abierta() && bien) ctx.aviso(entrega ? (bien === 1 ? 'Añadida 1 tarea a ' : 'Añadidas ' + bien + ' tareas a ') + corto + '.' :
+            (bien === 1 ? ids[0] + ' ya no está en ' : bien + ' tareas ya no están en ') + corto + '.');
+          return ctx.tablas.refrescar([T], true).catch(function () {});
+        });
+      }
+      /** La ventanita para añadir tareas: las de su iniciativa sin entrega y sin cerrar, con un buscador y una casilla cada una. */
+      function abrirAnadir(id) {
+        var e = ctx.tablas.fila(TE, id);
+        if (!e) return;
+        var corto = cortoDe(e), marcadas = {};
+        altaForm.innerHTML = '<h2>Añadir tareas a ' + texto(corto) + '</h2><p class="u-nota">Las de ' + texto((ctx.tablas.fila(TI, e.INICIATIVA) || {}).NOMBRE || e.INICIATIVA) +
+          ' que aún no están en ninguna entrega y no se han cerrado.</p><div class="edit">' +
+          '<div class="campo"><label class="u-oculto" for="en-a-busca">Buscar</label><input type="search" id="en-a-busca" placeholder="Buscar por título o ID" autocomplete="off"></div>' +
+          '<div id="en-a-lista" class="en-a-lista"></div></div><div id="alta-error" role="alert"></div>' +
+          '<div class="botones"><button type="button" class="sec" data-cancelar-alta>Cancelar</button><button type="submit" class="pri" disabled>Añadir</button></div>';
+        var lista = altaForm.querySelector('#en-a-lista'), b = altaForm.querySelector('.pri');
+        function cuenta() { var n = Object.keys(marcadas).length; b.disabled = !n; b.textContent = n ? (n === 1 ? 'Añadir 1 tarea' : 'Añadir ' + n + ' tareas') : 'Añadir'; }
+        function pintarLista() {
+          var cs = candidatas(ctx.tablas.filas(T), e.INICIATIVA, altaForm.querySelector('#en-a-busca').value);
+          lista.innerHTML = cs.length ? cs.map(function (t) {
+            return '<label class="en-a-t"><input type="checkbox" value="' + texto(t.ID) + '"' + (marcadas[t.ID] ? ' checked' : '') + '>' +
+              '<span><span class="id">' + texto(t.ID) + '</span> ' + texto(t.TITULO) + '<small class="' + (CLS[t.ESTADO] || 's-x') + '">' + texto(t.ESTADO) +
+              (t.EN_MANOS_NOMBRE ? ' · ' + texto(t.EN_MANOS_NOMBRE) : '') + '</small></span></label>';
+          }).join('') : '<p class="u-nota">' + (altaForm.querySelector('#en-a-busca').value.trim() ? 'Ninguna con eso.' : 'No hay tareas sin entrega en esta iniciativa.') + '</p>';
+        }
+        altaForm.querySelector('#en-a-busca').oninput = pintarLista;
+        lista.onchange = function (ev) { var x = ev.target; if (x.type !== 'checkbox') return; if (x.checked) marcadas[x.value] = 1; else delete marcadas[x.value]; cuenta(); };
+        pintarLista();
+        abrirVelo();
+        altaForm.onsubmit = function (ev) {
+          ev.preventDefault();
+          var ids = Object.keys(marcadas).sort();
+          if (!ids.length) return;
+          cerrarVelo();
+          ponerEntrega(ids, id, id);
+        };
+      }
+
+      function pintarFicha() {
+        var e = ctx.tablas.fila(TE, fichaId);
+        if (!e) { cerrarFicha(); return; }
+        var id = e.ID, corto = cortoDe(e), pc = lleva(e.INICIATIVA) && !e._pendiente, hoy = hoyIso();
+        if (cambiando && !pc) cambiando = '';
+        var ab = function (k) { return pc && cambiando === k; };
+        var pulsa = function (k) { return pc ? ' data-ed="' + k + '" tabindex="0" title="' + texto(NOMBRE_E[k] + ': pulsa para cambiar') + '"' : ''; };
+        var ts = ctx.tablas.filas(T).filter(function (t) { return t.ENTREGA === id; }), p = progreso(ts);
+        var i = ctx.tablas.fila(TI, e.INICIATIVA);
+
+        // Estado: a los que puede pasar (corregir, solo admin).
+        var pasos = pc ? pasosEntrega(e.ESTADO, !!ctx.admin) : [];
+        var estado = '<div class="est ' + (CLS_E[e.ESTADO] || 's-x') + '">' + (pasos.length ? '<label for="en-f-est">Estado</label><select id="en-f-est">' +
+            '<option value="" selected>' + texto(e.ESTADO) + '</option>' + pasos.map(function (x) {
+              return '<option value="' + texto(x.estado) + '">' + texto(x.corrige ? 'Volver a ' + x.estado + ' (se marcó por error)' : x.estado) + '</option>'; }).join('') + '</select>'
+            : '<span class="fpill">' + texto(e.ESTADO) + '</span>') +
+          '<span class="msg">' + (e._pendiente ? 'Guardando…' : texto(p.total ? p.hechas + ' de ' + p.total + (p.total === 1 ? ' tarea hecha' : ' tareas hechas') + ' · ' + p.pct + ' %' : 'Sin tareas todavía')) + '</span></div>';
+
+        // Fechas: empieza, fecha límite y, si está entregada, cuándo.
+        var fecha = function (k, val, pista, c) {
+          if (ab(k)) return '<div class="ffecha fed-abierto"><small>' + texto(NOMBRE_E[k]) + '</small>' + control(e, k) + '</div>';
+          return '<div class="ffecha ' + (c || '') + '"' + pulsa(k) + '><small>' + texto(NOMBRE_E[k]) + '</small><strong>' + texto(val || '—') + '</strong>' +
+            (pista ? '<span class="fpista">' + texto(pista) + '</span>' : '') + '</div>';
+        };
+        var fs = [], n = diasEntre(hoy, e.FECHA_PREVISTA), pista = '', c = '';
+        fs.push(fecha('FECHA_INICIO', fechaEs(e.FECHA_INICIO), e.FECHA_INICIO ? '' : 'cuando se empiece a trabajar', e.FECHA_INICIO ? '' : 'nada'));
+        if (!dia(e.FECHA_PREVISTA)) { pista = 'sin fecha límite'; c = 'nada'; }
+        else if (!enMarcha(e)) c = e.ESTADO === 'Entregada' ? 'ok' : '';
+        else if (n < 0) { pista = 'venció hace ' + diasTxt(-n); c = 'venc'; }
+        else if (n === 0) { pista = 'es hoy'; c = 'venc'; }
+        else { pista = n === 1 ? 'falta 1 día' : 'faltan ' + n + ' días'; c = n <= 7 ? 'pronto' : ''; }
+        fs.push(fecha('FECHA_PREVISTA', fechaEs(e.FECHA_PREVISTA), pista, c));
+        if (e.ESTADO === 'Entregada') fs.push(fecha('FECHA_ENTREGA', fechaEs(e.FECHA_ENTREGA), '', 'ok'));
+
+        var largo = function (k, vacio) {
+          if (ab(k)) return '<div class="bloque fed-abierto"><h3>' + texto(NOMBRE_E[k]) + '</h3><div class="edit">' + control(e, k) + '</div></div>';
+          if (!e[k]) return vacio ? '<div class="bloque"' + pulsa(k) + '><h3>' + texto(NOMBRE_E[k]) + '</h3><p class="u-nota">' + texto(vacio) + '</p></div>' : '';
+          return '<div class="bloque"' + pulsa(k) + '><h3>' + texto(NOMBRE_E[k]) + '</h3>' + String(e[k]).split('\n').filter(function (l) { return l.trim(); }).map(function (l) { return '<p>' + texto(l) + '</p>'; }).join('') + '</div>';
+        };
+
+        // Tareas: las abiertas a la vista, por estado; las cerradas, plegadas.
+        var tareasH = '';
+        if (ts.length) {
+          // Una abierta se puede sacar de la entrega (×): vuelve a no tener entrega. Las cerradas se quedan donde se cerraron.
+          var li = function (x) {
+            var h = tareaLi(x, hoy);
+            return pc && !CERRADA[x.ESTADO] && !x._pendiente ? h.replace(/<\/li>$/, '<button type="button" class="fquitar" data-sacar="' + texto(x.ID) + '" aria-label="Sacar ' +
+              texto(x.ID) + ' de la entrega" title="Sacar ' + texto(x.ID) + ' de la entrega">×</button></li>') : h;
+          };
+          var grupo = function (s) {
+            var de = ts.filter(function (x) { return x.ESTADO === s; }).sort(function (a, b) { return String(a.ID).localeCompare(String(b.ID)); });
+            return de.length ? '<h5 class="' + (CLS[s] || 's-x') + '">' + texto(s) + ' · ' + de.length + '</h5><ul class="mp-ts">' + de.map(li).join('') + '</ul>' : '';
+          };
+          var nc = ts.filter(function (x) { return CERRADA[x.ESTADO]; }).length;
+          tareasH = ORDEN_TAREAS.filter(function (s) { return !CERRADA[s]; }).map(grupo).join('') +
+            (nc ? '<details class="mp-dcerr"><summary>' + (nc === 1 ? 'Ver la cerrada' : 'Ver las ' + nc + ' cerradas') + '</summary>' + ORDEN_TAREAS.filter(function (s) { return CERRADA[s]; }).map(grupo).join('') + '</details>' : '');
+        } else tareasH = '<p class="u-nota">Ninguna todavía.' + (pc && !CERRADA[e.ESTADO] ? '' : ' Una tarea se pone en una entrega desde su ficha, en Tareas.') + '</p>';
+        // T0417: añadir tareas sin entrega de su iniciativa (no a una entregada o descartada: lo dice la base).
+        if (pc && !CERRADA[e.ESTADO]) tareasH += '<button type="button" class="fmas" data-anadir-tareas>+ Añadir tareas</button>';
+
+        var faltan = !pc ? [] : [['FECHA_PREVISTA', !dia(e.FECHA_PREVISTA)], ['QUE_INCLUYE', !e.QUE_INCLUYE], ['RESUMEN', !e.RESUMEN && e.ESTADO !== 'Entregada']]
+          .filter(function (x) { return x[1] && cambiando !== x[0]; });
+        var anadir = faltan.length ? '<div class="fanadir"><span>Añadir</span>' + faltan.map(function (x) {
+          return '<button type="button" class="fmas" data-ed="' + x[0] + '">+ ' + texto(NOMBRE_E[x[0]]) + '</button>'; }).join('') + '</div>' : '';
+
+        var bit = ctx.tablas.filas(TB).filter(function (b) { return b.ENTREGA === id; }).sort(function (a, b) {
+          return String(b.CUANDO || '').localeCompare(String(a.CUANDO || '')) || String(b.ID).localeCompare(String(a.ID));
+        }).map(function (b) {
+          return '<p class="hito"><span class="hito-cuando">' + texto(fechaEs(b.CUANDO) + ' · ' + (b.QUIEN || 'Sistema')) + '</span> ' + texto(b.TEXTO) + '</p>';
+        });
+
+        fcaja.innerHTML =
+          '<div class="barra"><button type="button" class="volver" data-cerrar>' + ICO_VOLVER + 'Volver a Entregas</button></div>' +
+          '<div class="cab"><div class="id"><span class="n">' + texto(corto) + '</span><span class="n">' + texto(id) + '</span></div>' +
+            (ab('NOMBRE') ? '<h1 id="en-f-tit" class="fed-abierto">' + control(e, 'NOMBRE') + '</h1>' : '<h1 id="en-f-tit"' + pulsa('NOMBRE') + '>' + texto(e.NOMBRE) + '</h1>') + '</div>' +
+          '<div class="fmeta"><span class="ftag">' + texto((i && i.NOMBRE) || e.INICIATIVA) + '</span></div>' + estado +
+          '<div class="datos"><div class="fila"><b>Fechas</b><div class="ffechas">' + fs.join('') + '</div></div></div>' +
+          largo('CRITERIO', 'Sin criterio: di cuándo estará terminada.') + largo('QUE_INCLUYE') + largo('RESUMEN', e.ESTADO === 'Entregada' ? 'Falta cómo fue.' : '') + anadir +
+          '<div class="bloque"><h3>Tareas</h3>' + tareasH + '</div>' +
+          '<div class="bloque hist"><h3>Bitácora (lo más reciente arriba)</h3>' +
+            (pc ? '<div class="edit"><div class="campo"><label class="u-oculto" for="en-nota">Apuntar una nota</label><textarea id="en-nota" rows="2" placeholder="Apuntar una nota…"></textarea></div>' +
+              '<div class="pie"><button type="button" class="sec" data-anotar>Apuntar</button></div></div>' : '') +
+            (bit.length ? bit.join('') : '<p class="u-nota">' + (ctx.tablas.tiene && ctx.tablas.tiene(TB, { clave: 'E:' + id }) ? 'Todavía no hay nada apuntado.' : 'Cargando…') + '</p>') + '</div>';
+      }
+
+      fv.addEventListener('click', function (ev) {
+        if (ev.target === fv || ev.target.closest('[data-cerrar]')) { cerrarFicha(); return; }
+        if (TACTIL && cambiando && fcaja.querySelector('input[type=date]#fed') && !ev.target.closest('.fed-abierto')) {
+          cerrarCampo(); if (!ev.target.closest('[data-ed],button,a,select,input,textarea')) return;
+        }
+        if (ev.target.closest('[data-fed-ok]')) { var a0 = fcaja.querySelector('#fed'); if (a0) guardarCampo(cambiando, a0.value); return; }
+        if (ev.target.closest('[data-fed-no]')) { cerrarCampo(); return; }
+        var d = ev.target.closest('[data-ed]');
+        if (d && !ev.target.closest('a')) { abrirCampo(d.getAttribute('data-ed')); return; }
+        var b = ev.target.closest('[data-anotar]');
+        if (b) { var a = fcaja.querySelector('#en-nota'), txt = a ? a.value.trim() : ''; if (txt) anotarE(fichaId, txt, b); else if (a) a.focus(); return; }
+        if (ev.target.closest('[data-anadir-tareas]')) { abrirAnadir(fichaId); return; }
+        var sq = ev.target.closest('[data-sacar]');
+        if (sq) { ev.preventDefault(); ponerEntrega([sq.getAttribute('data-sacar')], '', fichaId); return; }
+        // Una tarea abre su ficha en Tareas: se cierra esta antes de irse.
+        if (ev.target.closest('a[data-sx]')) cerrarFicha();
+      });
+      // En el móvil (sin ratón), una fecha se guarda al elegirla: su calendario le quita el foco, y guardarla al salir la
+      // cerraba antes de elegir el día. Se cierra sin cambiarla tocando fuera.
+      var TACTIL = !!(window.matchMedia && matchMedia('(hover: none)').matches);
+      fv.addEventListener('change', function (ev) {
+        if (ev.target.id === 'en-f-est' && ev.target.value) moverE(fichaId, ev.target.value);
+        if (TACTIL && ev.target.id === 'fed' && ev.target.type === 'date' && cambiando) guardarCampo(cambiando, ev.target.value);
+      });
+      // Una fecha o el nombre se guardan al salir (o con Intro); un texto largo, con «Guardar».
+      fv.addEventListener('focusout', function (ev) {
+        var x = ev.target;
+        if (x.id === 'fed' && cambiando && x.isConnected && x.tagName === 'INPUT' && !(TACTIL && x.type === 'date')) guardarCampo(cambiando, x.value);
+      });
+      fv.addEventListener('keydown', function (ev) {
+        if (cambiando && ev.target.id === 'fed') {
+          if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); cerrarCampo(); return; }
+          if (ev.key === 'Enter' && (ev.target.tagName === 'INPUT' || ev.metaKey || ev.ctrlKey)) { ev.preventDefault(); guardarCampo(cambiando, ev.target.value); }
+          return;
+        }
+        var d = ev.target.getAttribute && ev.target.getAttribute('data-ed');
+        if (d && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); abrirCampo(d); return; }
+        if (ev.key === 'Escape') { ev.stopPropagation(); if (cambiando) cerrarCampo(); else cerrarFicha(); }
+      });
+
       /* ---------- las dos vistas ---------- */
       function esMapa() { return F.vista === 'Mapa'; }
+      /* ---------- T0422 · los filtros, en una hoja que sube desde abajo ---------- */
+      var VER_DEF = VER.indexOf(C.VER) >= 0 ? C.VER : 'En marcha';
+      /** Cuántos filtros hay puestos (distintos de los de siempre), para el número de «Filtros». */
+      function filtrosPuestos() { return (F.ver !== VER_DEF ? 1 : 0) + (F.ini ? 1 : 0); }
+      function cuantasSeVen() { return ctx.tablas.filas(TE).filter(function (e) { return seVe(e, F.ver) && (!F.ini || e.INICIATIVA === F.ini); }).length; }
+      function pintarHoja() {
+        var IS = ctx.tablas.filas(TI), n = cuantasSeVen();
+        var chips = function (grupo, vs, actual) {
+          return '<div class="en-chips" role="group" aria-label="' + texto(grupo) + '">' + vs.map(function (x) {
+            return '<button type="button" class="en-chip" data-' + (grupo === 'Ver' ? 'ver' : 'ini') + '="' + texto(x[0]) + '" aria-pressed="' + (x[0] === actual) + '">' + texto(x[1]) + '</button>';
+          }).join('') + '</div>';
+        };
+        altaForm.innerHTML = '<div class="en-hoja-cab"><h2>Filtros</h2><button type="button" class="en-hoja-x" data-cancelar-alta aria-label="Cerrar" title="Cerrar">' + ICO_CERRAR + '</button></div>' +
+          '<h3 class="en-hoja-h">Ver</h3>' + chips('Ver', VER.map(function (v) { return [v, v]; }), F.ver) +
+          (IS.length > 1 ? '<h3 class="en-hoja-h">Iniciativa</h3>' + chips('Iniciativa', [['', 'Todas']].concat(IS.map(function (i) { return [i.ID, i.NOMBRE || i.ID]; })), F.ini || '') : '') +
+          '<div class="botones"><button type="button" class="sec" data-quitar-filtros' + (filtrosPuestos() ? '' : ' disabled') + '>Quitar filtros</button>' +
+          '<button type="submit" class="pri">' + (n === 1 ? 'Ver 1 entrega' : 'Ver ' + n + ' entregas') + '</button></div>';
+      }
+      function abrirFiltros() {
+        pintarHoja();
+        altaForm.onsubmit = function (ev) { ev.preventDefault(); cerrarVelo(); };
+        altaVelo.classList.add('en-hoja');
+        abrirVelo();
+        var b = altaForm.querySelector('.en-chip[aria-pressed=true]'); if (b) b.focus();
+      }
+      altaForm.addEventListener('click', function (ev) {
+        if (!altaVelo.classList.contains('en-hoja')) return;
+        var v = ev.target.closest('[data-ver]'), i = ev.target.closest('[data-ini]');
+        if (v) F.ver = v.getAttribute('data-ver');
+        else if (i) F.ini = i.getAttribute('data-ini');
+        else if (ev.target.closest('[data-quitar-filtros]')) { F.ver = VER_DEF; F.ini = ''; }
+        else return;
+        guardarLocal(CLAVE + '_f', F); pintar(); pintarHoja();
+        var foco = altaForm.querySelector(v ? '[data-ver="' + F.ver + '"]' : i ? '[data-ini="' + F.ini + '"]' : '.pri'); if (foco) foco.focus();
+      });
+      $('en-filtros').onclick = abrirFiltros;
+
       function pintar() {
-        var IS = ctx.tablas.filas(TI), sl = $('en-ini');
         if (F.ini && !ctx.tablas.fila(TI, F.ini)) F.ini = '';
-        sl.innerHTML = '<option value="">Todas</option>' + IS.map(function (i) { return '<option value="' + texto(i.ID) + '"' + (i.ID === F.ini ? ' selected' : '') + '>' + texto(i.NOMBRE || i.ID) + '</option>'; }).join('');
-        $('en-lini').style.display = IS.length > 1 ? '' : 'none';
-        $('en-ver').innerHTML = VER.map(function (v) { return '<option' + (v === F.ver ? ' selected' : '') + '>' + v + '</option>'; }).join('');
+        var k = filtrosPuestos(), fn = $('en-fil-n');
+        fn.textContent = k ? String(k) : ''; fn.hidden = !k;
+        $('en-filtros').title = k ? (k === 1 ? '1 filtro puesto: ' : k + ' filtros puestos: ') + [F.ver !== VER_DEF ? F.ver : '', F.ini ? ((ctx.tablas.fila(TI, F.ini) || {}).NOMBRE || F.ini) : ''].filter(Boolean).join(', ') : 'Sin filtros: ' + VER_DEF.toLowerCase();
+        $('alta-btn').hidden = !iniciativasQueLlevo().length; // T0417: solo quien lleva alguna iniciativa
         [].forEach.call(el.querySelectorAll('[data-vista]'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-vista') === F.vista)); });
         $('en-vmapa').hidden = !esMapa();
         $('en-lista').hidden = esMapa();
@@ -632,24 +1146,21 @@
           if (F.vista !== v.getAttribute('data-vista')) { F.vista = v.getAttribute('data-vista'); guardarLocal(CLAVE + '_f', F); pintar(); }
           return;
         }
+        var fi = ev.target.closest && ev.target.closest('[data-ficha]');
+        if (fi && el.contains(fi)) { ev.preventDefault(); abrirFicha(fi.getAttribute('data-ficha')); return; }
         var b = ev.target.closest && ev.target.closest('[data-e]');
-        if (b && el.contains(b)) { ev.preventDefault(); seleccionar(b.getAttribute('data-e')); return; }
+        if (b && el.contains(b) && !fv.contains(b)) { ev.preventDefault(); seleccionar(b.getAttribute('data-e')); return; }
         if (ev.target.closest && ev.target.closest('#mp-cer')) cerrarDetalle();
       });
       el.addEventListener('toggle', function (e) {
         var d = e.target, s = d && d.querySelector && d.querySelector('summary[data-que]');
         if (s) s.textContent = (d.open ? 'Ocultar ' : 'Ver ') + s.getAttribute('data-que');
       }, true);
-      el.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && sel) cerrarDetalle(); });
-      $('en-ver').onchange = function () { F.ver = this.value; guardarLocal(CLAVE + '_f', F); pintar(); };
-      $('en-ini').onchange = function () { F.ini = this.value; guardarLocal(CLAVE + '_f', F); pintar(); };
-      $('en-rec').onclick = function () {
-        var b = this; b.disabled = true; b.classList.add('girando');
-        ctx.tablas.refrescar([TE, TI, T, TD, TB], true).then(function () { if (ctx.abierta()) ctx.aviso('Entregas al día.'); }, function (e) {
-          if (ctx.abierta()) ctx.aviso('No se ha podido actualizar: ' + String(e.message).replace(/^\w+:\s*/, ''));
-        }).then(function () { b.disabled = false; b.classList.remove('girando'); });
-      };
-      ctx.alCambiar(function (t) { if ([TE, TI, T, TD, TB].indexOf(t) >= 0) pintar(); });
+      el.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && sel && !fichaId && !altaVelo.classList.contains('abierto')) cerrarDetalle(); });
+      ctx.alCambiar(function (t) {
+        if ([TE, TI, T, TD, TB].indexOf(t) >= 0) pintar();
+        if (fichaId && !cambiando && [TE, TI, T, TB].indexOf(t) >= 0) pintarFicha();
+      });
 
       // Si cambia el ancho del marco (llega la hoja de estilos, se gira el móvil, se pliega el menú, se abre el detalle), se
       // vuelve a colocar. Sin ResizeObserver, al cambiar la ventana.
@@ -663,24 +1174,40 @@
 
       pintar();
       // De la bitácora, solo las líneas que pasan una tarea a En curso o más allá: de ahí sale cuándo empezó cada entrega.
-      ctx.tablas.leer([TE, TI, T, TD, TB], { partes: { BITACORA: PARTE_TRABAJO } }).then(function () { leido = true; if (ctx.abierta()) pintar(); }, function (e) {
+      ctx.tablas.leer([TE, TI, T, TD, TB], { partes: { BITACORA: PARTE_TRABAJO } }).then(function () {
         leido = true;
-        var m = '<p class="u-error">No se han podido leer las entregas.</p><p class="u-nota">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Pulsa ↻ o vuelve a abrir la sección.</p>';
+        if (!ctx.abierta()) return;
+        pintar();
+        var pedidaE = new URLSearchParams(location.search).get('e'); // T0417: ?e=E0023 abre su ficha
+        if (pedidaE && ctx.tablas.fila(TE, pedidaE)) abrirFicha(pedidaE, true);
+      }, function (e) {
+        leido = true;
+        var m = '<p class="u-error">No se han podido leer las entregas.</p><p class="u-nota">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Vuelve a abrir la sección.</p>';
         marco.innerHTML = m; $('en-lista').innerHTML = m;
       });
 
-      // En directo (como Tareas): si alguien cambia una tarea o una dependencia, se vuelve a leer (las entregas no van por
-      // Realtime: cambian poco y ↻ las trae).
-      var directo = null, tDirecto = null;
-      if (ctx.enDirecto) directo = ctx.enDirecto(['tareas', 'dependencias', 'bitacora'], function () {
+      // En directo (como Tareas): si alguien cambia una entrega (T0422), una tarea o una dependencia, se vuelve a leer; los
+      // avisos de un momento se juntan en una lectura.
+      var directo = null, tDirecto = null, pendientes = {};
+      if (ctx.enDirecto) directo = ctx.enDirecto(['entregas', 'tareas', 'dependencias', 'bitacora'], function (tabla) {
+        pendientes[tabla || '*'] = 1;
         if (tDirecto) return;
-        tDirecto = setTimeout(function () { tDirecto = null; if (ctx.abierta()) ctx.tablas.refrescar([T, TD, TB], true).catch(function () {}); }, 800);
+        tDirecto = setTimeout(function () {
+          tDirecto = null;
+          var p = pendientes; pendientes = {};
+          if (!ctx.abierta()) return;
+          var ts = p['*'] ? [TE, T, TD, TB] : [].concat(p.entregas ? [TE] : [], p.tareas || p.dependencias || p.bitacora ? [T, TD, TB] : []);
+          ctx.tablas.refrescar(ts, true).catch(function () {});
+          if (fichaId && (p['*'] || p.entregas || p.bitacora)) bitacoraE(fichaId, true);
+        }, 800);
       });
       this._cerrar = function () {
         if (obs) { obs.disconnect(); obs = null; } else window.removeEventListener('resize', alRedimensionar);
         if (tAncho) { clearTimeout(tAncho); tAncho = null; }
         if (directo) { directo.cerrar(); directo = null; }
         if (tDirecto) { clearTimeout(tDirecto); tDirecto = null; }
+        if (fichaId) urlFicha('');
+        document.documentElement.classList.remove('fv-abierta');
       };
     },
     cerrar: function () { if (this._cerrar) this._cerrar(); }

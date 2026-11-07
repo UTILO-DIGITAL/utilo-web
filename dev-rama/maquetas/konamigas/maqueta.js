@@ -185,33 +185,89 @@
   var CAMPOS_PARTIDO = ['ESTADO', 'FECHA', 'HORA', 'ID_CAMPO', 'GOLES_LOCAL', 'GOLES_VISITANTE'];
   function instantanea(ps) { var o = {}; (ps || []).forEach(function (p) { o[p.ID] = CAMPOS_PARTIDO.map(function (k) { return String(p[k] == null ? '' : p[k]); }).join('|'); }); return o; }
   /**
-   * Los partidos que han cambiado desde una instantánea, con qué les ha pasado: [{ p, tipo, clave }]. tipo: 'Aplazado',
-   * 'Suspendido' o 'Anulado'; 'resultado' (con resultado nuevo); 'horario' (otro día, hora o campo); 'estado' (otro estado).
-   * Los que no estaban antes no cuentan (son nuevos, no cambios).
+   * Los partidos que han cambiado desde una instantánea, con qué les ha pasado: [{ p, tipo, clave, nueva }]. tipo: 'Aplazado',
+   * 'Suspendido' o 'Anulado'; 'resultado' (con resultado nuevo); 'horario' (otro día, hora o campo); 'estado' (otro estado);
+   * 'recuperacion' (T0419: uno que ya estaba aplazado o suspendido tiene nueva fecha). nueva: su recuperación (el partido
+   * nuevo con ID_PARTIDO_ORIGEN = el aplazado), si la tiene. Los demás nuevos no cuentan (son nuevos, no cambios).
    */
   function cambiosPartidos(antes, ps) {
-    var out = [];
+    var out = [], ix = {}, rec = {};
+    antes = antes || {};
+    (ps || []).forEach(function (p) { ix[p.ID] = p; if (p.ID_PARTIDO_ORIGEN && p.ESTADO !== 'Anulado') rec[p.ID_PARTIDO_ORIGEN] = p; });
     (ps || []).forEach(function (p) {
-      var a = (antes || {})[p.ID], ahora = instantanea([p])[p.ID];
-      if (a === undefined || a === ahora) return;
+      var a = antes[p.ID], ahora = instantanea([p])[p.ID];
+      if (a === undefined) {
+        // Una recuperación nueva de un partido que ya se veía y que no cambia ahora (si cambia, va con él).
+        var o = ix[p.ID_PARTIDO_ORIGEN];
+        if (o && antes[o.ID] !== undefined && antes[o.ID] === instantanea([o])[o.ID] && p.ESTADO !== 'Anulado') out.push({ p: o, tipo: 'recuperacion', nueva: p, clave: 'r-' + p.ID + '-' + ahora });
+        return;
+      }
+      if (a === ahora) return;
       var v = a.split('|'), tipo;
       if (p.ESTADO !== v[0] && ['Aplazado', 'Suspendido', 'Anulado'].indexOf(p.ESTADO) >= 0) tipo = p.ESTADO;
       else if (conResultado(p) && (String(p.GOLES_LOCAL) !== v[4] || String(p.GOLES_VISITANTE) !== v[5])) tipo = 'resultado';
       else if (String(p.FECHA) !== v[1] || String(p.HORA) !== v[2] || String(p.ID_CAMPO) !== v[3]) tipo = 'horario';
       else tipo = 'estado';
-      out.push({ p: p, tipo: tipo, clave: 'p-' + p.ID + '-' + ahora });
+      var nueva = (tipo === 'Aplazado' || tipo === 'Suspendido') && rec[p.ID] ? rec[p.ID] : null;
+      out.push({ p: p, tipo: tipo, nueva: nueva, clave: 'p-' + p.ID + '-' + ahora + (nueva ? '-' + nueva.ID : '') });
     });
     return out;
   }
 
+  /**
+   * T0419 · A quién le llega lo que avisa una capitana: lo de un resultado («El resultado está mal», «Un gol lo marcó otra
+   * jugadora») de un partido jugado, al árbitro que lo pitó (ID_ARBITRO_REAL o, si no, ID_ARBITRO), que corrige su acta; lo
+   * demás (un partido que viene: no podemos venir, otra hora; otra cosa), y lo de un partido sin árbitro, al gestor de la liga.
+   * { para: 'arbitro', arbitro } o { para: 'gestor' }.
+   */
+  var DEL_ACTA = ['El resultado está mal', 'Un gol lo marcó otra jugadora'];
+  function destinoIncidencia(tipo, p) {
+    var arb = p ? String(p.ID_ARBITRO_REAL || p.ID_ARBITRO || '') : '';
+    return DEL_ACTA.indexOf(tipo) >= 0 && p && p.ESTADO === 'Jugado' && arb ? { para: 'arbitro', arbitro: arb } : { para: 'gestor' };
+  }
+
+  /**
+   * T0419 · Dónde se puede jugar un partido: los huecos libres de su liga (HUECOS), [{ fecha, hueco }] por fecha y hora.
+   * o.mismoDia: solo su día, a otra hora o en otro campo (para ligasMover). Si no, los días siguientes al partido (y a hoy)
+   * hasta o.hasta (o seis semanas), con el día de la semana de cada hueco, sin festivos ni descansos (o.calendario) y sin que
+   * ninguno de los dos equipos juegue ese día (para recuperarlo con ligasRecuperar). Un hueco está ocupado si ese día hay
+   * otro partido a esa hora en ese campo que no esté aplazado, suspendido ni anulado. Como mucho o.max (6).
+   */
+  function huecosLibres(p, o) {
+    o = o || {};
+    var hs = (o.huecos || []).filter(function (h) { return String(h.ID_LIGA) === String(p.ID_LIGA); });
+    var ocupado = {}, juega = {}, cerrado = {};
+    (o.partidos || []).forEach(function (x) {
+      if (String(x.ID) === String(p.ID) || ['Aplazado', 'Suspendido', 'Anulado'].indexOf(x.ESTADO) >= 0) return;
+      ocupado[x.FECHA + '|' + x.HORA + '|' + x.ID_CAMPO] = 1;
+      [x.ID_INSCRIPCION_LOCAL, x.ID_INSCRIPCION_VISITANTE].forEach(function (ie) { if (ie) juega[x.FECHA + '|' + ie] = 1; });
+    });
+    (o.calendario || []).forEach(function (c) { if (c.FESTIVO === true || c.DESCANSO === true) cerrado[String(c.FECHA)] = 1; });
+    var libre = function (f, h) { return !ocupado[f + '|' + h.HORA + '|' + h.ID_CAMPO]; };
+    var out = [];
+    if (o.mismoDia) {
+      hs.forEach(function (h) { if (!(String(h.HORA) === String(p.HORA) && String(h.ID_CAMPO) === String(p.ID_CAMPO)) && libre(p.FECHA, h)) out.push({ fecha: p.FECHA, hueco: h }); });
+    } else {
+      var desde = sumarDias(String(p.FECHA) > String(o.hoy || '') ? p.FECHA : o.hoy, 1), hasta = o.hasta || sumarDias(desde, 42);
+      for (var f = desde; f && f <= hasta && out.length < (o.max || 6); f = sumarDias(f, 1)) {
+        if (cerrado[f] || juega[f + '|' + p.ID_INSCRIPCION_LOCAL] || juega[f + '|' + p.ID_INSCRIPCION_VISITANTE]) continue;
+        var dia = DIAS[deIso(f).getDay()];
+        hs.filter(function (h) { return (!h.DIA_SEMANA || h.DIA_SEMANA === dia) && libre(f, h); })
+          .sort(function (a, b) { return orden(String(a.HORA), String(b.HORA)); }).slice(0, 1) // un hueco por día: el más temprano
+          .forEach(function (h) { out.push({ fecha: f, hueco: h }); });
+      }
+    }
+    return out.sort(function (a, b) { return orden(a.fecha + ' ' + a.hueco.HORA, b.fecha + ' ' + b.hueco.HORA); }).slice(0, o.max || 6);
+  }
+
   var CALC = { hoy: hoy, sumarDias: sumarDias, temporadaActual: temporadaActual, clasificacion: clasificacion, resultadoDe: resultadoDe,
-    golesJugadora: golesJugadora, planRedes: planRedes, instantanea: instantanea, cambiosPartidos: cambiosPartidos, corto: corto, pascua: pascua, lunes: lunes, tematicas: tematicas, tareasTematica: tareasTematica, tapar: tapar, conResultado: conResultado };
+    golesJugadora: golesJugadora, planRedes: planRedes, instantanea: instantanea, cambiosPartidos: cambiosPartidos, destinoIncidencia: destinoIncidencia, huecosLibres: huecosLibres, corto: corto, pascua: pascua, lunes: lunes, tematicas: tematicas, tareasTematica: tareasTematica, tapar: tapar, conResultado: conResultado };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
 
   var TABLAS = ['TEMPORADAS', 'COMPETICIONES', 'LIGAS', 'PARTIDOS', 'GOLES', 'CAMPOS', 'INSTALACIONES', 'CALENDARIO', 'STAFF',
-    'EQUIPOS', 'JUGADORAS', 'INSCRIPCIONES_EQUIPOS', 'INSCRIPCIONES_JUGADORAS', 'FOTOS'];
+    'EQUIPOS', 'JUGADORAS', 'INSCRIPCIONES_EQUIPOS', 'INSCRIPCIONES_JUGADORAS', 'FOTOS', 'HUECOS']; // HUECOS: dónde aplazar o mover un partido (T0419)
   // konamigas.com (la web de todas: inscripciones, competiciones y el área de jugadora y de capitana) es otra página,
   // web/maquetas/konamigas/index.html, que pinta esta misma sección con ctx.web (abajo, «konamigas.com»).
   var PORTALES = [
@@ -224,9 +280,11 @@
     { id: 'redes', titulo: 'Redes sociales', quien: 'Los socios',
       que: 'El calendario de publicaciones de la temporada, las fotos que nunca se comparten y publicar en Instagram y TikTok.' }
   ];
-  var TIPOS_INCIDENCIA = ['No podremos venir', 'El resultado está mal', 'Un gol lo marcó otra jugadora', 'Otra cosa'];
+  // T0419: lo del acta (el resultado, quién marcó) le llega al árbitro del partido; lo demás, al gestor (destinoIncidencia).
+  var TIPOS_INCIDENCIA = ['No podremos venir', 'Queremos otra hora', 'El resultado está mal', 'Un gol lo marcó otra jugadora', 'Otra cosa'];
   // T0366: aquí y no dentro de abrir, que pinta antes de llegar a su línea (Futuro se quedaba en blanco con incidencias).
-  var ORDEN_INC = { 'Enviada': 0, 'Vista por el gestor': 1, 'Resuelta': 2 };
+  var ORDEN_INC = { 'Enviada': 0, 'Vista por el gestor': 1, 'Vista por el árbitro': 1, 'Resuelta': 2 };
+  var CHIP_INC = { 'Enviada': 'lg-av-rec', 'Vista por el gestor': 'lg-av-si', 'Vista por el árbitro': 'lg-av-si', 'Resuelta': 'mq-ok' };
 
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function euros(n) { return Number(n || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' €'; }
@@ -444,7 +502,9 @@
               '<span class="mq-t-que">' + texto(x.que) + '</span><span class="mq-t-ir">Abrir ›</span>';
             // konamigas.com es otra página (la misma para todas): se abre en su sitio.
             if (x.id === 'web') return '<a class="mq-tarjeta" href="' + texto((window.KANBAN || {}).web || '../') + '" data-mqira="web" data-q="">' + dentro + '</a>';
-            var nuevas = x.id === 'incidencias' ? todasIncidencias().filter(function (y) { return y.x.estado === 'Enviada'; }).length : 0;
+            // T0419: a cada portal, las suyas: al gestor, las de partidos que vienen; al árbitro, las reclamaciones de su acta.
+            var nuevas = x.id === 'incidencias' ? todasIncidencias().filter(function (y) { return y.x.estado === 'Enviada' && y.x.para !== 'arbitro'; }).length
+              : x.id === 'arbitro' ? reclamacionesArbitro(ctx.admin ? '' : yoStaff()).filter(function (y) { return y.x.estado !== 'Resuelta'; }).length : 0;
             return '<button type="button" class="mq-tarjeta" data-mqir="' + x.id + '">' + (nuevas ? '<span class="u-chip mq-nuevas">' + plural(nuevas, 'nueva', 'nuevas') + '</span>' : '') + dentro + '</button>';
           }).join('') + '</div>';
       }
@@ -453,19 +513,26 @@
       // Lo que le pasa a su equipo: la respuesta del gestor a una incidencia (la apunta la plataforma) y un partido que
       // Konamigas cambia (aplazado, otra hora o campo, el resultado: lo ve konamigas.com al refrescarse). En lo compartido.
 
-      function novedad(ies, titulo, textoN, id) {
-        var c = comun(), l = c.novedades || (c.novedades = []);
-        if (id && l.some(function (x) { return x.id === id; })) return;
-        l.unshift({ id: id || 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), ies: ies.map(String), titulo: titulo, texto: textoN, cuando: new Date().toISOString() });
+      // prio (T0419): la que explica más (la corrección del árbitro) gana a la automática del mismo cambio (mismo id).
+      function novedad(ies, titulo, textoN, id, prio) {
+        var c = comun(), l = c.novedades || (c.novedades = []), ya = id ? l.filter(function (x) { return x.id === id; })[0] : null;
+        if (ya && (ya.prio || 0) >= (prio || 0)) return;
+        if (ya) l.splice(l.indexOf(ya), 1);
+        l.unshift({ id: id || 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), ies: ies.map(String), titulo: titulo, texto: textoN, cuando: new Date().toISOString(), prio: prio || 0 });
         if (l.length > 80) l.length = 80;
       }
+      function cuandoDonde(p) { return fechaDia(p.FECHA) + (p.HORA ? ' a las ' + p.HORA : '') + (p.ID_CAMPO ? ' · ' + campo(p.ID_CAMPO) : ''); }
       function novedadesDePartidos(antes, ps) {
         var l = cambiosPartidos(antes, ps);
         l.forEach(function (x) {
-          var p = x.p, L = p.ID_INSCRIPCION_LOCAL, V = p.ID_INSCRIPCION_VISITANTE;
+          var p = x.p, L = p.ID_INSCRIPCION_LOCAL, V = p.ID_INSCRIPCION_VISITANTE, vs = equipo(L) + ' – ' + equipo(V);
+          // T0419: aplazado, suspendido o anulado, con el motivo y, si ya la tiene, la nueva fecha (su recuperación).
+          if (x.tipo === 'recuperacion') return novedad([L, V].filter(Boolean), 'Nueva fecha para el partido ' + String(p.ESTADO).toLowerCase(), vs + ' · ' + cuandoDonde(x.nueva), x.clave);
           var t = x.tipo === 'resultado' ? 'Resultado: ' + equipo(L) + ' ' + p.GOLES_LOCAL + '–' + p.GOLES_VISITANTE + ' ' + equipo(V)
             : x.tipo === 'horario' ? 'Cambio de día, hora o campo' : 'Partido ' + String(p.ESTADO).toLowerCase() + (x.tipo !== 'estado' && p.MOTIVO ? ': ' + p.MOTIVO : '');
-          novedad([L, V].filter(Boolean), t, equipo(L) + ' – ' + equipo(V) + ' · ' + fechaDia(p.FECHA) + (p.HORA ? ' a las ' + p.HORA : '') + (p.ID_CAMPO ? ' · ' + campo(p.ID_CAMPO) : ''), x.clave);
+          var txt = x.nueva ? vs + ' · era el ' + fechaDia(p.FECHA).toLowerCase() + '. Nueva fecha: ' + cuandoDonde(x.nueva)
+            : vs + ' · ' + cuandoDonde(p) + (['Aplazado', 'Suspendido'].indexOf(x.tipo) >= 0 ? '. La nueva fecha, cuando la diga Konamigas.' : '');
+          novedad([L, V].filter(Boolean), t, txt, x.clave);
         });
         if (l.length) guardarComun();
       }
@@ -550,13 +617,14 @@
 
       /** Mi área: el saludo, sus cifras y sus pestañas (las de capitana, si lo es). */
       function areaJugadora(idJ) {
-        var Y = deJugadora(idJ), j = Y.j, ieCap = Y.cap;
+        // T0419: la capitana de un equipo aún sin liga también tiene Mi equipo (su inscripción y lo que lleva pagado).
+        var Y = deJugadora(idJ), j = Y.j, ieCap = Y.cap || Y.solicitadas.filter(function (i) { return String(i.ID_CAPITANA || '') === String(idJ); })[0] || null;
         if (!j) return '<p class="u-vacio">No se ha encontrado tu ficha.</p>';
         var goles = golesJugadora(D.GOLES, Y.ijs, Y.ps), nGoles = goles.reduce(function (t, g) { return t + g.goles; }, 0);
         var temps = {}; Y.ies.forEach(function (ie) { var t = D.tempDeIE(ie); if (t) temps[t] = 1; });
         var h = htmlDirecto(Y.ies) + '<div class="mq-hola"><h2>Hola, <span class="mq-pintada">' + texto(j.NOMBRE || '') + '</span></h2><p class="u-nota">' +
           texto(Y.actuales.length ? Y.actuales.map(equipo).join(' y ') + ' · temporada ' + D.temp.NOMBRE : Y.solicitadas.length ? 'Capitana de ' + Y.solicitadas.map(function (i) { return i.NOMBRE_EQUIPO; }).join(' y ') + ' · temporada ' + D.temp.NOMBRE : 'Esta temporada no estás en ningún equipo') +
-          (ieCap ? ' · capitana de ' + ieCap.NOMBRE_EQUIPO : '') + '</p></div>' +
+          (Y.cap ? ' · capitana de ' + Y.cap.NOMBRE_EQUIPO : '') + '</p></div>' +
           cifras([[Object.keys(temps).length, 'temporadas'], [Y.ps.filter(conResultado).length, 'partidos jugados'], [nGoles, goles.some(function (g) { return g.ejemplo; }) ? 'goles (de ejemplo)' : 'goles'],
             [new Set(Y.ies.map(function (ie) { return (D.ixIE[ie] || {}).ID_EQUIPO; }).filter(Boolean)).size, 'equipos']]); // también los que capitanea (T0366)
         h += Y.solicitadas.map(function (i) {
@@ -588,7 +656,7 @@
         } else if (sel === 'historico') h += historico(Y.ijs);
         else if (sel === 'goles') h += misGoles(goles);
         else if (sel === 'datos') h += misDatos(j, Y.ijs);
-        else if (sel === 'equipo') h += miEquipo(ieCap);
+        else if (sel === 'equipo') { h += miEquipo(ieCap); paso('pagos'); }
         else if (sel === 'incidencias') h += incidencias(ieCap);
         return h + '</div>';
       }
@@ -642,12 +710,44 @@
           (fotos.length ? '<div class="mq-fotos">' + fotos.slice(0, 12).map(htmlFoto).join('') + '</div>' : '<p class="u-vacio">Aún no hay fotos tuyas.</p>');
       }
 
+      /**
+       * T0419 · La inscripción del equipo y sus pagos, como los ve Konamigas en Gestión (W.pagos, de maquetaEntrar): el estado,
+       * la señal (pagada y cuándo, o lo que falta), la inscripción y las camisetas personalizadas con lo que falta de cada una, y
+       * cada pago con su fecha. Importes en céntimos con IVA.
+       */
+      function inscripcionYPagos(ie) {
+        // Con céntimos solo si los hay: «100 €», «81,50 €».
+        var P = ((W && W.pagos) || {})[ie.ID], c = D.ixComp[ie.ID_COMPETICION] || {}, eur = function (cts) {
+          cts = Math.round(cts || 0);
+          return (cts / 100).toLocaleString('es-ES', { minimumFractionDigits: cts % 100 ? 2 : 0, maximumFractionDigits: 2 }) + ' €';
+        };
+        var conf = ie.ESTADO === 'Confirmada';
+        var estado = conf ? (ie.ID_LIGA ? 'Confirmada' : 'Plaza confirmada: falta saber vuestra liga') : ie.ESTADO === 'Solicitada' ? 'Solicitada: falta la señal para confirmar la plaza' : String(ie.ESTADO || '');
+        var h = '<h3 class="n-grupo">Inscripción</h3><p class="mq-ins-estado"><span class="lg-pav ' + (conf ? 'mq-ok' : 'lg-av-si') + '">' + texto(estado) + '</span> ' +
+          texto(c.NOMBRE_COMERCIAL || c.NOMBRE || '') + '</p>';
+        if (!P) return h + '<p class="u-nota">Los pagos de tu equipo te los dice Konamigas por WhatsApp.</p>';
+        if (P.incluida) return h + '<p class="u-nota">Esta competición va incluida en otra inscripción: no se paga aparte.</p>';
+        var fila = function (et, v, nota) { return '<dt>' + texto(et) + '</dt><dd>' + v + (nota ? ' <span class="u-nota">' + texto(nota) + '</span>' : '') + '</dd>'; };
+        var falta = function (n) { return n > 0 ? '<b class="mq-falta">faltan ' + texto(eur(n)) + '</b>' : '<span class="mq-pagado">pagado</span>'; };
+        var dl = '';
+        if (P.senal > 0) dl += fila('Señal', texto(eur(P.senal)) + ' · ' + (P.senalFecha ? '<span class="mq-pagado">pagada el ' + texto(fechaCorta(P.senalFecha)) + '</span>' : falta(Math.max(0, P.senal - Math.max(0, P.cobrado)))), P.senalFecha ? '' : 'con ella se confirma la plaza');
+        if (P.inscripcion !== null) dl += fila('Inscripción', texto(eur(P.inscripcion)) + ' · ' + falta(P.faltaInscripcion), P.senal > 0 ? 'la señal va dentro' : '');
+        if (P.camisetas && P.camisetas.n) dl += fila('Camisetas', texto(plural(P.camisetas.n, 'personalizada', 'personalizadas') + (P.camisetas.unidad ? ' × ' + eur(P.camisetas.unidad) : '') + ' = ' + eur(P.camisetas.total)) + ' · ' + falta(P.faltaCamisetas), 'las que no van en el pack');
+        dl += fila('Pagado', '<b>' + texto(eur(P.cobrado)) + '</b>');
+        if (P.falta !== null) dl += fila('Lo que falta', P.falta > 0 ? '<b class="mq-falta">' + texto(eur(P.falta)) + '</b>' : P.falta < 0 ? '<span class="mq-pagado">al día (' + texto(eur(-P.falta)) + ' de más)</span>' : '<span class="mq-pagado">nada: al día</span>');
+        h += '<dl class="mq-ficha-d mq-pagos">' + dl + '</dl>';
+        h += (P.cobros || []).length ? '<h3 class="n-grupo">Vuestros pagos <span class="u-cifra">' + P.cobros.length + '</span></h3><ul class="mq-cobros">' + P.cobros.map(function (x) {
+          return '<li><span>' + texto(fechaCorta(x.fecha)) + '</span><span>' + texto(x.concepto || 'Pago') + '</span><b class="u-cifra">' + texto(eur(x.importe)) + '</b></li>';
+        }).join('') + '</ul>' : '<p class="u-vacio">Todavía no habéis pagado nada.</p>';
+        return h + (P.falta > 0 ? '<p class="u-nota">Konamigas te escribirá por WhatsApp para decirte cómo pagar lo que falta. Aquí lo verás en cuanto lo apunte.</p>' : '');
+      }
+
       function miEquipo(ie) {
         var js = (D.ijPorIE[ie.ID] || []).filter(function (x) { return x.ESTADO !== 'Baja'; });
         var faltan = js.filter(function (x) { return !x.ACEPTA_NORMAS || !x.ACEPTA_DATOS; });
         var gestor = (D.ixLiga[ie.ID_LIGA] || {}).ID_GESTOR;
-        return '<p class="u-nota">' + texto(liga(ie.ID_LIGA)) + (gestor ? ' · tu gestor es ' + texto(staff(gestor)) : '') + '</p>' +
-          cifras([[js.length, 'jugadoras'], [faltan.length, 'les falta aceptar'], [posicion(ie.ID_LIGA, ie.ID) || '—', 'en la liga']]) +
+        return inscripcionYPagos(ie) + '<h3 class="n-grupo">Jugadoras</h3><p class="u-nota">' + texto(liga(ie.ID_LIGA) || 'Aún sin liga') + (gestor ? ' · tu gestor es ' + texto(staff(gestor)) : '') + '</p>' +
+          cifras([[js.length, 'jugadoras'], [faltan.length, 'les falta aceptar'], [(ie.ID_LIGA && posicion(ie.ID_LIGA, ie.ID)) || '—', 'en la liga']]) +
           '<ol class="lg-ranking mq-plantilla">' + js.map(function (x) {
             var jj = D.ixJug[x.ID_JUGADORA], cap = String(x.ID_JUGADORA) === String(ie.ID_CAPITANA);
             return '<li><span class="lg-pos">' + texto(x.DORSAL || '') + '</span><span class="lg-nom"><b>' + texto(nombreJug(jj)) + '</b>' + (cap ? ' <span class="u-chip">Capitana</span>' : '') +
@@ -665,31 +765,41 @@
           // T0366: las de ejemplo, solo para un equipo que ya jugaba antes de hoy (uno recién inscrito no ha reclamado nada).
           if (!ps.some(function (p) { return conResultado(p) && String(p.FECHA) < D.h; })) jug = prox = [];
           var l = [];
-          if (jug.length) l.push({ tipo: 'El resultado está mal', partido: jug[jug.length - 1].ID, texto: 'Ganamos por un gol más: el último lo marcamos en el descuento.', estado: 'Resuelta', respuesta: 'Revisado con el árbitro: el resultado se queda como está.', cuando: sumarDias(D.h, -3) });
-          if (prox.length > 1) l.push({ tipo: 'No podremos venir', partido: prox[1].ID, texto: 'Ese día tenemos boda de una compañera: ¿se puede aplazar?', estado: 'Vista por el gestor', respuesta: '', cuando: sumarDias(D.h, -1) });
+          if (jug.length) {
+            var pj = jug[jug.length - 1];
+            l.push(Object.assign({ tipo: 'El resultado está mal', partido: pj.ID, texto: 'Ganamos por un gol más: el último lo marcamos en el descuento.', estado: 'Resuelta', respuesta: 'Revisado: el resultado se queda como está.', cuando: sumarDias(D.h, -3) }, destinoIncidencia('El resultado está mal', pj)));
+          }
+          if (prox.length > 1) l.push({ tipo: 'No podremos venir', partido: prox[1].ID, texto: 'Ese día tenemos boda de una compañera: ¿se puede aplazar?', estado: 'Vista por el gestor', respuesta: '', cuando: sumarDias(D.h, -1), para: 'gestor' });
           l.forEach(function (x, i) { x.id = ie.ID + '-' + i; x.ie = ie.ID; });
           I[ie.ID] = l;
           guardarComun();
         }
         return I[ie.ID];
       }
+      /** A quién le llega una incidencia: «al árbitro Marta» o «a Lucía» (el gestor de la liga). */
+      function quienLleva(x, ie) {
+        if (x.para === 'arbitro') return staff(x.arbitro) ? 'al árbitro ' + staff(x.arbitro) : 'al árbitro del partido';
+        var g = staff((D.ixLiga[(ie || D.ixIE[x.ie] || {}).ID_LIGA] || {}).ID_GESTOR);
+        return g ? 'a ' + g : 'al gestor de la liga';
+      }
       function incidencias(ie) {
-        var l = incidenciasDe(ie), gestor = staff((D.ixLiga[ie.ID_LIGA] || {}).ID_GESTOR) || 'el gestor de la liga';
-        var chip = { 'Enviada': 'lg-av-rec', 'Vista por el gestor': 'lg-av-si', 'Resuelta': 'mq-ok' };
-        var una = function (x, i, gest) {
-          var p = D.ixPar[x.partido];
-          return '<li class="mq-inc"><div class="mq-inc-cab"><b>' + texto(x.tipo) + '</b><span class="lg-pav ' + (chip[x.estado] || '') + '">' + texto(x.estado) + '</span></div>' +
-            (p ? '<small>' + texto(fechaDia(p.FECHA) + ' · ' + equipo(p.ID_INSCRIPCION_LOCAL) + ' – ' + equipo(p.ID_INSCRIPCION_VISITANTE)) + '</small>' : '') +
-            '<p>' + texto(x.texto) + '</p>' + (x.respuesta ? '<p class="mq-resp"><b>' + texto(gestor) + ':</b> ' + texto(x.respuesta) + '</p>' : '') +
-            (gest && x.estado !== 'Resuelta' ? '<div class="n-botones">' + (x.estado === 'Enviada' ? '<button type="button" class="u-btn" data-mqinc="' + i + '" data-accion="ver">Marcar vista</button>' : '') +
-              '<button type="button" class="u-btn" data-mqinc="' + i + '" data-accion="resolver">Resolver</button>' +
-              (x.tipo === 'No podremos venir' && p ? '<button type="button" class="u-btn" data-mqaviso="Abriría el partido en Ligas para aplazarlo, con la carta de aplazamiento y su plazo.">Aplazar en Ligas ›</button>' : '') + '</div>' : '') + '</li>';
+        var l = incidenciasDe(ie), gestor = quienLleva({ para: 'gestor' }, ie).replace(/^al? /, '');
+        var una = function (x, gest) {
+          var p = D.ixPar[x.partido], arb = x.para === 'arbitro', quien = quienLleva(x, ie);
+          return '<li class="mq-inc"><div class="mq-inc-cab"><b>' + texto(x.tipo) + '</b><span class="lg-pav ' + (CHIP_INC[x.estado] || '') + '">' + texto(x.estado) + '</span></div>' +
+            '<small>' + texto((p ? fechaDia(p.FECHA) + ' · ' + equipo(p.ID_INSCRIPCION_LOCAL) + ' – ' + equipo(p.ID_INSCRIPCION_VISITANTE) + ' · ' : '') + 'le llega ' + quien) + '</small>' +
+            '<p>' + texto(x.texto) + '</p>' + (x.respuesta ? '<p class="mq-resp"><b>' + texto(arb ? 'Árbitro' : gestor) + ':</b> ' + texto(x.respuesta) + '</p>' : '') +
+            (gest && !arb && x.estado !== 'Resuelta' ? '<div class="n-botones">' + (x.estado === 'Enviada' ? '<button type="button" class="u-btn" data-mqinc="' + texto(x.id) + '" data-accion="ver">Marcar vista</button>' : '') +
+              '<button type="button" class="u-btn" data-mqinc="' + texto(x.id) + '" data-accion="resolver">Resolver</button></div>' : '') + '</li>';
         };
-        return '<p class="u-nota">Avisos sencillos que le llegan a ' + texto(gestor) + '. Él decide y, si hace falta, corrige el partido: tú nunca lo editas.</p>' +
+        var deGestor = l.filter(function (x) { return x.para !== 'arbitro'; });
+        return '<p class="u-nota">Avisos sencillos: lo del resultado o de quién marcó le llega al árbitro del partido, que corrige el acta; lo de un partido que viene (no podéis venir, otra hora), ' + texto(quienLleva({ para: 'gestor' }, ie)) +
+          ', que os propone una solución. Tú nunca editas el partido.</p>' +
           '<div class="n-botones mq-botones"><button type="button" class="u-btn u-btn-accion" data-mqnueva="' + texto(ie.ID) + '">Avisar de algo</button></div>' +
-          '<h3 class="n-grupo">Tus avisos <span class="u-cifra">' + l.length + '</span></h3>' + (l.length ? '<ul class="mq-incs">' + l.map(function (x, i) { return una(x, i, false); }).join('') + '</ul>' : '<p class="u-vacio">No has avisado de nada.</p>') +
-          '<section class="mq-gestor"><h3 class="n-grupo">Así le llega a ' + texto(gestor) + '</h3><p class="u-nota">En su Perfil y en Ligas, con un aviso en el móvil.</p>' +
-          (l.length ? '<ul class="mq-incs">' + l.map(function (x, i) { return una(x, i, true); }).join('') + '</ul>' : '<p class="u-vacio">Nada pendiente.</p>') + '</section>';
+          '<h3 class="n-grupo">Tus avisos <span class="u-cifra">' + l.length + '</span></h3>' + (l.length ? '<ul class="mq-incs">' + l.map(function (x) { return una(x, false); }).join('') + '</ul>' : '<p class="u-vacio">No has avisado de nada.</p>') +
+          // Fuera del simulador (no se ve la plataforma al lado): así le llega al gestor, con sus botones.
+          (window.parent === window && deGestor.length ? '<section class="mq-gestor"><h3 class="n-grupo">Así le llega a ' + texto(gestor) + '</h3><p class="u-nota">En su Perfil y en Ligas, con un aviso en el móvil.</p>' +
+            '<ul class="mq-incs">' + deGestor.map(function (x) { return una(x, true); }).join('') + '</ul></section>' : '');
       }
       function nuevaIncidencia(idIE, idP) {
         var ie = D.ixIE[idIE], ps = (D.parPorIE[idIE] || []).filter(function (p) { return p.FECHA >= sumarDias(D.h, -21) || String(p.ID) === String(idP); }).slice(0, 14);
@@ -698,18 +808,31 @@
           TIPOS_INCIDENCIA.map(function (t) { return '<option' + (t === tipo ? ' selected' : '') + '>' + texto(t) + '</option>'; }).join('') + '</select></label>' +
           '<label class="u-campo u-ancho"><span class="u-etiqueta">Partido</span><select data-k="partido">' + ps.map(function (p) {
             return '<option value="' + texto(p.ID) + '"' + (String(p.ID) === String(idP) ? ' selected' : '') + '>' + texto(fechaDia(p.FECHA) + ' · ' + equipo(p.ID_INSCRIPCION_LOCAL) + ' – ' + equipo(p.ID_INSCRIPCION_VISITANTE)) + '</option>';
-          }).join('') + '</select></label><label class="u-campo u-ancho"><span class="u-etiqueta">Cuéntaselo</span><textarea rows="3" data-k="texto" placeholder="Lo que tenga que saber el gestor"></textarea></label></div>' +
-          '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" data-enviar>Enviar al gestor</button><button type="button" class="u-btn" data-cerrar>Cancelar</button></div>', function (b, v) {
+          }).join('') + '</select></label><label class="u-campo u-ancho"><span class="u-etiqueta">Cuéntaselo</span><textarea rows="3" data-k="texto" placeholder="Lo que tenga que saber"></textarea></label></div>' +
+          '<p class="u-nota" data-k="destino"></p>' +
+          '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" data-enviar>Enviar</button><button type="button" class="u-btn" data-cerrar>Cancelar</button></div>', function (b, v) {
           if (!b.hasAttribute('data-enviar')) return;
           var val = function (k) { return v.querySelector('[data-k=' + k + ']').value; };
-          var nueva = { id: ie.ID + '-' + Date.now().toString(36), ie: ie.ID, tipo: val('tipo'), partido: val('partido'), texto: val('texto') || '(sin texto)', estado: 'Enviada', respuesta: '', cuando: D.h };
+          var dest = destinoIncidencia(val('tipo'), D.ixPar[val('partido')]);
+          var nueva = Object.assign({ id: ie.ID + '-' + Date.now().toString(36), ie: ie.ID, tipo: val('tipo'), partido: val('partido'), texto: val('texto') || '(sin texto)', estado: 'Enviada', respuesta: '', cuando: D.h, cambio: new Date().toISOString() }, dest);
           incidenciasDe(ie).unshift(nueva);
           guardarComun();
-          avisarSim({ a: 'app', titulo: 'Incidencia de ' + equipo(ie.ID), texto: nueva.tipo + ': ' + nueva.texto, ir: 'incidencias' });
+          var quien = quienLleva(nueva, ie);
+          avisarSim({ a: 'app', titulo: 'Incidencia de ' + equipo(ie.ID) + (dest.para === 'arbitro' ? ' para el árbitro' : ''), texto: nueva.tipo + ': ' + nueva.texto, ir: dest.para === 'arbitro' ? 'arbitro' : 'incidencias' });
           v.remove();
-          ctx.aviso('Enviado a ' + (staff((D.ixLiga[ie.ID_LIGA] || {}).ID_GESTOR) || 'el gestor') + ': lo verás en Mi área · Incidencias (en la maqueta, solo aquí)');
+          ctx.aviso('Enviado ' + quien + ': lo verás en Mi área · Incidencias');
           if (!(W && M.web.vista === 'liga')) pintar(); // en Competiciones se queda la ficha del partido abierta
         });
+        // A quién le llega, según lo que se elige (T0419): el botón lo dice.
+        var poner = function () {
+          var val = function (k) { return v.querySelector('[data-k=' + k + ']').value; };
+          var dest = destinoIncidencia(val('tipo'), D.ixPar[val('partido')]), quien = quienLleva(dest, ie);
+          v.querySelector('[data-enviar]').textContent = dest.para === 'arbitro' ? 'Enviar al árbitro' : 'Enviar al gestor';
+          v.querySelector('[data-k=destino]').textContent = dest.para === 'arbitro' ? 'Le llega ' + quien + ', que pitó el partido: si tenéis razón, corrige el acta y lo veréis en Novedades.'
+            : DEL_ACTA.indexOf(val('tipo')) >= 0 ? 'Ese partido aún no tiene acta: le llega ' + quien + '.' : 'Le llega ' + quien + ', que os propondrá una solución.';
+        };
+        v.addEventListener('change', poner);
+        poner();
         return v;
       }
 
@@ -876,43 +999,87 @@
         return M.yoStaff;
       }
       function portalIncidencias() {
-        // Un gestor ve las de sus ligas; quien administra y los socios, todas.
+        // Un gestor ve las de sus ligas; quien administra y los socios, todas. Lo del acta lo lleva el árbitro (T0419).
         var gestor = !ctx.admin && /Gestor/.test(String(ctx.perfil || '')), yo = gestor ? yoStaff() : '';
-        var l = todasIncidencias().filter(function (y) { var ie = D.ixIE[y.ie], lg = ie && D.ixLiga[ie.ID_LIGA]; return !gestor || (yo && lg && String(lg.ID_GESTOR) === String(yo)); });
+        var deSusLigas = todasIncidencias().filter(function (y) { var ie = D.ixIE[y.ie], lg = ie && D.ixLiga[ie.ID_LIGA]; return !gestor || (yo && lg && String(lg.ID_GESTOR) === String(yo)); });
+        var l = deSusLigas.filter(function (y) { return y.x.para !== 'arbitro'; }), alArbitro = deSusLigas.length - l.length;
         var n = function (e) { return l.filter(function (y) { return y.x.estado === e; }).length; };
-        var chip = { 'Enviada': 'lg-av-rec', 'Vista por el gestor': 'lg-av-si', 'Resuelta': 'mq-ok' };
         var h = franja('Así le llegan al gestor las incidencias de las capitanas') +
           cifras([[n('Enviada'), 'sin ver'], [n('Vista por el gestor'), 'vistas'], [n('Resuelta'), 'resueltas']]) +
-          '<p class="u-nota">Cada capitana reclama desde konamigas.com, tocando un partido de su equipo. Al gestor de la liga le llega con un aviso en el móvil; la capitana ve en su área cómo va y la respuesta.' +
+          '<p class="u-nota">Lo de un partido que viene (no pueden venir, quieren otra hora) le llega al gestor de la liga, que propone la solución desde aquí: aplazarlo a un hueco libre o cambiarle la hora, y las jugadoras de los dos equipos lo ven en Novedades.' +
+          (alArbitro ? ' Las reclamaciones del resultado (' + alArbitro + ') las revisa el árbitro de cada partido.' : '') +
           (gestor ? ' Ves las de tus ligas' + (yo ? ' (' + texto(D.LIGAS.filter(function (x) { return String(x.ID_GESTOR) === String(yo) && D.tempDeLiga(x.ID) === String(D.temp.ID); }).map(function (x) { return liga(x.ID); }).join(', ') || 'ninguna esta temporada') + ')' : '') + '.' : '') + '</p>';
         if (gestor && yo === null) return h + '<div class="kz-centro" role="status"><div class="u-carga"></div></div>';
-        if (!l.length) return h + '<p class="u-vacio">' + (gestor ? 'Ninguna capitana de tus ligas ha reclamado nada todavía.' : 'Ninguna capitana ha reclamado nada todavía.') + '</p>';
+        if (!l.length) return h + '<p class="u-vacio">' + (gestor ? 'Ninguna capitana de tus ligas ha avisado de nada todavía.' : 'Ninguna capitana ha avisado de nada todavía.') + '</p>';
         return h + '<ul class="mq-incs">' + l.map(function (y) {
-          var x = y.x, p = D.ixPar[x.partido], ie = D.ixIE[y.ie];
-          return '<li class="mq-inc"><div class="mq-inc-cab"><b>' + texto(equipo(y.ie)) + ' · ' + texto(x.tipo) + '</b><span class="lg-pav ' + (chip[x.estado] || '') + '">' + texto(x.estado) + '</span></div>' +
-            '<small>' + texto((ie ? liga(ie.ID_LIGA) + ' · ' : '') + (p ? fechaDia(p.FECHA) + ' · ' + equipo(p.ID_INSCRIPCION_LOCAL) + ' – ' + equipo(p.ID_INSCRIPCION_VISITANTE) : '')) + '</small>' +
+          var x = y.x, p = D.ixPar[x.partido], ie = D.ixIE[y.ie], k = texto(y.ie) + '|' + texto(x.id);
+          return '<li class="mq-inc"><div class="mq-inc-cab"><b>' + texto(equipo(y.ie)) + ' · ' + texto(x.tipo) + '</b><span class="lg-pav ' + (CHIP_INC[x.estado] || '') + '">' + texto(x.estado) + '</span></div>' +
+            '<small>' + texto((ie ? liga(ie.ID_LIGA) + ' · ' : '') + (p ? fechaDia(p.FECHA) + (p.HORA ? ' a las ' + p.HORA : '') + ' · ' + equipo(p.ID_INSCRIPCION_LOCAL) + ' – ' + equipo(p.ID_INSCRIPCION_VISITANTE) + (p.ESTADO !== 'Programado' ? ' · ' + String(p.ESTADO).toLowerCase() : '') : '')) + '</small>' +
             '<p>' + texto(x.texto) + '</p>' + (x.respuesta ? '<p class="mq-resp"><b>Respuesta:</b> ' + texto(x.respuesta) + '</p>' : '') +
-            '<div class="n-botones">' + (x.estado === 'Enviada' ? '<button type="button" class="u-btn" data-mqgest="' + texto(y.ie) + '|' + y.i + '" data-accion="ver">Marcar vista</button>' : '') +
-            (x.estado !== 'Resuelta' ? '<button type="button" class="u-btn u-btn-accion" data-mqgest="' + texto(y.ie) + '|' + y.i + '" data-accion="responder">Responder y resolver</button>' : '') +
+            '<div class="n-botones">' + (x.estado === 'Enviada' ? '<button type="button" class="u-btn" data-mqgest="' + k + '" data-accion="ver">Marcar vista</button>' : '') +
+            (x.estado !== 'Resuelta' ? '<button type="button" class="u-btn u-btn-accion" data-mqgest="' + k + '" data-accion="responder">' + (solucionesDe(x).length > 1 ? 'Proponer una solución' : 'Responder y resolver') + '</button>' : '') +
             (p ? '<button type="button" class="u-btn" data-mqenligas="' + texto(p.ID) + '">Abrir el partido en Ligas ›</button>' : '') + '</div></li>';
         }).join('') + '</ul>';
       }
-      function responderIncidencia(ie, i) {
-        var x = (comun().incidencias[ie] || [])[i];
+      /**
+       * T0419 · Lo que el gestor puede proponer desde el aviso de un partido que viene, con su respuesta a la capitana:
+       * con «Queremos otra hora», los huecos libres de su liga ese mismo día (ligasMover); con «No podremos venir» y «Queremos
+       * otra hora», aplazarlo a uno de los próximos huecos libres en los que no juega ningún equipo (ligasPartido y
+       * ligasRecuperar) o aplazarlo sin fecha; y siempre, solo responder. [{ k, titulo, resp, hacer }]
+       */
+      function solucionesDe(x) {
+        var p = D.ixPar[x.partido], ie = x.ie, ops = [];
+        var futuro = p && p.ESTADO === 'Programado' && String(p.FECHA) >= D.h && ['No podremos venir', 'Queremos otra hora'].indexOf(x.tipo) >= 0;
+        if (futuro) {
+          var aplazar = function () {
+            return ctx.llamar('ligasPartido', [p.ID, { ESTADO: 'Aplazado', MOTIVO: 'Lo pidió ' + equipo(ie), APLAZADO_POR: ie, AVISO_APLAZAMIENTO: String(x.cuando || D.h).slice(0, 10) > String(p.FECHA) ? p.FECHA : String(x.cuando || D.h).slice(0, 10) }]);
+          };
+          var dia = fechaDia(p.FECHA).toLowerCase();
+          if (x.tipo === 'Queremos otra hora') huecosLibres(p, { huecos: D.HUECOS, partidos: D.PARTIDOS, mismoDia: true }).forEach(function (o) {
+            ops.push({ k: 'mover-' + o.hueco.ID, titulo: 'El mismo día a las ' + o.hueco.HORA + ' en ' + campo(o.hueco.ID_CAMPO),
+              resp: 'Cambiado: jugáis el ' + dia + ' a las ' + o.hueco.HORA + ' en ' + campo(o.hueco.ID_CAMPO) + '.', hacer: function () { return ctx.llamar('ligasMover', [p.ID, o.hueco.ID]); } });
+          });
+          var c = D.ixComp[(D.ixLiga[p.ID_LIGA] || {}).ID_COMPETICION] || {};
+          huecosLibres(p, { huecos: D.HUECOS, partidos: D.PARTIDOS, calendario: D.CALENDARIO, hoy: D.h, hasta: c.FECHA_FIN || D.temp.FECHA_FIN, max: 3 }).forEach(function (o) {
+            var cu = fechaDia(o.fecha).toLowerCase() + ' a las ' + o.hueco.HORA + ' en ' + campo(o.hueco.ID_CAMPO);
+            ops.push({ k: 'recuperar-' + o.fecha + '-' + o.hueco.ID, titulo: 'Aplazarlo al ' + cu,
+              resp: 'Aplazado: lo jugáis el ' + cu + '.', hacer: function () { return aplazar().then(function () { return ctx.llamar('ligasRecuperar', [o.fecha, [{ id: p.ID, hueco: o.hueco.ID }]]); }); } });
+          });
+          ops.push({ k: 'aplazar', titulo: 'Aplazarlo; la nueva fecha, más adelante', resp: 'Aplazado: os decimos la nueva fecha en cuanto la tengamos.', hacer: aplazar });
+        }
+        ops.push({ k: 'responder', titulo: futuro ? 'Solo responder, sin cambiar el partido' : 'Responder', resp: x.tipo === 'No podremos venir' ? 'Lo miramos y os decimos algo.' : 'Lo revisamos y os decimos algo. Gracias por avisar.', hacer: null });
+        return ops;
+      }
+      function responderIncidencia(ie, id) {
+        var x = incidencia(ie, id);
         if (!x) return;
-        ventana('<h2>Responder a ' + texto(equipo(ie)) + '</h2><p class="u-nota">' + texto(x.tipo + ': ' + x.texto) + '</p>' +
-          '<label class="u-campo u-ancho"><span class="u-etiqueta">Respuesta a la capitana</span><textarea rows="3" data-k="r">' + texto(x.tipo === 'No podremos venir' ? 'Aplazado: os avisamos de la nueva fecha.' : 'Lo revisamos con el árbitro y os decimos algo. Gracias por avisar.') + '</textarea></label>' +
+        var ops = solucionesDe(x), p = D.ixPar[x.partido], editado = false;
+        var v = ventana('<h2>' + (ops.length > 1 ? 'Proponer una solución a ' : 'Responder a ') + texto(equipo(ie)) + '</h2><p class="u-nota">' + texto(x.tipo + ': ' + x.texto) + '</p>' +
+          (p ? '<p class="u-nota">' + texto(equipo(p.ID_INSCRIPCION_LOCAL) + ' – ' + equipo(p.ID_INSCRIPCION_VISITANTE) + ' · ' + cuandoDonde(p)) + '</p>' : '') +
+          (ops.length > 1 ? '<fieldset class="mq-opciones"><legend class="u-etiqueta">Qué propones</legend>' + ops.map(function (o, i) {
+            return '<label class="u-check"><input type="radio" name="mq-sol" value="' + i + '"' + (i === 0 ? ' checked' : '') + '> ' + texto(o.titulo) + '</label>';
+          }).join('') + '</fieldset>' : '') +
+          '<label class="u-campo u-ancho"><span class="u-etiqueta">Respuesta a la capitana</span><textarea rows="3" data-k="r">' + texto(ops[0].resp) + '</textarea></label>' +
+          (ops.length > 1 ? '<p class="u-nota">El partido se cambia en Ligas al enviar, y las jugadoras de los dos equipos lo ven en Novedades.</p>' : '') +
           '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" data-guardar>Enviar y resolver</button><button type="button" class="u-btn" data-cerrar>Cancelar</button></div>', function (b, v) {
           if (!b.hasAttribute('data-guardar')) return;
-          x.respuesta = v.querySelector('[data-k=r]').value || 'Resuelto.';
-          x.estado = 'Resuelta';
-          novedad([ie], 'Respuesta de Konamigas a tu aviso', x.tipo + ': ' + x.respuesta);
-          guardarComun();
-          avisarSim({ a: 'web', titulo: 'Respuesta del gestor a ' + equipo(ie), texto: x.respuesta });
-          v.remove();
-          ctx.aviso('Respondida: la capitana lo ve en su área');
-          pintar();
+          var sel = v.querySelector('[name=mq-sol]:checked'), o = ops[sel ? Number(sel.value) : ops.length - 1];
+          var resp = v.querySelector('[data-k=r]').value || o.resp;
+          b.disabled = true;
+          (o.hacer ? o.hacer().then(function () { return T.refrescar ? T.refrescar(['PARTIDOS', 'SANCIONES']) : null; }) : Promise.resolve()).then(function () {
+            cambiarIncidencia(ie, id, { estado: 'Resuelta', respuesta: resp });
+            novedad([ie], 'Respuesta de Konamigas a tu aviso', x.tipo + ': ' + resp);
+            guardarComun();
+            avisarSim({ a: 'web', titulo: 'Respuesta del gestor a ' + equipo(ie), texto: resp });
+            if (o.hacer) paso('aplaza');
+            v.remove();
+            ctx.aviso(o.hacer ? 'Hecho en Ligas y respondido: las jugadoras lo ven en Novedades' : 'Respondida: la capitana lo ve en su área');
+            firma = ''; pintar();
+          }, function (e) { b.disabled = false; ctx.aviso(String(e && e.message || e).replace(/^\w+:\s*/, '')); });
         });
+        // Al elegir otra solución, su respuesta (si no se ha escrito otra a mano).
+        v.querySelector('textarea').addEventListener('input', function () { editado = true; });
+        v.addEventListener('change', function (e) { if (e.target.name === 'mq-sol' && !editado) v.querySelector('textarea').value = ops[Number(e.target.value)].resp; });
       }
       /** Abre un partido en la sección Ligas de la plataforma (su ficha, con Partidos en su día detrás). */
       function abrirEnLigas(id) {
@@ -932,6 +1099,27 @@
        * en Ligas (ligasActa). Lo que va en directo se guarda en lo compartido (comun().directo), mientras se juega.
        */
       function directo(id) { var c = comun(); return (c.directo || {})[id] || null; }
+      /**
+       * T0419 · Las reclamaciones del acta que le llegan a un árbitro (las de los partidos que pitó; yo '': todas, para quien
+       * administra; null, mientras se sabe quién es: ninguna), las pendientes primero.
+       */
+      function reclamacionesArbitro(yo) {
+        if (yo === null || yo === undefined) return [];
+        return todasIncidencias().filter(function (y) { return y.x.para === 'arbitro' && (!yo || String(y.x.arbitro) === String(yo)); });
+      }
+      function htmlReclamaciones(yo) {
+        var l = reclamacionesArbitro(ctx.admin ? '' : yo), pend = l.filter(function (y) { return y.x.estado !== 'Resuelta'; });
+        if (!l.length) return '';
+        var hechas = l.length - pend.length;
+        return '<h3 class="n-grupo">Reclamaciones <span class="u-cifra">' + pend.length + '</span></h3>' +
+          (pend.length ? '<p class="u-nota">Lo que reclaman las capitanas del acta de tus partidos. Ábrela, corrige lo que haga falta y guárdala: las jugadoras de los dos equipos lo ven en Novedades.</p><ul class="mq-incs">' + pend.map(function (y) {
+            var x = y.x, p = D.ixPar[x.partido];
+            return '<li class="mq-inc"><div class="mq-inc-cab"><b>' + texto(equipo(y.ie)) + ' · ' + texto(x.tipo) + '</b><span class="lg-pav ' + (CHIP_INC[x.estado] || '') + '">' + texto(x.estado) + '</span></div>' +
+              (p ? '<small>' + texto(fechaDia(p.FECHA) + ' · ' + equipo(p.ID_INSCRIPCION_LOCAL) + ' ' + (conResultado(p) ? p.GOLES_LOCAL + '–' + p.GOLES_VISITANTE : '–') + ' ' + equipo(p.ID_INSCRIPCION_VISITANTE)) + '</small>' : '') +
+              '<p>' + texto(x.texto) + '</p><div class="n-botones">' + (p ? '<button type="button" class="u-btn u-btn-accion" data-mqarbrec="' + texto(y.ie) + '|' + texto(x.id) + '">Revisar el acta</button>' : '') + '</div></li>';
+          }).join('') + '</ul>' : '') +
+          (hechas ? '<p class="u-nota">' + plural(hechas, 'reclamación revisada', 'reclamaciones revisadas') + '.</p>' : '');
+      }
       function minuto(d) { return d ? Math.max(1, Math.round((Date.now() - new Date(d.desde).getTime()) / 60000)) : 0; }
       function portalArbitro() {
         var yo = yoStaff();
@@ -950,6 +1138,7 @@
         };
         return franja('Lo nuevo para el árbitro: el acta en directo, desde el móvil, durante el partido') +
           '<div class="mq-hola"><h2>Hola, <span class="mq-pintada">' + texto(yo ? staff(yo) : 'Konamigas') + '</span></h2><p class="u-nota">Tus partidos de hoy: tócalo al empezar, marca cada gol tocando a quien marca y, al pitar el final, cierra el acta. Lo demás (próximos, cobros, nivel) sigue en tu Perfil.</p></div>' +
+          htmlReclamaciones(yo) +
           '<h3 class="n-grupo">Hoy <span class="u-cifra">' + hoyL.length + '</span></h3>' + (hoyL.length ? '<div class="mq-arb-lista">' + hoyL.map(tarjeta).join('') + '</div>' : '<p class="u-vacio">Hoy no arbitras ningún partido.</p>') +
           (cerrar.length ? '<h3 class="n-grupo">Actas por cerrar <span class="u-cifra">' + cerrar.length + '</span></h3><div class="mq-arb-lista">' + cerrar.map(tarjeta).join('') + '</div>' : '');
       }
@@ -979,12 +1168,17 @@
         if (!p) { M.arbActa = ''; return portalArbitro(); }
         var L = String(p.ID_INSCRIPCION_LOCAL), V = String(p.ID_INSCRIPCION_VISITANTE), gs = golesActa(p), pl = plantillas(p);
         var n = function (eq) { return gs.filter(function (g) { return g.eq === eq; }).length; };
+        var rec = M.arbRec && M.arbRec.partido === String(p.ID) ? incidencia(M.arbRec.ie, M.arbRec.id) : null;
         var h = '<p class="mq-volver"><button type="button" class="u-btn u-btn-texto" data-mqarbvolver>‹ Mis partidos</button></p>' +
+          // T0419: la reclamación que se está revisando, encima del acta.
+          (rec ? '<div class="mq-aviso mq-arb-rec"><b>' + texto(equipo(rec.ie) + ' reclama: ' + rec.tipo) + '</b><p>' + texto(rec.texto) + '</p><p class="u-nota">Cambia lo que haga falta (toca a quien marcó; «−» lo quita) y guarda el acta. Si está bien, dilo sin cambiar nada.</p>' +
+            '<div class="n-botones"><button type="button" class="u-btn" data-mqarbbien>Está bien como está</button></div></div>' : '') +
           '<div class="mq-arb-cab"><p class="u-nota">' + texto(fechaDia(p.FECHA) + ' · ' + (p.HORA || '') + ' · ' + campo(p.ID_CAMPO) + ' · ' + liga(p.ID_LIGA) + (p.JORNADA ? ' · J' + p.JORNADA : '')) + '</p>' +
           '<div class="mq-arb-marcador"><span>' + texto(equipo(L)) + '</span><b class="u-cifra">' + n(L) + '<i>–</i>' + n(V) + '</b><span>' + texto(equipo(V)) + '</span></div>' +
           (directo(p.ID) ? '<p class="mq-arb-vivo"><span class="mq-vivo">En directo</span> Minuto ' + minuto(directo(p.ID)) + ' · cada gol se ve al momento en konamigas.com</p>' : '') +
           (p.FECHA > D.h ? '<p class="mq-aviso">Es del ' + texto(fechaDia(p.FECHA)) + ': el acta se cierra el día del partido.</p>' : '') + '</div>';
         if (!pl) return h + '<div class="kz-centro" role="status"><div class="u-carga"></div><p class="u-nota">Leyendo las plantillas…</p></div>';
+        if (M.arbRec && M.arbRec.partido === String(p.ID) && M.arbRec.marcan === null) M.arbRec.marcan = marcanActa(p, gs); // cómo estaba, antes de tocar nada
         var columna = function (eq) {
           var cuenta = {};
           gs.forEach(function (g) { if (g.eq === eq) cuenta[g.ju || 'propia'] = (cuenta[g.ju || 'propia'] || 0) + 1; });
@@ -999,7 +1193,7 @@
         return h + '<div class="mq-arb-eqs">' + columna(L) + columna(V) + '</div>' +
           '<div class="n-botones mq-arb-pie">' + (p.FECHA === D.h && p.ESTADO === 'Programado' && !directo(p.ID) ? '<button type="button" class="u-btn u-btn-accion" data-mqarbempezar>Empezar el partido</button>' : '') +
           // T0366: el partido de hoy sin empezar, sin «Cerrar el acta» (salía con un 0–0 antes de jugar).
-          (p.FECHA === D.h && p.ESTADO === 'Programado' && !directo(p.ID) ? '' : '<button type="button" class="u-btn' + (directo(p.ID) || p.FECHA < D.h ? ' u-btn-accion' : '') + '" data-mqarbcerrar' + (p.FECHA > D.h ? ' disabled' : '') + '>' + (directo(p.ID) ? 'Terminar y cerrar el acta' : p.ESTADO === 'Jugado' ? 'Guardar el acta' : 'Cerrar el acta') + ' (' + n(L) + '–' + n(V) + ')</button>') +
+          (p.FECHA === D.h && p.ESTADO === 'Programado' && !directo(p.ID) ? '' : '<button type="button" class="u-btn' + (directo(p.ID) || p.FECHA < D.h || rec ? ' u-btn-accion' : '') + '" data-mqarbcerrar' + (p.FECHA > D.h ? ' disabled' : '') + '>' + (directo(p.ID) ? 'Terminar y cerrar el acta' : p.ESTADO === 'Jugado' ? 'Guardar el acta' : 'Cerrar el acta') + ' (' + n(L) + '–' + n(V) + ')</button>') +
           '</div><p class="mq-arb-mas">' + (p.FECHA > D.h ? '' : '<button type="button" class="u-btn u-btn-texto" data-mqarbestado="Suspendido">Se suspendió</button>' +
           '<button type="button" class="u-btn u-btn-texto" data-mqarbestado="Anulado">No se presentó un equipo</button>') +
           '<button type="button" class="u-btn u-btn-texto" data-mqenligas="' + texto(p.ID) + '">Su ficha en Ligas ›</button></p>';
@@ -1013,9 +1207,67 @@
           ctx.aviso('Acta cerrada: ' + equipo(L) + ' ' + acta.GOLES_LOCAL + '–' + acta.GOLES_VISITANTE + ' ' + equipo(V) + '. Ya sale en Competiciones.');
           delete M.arbGoles[p.ID];
           if (comun().directo && comun().directo[p.ID]) { delete comun().directo[p.ID]; guardarComun(); }
-          avisarSim({ a: 'app', titulo: 'Final: ' + equipo(L) + ' ' + acta.GOLES_LOCAL + '–' + acta.GOLES_VISITANTE + ' ' + equipo(V), texto: 'Acta cerrada por ' + (staff(yoStaff()) || 'el árbitro') + ': ya está en Ligas.' });
+          var rec = M.arbRec && M.arbRec.partido === String(p.ID) ? M.arbRec : null;
+          if (rec) resolverReclamacion(rec, p, acta, gs);
+          else avisarSim({ a: 'app', titulo: 'Final: ' + equipo(L) + ' ' + acta.GOLES_LOCAL + '–' + acta.GOLES_VISITANTE + ' ' + equipo(V), texto: 'Acta cerrada por ' + (staff(yoStaff()) || 'el árbitro') + ': ya está en Ligas.' });
           M.arbActa = ''; firma = ''; pintar();
         }, function (e) { b.disabled = false; ctx.aviso(String(e && e.message || e).replace(/^\w+:\s*/, '')); });
+      }
+      /** «Laura Gómez» → «Laura G.»: lo que ven las jugadoras de quien marca. */
+      function nombreCorto(n) { var x = String(n || '').trim().split(/\s+/); return x[0] + (x[1] ? ' ' + x[1].charAt(0) + '.' : ''); }
+      /** Quién marcó en un acta, por equipo: «Laura G. (2) y Ana P. (Las Tigres); en propia (Las Leonas)». */
+      function marcanActa(p, gs) {
+        var pl = M.arbPlant || {};
+        return [String(p.ID_INSCRIPCION_LOCAL), String(p.ID_INSCRIPCION_VISITANTE)].map(function (eq) {
+          var c = {}, orden_ = [];
+          gs.filter(function (g) { return g.eq === eq; }).forEach(function (g) {
+            var n = g.ju ? nombreCorto(((pl[eq] || []).filter(function (j) { return String(j.ID) === String(g.ju); })[0] || {}).NOMBRE || '?') : 'en propia';
+            if (!c[n]) orden_.push(n);
+            c[n] = (c[n] || 0) + 1;
+          });
+          var l = orden_.map(function (n) { return n + (c[n] > 1 ? ' (' + c[n] + ')' : ''); });
+          return l.length ? (l.length > 1 ? l.slice(0, -1).join(', ') + ' y ' + l[l.length - 1] : l[0]) + ' (' + equipo(eq) + ')' : '';
+        }).filter(Boolean).join('; ');
+      }
+      /** T0419 · Abre el acta de una reclamación: la marca vista por el árbitro y guarda cómo estaba, para saber qué corrige. */
+      function abrirReclamacion(ie, id) {
+        var x = incidencia(ie, id), p = x && D.ixPar[x.partido];
+        if (!p) return;
+        M.arbActa = String(p.ID);
+        if (M.arbGoles) delete M.arbGoles[p.ID]; // el acta, como está guardada
+        M.arbRec = { ie: ie, id: id, partido: String(p.ID), gl: String(p.GOLES_LOCAL), gv: String(p.GOLES_VISITANTE), marcan: null };
+        if (x.estado === 'Enviada') {
+          cambiarIncidencia(ie, id, { estado: 'Vista por el árbitro' });
+          guardarComun();
+          avisarSim({ a: 'web', titulo: 'El árbitro está revisando la reclamación de ' + equipo(ie), texto: x.tipo });
+        }
+        window.scrollTo(0, 0);
+        pintar();
+      }
+      /**
+       * T0419 · El árbitro ha guardado el acta de una reclamación (o dice que está bien, sin acta): la resuelve con lo que ha
+       * cambiado y, si ha corregido algo, las jugadoras de los dos equipos lo ven en Novedades (la misma que la del resultado
+       * nuevo, que la sustituye: prio 1); si no, la capitana ve que se ha revisado.
+       */
+      function resolverReclamacion(rec, p, acta, gs) {
+        var x = incidencia(rec.ie, rec.id);
+        if (!x) { M.arbRec = null; return; }
+        var L = String(p.ID_INSCRIPCION_LOCAL), V = String(p.ID_INSCRIPCION_VISITANTE);
+        var marcan = acta ? marcanActa(p, gs) : '';
+        var cambiaRes = !!acta && (String(acta.GOLES_LOCAL) !== rec.gl || String(acta.GOLES_VISITANTE) !== rec.gv);
+        var cambia = !!acta && (cambiaRes || marcan !== rec.marcan);
+        var res = acta ? equipo(L) + ' ' + acta.GOLES_LOCAL + '–' + acta.GOLES_VISITANTE + ' ' + equipo(V) : '';
+        var resp = cambia ? 'Corregido en el acta: ' + res + (marcan ? '. Goles: ' + marcan : '') : 'Revisado: el acta se queda como estaba.';
+        cambiarIncidencia(rec.ie, rec.id, { estado: 'Resuelta', respuesta: resp });
+        if (cambia) {
+          var nuevo = Object.assign({}, p, { ESTADO: 'Jugado', GOLES_LOCAL: acta.GOLES_LOCAL, GOLES_VISITANTE: acta.GOLES_VISITANTE });
+          novedad([L, V], 'El árbitro ha corregido el acta', res + ' · ' + fechaDia(p.FECHA) + ', lo reclamó ' + equipo(rec.ie) + (marcan ? '. Goles: ' + marcan : ''),
+            cambiaRes ? 'p-' + p.ID + '-' + instantanea([nuevo])[p.ID] : '', 1);
+        } else novedad([rec.ie], 'El árbitro ha revisado tu reclamación', x.tipo + ': el acta se queda como estaba.');
+        guardarComun();
+        avisarSim({ a: 'web', titulo: 'Respuesta del árbitro a ' + equipo(rec.ie), texto: resp });
+        ctx.aviso(cambia ? 'Acta corregida: las jugadoras de los dos equipos lo ven en Novedades' : 'Reclamación revisada: la capitana lo ve en su área');
+        M.arbRec = null;
       }
       function estadoArbitro(estado) {
         var p = D.ixPar[M.arbActa], L = p.ID_INSCRIPCION_LOCAL, V = p.ID_INSCRIPCION_VISITANTE;
@@ -1041,9 +1293,25 @@
       // Se guarda en el motor de la maqueta (maquetaComun, la memoria del modo local o de la copia del móvil): así lo
       // comparten konamigas.com y la plataforma, también a la vez en el simulador. Hasta leerlo, no se propone ni se guarda nada.
       function comun() { return window.MQ_COMUN || (window.MQ_COMUN = { v: 1, avisos: null, tareas: {}, propias: [], incidencias: {} }); }
+      // T0419: el motor lo junta con lo que haya guardado la otra pantalla (las incidencias y las novedades no se pisan) y
+      // devuelve lo junto, que pasa a ser lo de esta.
       function guardarComun() {
-        if (!window.MQ_COMUN_LEIDO) return;
-        llamarPublica('maquetaComunGuardar', [comun()]).catch(function (e) { ctx.aviso(String(e && e.message || e)); });
+        if (!window.MQ_COMUN_LEIDO) return Promise.resolve();
+        return llamarPublica('maquetaComunGuardar', [comun()]).then(function (r) {
+          if (!r || r.v !== 1) return;
+          var n = comun();
+          Object.keys(n).forEach(function (k) { delete n[k]; });
+          Object.assign(n, r);
+          n.incidencias = n.incidencias || {};
+        }, function (e) { ctx.aviso(String(e && e.message || e)); });
+      }
+      /** Una incidencia por su id (lo compartido se rehace al guardar: no vale quedarse con la de antes). */
+      function incidencia(ie, id) { return ((comun().incidencias || {})[ie] || []).filter(function (x) { return x.id === id; })[0] || null; }
+      /** Cambia una incidencia, con cuándo (al juntar lo de las dos pantallas, gana el último cambio). */
+      function cambiarIncidencia(ie, id, cambios) {
+        var x = incidencia(ie, id);
+        if (x) Object.assign(x, cambios, { cambio: new Date().toISOString() });
+        return x;
       }
       function partidosTemp() { return D.PARTIDOS.filter(function (p) { return D.tempDeLiga(p.ID_LIGA) === String(D.temp.ID); }); }
       function listaTematicas() {
@@ -1381,9 +1649,9 @@
         if (b.hasAttribute('data-mqwsalir')) { W.salir(); M.web.yo = ''; M.web.vista = 'inicio'; M.liga = ''; M.pestana = {}; window.scrollTo(0, 0); return pintar(); }
         if (b.hasAttribute('data-mqnueva')) return nuevaIncidencia(a('data-mqnueva'));
         if (b.hasAttribute('data-mqinc')) {
-          var x = incidenciasDe(capitanaDe(M.web.yo))[Number(a('data-mqinc'))];
-          if (a('data-accion') === 'ver') x.estado = 'Vista por el gestor';
-          else { x.estado = 'Resuelta'; x.respuesta = x.respuesta || 'Hecho, gracias por avisar.'; }
+          var x = incidencia(capitanaDe(M.web.yo).ID, a('data-mqinc'));
+          if (!x) return;
+          cambiarIncidencia(x.ie, x.id, a('data-accion') === 'ver' ? { estado: 'Vista por el gestor' } : { estado: 'Resuelta', respuesta: x.respuesta || 'Hecho, gracias por avisar.' });
           guardarComun();
           return pintar();
         }
@@ -1399,18 +1667,20 @@
           return pintar();
         }
         if (b.hasAttribute('data-mqgest')) {
-          var g = a('data-mqgest').split('|'), xg = (comun().incidencias[g[0]] || [])[Number(g[1])];
+          var g = a('data-mqgest').split('|'), xg = incidencia(g[0], g[1]);
           if (!xg) return;
           if (a('data-accion') === 'ver') {
-            xg.estado = 'Vista por el gestor'; novedad([g[0]], 'Konamigas ha visto tu aviso', xg.tipo + ': ' + xg.texto); guardarComun();
+            cambiarIncidencia(g[0], g[1], { estado: 'Vista por el gestor' }); novedad([g[0]], 'Konamigas ha visto tu aviso', xg.tipo + ': ' + xg.texto); guardarComun();
             avisarSim({ a: 'web', titulo: 'El gestor ha visto la incidencia de ' + equipo(g[0]), texto: xg.tipo });
             return pintar();
           }
-          return responderIncidencia(g[0], Number(g[1]));
+          return responderIncidencia(g[0], g[1]);
         }
         if (b.hasAttribute('data-mqenligas')) return abrirEnLigas(a('data-mqenligas'));
-        if (b.hasAttribute('data-mqarb')) { M.arbActa = a('data-mqarb'); window.scrollTo(0, 0); return pintar(); }
-        if (b.hasAttribute('data-mqarbvolver')) { M.arbActa = ''; return pintar(); }
+        if (b.hasAttribute('data-mqarb')) { M.arbActa = a('data-mqarb'); M.arbRec = null; window.scrollTo(0, 0); return pintar(); }
+        if (b.hasAttribute('data-mqarbvolver')) { M.arbActa = ''; M.arbRec = null; return pintar(); }
+        if (b.hasAttribute('data-mqarbrec')) { var rr = a('data-mqarbrec').split('|'); return abrirReclamacion(rr[0], rr[1]); }
+        if (b.hasAttribute('data-mqarbbien')) { resolverReclamacion(M.arbRec, D.ixPar[M.arbActa], null, []); M.arbActa = ''; return pintar(); }
         if (b.hasAttribute('data-mqarbempezar')) {
           var pe = D.ixPar[M.arbActa], cd = comun();
           (cd.directo = cd.directo || {})[pe.ID] = { gl: 0, gv: 0, goles: [], desde: new Date().toISOString(), arbitro: yoStaff() || '' };

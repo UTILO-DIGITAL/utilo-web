@@ -82,11 +82,14 @@
       ['calendario', '💻', 'Genera los calendarios', '«Generar calendario ›» → Guardar; luego la otra liga. Tu jugadora ve sus partidos.']]],
     ['4', 'Árbitro y reclamación', [
       ['directo', '📱', 'El árbitro, en directo', 'Entrar → «Entrar como árbitro» → su partido de hoy (el de tu equipo) → Empezar → goles → Terminar y cerrar el acta.'],
-      ['reclama', '📱', 'La capitana reclama', 'Entra como tu capitana → Mi área → Mis partidos → el partido → Reclamar.'],
-      ['responde', '💻', 'El gestor responde', 'Su aviso → Ver → Responder y resolver. Ella lo ve en Novedades.']]],
+      ['reclama', '📱', 'La capitana reclama el resultado', 'Entra como tu capitana → Mi área → Mis partidos → ese partido → Reclamar → «Un gol lo marcó otra jugadora» → Enviar al árbitro.'],
+      ['responde', '💻', 'El árbitro corrige el acta', 'Le llega a él: Futuro → Árbitro → Reclamaciones → Revisar el acta → cambia el gol → Guardar el acta. Las jugadoras lo ven en Novedades.'],
+      // T0419: lo de un partido que viene sigue siendo del gestor, que propone la solución desde el aviso.
+      ['aplaza', '💻', 'El gestor aplaza un partido que viene', 'La capitana: Incidencias → Avisar de algo → «No podremos venir». La plataforma, como gestor: Futuro → Incidencias → Proponer una solución → aplazarlo a otro día. Las de los dos equipos lo ven en Novedades, con la nueva fecha.']]],
     ['5', 'Camisetas y pagos', [
       ['camisetas', '💻', 'Entrega su camiseta a tu jugadora', 'Camisetas → Entregas → tu equipo → Entregar (a tu jugadora o a la capitana). Ella lo ve en Mi área → Mis datos.'],
-      ['debe', '💻', 'Mira lo que debe cada equipo', 'Gestión → Pagos pendientes → la ficha de un equipo → Pagos.']]]
+      ['debe', '💻', 'Mira lo que debe cada equipo', 'Gestión → Pagos pendientes → la ficha de un equipo → Pagos.'],
+      ['pagos', '📱', 'La capitana ve lo que lleva pagado', 'Entra como tu capitana → Mi área → Mi equipo: la inscripción, la señal, las camisetas y lo que falta.']]]
   ];
   var hechos = {};
   try { hechos = JSON.parse(sessionStorage.getItem('sim_pasos') || '{}') || {}; } catch (e) { hechos = {}; }
@@ -116,7 +119,8 @@
       if (m.fn === 'ligasCerrar') return m.args.length === 1 ? 'reparto' : '';
       return { ligasTraerCompeticiones: 'kopa', maquetaKopaCrear: 'kopa', inscripcionesEquipo: 'equipo', inscripcionesJugadora: 'jugadora', maquetaKopaEjemplo: 'resto', ligasActa: 'directo' }[m.fn];
     }
-    if (m.mq === 'aviso') return /^Incidencia/.test(m.titulo || '') ? 'reclama' : /^Respuesta/.test(m.titulo || '') ? 'responde' : ''; // el directo, al cerrar el acta (ligasActa)
+    // El directo, al cerrar el acta (ligasActa); la reclamación, al enviarla al árbitro; aplazar, lo dice la plataforma (paso).
+    if (m.mq === 'aviso') return /^Incidencia .* para el árbitro/.test(m.titulo || '') ? 'reclama' : /^Respuesta del árbitro/.test(m.titulo || '') ? 'responde' : '';
     if (m.mq === 'paso') return m.id;
     return '';
   }

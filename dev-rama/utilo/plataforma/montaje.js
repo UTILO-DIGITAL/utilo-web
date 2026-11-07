@@ -30,7 +30,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Tareas",
    "icono": "<rect x=\"3\" y=\"4\" width=\"5\" height=\"16\" rx=\"1\"/><rect x=\"10\" y=\"4\" width=\"5\" height=\"11\" rx=\"1\"/><rect x=\"17\" y=\"4\" width=\"4\" height=\"7\" rx=\"1\"/>",
    "web": "utilo/secciones/tablero.js",
-   "version": "ef2cf09a81",
+   "version": "03ca984976",
    "perfiles": "todos",
    "config": {
     "VISTA": "ocho",
@@ -50,13 +50,18 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Entregas",
    "icono": "<path d=\"M3 7l9-4 9 4-9 4-9-4z\"/><path d=\"M3 7v10l9 4 9-4V7\"/><path d=\"M12 11v10\"/>",
    "web": "utilo/secciones/entregas.js",
-   "version": "8481ba9d74",
+   "version": "5c6577cd28",
    "perfiles": "todos",
    "config": {
     "VISTA": "Mapa",
     "VER": "En marcha"
    },
-   "api": []
+   "api": [
+    "crear_entrega",
+    "cambiar_entrega",
+    "mover_entrega",
+    "cambiar_tarea"
+   ]
   }
  ],
  "perfilEnMenu": false,
@@ -557,7 +562,6 @@ window.NUCLEO_MONTAJE = {
      {
       "nombre": "TAREA",
       "tipo": "ref",
-      "obligatoria": true,
       "ref": "TAREAS"
      },
      {
@@ -604,6 +608,11 @@ window.NUCLEO_MONTAJE = {
      {
       "nombre": "ESTADO_DESPUES",
       "tipo": "texto"
+     },
+     {
+      "nombre": "ENTREGA",
+      "tipo": "ref",
+      "ref": "ENTREGAS"
      }
     ],
     "restricciones": {
@@ -624,6 +633,9 @@ window.NUCLEO_MONTAJE = {
      ],
      "bitacora_tipo_valores": [
       "TIPO"
+     ],
+     "bitacora_entrega_fkey": [
+      "ENTREGA"
      ]
     }
    },

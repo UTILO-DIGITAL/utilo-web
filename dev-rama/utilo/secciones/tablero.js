@@ -575,7 +575,8 @@
       }
       function gentes() { return Object.keys(GENTE).map(function (k) { return [k, GENTE[k]]; }).sort(function (a, b) { return a[1].localeCompare(b[1]); }); }
       function entregasDe(ini) {
-        return ctx.tablas.filas(TE).filter(function (e) { return e.INICIATIVA === ini && e.ESTADO !== 'Entregada'; })
+        // T0417: a una entrega Entregada o Descartada no se le añaden tareas (lo dice la base).
+        return ctx.tablas.filas(TE).filter(function (e) { return e.INICIATIVA === ini && e.ESTADO !== 'Entregada' && e.ESTADO !== 'Descartada'; })
           .map(function (e) { var i = ctx.tablas.fila(TI, ini); return [e.ID, ((i && i.INICIAL) || '') + e.NUMERO + ' · ' + (e.NOMBRE || '')]; });
       }
       function chipDep(x) {
@@ -738,11 +739,20 @@
         if (k === 'DEADLINE' || k === 'DISPONIBLE_DESDE') return '<input type="date" id="fed" value="' + texto(v) + '"' + lab + '>';
         if (LARGO[k]) return '<textarea id="fed" rows="' + LARGO[k] + '"' + lab + '>' + texto(v) + '</textarea>' +
           '<div class="pie"><button type="button" class="sec" data-fed-no>Cancelar</button><button type="button" class="accion" data-fed-ok>Guardar</button></div>';
+        var o = opcionesDe(t, k);
+        if (k === 'DEPENDE') return '<select id="fed" aria-label="Añadir una tarea a la que espera">' + opciones(o.vs, '', o.vacio) + '</select>';
+        return '<select id="fed"' + lab + '>' + opciones(o.vs, o.v, o.vacio) + '</select>';
+      }
+      /** Los datos que se eligen de una lista (en el ordenador, un desplegable; en el móvil, la ventanita de elegir). */
+      var DE_LISTA = { INICIATIVA: 1, ENTREGA: 1, ASIGNADO: 1, REVISA: 1, P: 1, T: 1, DEPENDE: 1 };
+      /** Las opciones de un dato de lista: { vs: [[valor, texto]], v: el de ahora, vacio: el texto de la opción vacía o false }. */
+      function opcionesDe(t, k) {
+        var v = t[k] == null ? '' : String(t[k]), vs = [], vacio = false;
         if (k === 'DEPENDE') {
           var ya = esperaA(String(t.ID));
           vs = tareas().filter(function (x) { return CERRADOS.indexOf(x.ESTADO) < 0 && !x._nueva && String(x.ID) !== String(t.ID) && ya.indexOf(String(x.ID)) < 0; })
             .sort(function (a, b) { return String(b.ID).localeCompare(String(a.ID)); }).map(function (x) { return [String(x.ID), x.ID + ' · ' + x.TITULO]; });
-          return '<select id="fed" aria-label="Añadir una tarea a la que espera">' + opciones(vs, '', 'Elige la tarea…') + '</select>';
+          return { vs: vs, v: '', vacio: 'Elige la tarea…' };
         }
         if (k === 'INICIATIVA') vs = ctx.tablas.filas(TI).map(function (i) { return [i.ID, i.NOMBRE || i.ID]; });
         else if (k === 'ENTREGA') { vs = entregasDe(t.INICIATIVA); if (v && !vs.some(function (x) { return x[0] === v; })) vs.unshift([v, t.ENTREGA_CORTA || v]); vacio = 'Sin entrega'; }
@@ -751,15 +761,43 @@
         else if (k === 'P') vs = ['!!!!', '!!!', '!!', '!'].map(function (x) { return [x, x]; });
         else if (k === 'T') vs = ['XS', 'S', 'M', 'L', 'XL'].map(function (x) { return [x, x]; });
         if (!vacio && !v) vacio = 'Elige…';
-        return '<select id="fed"' + lab + '>' + opciones(vs || [], v, vacio) + '</select>';
+        return { vs: vs, v: v, vacio: vacio };
       }
+      /**
+       * T0417 · En el móvil, un dato de lista se elige en una ventanita con una opción por botón, no con el desplegable del
+       * navegador: en algunos móviles no se abría o no dejaba elegir, y además salía arriba del todo, lejos de donde se tocó.
+       */
+      function elegir(k) {
+        var t = tarea(abiertaId);
+        if (!t) return;
+        var o = opcionesDe(t, k), dep = k === 'DEPENDE';
+        var vs = (o.vacio && !dep && o.vacio !== 'Elige…' ? [['', o.vacio]] : []).concat(o.vs);
+        altaForm.innerHTML = '<h2 data-k="' + texto(k) + '">' + texto(dep ? 'Espera a…' : ETIQUETA[k] || k) + '</h2>' +
+          (vs.length ? '<div class="tb-elegir" role="listbox" aria-label="' + texto(ETIQUETA[k] || k) + '">' + vs.map(function (x) {
+            var es = !dep && x[0] === o.v;
+            return '<button type="button" role="option" class="tb-op' + (es ? ' es' : '') + '" aria-selected="' + es + '" data-elegir="' + texto(x[0]) + '">' + texto(x[1]) + '</button>';
+          }).join('') + '</div>' : '<p class="u-nota">' + (k === 'ENTREGA' ? 'Su iniciativa no tiene entregas abiertas.' : 'No hay nada que elegir.') + '</p>') +
+          '<div class="botones"><button type="button" class="sec" data-cancelar-alta>Cancelar</button></div>';
+        altaForm.onsubmit = function (e) { e.preventDefault(); };
+        abrirVelo();
+        var b = altaForm.querySelector('.tb-op.es') || altaForm.querySelector('.tb-op'); if (b) b.focus();
+      }
+      altaForm.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-elegir]');
+        if (!b || !altaForm.querySelector('.tb-elegir')) return;
+        var k = altaForm.querySelector('h2').getAttribute('data-k');
+        cerrarVelo();
+        guardarCampo(k, b.getAttribute('data-elegir'));
+      });
       function abrirCampo(k) {
+        if (TACTIL && DE_LISTA[k]) { elegir(k); return; }
         cambiando = k; pintarFicha();
         var x = caja.querySelector('#fed');
         if (!x) return;
         x.focus();
         if (x.type === 'text') x.select();
-        if (x.tagName === 'SELECT' && x.showPicker) { try { x.showPicker(); } catch (e) {} }
+        // Con ratón, la lista se abre sola; en el móvil, se toca el desplegable (abrirla desde aquí no siempre deja elegir).
+        if (x.tagName === 'SELECT' && x.showPicker && !TACTIL) { try { x.showPicker(); } catch (e) {} }
       }
       function cerrarCampo() {
         var k = cambiando; cambiando = ''; pintarFicha();
@@ -848,6 +886,9 @@
       }
       fv.addEventListener('click', function (e) {
         if (e.target === fv || e.target.closest('[data-cerrar]')) { cerrarFicha(); return; }
+        // Un desplegable abierto se cierra al tocar fuera de él (si el toque no abre otra cosa, no hace nada más).
+        var abierto = cambiando && caja.querySelector('select#fed' + (TACTIL ? ', input[type=date]#fed' : ''));
+        if (abierto && !e.target.closest('.fed-abierto')) { cerrarCampo(); if (!e.target.closest('[data-ed],[data-rel],button,a,select,input,textarea')) return; }
         var r = e.target.closest('[data-rel]');
         if (r && !(e.metaKey || e.ctrlKey || e.shiftKey)) { e.preventDefault(); if (tarea(r.getAttribute('data-rel'))) abrirFicha(r.getAttribute('data-rel')); return; }
         if (e.target.closest('[data-fed-ok]')) { var a0 = caja.querySelector('#fed'); if (a0) guardarCampo(cambiando, a0.value); return; }
@@ -866,14 +907,16 @@
       fv.addEventListener('input', function (e) { if (e.target.id === 'tb-resp' && abiertaId) respuestas[abiertaId] = e.target.value; });
       fv.addEventListener('change', function (e) {
         if (e.target.id === 'kb-f-est') { mover(abiertaId, e.target.value); return; }
-        if (e.target.id === 'fed' && e.target.tagName === 'SELECT' && cambiando) guardarCampo(cambiando, e.target.value);
+        if (e.target.id === 'fed' && cambiando && (e.target.tagName === 'SELECT' || (TACTIL && e.target.type === 'date'))) guardarCampo(cambiando, e.target.value);
       });
-      // Un dato de una línea se guarda al salir de él (o con Intro); un desplegable que se deja sin cambiar, se cierra.
+      // Un dato de una línea se guarda al salir de él (o con Intro). Un desplegable que se deja sin cambiar se cierra al tocar
+      // fuera de él (abajo, en el clic) o con Escape, no al perder el foco: en el móvil, abrir su lista de opciones le quita el
+      // foco, y cerrarlo entonces dejaba la lista sin nada detrás (T0417: no se podía elegir la entrega en el móvil).
       fv.addEventListener('focusout', function (e) {
         var x = e.target;
         if (x.id !== 'fed' || !cambiando || !x.isConnected) return;
-        if (x.tagName === 'INPUT') guardarCampo(cambiando, x.value);
-        else if (x.tagName === 'SELECT') setTimeout(function () { if (cambiando && x.isConnected && document.activeElement !== x) cerrarCampo(); }, 0);
+        // En el móvil, una fecha se guarda al elegirla (change, abajo): su calendario también le quita el foco.
+        if (x.tagName === 'INPUT' && !(TACTIL && x.type === 'date')) guardarCampo(cambiando, x.value);
       });
       fv.addEventListener('keydown', function (e) {
         if (cambiando && e.target.id === 'fed') {

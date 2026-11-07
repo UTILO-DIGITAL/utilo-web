@@ -868,3 +868,77 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
 .u .mp-det .mp-ts small.mp-rojo { color: var(--estado-bl); font-weight: 700; }
 .u .mp-dcerr { margin-top: var(--e3); border-top: 1px solid var(--color-linea); padding-top: var(--e2); }
 .u .mp-dcerr summary { cursor: pointer; min-height: 32px; display: inline-flex; align-items: center; font-weight: 700; color: var(--color-principal-oscuro); }
+
+/* T0417 · Entregas: «Nueva entrega», «Cambiar o mover» y la ficha de una entrega, con lo de la ficha de una tarea (.kb-ficha) y
+   su ventanita (#alta-form). Las tareas de la ficha, como en el detalle del mapa. */
+.u .en-fil .act { display: flex; align-items: center; gap: var(--e2); }
+.u .mp #alta-form .edit { padding: 0; gap: var(--e3); }
+.u .mp #alta-error:not(:empty) { display: block; }
+.u .mp #alta-form .u-nota b { color: var(--color-texto); }
+.u .mp-det .mp-dficha { margin: 0 0 var(--e3); }
+.u .en-acc { margin: var(--e3) 0 0; }
+.u .kb-ficha .cab .id .n + .n { opacity: .8; }
+.u .kb-ficha .bloque h5 { margin: var(--e3) 0 var(--e1); padding-left: var(--e2); border-left: 4px solid var(--estado); font: 700 13px/1.4 var(--fuente-texto); }
+.u .kb-ficha .bloque h5:first-of-type { margin-top: 0; }
+.u .kb-ficha .mp-ts { list-style: none; margin: 0; padding: 0; }
+.u .kb-ficha .mp-ts li { display: flex; flex-direction: column; padding: 2px 0; }
+.u .kb-ficha .mp-ts a { color: var(--color-texto); text-decoration: none; }
+.u .kb-ficha .mp-ts a:hover { text-decoration: underline; }
+.u .kb-ficha .mp-ts .id { font: 600 13px var(--fuente-titulos); color: var(--color-principal-oscuro); }
+.u .kb-ficha .mp-ts small { font-size: 12px; color: var(--color-suave); }
+.u .kb-ficha .mp-dcerr summary { cursor: pointer; margin-top: var(--e2); font-weight: 700; color: var(--color-principal-oscuro); }
+/* T0417 · Añadir tareas a una entrega: una casilla por tarea, con su estado debajo; × para sacar una de la entrega. */
+.u .en-a-lista { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow-y: auto; border: 1px solid var(--color-linea); border-radius: var(--radio); padding: var(--e1); }
+.u #alta-form label.en-a-t { display: flex; align-items: flex-start; gap: var(--e2); padding: var(--e2); border-radius: var(--radio-peq); cursor: pointer;
+  font: 400 15px/1.35 var(--fuente-texto); color: var(--color-texto); text-transform: none; letter-spacing: 0; }
+.u #alta-form label.en-a-t:hover { background: var(--color-bloque); }
+.u #alta-form label.en-a-t input { width: 20px; height: 20px; flex: none; margin-top: 1px; }
+.u .en-a-t .id { font: 600 13px var(--fuente-titulos); color: var(--color-principal-oscuro); }
+.u .en-a-t small { display: block; margin-top: 2px; padding-left: var(--e2); border-left: 3px solid var(--estado); font-size: 12px; color: var(--color-suave); }
+.u .kb-ficha .mp-ts li:has(.fquitar) { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: var(--e2); }
+.u .kb-ficha .mp-ts li:has(.fquitar) a { flex: 1 1 0; min-width: 0; }
+.u .kb-ficha .mp-ts li:has(.fquitar) small { order: 3; flex: 1 1 100%; }
+.u .kb-ficha .mp-ts .fquitar { order: 2; }
+.u .kb-ficha .bloque > .fmas[data-anadir-tareas] { margin-top: var(--e3); }
+/* T0417 · En el móvil, lo que se cambia en una ficha va a 16 px: con menos, el iPhone acerca la página al tocarlo. */
+@media (hover: none) {
+  .u .kb-ficha .fed-abierto select, .u .kb-ficha .fed-abierto input, .u .kb-ficha .fed-abierto textarea { font-size: 16px; }
+}
+/* T0417 · En el móvil, un dato de lista de la ficha (entrega, prioridad, personas…) se elige en una ventanita: una opción por botón. */
+.u .tb-elegir { display: flex; flex-direction: column; gap: var(--e2); }
+.u .tb-op { min-height: 52px; padding: var(--e2) var(--e4); text-align: left; border: 1px solid var(--color-linea); border-radius: var(--radio);
+  background: var(--color-superficie); color: var(--color-texto); font: 600 16px/1.3 var(--fuente-texto); cursor: pointer; }
+.u .tb-op.es { border: 2px solid var(--color-principal-oscuro); background: var(--color-bloque); }
+.u .tb-op.es::after { content: ' ✓'; color: var(--color-principal-oscuro); }
+
+/* T0422 · Entregas: la vista y «Filtros» en una línea; los filtros, en una hoja que sube desde abajo con botones; crear, con
+   el botón flotante (en el móvil, un + redondo). */
+.u .en-fil:has(.en-filtros) { align-items: center; justify-content: space-between; flex-wrap: nowrap; }
+.u .en-filtros { display: inline-flex; align-items: center; gap: var(--e2); min-height: 44px; padding: 0 var(--e4); }
+.u .en-filtros svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+.u .en-filtros .k-fil-n { margin-left: 2px; }
+.u #alta-velo.en-hoja #alta-form { padding-top: var(--e4); }
+.u .en-hoja-cab { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); margin-bottom: var(--e2); }
+.u .en-hoja-cab h2 { margin: 0 !important; }
+.u .en-hoja-x { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 50%;
+  background: var(--color-bloque); color: var(--color-texto); cursor: pointer; }
+.u .en-hoja-x svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+.u .en-hoja-h { margin: var(--e4) 0 var(--e2); font: 700 12px/1.3 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; }
+.u .en-chips { display: flex; flex-wrap: wrap; gap: var(--e2); }
+.u .en-chip { min-height: 44px; padding: 0 var(--e4); border: 1.5px solid var(--color-linea); border-radius: 22px; background: var(--color-superficie);
+  color: var(--color-texto); font: 600 15px/1 var(--fuente-texto); cursor: pointer; }
+.u .en-chip[aria-pressed=true] { background: var(--color-principal-oscuro); border-color: var(--color-principal-oscuro); color: var(--color-superficie); }
+.u #alta-velo.en-hoja .botones button[disabled] { opacity: .5; cursor: default; }
+@media (max-width: 640px) {
+  .u #alta-velo.en-hoja { align-items: flex-end; }
+  .u #alta-velo.en-hoja #alta-form { min-height: 0; border-radius: var(--radio) var(--radio) 0 0; padding-bottom: calc(var(--e4) + env(safe-area-inset-bottom, 0px)); }
+  .u #alta-velo.en-hoja .botones > * { flex: 1 1 0; }
+}
+.u #alta-btn.en-mas { display: inline-flex; align-items: center; gap: var(--e2); }
+.u #alta-btn.en-mas[hidden] { display: none; }
+.u .en-mas-mas { font-size: 26px; line-height: 1; font-weight: 700; }
+@media (max-width: 640px) {
+  .u #alta-btn.en-mas { width: 60px; height: 60px; min-height: 0; padding: 0; justify-content: center; border-radius: 50%; }
+  .u #alta-btn.en-mas .en-mas-t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .u #alta-btn.en-mas .en-mas-mas { font-size: 32px; }
+}

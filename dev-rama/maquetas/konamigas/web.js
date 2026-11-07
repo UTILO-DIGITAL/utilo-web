@@ -66,9 +66,10 @@
     personas: function () { return llamar('maquetaPersonas'); },
     inscripciones: function () { return llamar('inscripcionesDatos'); },
     entrar: function (id) {
-      return llamar('maquetaEntrar', [id]).then(function (r) { poner(PUB, r.tablas); recordar(id); });
+      return llamar('maquetaEntrar', [id]).then(function (r) { web.pagos = r.pagos || {}; poner(PUB, r.tablas); recordar(id); });
     },
-    salir: function () { poner(PUB, null); recordar(''); },
+    salir: function () { web.pagos = {}; poner(PUB, null); recordar(''); },
+    pagos: {}, // T0419: los de los equipos de la capitana que ha entrado (Mi equipo), por su inscripción
     partido: '',
     /**
      * Competiciones: la sección Ligas de verdad, solo para ver (un perfil sin permisos: ni actas, ni mover, ni sanciones),
