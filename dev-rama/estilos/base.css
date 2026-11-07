@@ -142,6 +142,22 @@ body.u { margin: 0; background: var(--color-fondo); color: var(--color-texto);
 .u .kz-aviso { min-height: 1.3em; margin: 0; color: var(--color-error); font-weight: 700; font-size: 14px; }
 .u .kz-ayuda { margin: 0; font-size: 14px; color: var(--color-suave); }
 .u .kz-caja p { margin: 0; }
+/* T0391 · Entrar con un código al correo, y «Tus correos» del Perfil */
+.u .kz-form { display: flex; flex-direction: column; gap: var(--e3); }
+.u .kz-codigo { letter-spacing: .4em; text-align: center; font-variant-numeric: tabular-nums; font-size: 22px !important; }
+.u .kz-o { text-align: center; color: var(--color-suave); font-size: 14px; }
+.u .kz-otros { display: flex; gap: var(--e2); }
+.u .kz-otros button { flex: 1 1 0; font-size: 14px; }
+.u .kz-buzon { padding: var(--e3); border: 1px dashed var(--color-linea); border-radius: 8px; font-size: 14px; display: flex; flex-direction: column; gap: var(--e2); overflow-wrap: anywhere; }
+.u .n-correos { margin-top: var(--e5); padding-top: var(--e4); border-top: 1px solid var(--color-linea); display: flex; flex-direction: column; gap: var(--e3); }
+.u .n-correos h3 { margin: 0; font-size: 16px; }
+.u .n-correos .u-nota { margin: 0; }
+.u .n-correos-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--e2); }
+.u .n-correos-lista li { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e1) var(--e3); min-width: 0; }
+.u .n-correos-lista li > span:first-child { font-weight: 700; overflow-wrap: anywhere; min-width: 0; }
+.u .n-correos-lista li > button { margin-left: auto; }
+.u .n-correos label { display: flex; flex-direction: column; gap: var(--e1); font: 700 12px/1.3 var(--fuente-texto); color: var(--color-principal-oscuro); }
+.u .n-correos input { width: 100%; font-size: 16px; }
 
 /* ---------- Barra de secciones: abajo en el móvil, menú a la izquierda en el ordenador (T0225) ----------
  * T0224: los botones quedan por encima de la zona segura (barra de inicio y esquinas del iPhone); el fondo de la barra
