@@ -172,7 +172,7 @@
       pantalla('<div class="kz-caja" id="n-entrar">' + bandaDev(ini.nucleo.dev) + '<h1>' + texto(titulo) + '</h1>' +
         '<p class="kz-ayuda">Te hemos enviado un código a <strong>' + texto(correo) + '</strong>. Escríbelo aquí: caduca en 10 minutos.</p>' +
         '<form id="n-f-codigo" class="kz-form" novalidate><label>Código<input type="text" id="n-codigo" class="kz-codigo" inputmode="numeric" ' +
-          'autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" required></label>' +
+          'autocomplete="one-time-code" pattern="[0-9]*" maxlength="10" required></label>' +
         '<button type="submit" class="u-btn u-btn-accion">Entrar</button></form>' +
         '<p class="kz-aviso" id="n-aviso-entrar" role="alert">' + texto(msg || '') + '</p>' +
         '<p class="kz-ayuda">¿No te llega? Mira en el correo no deseado. Si tampoco está, puede que ese correo no sea el que diste al apuntarte: pídeselo a quien te dio de alta.</p>' +
@@ -181,8 +181,14 @@
         (dev ? '<button type="button" class="u-btn" id="n-buzon">Ver el buzón de pruebas</button><div id="n-buzon-ver" class="kz-buzon" hidden></div>' : '') +
         '</div>');
       var f = $('n-f-codigo'), b = f.querySelector('button'), i = $('n-codigo');
-      // Al pegar o al completar las 6 cifras (el móvil las sugiere del correo), entra solo.
-      i.oninput = function () { i.value = i.value.replace(/\D+/g, '').slice(0, 6); if (i.value.length === 6 && !b.disabled) f.requestSubmit ? f.requestSubmit() : f.onsubmit(new Event('submit')); };
+      // Al pegar el código o al ponerlo el móvil (lo sugiere del correo), entra solo; escrito a mano, con «Entrar». Auth
+      // manda 6 u 8 cifras según el proyecto: no se sabe cuántas faltan.
+      var antes = 0;
+      i.oninput = function () {
+        i.value = i.value.replace(/\D+/g, '').slice(0, 10);
+        var de_golpe = i.value.length - antes >= 6; antes = i.value.length;
+        if (de_golpe && !b.disabled) { if (f.requestSubmit) f.requestSubmit(); else f.onsubmit(new Event('submit')); }
+      };
       f.onsubmit = function (e) {
         if (e && e.preventDefault) e.preventDefault();
         b.disabled = true; b.textContent = 'Entrando…'; $('n-aviso-entrar').textContent = '';
@@ -651,7 +657,7 @@
         }).join('') + '</ul>' +
         pend.map(function (x) {
           return '<form class="kz-form n-correo-codigo" data-n-confirmar="' + texto(x.correo) + '"><label>Código que ha llegado a ' + texto(x.correo) +
-            '<input type="text" class="kz-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label>' +
+            '<input type="text" class="kz-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="10"></label>' +
             '<div class="n-botones"><button type="submit" class="u-btn u-btn-accion">Confirmar</button>' +
             '<button type="button" class="u-btn" data-n-reenviar="' + texto(x.correo) + '">Enviar otro código</button>' +
             (window.UG.entorno !== 'prod' && window.UG.buzon ? '<button type="button" class="u-btn" data-n-buzon="' + texto(x.correo) + '">Ver el buzón de pruebas</button>' : '') +

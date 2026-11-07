@@ -126,7 +126,8 @@
   /** Cambia el código por la sesión. Un código equivocado y uno caducado, Auth los dice igual. */
   function entrarConCodigo(correo, codigo) {
     var c = bajo(correo), k = String(codigo == null ? '' : codigo).replace(/\s+/g, '');
-    if (!/^\d{6}$/.test(k)) return Promise.reject(new Error('El código son las 6 cifras que te han llegado al correo.'));
+    // Auth manda 6 u 8 cifras según el proyecto (Email OTP Length en el panel): vale el largo que llegue.
+    if (!/^\d{6,10}$/.test(k)) return Promise.reject(new Error('El código son las cifras que te han llegado al correo.'));
     return auth('verify', { type: 'email', email: c, token: k }).then(function (r) {
       if (!r.ok || !r.j.access_token) {
         if (demasiados(r.j)) throw new Error('Has probado demasiadas veces: espera unos minutos y pide otro código.');

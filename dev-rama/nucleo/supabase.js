@@ -216,7 +216,7 @@
     var k = claveDe(det);
     if (!k && R && R.T === T && R.cols.every(function (x) { return !vacio(valores[x]); })) k = { cols: R.cols, vals: R.cols.map(function (x) { return txt(valores[x]); }).join(', ') };
     var cols = k ? k.cols : R ? R.cols : null;
-    if (c === '23505') e = 'VALIDAR: ' + (cols ? cols.join(' y ') + ': ya hay una fila con ' + (k ? '«' + k.vals + '»' : 'ese valor') + ' en ' + T.nombre + '.' : 'ese valor ya está en ' + T.nombre + ' y no se puede repetir.');
+    if (c === '23505' || c === '23P01') e = 'VALIDAR: ' + (cols ? cols.join(' y ') + ': ya hay una fila con ' + (k ? '«' + k.vals + '»' : 'ese valor') + ' en ' + T.nombre + '.' : 'ese valor ya está en ' + T.nombre + ' y no se puede repetir.');
     else if (c === '23503' && (/still referenced/.test(det) || /update or delete on table/.test(msg))) {
       var usa = (/from table "?([^"\s]+)"?/.exec(det) || /on table "([^"]+)"\s*$/.exec(msg) || [])[1];
       var id = k && !R ? k.vals : txt(valores[T.clave]);
