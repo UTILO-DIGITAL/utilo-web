@@ -24,6 +24,7 @@
  * - Quién puede qué lo dicen las reglas por fila (RLS) y los permisos de la base, no la web: lo que no deja, aquí es un error.
  * - Leer: toda la tabla en páginas de 1000 filas (lo que da la API como mucho), en el orden de su clave. v es una huella de
  *   lo leído: si no ha cambiado desde lo que tiene la web (desde), va { igual: true } y no se vuelve a pintar.
+ * - En directo (T0386): US.directo({ url, clave, token, tablas, alCambiar }) avisa de cada cambio en esas tablas (Realtime).
  * - Partes (T0256): { col, valores } → col=in.(…), de 100 en 100 valores.
  * - Actualizar con antes (lo que había en la pantalla): solo cambia la fila si sigue así; si otra persona la ha cambiado,
  *   CAMBIADO (tablas.js la vuelve a leer). Una fila que no se puede cambiar no da error en la API (las reglas por fila la
@@ -483,7 +484,81 @@
     return err;
   }
 
-  var US = { crear: crear, _: { aPared: aPared, dePared: dePared, fechaWeb: fechaWeb, deBase: deBase, aBase: aBase, validar: validar, preparar: preparar, traducir: traducir, huella: huella, errorFuncion: errorFuncion } };
+  /* ---------- en directo (T0386): Supabase Realtime ---------- */
+
+  /**
+   * Avisa cuando cambian filas de unas tablas de la base, en el momento, por la conexión de Realtime de Supabase (un WebSocket;
+   * los avisos respetan las reglas por fila: cada uno recibe solo los de lo que puede ver). Las tablas tienen que estar en la
+   * publicación supabase_realtime (su migración).
+   *
+   *   var d = US.directo({ url, clave (la publishable), token: function () { return promesa del access_token },
+   *                        tablas: ['tareas', …] (nombres de la base), alCambiar: function (tabla) {}, WebSocket (opcional) });
+   *   d.cerrar();
+   *
+   * alCambiar(tabla) va por cada cambio (insert, update o delete), con el nombre de la tabla de la base; y alCambiar('*') al volver
+   * a conectar tras un corte (pudo cambiar algo mientras tanto). Se reconecta sola, cada vez esperando más (hasta 30 s), y cada
+   * 25 s da señales de vida; la sesión renovada se le pasa sola. Sin WebSocket o sin sesión no hace nada (la web sigue con ↻).
+   */
+  function directo(o) {
+    o = o || {};
+    var WS = o.WebSocket || (typeof WebSocket === 'function' ? WebSocket : null);
+    var nada = { cerrar: function () {}, activo: function () { return false; } };
+    if (!WS || !o.url || !o.clave || !(o.tablas || []).length) return nada;
+    var dir = String(o.url).replace(/\/+$/, '').replace(/^http/, 'ws') + '/realtime/v1/websocket?apikey=' + encodeURIComponent(o.clave) + '&vsn=1.0.0';
+    var TEMA = 'realtime:utilo-' + o.tablas.join('-'), ref = 0, ws = null, vivo = null, espera = 1000, cerrado = false, unida = false, ultimo = '', otra = false;
+    var avisar = o.alCambiar || function () {};
+    var poner = o.setTimeout || setTimeout, quitar = o.clearTimeout || clearTimeout, cada = o.setInterval || setInterval, parar = o.clearInterval || clearInterval;
+    function enviar(tema, ev, carga) { try { ws.send(JSON.stringify({ topic: tema, event: ev, payload: carga || {}, ref: String(++ref) })); } catch (e) {} }
+    function sesion() { return Promise.resolve(o.token ? o.token() : '').catch(function () { return ''; }); }
+    function abrir() {
+      if (cerrado) return;
+      sesion().then(function (tok) {
+        if (cerrado) return;
+        try { ws = new WS(dir); } catch (e) { reintentar(); return; }
+        ws.onopen = function () {
+          ultimo = tok || '';
+          enviar(TEMA, 'phx_join', {
+            config: { broadcast: { self: false }, presence: { key: '' }, private: false,
+              postgres_changes: o.tablas.map(function (t) { return { event: '*', schema: 'public', table: t }; }) },
+            access_token: tok || o.clave
+          });
+          vivo = cada(function () {
+            enviar('phoenix', 'heartbeat', {});
+            sesion().then(function (n) { if (n && n !== ultimo && unida) { ultimo = n; enviar(TEMA, 'access_token', { access_token: n }); } });
+          }, 25000);
+        };
+        ws.onmessage = function (m) {
+          var x; try { x = JSON.parse(m.data); } catch (e) { return; }
+          if (x.topic !== TEMA) return;
+          if (x.event === 'phx_reply' && x.payload && x.payload.status === 'ok' && !unida) {
+            unida = true; espera = 1000;
+            if (otra) avisar('*'); // tras un corte, lo que cambió mientras tanto
+            otra = true;
+          } else if (x.event === 'postgres_changes') {
+            var d = x.payload && x.payload.data;
+            avisar(String((d && d.table) || '*'));
+          } else if (x.event === 'phx_error' || x.event === 'phx_close') {
+            try { ws.close(); } catch (e) {}
+          }
+        };
+        ws.onclose = function () { unida = false; if (vivo) { parar(vivo); vivo = null; } reintentar(); };
+        ws.onerror = function () {};
+      });
+    }
+    var t = null;
+    function reintentar() {
+      if (cerrado || t) return;
+      t = poner(function () { t = null; abrir(); }, espera);
+      espera = Math.min(espera * 2, 30000);
+    }
+    abrir();
+    return {
+      cerrar: function () { cerrado = true; if (t) quitar(t); if (vivo) parar(vivo); try { if (ws) ws.close(); } catch (e) {} },
+      activo: function () { return unida; }
+    };
+  }
+
+  var US = { crear: crear, directo: directo, _: { aPared: aPared, dePared: dePared, fechaWeb: fechaWeb, deBase: deBase, aBase: aBase, validar: validar, preparar: preparar, traducir: traducir, huella: huella, errorFuncion: errorFuncion } };
   if (typeof module === 'object' && module.exports) module.exports = US;
   else raiz.US = US;
 })(typeof window !== 'undefined' ? window : this);

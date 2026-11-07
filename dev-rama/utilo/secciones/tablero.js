@@ -9,14 +9,22 @@
  * - Vista (arriba): «8 columnas» (todas menos Aplazada y Descartada), «Todas» (los diez estados) o «Agrupadas» (Necesita tu
  *   respuesta con Bloqueada y Para revisar con Aprobada; el estado exacto, en la tarjeta). La primera vez, la de
  *   config.VISTA; después, la última de este dispositivo. Entregadas y Descartadas, solo las de los últimos días (Filtros).
+ * - En directo: con Supabase, lo que cambie otra persona (o el agente) sale solo en un segundo (Realtime); ↻ sigue para forzarlo.
+ * - Ordenar a mano: arrastrada dentro de su columna, la tarjeta se queda donde se suelta (el mismo orden para todos; las que no
+ *   se han tocado, debajo, con el de siempre). Al cambiar de estado, vuelve al de siempre. Las cerradas, por fecha.
  * - Filtros: iniciativa, entrega, persona (en manos de, asignada, pide o revisa), épica y prioridad; y buscar.
  * - Las personas son su id en la base: el nombre sale de personas_gestion().
  * - Se pinta al momento con lo guardado en el dispositivo y se refresca por detrás.
  * - Mover (arrastrando en el ordenador, con el desplegable en el móvil o desde la ficha): solo a los estados a los que se
  *   puede pasar, y pide lo que exige cada uno (Bloqueada, el motivo; Necesita tu respuesta, la pregunta; Aplazada, la fecha;
  *   Descartada y rechazar, el motivo). La tarjeta cambia al momento y lo escribe mover_tarea(); si la base dice que no, vuelve.
+ * - En el móvil, mantener pulsada una tarjeta la coge para llevarla con el dedo a otra columna o a otro sitio de la suya.
+ * - Ficha: cada dato (título, etiquetas, fechas, personas, «espera a», textos) se cambia pulsándolo; lo que no tiene valor, con
+ *   «Añadir». «Editar tarea» sigue para cambiar varios a la vez.
  * - Crear y editar escriben TAREAS (y sus DEPENDENCIAS) con la capa de tablas; la tarjeta sale al momento con «Guardando».
  *   Una nota va a la bitácora con anotar(). Después se trae el tablero (en manos de, lo que la base mueve sola).
+ * - T0387 · Una tarea en Necesita tu respuesta se responde en su ficha (responder() de la base, como en Para mí): quien la
+ *   pidió o quien lleva la iniciativa. Lo escrito se guarda aunque la ficha se repinte.
  */
 (function () {
   'use strict';
@@ -42,6 +50,23 @@
     'Aprobada': ['Entregada'],
     'Aplazada': ['En cola', 'Esperando', 'Descartada']
   };
+  /** Qué abarca cada estado: sale al pasar el ratón por la cabecera de su columna. */
+  var QUE_ES = {
+    'Esperando': 'Espera a otra tarea de la que depende: todavía no se puede empezar.',
+    'En cola': 'No espera nada: lista para empezar cuando alguien la coja.',
+    'En curso': 'Alguien está trabajando en ella ahora.',
+    'Necesita tu respuesta': 'Parada hasta que quien la pidió conteste una pregunta concreta.',
+    'Bloqueada': 'Parada por algo de fuera: material del cliente, un acceso, un problema técnico o un tercero.',
+    'Para revisar': 'Hecha: falta que quien la revisa la mire.',
+    'Aprobada': 'Revisada y bien: falta publicarla o entregarla.',
+    'Entregada': 'Hecha y funcionando. Se cierra con su fecha.',
+    'Aplazada': 'Se deja para más adelante: se vuelve a mirar en la fecha que diga.',
+    'Descartada': 'No se va a hacer.'
+  };
+  /** El texto de la cabecera de una columna: el de su estado o, si junta varios, el de cada uno. */
+  function queEs(c) {
+    return c.estados.length === 1 ? QUE_ES[c.estados[0]] || '' : c.estados.map(function (e) { return e + ': ' + (QUE_ES[e] || ''); }).join('\n');
+  }
   var MOTIVOS_BLOQUEO = ['Falta material del cliente', 'Falta un acceso', 'Problema técnico', 'Un tercero'];
   var HERRAMIENTAS = ['Chat', 'Cowork', 'Claude Code'];
   /** Las columnas de cada vista: [{ id, titulo, estados }]. */
@@ -60,7 +85,21 @@
   var ETIQUETA = { ASIGNADO: 'Asignada a', PIDE: 'La pide', REVISA: 'La revisa', EPICA: 'Épica', P: 'Prioridad', T: 'Tamaño', INICIATIVA: 'Iniciativa',
     ENTREGA: 'Entrega', DEADLINE: 'Fecha límite', DISPONIBLE_DESDE: 'No empezar antes del', FECHA_CIERRE: 'Cerrada el', REVISAR_EL: 'Se vuelve a mirar el',
     DESCRIPCION: 'Qué hay que hacer', DOCUMENTOS_RELEVANTES: 'Documentos', CONCLUSIONES: 'Conclusiones', PREGUNTA: 'Pregunta', MOTIVO: 'Motivo',
-    MOTIVO_BLOQUEO: 'Motivo del bloqueo', HERRAMIENTA: 'Herramienta', EMPLEADO: 'Empleado IA' };
+    MOTIVO_BLOQUEO: 'Motivo del bloqueo', HERRAMIENTA: 'Herramienta', EMPLEADO: 'Empleado IA', TITULO: 'Título', DEPENDE: 'Espera a' };
+  var OBLIGA = { TITULO: 'Título', DESCRIPCION: 'Qué hay que hacer', INICIATIVA: 'Iniciativa', ASIGNADO: 'Asignada a' };
+  /** T0386: lo que se guarda al cambiar el dato k de la tarea t desde la ficha: { cambios, antes }, { mal } si no vale, o null si no
+   *  cambia nada. entregasDe(ini) da los id de las entregas de una iniciativa: al cambiar de iniciativa, la entrega que no es suya se quita. */
+  function cambioDe(t, k, v, entregasDe) {
+    v = typeof v === 'boolean' ? v : String(v == null ? '' : v).trim();
+    if (k === 'TITULO') v = v.replace(/\.+$/, '');
+    if (OBLIGA[k] && !v) return { mal: OBLIGA[k] + ': falta.' };
+    if (k === 'TITULO' && v.length > 60) return { mal: 'Título: pasa de 60 caracteres.' };
+    var cambios = {}, antes = {};
+    var pon = function (c, x) { var a = t[c] == null ? '' : t[c]; if (typeof x === 'boolean' ? !!a !== x : String(a) !== x) { cambios[c] = x; antes[c] = a; } };
+    pon(k, v);
+    if (k === 'INICIATIVA' && 'INICIATIVA' in cambios && t.ENTREGA && (entregasDe ? entregasDe(v) : []).indexOf(t.ENTREGA) < 0) pon('ENTREGA', '');
+    return Object.keys(cambios).length ? { cambios: cambios, antes: antes } : null;
+  }
 
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function leerLocal(k, d) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
@@ -106,12 +145,13 @@
       var GENTE = leerLocal(CLAVE + '_gente', {});   // id de persona → nombre (personas_gestion)
       var PL = leerLocal(CLAVE + '_pl', null);       // columnas plegadas; la primera vez, en el móvil, todas menos En curso
       if (!PL) { PL = {}; if (window.matchMedia && matchMedia('(max-width:640px)').matches) ESTADOS.concat(['Atascadas', 'En revisión']).forEach(function (e) { if (e !== 'En curso') PL[e] = 1; }); }
-      var abiertaId = '', leido = false, editando = false;
+      var abiertaId = '', leido = false, editando = false, cambiando = ''; // cambiando: el dato de la ficha que se está cambiando
       var TACTIL = window.matchMedia && matchMedia('(hover: none)').matches;
       // Solo lee: lector en todo (las reglas de la base lo dicen igual; aquí, para no ofrecer lo que no puede).
       var SOLO_LEE = !ctx.admin && /^Lector/.test(ctx.perfil || '');
+      var ORDENA = !SOLO_LEE; // T0386: ordenar a mano en su columna (la base dice quién puede: ordenar_tareas)
 
-      el.classList.add('kb');
+      el.classList.add('kb', 'tb'); // tb: lo propio de la plataforma en estilos/kanban.css
       el.innerHTML =
         '<div class="filtros">' +
           '<label class="busca"><span class="u-oculto">Buscar tareas</span><input type="search" id="kb-busca" placeholder="Buscar tareas" autocomplete="off"></label>' +
@@ -226,9 +266,17 @@
         var dl = function (t) { var d = dias(t.DEADLINE); return d === null ? 1e9 : d; };
         var ur = function (t) { return t.URGENTE || dl(t) <= 7 ? 1 : 0; };
         var pn = function (t) { return String(t.P || '').length; };
+        // T0386: las ordenadas a mano (ORDEN), antes y en su orden; las demás, debajo, con el de siempre.
+        var om = function (t) { var o = ordenDe(t); return o === null ? Infinity : o; };
         return ts.sort(function (a, b) {
-          return (ur(b) - ur(a)) || (ur(a) ? dl(a) - dl(b) : 0) || (pn(b) - pn(a)) || (dl(a) - dl(b)) || String(a.ID).localeCompare(String(b.ID));
+          return (om(a) - om(b) || 0) || (ur(b) - ur(a)) || (ur(a) ? dl(a) - dl(b) : 0) || (pn(b) - pn(a)) || (dl(a) - dl(b)) || String(a.ID).localeCompare(String(b.ID));
         });
+      }
+      /** El orden a mano de una tarea (null si no tiene): el que se acaba de poner aquí, hasta que llega el de la base. */
+      var ORDEN_AQUI = {};
+      function ordenDe(t) {
+        var o = Object.prototype.hasOwnProperty.call(ORDEN_AQUI, t.ID) ? ORDEN_AQUI[t.ID] : t.ORDEN;
+        return o === null || o === undefined || o === '' || isNaN(Number(o)) ? null : Number(o);
       }
       function tarjeta(t, col) {
         var id = String(t.ID), m = [], x = [], varias = variasIniciativas();
@@ -265,7 +313,7 @@
           var ts = ordenar(lista.filter(function (t) { return c.estados.indexOf(t.ESTADO) >= 0; }), CERRADOS.indexOf(c.id) >= 0);
           var pl = !!PL[c.id] && !F.busca;
           return '<section class="col' + (pl ? ' plegada' : '') + '" data-est="' + texto(c.id) + '">' +
-            '<h2 class="' + cls(c.estados[0], c) + ' ch" role="button" tabindex="0" aria-expanded="' + (pl ? 'false' : 'true') + '" data-plegar="' + texto(c.id) + '">' + texto(c.titulo) +
+            '<h2 class="' + cls(c.estados[0], c) + ' ch" title="' + texto(queEs(c)) + '" role="button" tabindex="0" aria-expanded="' + (pl ? 'false' : 'true') + '" data-plegar="' + texto(c.id) + '">' + texto(c.titulo) +
             '<span class="n">' + ts.length + '</span><span class="fl"></span></h2>' +
             '<div class="lista">' + (ts.length ? ts.map(function (t) { return tarjeta(t, c); }).join('') : '<div class="vacio">Ninguna tarea con estos filtros.</div>') + '</div></section>';
         }).join('');
@@ -286,32 +334,164 @@
         var s = e.target.closest('[data-mover]');
         if (s) mover(s.getAttribute('data-mover'), s.value);
       });
-      // Arrastrar en el ordenador: la tarjeta a otra columna (en una columna con dos estados, al primero al que puede pasar).
+      // Arrastrar en el ordenador: la tarjeta a otra columna (en una columna con dos estados, al primero al que puede pasar)
+      // o dentro de la suya, para ordenarla. En el móvil, lo mismo manteniéndola pulsada (abajo).
       var arr = '';
-      tab.addEventListener('dragstart', function (e) {
-        var c = e.target.closest && e.target.closest('.card[draggable]');
-        if (!c) return;
-        arr = c.getAttribute('data-id'); c.classList.add('arrastrando');
-        try { e.dataTransfer.setData('text/plain', arr); e.dataTransfer.effectAllowed = 'move'; } catch (x) {}
-      });
-      tab.addEventListener('dragend', function () { arr = ''; [].forEach.call(tab.querySelectorAll('.arrastrando,.destino'), function (x) { x.classList.remove('arrastrando', 'destino'); }); });
-      tab.addEventListener('dragover', function (e) {
-        var c = arr && e.target.closest('.col');
-        if (!c) return;
-        e.preventDefault();
+      /** Coge la tarjeta id: las columnas a las que puede pasar se marcan enteras, de arriba abajo; las demás se apagan. */
+      function marcar(id) {
+        arr = id;
+        var t = tarea(id), pasos = (t && PASOS[t.ESTADO]) || [];
+        tab.classList.add('kb-arrastre');
+        [].forEach.call(tab.querySelectorAll('.col'), function (x) {
+          var col = columna(x.getAttribute('data-est'));
+          var suya = col && t && col.estados.indexOf(t.ESTADO) >= 0, puede = col && !suya && col.estados.some(function (e) { return pasos.indexOf(e) >= 0; });
+          x.classList.add(suya ? 'kb-suya' : puede ? 'kb-puede' : 'kb-no');
+          if (suya && ORDENA && CERRADOS.indexOf(col.estados[0]) < 0) x.classList.add('kb-ordena');
+        });
+      }
+      function desmarcar() {
+        arr = ''; tab.classList.remove('kb-arrastre'); hueco(null);
+        [].forEach.call(tab.querySelectorAll('.arrastrando,.kb-cogida,.destino,.kb-suya,.kb-puede,.kb-no,.kb-ordena'), function (x) {
+          x.classList.remove('arrastrando', 'kb-cogida', 'destino', 'kb-suya', 'kb-puede', 'kb-no', 'kb-ordena'); });
+      }
+      /** Dónde caería la tarjeta cogida si se suelta sobre elem a la altura y, y lo marca: { o: su columna, antes } para ordenarla,
+       *  { c: columna } para pasarla a otro estado, o null si ahí no se puede. */
+      function apuntar(elem, y) {
+        var o = arr && elem && elem.closest && elem.closest('.col.kb-ordena');
+        var c = !o && arr && elem && elem.closest && elem.closest('.col.kb-puede');
         [].forEach.call(tab.querySelectorAll('.destino'), function (x) { if (x !== c) x.classList.remove('destino'); });
-        c.classList.add('destino');
-      });
-      tab.addEventListener('drop', function (e) {
-        var c = arr && e.target.closest('.col');
-        if (!c) return;
-        e.preventDefault();
-        var id = arr, t = tarea(id); arr = '';
-        var col = VISTAS[F.vista].cols.filter(function (x) { return x.id === c.getAttribute('data-est'); })[0];
+        if (o) { var ab = debajo(o, y); hueco(o, ab); return { o: o, antes: ab }; }
+        hueco(null);
+        if (c) { c.classList.add('destino'); return { c: c }; }
+        return null;
+      }
+      function soltar(id, d) {
+        if (!d) return;
+        if (d.o) { colocar(id, columna(d.o.getAttribute('data-est')), d.antes ? d.antes.getAttribute('data-id') : null); return; }
+        var t = tarea(id), col = columna(d.c.getAttribute('data-est'));
         if (!t || !col || col.estados.indexOf(t.ESTADO) >= 0) return;
         var a = col.estados.filter(function (x) { return (PASOS[t.ESTADO] || []).indexOf(x) >= 0; })[0];
         mover(id, a || col.estados[0]);
+      }
+      tab.addEventListener('dragstart', function (e) {
+        var c = e.target.closest && e.target.closest('.card[draggable]');
+        if (!c) return;
+        marcar(c.getAttribute('data-id')); c.classList.add('arrastrando');
+        try { e.dataTransfer.setData('text/plain', arr); e.dataTransfer.effectAllowed = 'move'; } catch (x) {}
       });
+      tab.addEventListener('dragend', desmarcar);
+      function columna(id) { return VISTAS[F.vista].cols.filter(function (x) { return x.id === id; })[0]; }
+      /** Dónde caería al soltarla en su columna: la tarjeta de debajo (null, al final). Se marca con una raya. */
+      function debajo(c, y) {
+        var cs = [].filter.call(c.querySelectorAll('.card[data-id]'), function (x) { return x.getAttribute('data-id') !== arr; });
+        for (var i = 0; i < cs.length; i++) { var r = cs[i].getBoundingClientRect(); if (y < r.top + r.height / 2) return cs[i]; }
+        return null;
+      }
+      function hueco(c, antes) {
+        [].forEach.call(tab.querySelectorAll('.kb-antes,.kb-al-final'), function (x) { x.classList.remove('kb-antes', 'kb-al-final'); });
+        if (!c) return;
+        if (antes) antes.classList.add('kb-antes'); else c.querySelector('.lista').classList.add('kb-al-final');
+      }
+      tab.addEventListener('dragover', function (e) { if (arr && apuntar(e.target, e.clientY)) e.preventDefault(); });
+      tab.addEventListener('drop', function (e) {
+        var d = arr && apuntar(e.target, e.clientY);
+        if (!d) return;
+        e.preventDefault();
+        var id = arr; desmarcar();
+        soltar(id, d);
+      });
+
+      // T0386: en el móvil (el navegador no arrastra con el dedo), mantener pulsada una tarjeta medio segundo la coge: con el dedo
+      // se lleva dentro de su columna, para ordenarla, o a otra a la que pueda pasar, como en el ordenador. Cerca del borde de
+      // arriba o de abajo, la página se desplaza sola. Si el dedo se mueve antes de cogerla, es desplazarse, como siempre.
+      var toque = null;
+      function desplazable(x) {
+        for (; x && x !== document.documentElement; x = x.parentElement) { // en el móvil, el body
+          var o = getComputedStyle(x).overflowY;
+          if ((o === 'auto' || o === 'scroll') && x.scrollHeight > x.clientHeight) return x;
+        }
+        return document.scrollingElement || document.documentElement;
+      }
+      function rodar() {
+        if (!toque || !toque.cogida) return;
+        var h = window.innerHeight, v = toque.y < 80 ? -(80 - toque.y) / 4 : toque.y > h - 80 ? (toque.y - (h - 80)) / 4 : 0;
+        if (v) { toque.rueda.scrollTop += v; apuntar(document.elementFromPoint(toque.x, toque.y), toque.y); }
+        toque.raf = requestAnimationFrame(rodar);
+      }
+      function coger() {
+        if (!toque) return;
+        toque.cogida = true;
+        marcar(toque.id);
+        toque.card.classList.add('arrastrando', 'kb-cogida');
+        try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) {}
+        toque.rueda = desplazable(tab);
+        toque.raf = requestAnimationFrame(rodar);
+      }
+      function soltarToque(e) {
+        if (!toque) return;
+        var tq = toque; toque = null;
+        clearTimeout(tq.tm); if (tq.raf) cancelAnimationFrame(tq.raf);
+        if (!tq.cogida) return;
+        if (e.cancelable) e.preventDefault(); // que al soltarla no se abra la ficha
+        var d = e.type === 'touchend' ? apuntar(document.elementFromPoint(tq.x, tq.y), tq.y) : null, id = arr;
+        desmarcar();
+        soltar(id, d);
+      }
+      if (TACTIL && !SOLO_LEE) {
+        tab.addEventListener('touchstart', function (e) {
+          var c = e.target.closest && e.target.closest('.card[data-id]');
+          if (!c || e.touches.length !== 1 || e.target.closest('select')) return;
+          var id = c.getAttribute('data-id'), t = id && tarea(id);
+          if (!t || t._pendiente || !(PASOS[t.ESTADO] || []).length) return;
+          var p = e.touches[0];
+          toque = { id: id, card: c, x: p.clientX, y: p.clientY, x0: p.clientX, y0: p.clientY, cogida: false };
+          toque.tm = setTimeout(coger, 450);
+        }, { passive: true });
+        tab.addEventListener('touchmove', function (e) {
+          if (!toque) return;
+          var p = e.touches[0];
+          if (!toque.cogida) { if (Math.abs(p.clientX - toque.x0) > 8 || Math.abs(p.clientY - toque.y0) > 8) { clearTimeout(toque.tm); toque = null; } return; }
+          e.preventDefault();
+          toque.x = p.clientX; toque.y = p.clientY;
+          apuntar(document.elementFromPoint(p.clientX, p.clientY), p.clientY);
+        }, { passive: false });
+        tab.addEventListener('touchend', soltarToque);
+        tab.addEventListener('touchcancel', soltarToque);
+        tab.addEventListener('contextmenu', function (e) { if (toque) e.preventDefault(); }); // el menú de mantener pulsado un enlace
+      }
+
+      /* ---------- ordenar a mano en su columna (al momento en la pantalla; ordenar_tareas, por detrás) ---------- */
+
+      /** Pone la tarea id justo encima de la tarea «antes» de su columna (null: al final de las que se ven). Numera de arriba abajo
+       *  las que hace falta (hasta ella y las ya ordenadas a mano), contando también las que ocultan los filtros; las de debajo, como siempre. */
+      function colocar(id, col, antes) {
+        var t = tarea(id);
+        if (!t || !col || id === antes) return;
+        var todas = ordenar(tareas().filter(function (x) { return col.estados.indexOf(x.ESTADO) >= 0 && String(x.ID) !== id; }), false);
+        var vistas = todas.filter(pasa), i;
+        if (antes) i = todas.map(function (x) { return String(x.ID); }).indexOf(antes);
+        else i = vistas.length ? todas.indexOf(vistas[vistas.length - 1]) + 1 : 0;
+        if (i < 0) return;
+        todas.splice(i, 0, t);
+        var hasta = i;
+        todas.forEach(function (x, k) { if (ordenDe(x) !== null) hasta = Math.max(hasta, k); });
+        var cambios = [];
+        for (var k = 0; k <= hasta; k++) {
+          if (ordenDe(todas[k]) !== k + 1) cambios.push({ tarea: String(todas[k].ID), orden: k + 1 });
+        }
+        if (!cambios.length) return;
+        cambios.forEach(function (c) { ORDEN_AQUI[c.tarea] = c.orden; });
+        pintarTablero();
+        ctx.llamar('ordenar_tareas', [{ orden: cambios }]).then(function () {
+          return ctx.tablas.refrescar([T], true);
+        }, function (e) {
+          if (ctx.abierta()) ctx.aviso('No se ha podido guardar el orden: ' + String(e.message).replace(/^\w+:\s*/, ''));
+          return ctx.tablas.refrescar([T], true);
+        }).catch(function () {}).then(function () {
+          cambios.forEach(function (c) { if (ORDEN_AQUI[c.tarea] === c.orden) delete ORDEN_AQUI[c.tarea]; });
+          if (ctx.abierta()) pintarTablero();
+        });
+      }
 
       /* ---------- mover (al momento en la pantalla; mover_tarea, por detrás) ---------- */
 
@@ -403,7 +583,7 @@
         return '<span class="chip" data-dep="' + texto(x) + '"><span>' + texto(x + (t ? ' · ' + t.TITULO : '')) + '</span><button type="button" class="quitar" aria-label="Quitar ' + texto(x) + '" data-quitar-dep="' + texto(x) + '">×</button></span>';
       }
       function campo(n, lab, h, opc, ayuda) {
-        return '<div class="campo" data-campo="' + n + '"><label class="lab" for="tb-f-' + n + '">' + texto(lab) + (opc ? ' <span class="opc">(opcional)</span>' : '') + '</label>' + h +
+        return '<div class="campo" data-cambiando="' + n + '"><label class="lab" for="tb-f-' + n + '">' + texto(lab) + (opc ? ' <span class="opc">(opcional)</span>' : '') + '</label>' + h +
           (ayuda ? '<div class="ayuda">' + ayuda + '</div>' : '') + '</div>';
       }
       /** Los campos de la tarea t (o de una nueva, con t = valores por defecto). */
@@ -539,6 +719,89 @@
         if (!TACTIL) { var p = f.querySelector('input'); if (p) p.focus(); }
       }
 
+      /* ---------- cambiar un dato pulsándolo en la ficha (T0386) ---------- */
+
+      var LARGO = { DESCRIPCION: 6, DOCUMENTOS_RELEVANTES: 4, CONCLUSIONES: 4 }; // textos de varias líneas: se guardan con «Guardar»
+      function ocupado() { return editando || !!cambiando; }
+      function puedeCambiar(t) { return !SOLO_LEE && !t._nueva && CERRADOS.indexOf(t.ESTADO) < 0; }
+      /** Los atributos de un dato que se cambia pulsándolo (nada si no se puede). */
+      function pulsa(t, k, tit) { return puedeCambiar(t) ? ' data-ed="' + k + '" tabindex="0" title="' + texto((tit ? tit + ': ' : '') + 'pulsa para cambiar') + '"' : (tit ? ' title="' + texto(tit) + '"' : ''); }
+      /** El control con el que se cambia k. */
+      function control(t, k) {
+        var v = t[k] == null ? '' : String(t[k]), lab = ' aria-label="' + texto(ETIQUETA[k] || k) + '"', vs, vacio = false;
+        if (k === 'TITULO') return '<input type="text" id="fed" autocomplete="off" value="' + texto(v) + '"' + lab + '>';
+        if (k === 'EPICA') {
+          var ep = []; tareas().forEach(function (x) { if (x.EPICA && ep.indexOf(x.EPICA) < 0) ep.push(x.EPICA); });
+          return '<input type="text" id="fed" list="fed-epicas" autocomplete="off" value="' + texto(v) + '"' + lab + '><datalist id="fed-epicas">' +
+            ep.sort().map(function (e) { return '<option value="' + texto(e) + '">'; }).join('') + '</datalist>';
+        }
+        if (k === 'DEADLINE' || k === 'DISPONIBLE_DESDE') return '<input type="date" id="fed" value="' + texto(v) + '"' + lab + '>';
+        if (LARGO[k]) return '<textarea id="fed" rows="' + LARGO[k] + '"' + lab + '>' + texto(v) + '</textarea>' +
+          '<div class="pie"><button type="button" class="sec" data-fed-no>Cancelar</button><button type="button" class="accion" data-fed-ok>Guardar</button></div>';
+        if (k === 'DEPENDE') {
+          var ya = esperaA(String(t.ID));
+          vs = tareas().filter(function (x) { return CERRADOS.indexOf(x.ESTADO) < 0 && !x._nueva && String(x.ID) !== String(t.ID) && ya.indexOf(String(x.ID)) < 0; })
+            .sort(function (a, b) { return String(b.ID).localeCompare(String(a.ID)); }).map(function (x) { return [String(x.ID), x.ID + ' · ' + x.TITULO]; });
+          return '<select id="fed" aria-label="Añadir una tarea a la que espera">' + opciones(vs, '', 'Elige la tarea…') + '</select>';
+        }
+        if (k === 'INICIATIVA') vs = ctx.tablas.filas(TI).map(function (i) { return [i.ID, i.NOMBRE || i.ID]; });
+        else if (k === 'ENTREGA') { vs = entregasDe(t.INICIATIVA); if (v && !vs.some(function (x) { return x[0] === v; })) vs.unshift([v, t.ENTREGA_CORTA || v]); vacio = 'Sin entrega'; }
+        else if (k === 'ASIGNADO') vs = gentes();
+        else if (k === 'REVISA') { vs = gentes(); vacio = 'Nadie'; }
+        else if (k === 'P') vs = ['!!!!', '!!!', '!!', '!'].map(function (x) { return [x, x]; });
+        else if (k === 'T') vs = ['XS', 'S', 'M', 'L', 'XL'].map(function (x) { return [x, x]; });
+        if (!vacio && !v) vacio = 'Elige…';
+        return '<select id="fed"' + lab + '>' + opciones(vs || [], v, vacio) + '</select>';
+      }
+      function abrirCampo(k) {
+        cambiando = k; pintarFicha();
+        var x = caja.querySelector('#fed');
+        if (!x) return;
+        x.focus();
+        if (x.type === 'text') x.select();
+        if (x.tagName === 'SELECT' && x.showPicker) { try { x.showPicker(); } catch (e) {} }
+      }
+      function cerrarCampo() {
+        var k = cambiando; cambiando = ''; pintarFicha();
+        var x = caja.querySelector('[data-ed="' + k + '"]'); if (x) x.focus();
+      }
+      function guardarCampo(k, v) {
+        var t = tarea(abiertaId);
+        if (!t || !k) return;
+        var id = String(t.ID);
+        if (k === 'DEPENDE') { cerrarCampo(); if (v) cambiarDeps(id, esperaA(id).concat([v])); return; }
+        var r = cambioDe(t, k, v, function (ini) { return entregasDe(ini).map(function (x) { return x[0]; }); });
+        if (r && r.mal) { ctx.aviso(r.mal); var x = caja.querySelector('#fed'); if (x) x.focus(); return; }
+        if (r) ctx.tablas.actualizar(T, id, r.cambios, { fn: 'tablasActualizar', args: ['TAREAS', id, r.cambios, { antes: r.antes }] }).then(function () {
+          if (ctx.abierta()) ctx.aviso(id + ' guardada.');
+          return alDia(id);
+        }, function () {});
+        cerrarCampo();
+      }
+      function cambiarDeps(id, deps) {
+        guardarDeps(id, deps).then(function () { if (ctx.abierta()) ctx.aviso(id + ' guardada.'); return alDia(id); });
+      }
+
+      /** T0387 · Responder la pregunta de la tarea abierta: a la DESCRIPCION y a la bitácora, y vuelve a la cola. */
+      var respuestas = {};   // lo escrito en la respuesta de cada tarea, para que repintar la ficha no lo borre
+      function puedeResponder(t) {
+        return t.ESTADO === 'Necesita tu respuesta' && !SOLO_LEE && !t._nueva &&
+          (ctx.admin || (ctx.personaId && t.PIDE === ctx.personaId) || /^responsable/.test(ctx.perfil || ''));
+      }
+      function responder(id, txt, b) {
+        b.disabled = true; b.textContent = 'Enviando…';
+        var auto = !!(tarea(id) || {}).AUTONOMA;
+        ctx.llamar('responder', [{ tarea: id, texto: txt }]).then(function (estado) {
+          delete respuestas[id];
+          if (ctx.abierta()) ctx.aviso('Respondida: ' + id + ' vuelve a ' + (typeof estado === 'string' && estado ? estado : 'la cola') + '.' +
+            (auto && estado === 'En cola' ? ' Es autónoma: lanza «Autónomo» en GitHub para que siga.' : ''));
+          return Promise.all([ctx.tablas.refrescar([T], true), abiertaId === id ? bitacora(id, true) : null]);
+        }, function (e) {
+          if (ctx.abierta()) ctx.aviso('No se ha enviado la respuesta: ' + String(e.message).replace(/^\w+:\s*/, ''));
+          b.disabled = false; b.textContent = 'Responder';
+        }).then(function () { if (ctx.abierta() && abiertaId === id && !ocupado()) pintarFicha(); });
+      }
+
       /** Una nota en la bitácora de la tarea abierta. */
       function anotar(id, txt, b) {
         b.disabled = true;
@@ -554,7 +817,7 @@
 
       function abrirFicha(id, sinUrl) {
         if (!tarea(id)) return;
-        abiertaId = id; editando = false;
+        abiertaId = id; editando = false; cambiando = '';
         pintarFicha();
         fv.classList.add('abierto');
         document.documentElement.classList.add('fv-abierta');
@@ -566,12 +829,12 @@
       function bitacora(id, fresco) {
         var p = { BITACORA: { clave: 'T:' + id, col: 'TAREA', valores: [id] } };
         return (fresco ? ctx.tablas.leer([TB], { partes: p, fresco: true }) : ctx.tablas.leer([TB], { partes: p })).then(function () {
-          if (ctx.abierta() && abiertaId === id && !editando) pintarFicha();
+          if (ctx.abierta() && abiertaId === id && !ocupado()) pintarFicha();
         }, function (e) { if (ctx.abierta() && abiertaId === id) ctx.aviso('No se ha podido leer la bitácora: ' + String(e.message).replace(/^\w+:\s*/, '')); });
       }
       function cerrarFicha() {
         if (!abiertaId) return;
-        abiertaId = ''; editando = false;
+        abiertaId = ''; editando = false; cambiando = '';
         fv.classList.remove('abierto');
         document.documentElement.classList.remove('fv-abierta');
         urlFicha('');
@@ -587,15 +850,43 @@
         if (e.target === fv || e.target.closest('[data-cerrar]')) { cerrarFicha(); return; }
         var r = e.target.closest('[data-rel]');
         if (r && !(e.metaKey || e.ctrlKey || e.shiftKey)) { e.preventDefault(); if (tarea(r.getAttribute('data-rel'))) abrirFicha(r.getAttribute('data-rel')); return; }
-        if (e.target.closest('[data-editar]')) { editando = true; pintarFicha(); return; }
+        if (e.target.closest('[data-fed-ok]')) { var a0 = caja.querySelector('#fed'); if (a0) guardarCampo(cambiando, a0.value); return; }
+        if (e.target.closest('[data-fed-no]')) { cerrarCampo(); return; }
+        var q = e.target.closest('[data-quitar-dep]');
+        if (q) { var qx = q.getAttribute('data-quitar-dep'); cambiarDeps(abiertaId, esperaA(abiertaId).filter(function (y) { return y !== qx; })); return; }
+        var d = e.target.closest('[data-ed]');
+        if (d && !e.target.closest('a')) { abrirCampo(d.getAttribute('data-ed')); return; }
+        if (e.target.closest('[data-editar]')) { editando = true; cambiando = ''; pintarFicha(); return; }
         if (e.target.closest('[data-cancelar]')) { editando = false; pintarFicha(); return; }
+        var rb = e.target.closest('[data-responder]');
+        if (rb) { var ra = caja.querySelector('#tb-resp'), rt = ra ? ra.value.trim() : ''; if (rt) responder(abiertaId, rt, rb); else if (ra) { ra.focus(); ctx.aviso('Escribe la respuesta antes de enviarla.'); } return; }
         var b = e.target.closest('[data-anotar]');
         if (b) { var a = caja.querySelector('#tb-nota'), txt = a ? a.value.trim() : ''; if (txt) anotar(abiertaId, txt, b); else if (a) a.focus(); }
       });
-      fv.addEventListener('change', function (e) { if (e.target.id === 'kb-f-est') mover(abiertaId, e.target.value); });
-      fv.addEventListener('keydown', function (e) { if (e.key === 'Escape') { if (editando) { editando = false; pintarFicha(); } else cerrarFicha(); } });
+      fv.addEventListener('input', function (e) { if (e.target.id === 'tb-resp' && abiertaId) respuestas[abiertaId] = e.target.value; });
+      fv.addEventListener('change', function (e) {
+        if (e.target.id === 'kb-f-est') { mover(abiertaId, e.target.value); return; }
+        if (e.target.id === 'fed' && e.target.tagName === 'SELECT' && cambiando) guardarCampo(cambiando, e.target.value);
+      });
+      // Un dato de una línea se guarda al salir de él (o con Intro); un desplegable que se deja sin cambiar, se cierra.
+      fv.addEventListener('focusout', function (e) {
+        var x = e.target;
+        if (x.id !== 'fed' || !cambiando || !x.isConnected) return;
+        if (x.tagName === 'INPUT') guardarCampo(cambiando, x.value);
+        else if (x.tagName === 'SELECT') setTimeout(function () { if (cambiando && x.isConnected && document.activeElement !== x) cerrarCampo(); }, 0);
+      });
+      fv.addEventListener('keydown', function (e) {
+        if (cambiando && e.target.id === 'fed') {
+          if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrarCampo(); return; }
+          if (e.key === 'Enter' && (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey)) { e.preventDefault(); guardarCampo(cambiando, e.target.value); }
+          return;
+        }
+        var d = e.target.getAttribute && e.target.getAttribute('data-ed');
+        if (d && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); abrirCampo(d); return; }
+        if (e.key === 'Escape') { if (cambiando) cerrarCampo(); else if (editando) { editando = false; pintarFicha(); } else cerrarFicha(); }
+      });
 
-      function bloque(tit, ls) {
+      function bloque(tit, ls, attrs) {
         if (!ls.length) return '';
         var html = '', enLista = false;
         ls.forEach(function (l) {
@@ -603,15 +894,15 @@
           else { if (enLista) { html += '</ul>'; enLista = false; } html += '<p>' + texto(l) + '</p>'; }
         });
         if (enLista) html += '</ul>';
-        return '<div class="bloque"><h3>' + texto(tit) + '</h3>' + html + '</div>';
+        return '<div class="bloque"' + (attrs || '') + '><h3>' + texto(tit) + '</h3>' + html + '</div>';
       }
       function rel(id) {
         var x = tarea(id), st = x ? x.ESTADO : 'No la ves';
         return '<a class="frel" href="?s=' + texto(ctx.id.toLowerCase()) + '&amp;t=' + encodeURIComponent(id) + '" data-rel="' + texto(id) + '">' +
           '<span class="fpill ' + cls(st) + '">' + texto(st) + '</span><span class="frid">' + texto(id) + '</span><span class="frtit">' + texto(x ? x.TITULO : '') + '</span></a>';
       }
-      function fechaCaja(lab, val, pista, c) {
-        return '<div class="ffecha ' + (c || '') + '"><small>' + texto(lab) + '</small><strong>' + texto(val || '—') + '</strong>' + (pista ? '<span class="fpista">' + texto(pista) + '</span>' : '') + '</div>';
+      function fechaCaja(lab, val, pista, c, attrs) {
+        return '<div class="ffecha ' + (c || '') + '"' + (attrs || '') + '><small>' + texto(lab) + '</small><strong>' + texto(val || '—') + '</strong>' + (pista ? '<span class="fpista">' + texto(pista) + '</span>' : '') + '</div>';
       }
       function quien(b) { return b.QUIEN || nombre(b.PERSONA) || (b.EMPLEADO ? b.EMPLEADO : 'Sistema'); }
 
@@ -620,6 +911,18 @@
         if (!t) { cerrarFicha(); return; }
         if (editando) { pintarEditar(t); return; }
         var id = String(t.ID), cerrada = CERRADOS.indexOf(t.ESTADO) >= 0, e = entrega(t.ENTREGA);
+        var pc = puedeCambiar(t), ab = function (k) { return pc && cambiando === k; };
+        if (cambiando && !pc) cambiando = '';
+        var fcaja = function (k, val, pista, c) {
+          return ab(k) ? '<div class="ffecha fed-abierto"><small>' + texto(ETIQUETA[k]) + '</small>' + control(t, k) + '</div>' : fechaCaja(ETIQUETA[k], val, pista, c, pulsa(t, k));
+        };
+        var tag = function (k, html, extra) {
+          return ab(k) ? '<span class="ftag fed-abierto">' + control(t, k) + '</span>' : '<span class="ftag' + (extra || '') + '"' + pulsa(t, k, ETIQUETA[k]) + '>' + html + '</span>';
+        };
+        var largo = function (k, html) {
+          if (ab(k)) return '<div class="bloque fed-abierto"><h3>' + texto(ETIQUETA[k]) + '</h3><div class="edit">' + control(t, k) + '</div></div>';
+          return html != null ? (html ? '<div class="bloque"' + pulsa(t, k) + '><h3>' + texto(ETIQUETA[k]) + '</h3>' + html + '</div>' : '') : bloque(ETIQUETA[k], lineas(t[k]), pulsa(t, k));
+        };
         var fs = [];
         var n = dias(t.DEADLINE), p = '', c = '';
         if (!t.DEADLINE) { p = 'sin fecha límite'; c = 'nada'; }
@@ -628,8 +931,8 @@
         else if (n === 0) { p = 'vence hoy'; c = 'venc'; }
         else if (n === 1) { p = 'vence mañana'; c = 'pronto'; }
         else { p = 'faltan ' + n + ' días'; c = n <= 3 ? 'pronto' : ''; }
-        fs.push(fechaCaja(ETIQUETA.DEADLINE, fechaEs(t.DEADLINE), p, c));
-        if (t.DISPONIBLE_DESDE) fs.push(fechaCaja(ETIQUETA.DISPONIBLE_DESDE, fechaEs(t.DISPONIBLE_DESDE), '', dias(t.DISPONIBLE_DESDE) > 0 ? 'pronto' : 'ok'));
+        fs.push(fcaja('DEADLINE', fechaEs(t.DEADLINE), p, c));
+        if (t.DISPONIBLE_DESDE || ab('DISPONIBLE_DESDE')) fs.push(fcaja('DISPONIBLE_DESDE', fechaEs(t.DISPONIBLE_DESDE), '', dias(t.DISPONIBLE_DESDE) > 0 ? 'pronto' : 'ok'));
         if (t.REVISAR_EL) fs.push(fechaCaja(ETIQUETA.REVISAR_EL, fechaEs(t.REVISAR_EL), '', 'pronto'));
         if (cerrada && t.FECHA_CIERRE) fs.push(fechaCaja(ETIQUETA.FECHA_CIERRE, fechaEs(t.FECHA_CIERRE), '', 'ok'));
         var deps = esperaA(id), bloquea = laEsperan(id);
@@ -645,36 +948,52 @@
           return '<p class="hito"><span class="hito-cuando">' + texto(fechaEs(b.CUANDO) + ' · ' + quien(b)) + '</span> ' + texto(b.TEXTO) + '</p>';
         });
         var tags = [];
-        tags.push('<span class="ftag" title="Iniciativa">' + texto(iniciativa(t.INICIATIVA)) + '</span>');
-        if (t.ENTREGA) tags.push('<span class="ftag" title="Entrega">' + texto((t.ENTREGA_CORTA || t.ENTREGA) + (e && e.NOMBRE ? ' · ' + e.NOMBRE : '')) + '</span>');
-        if (t.EPICA) tags.push('<span class="ftag" title="Épica">' + texto(t.EPICA) + '</span>');
-        if (t.P) tags.push('<span class="ftag p' + String(t.P).length + '" title="Prioridad">Prioridad ' + texto(t.P) + '</span>');
-        if (t.T) tags.push('<span class="ftag" title="Tamaño">Tamaño ' + texto(t.T) + '</span>');
+        tags.push(tag('INICIATIVA', texto(iniciativa(t.INICIATIVA))));
+        if (t.ENTREGA || ab('ENTREGA')) tags.push(tag('ENTREGA', texto((t.ENTREGA_CORTA || t.ENTREGA) + (e && e.NOMBRE ? ' · ' + e.NOMBRE : ''))));
+        if (t.EPICA || ab('EPICA')) tags.push(tag('EPICA', texto(t.EPICA)));
+        if (t.P || ab('P')) tags.push(tag('P', 'Prioridad ' + texto(t.P), ' p' + String(t.P || '').length));
+        if (t.T || ab('T')) tags.push(tag('T', 'Tamaño ' + texto(t.T)));
         var manos = enManos(t);
         var pasos = PASOS[t.ESTADO] || [], mueve = !SOLO_LEE && pasos.length && !t._nueva;
         var estado = '<div class="est ' + cls(t.ESTADO) + '">' + (mueve ? '<label for="kb-f-est">Estado</label><select id="kb-f-est"' + (t._pendiente ? ' disabled' : '') + '>' +
             [t.ESTADO].concat(pasos).map(function (e) { return '<option' + (e === t.ESTADO ? ' selected' : '') + '>' + texto(e) + '</option>'; }).join('') + '</select>'
             : '<span class="fpill">' + texto(t.ESTADO) + '</span>') +
           (t._pendiente ? '<span class="msg">Guardando…</span>' : manos ? '<span class="msg">' + texto(t.EN_MANOS_TIPO === 'espera' ? manos : t.EN_MANOS_TIPO === 'fuera' ? 'Depende de fuera: ' + manos : 'En manos de ' + manos) + '</span>' : '') + '</div>';
-        var personas = [['ASIGNADO', t.ASIGNADO], ['PIDE', t.PIDE], ['REVISA', t.REVISA]].filter(function (x) { return x[1]; })
-          .map(function (x) { return '<p><b>' + texto(ETIQUETA[x[0]]) + ':</b> ' + texto(nombre(x[1])) + '</p>'; });
+        var personas = ['ASIGNADO', 'PIDE', 'REVISA'].map(function (k) {
+          if (ab(k)) return '<p class="fed-abierto"><b>' + texto(ETIQUETA[k]) + ':</b> ' + control(t, k) + '</p>';
+          return t[k] ? '<p' + (k === 'PIDE' ? '' : pulsa(t, k)) + '><b>' + texto(ETIQUETA[k]) + ':</b> ' + texto(nombre(t[k])) + '</p>' : '';
+        }).filter(String);
         if (t.EMPLEADO) personas.push('<p><b>' + ETIQUETA.EMPLEADO + ':</b> ' + texto(t.EMPLEADO) + '</p>');
+        var espera = deps.map(function (x) {
+          return pc ? '<div class="frel-fila">' + rel(x) + '<button type="button" class="fquitar" data-quitar-dep="' + texto(x) + '" aria-label="Ya no espera a ' + texto(x) +
+            '" title="Ya no espera a ' + texto(x) + '">×</button></div>' : rel(x);
+        }).join('') + (ab('DEPENDE') ? '<div class="fed-abierto">' + control(t, 'DEPENDE') + '</div>' : pc && deps.length ? '<button type="button" class="fmas" data-ed="DEPENDE">+ Otra tarea</button>' : '');
+        // Lo que no tiene valor no sale en la ficha: se añade desde aquí.
+        var faltan = !pc ? [] : [['ASIGNADO', !t.ASIGNADO], ['REVISA', !t.REVISA], ['ENTREGA', !t.ENTREGA], ['EPICA', !t.EPICA], ['P', !t.P], ['T', !t.T],
+          ['DISPONIBLE_DESDE', !t.DISPONIBLE_DESDE], ['DEPENDE', !deps.length], ['DOCUMENTOS_RELEVANTES', !docs.length], ['CONCLUSIONES', !lineas(t.CONCLUSIONES).length]]
+          .filter(function (x) { return x[1] && cambiando !== x[0]; });
+        var anadir = faltan.length ? '<div class="fanadir"><span>Añadir</span>' + faltan.map(function (x) {
+          return '<button type="button" class="fmas" data-ed="' + x[0] + '">+ ' + texto(ETIQUETA[x[0]]) + '</button>'; }).join('') + '</div>' : '';
         var motivo = [];
         if (t.PREGUNTA) motivo.push('<p><b>Pregunta:</b> ' + texto(t.PREGUNTA) + '</p>');
+        if (puedeResponder(t)) motivo.push('<div class="fresp"><label class="u-oculto" for="tb-resp">Tu respuesta</label>' +
+          '<textarea id="tb-resp" rows="3" placeholder="Tu respuesta…">' + texto(respuestas[id] || '') + '</textarea>' +
+          '<div class="pie"><button type="button" class="u-btn" data-responder>Responder</button></div></div>');
         if (t.MOTIVO_BLOQUEO) motivo.push('<p><b>Bloqueada:</b> ' + texto(t.MOTIVO_BLOQUEO) + '</p>');
         if (t.MOTIVO) motivo.push('<p><b>Motivo:</b> ' + texto(t.MOTIVO) + '</p>');
         caja.innerHTML =
           '<div class="barra"><button type="button" class="volver" data-cerrar>' + ICO_VOLVER + 'Volver al tablero</button></div>' +
-          '<div class="cab"><div class="id"><span class="n">' + texto(id) + '</span></div><h1 id="kb-f-tit">' + texto(t.TITULO) + '</h1></div>' +
+          '<div class="cab"><div class="id"><span class="n">' + texto(id) + '</span></div>' +
+            (ab('TITULO') ? '<h1 id="kb-f-tit" class="fed-abierto">' + control(t, 'TITULO') + '</h1>' : '<h1 id="kb-f-tit"' + pulsa(t, 'TITULO') + '>' + texto(t.TITULO) + '</h1>') + '</div>' +
           '<div class="fmeta">' + tags.join('') + '</div>' + estado +
           (motivo.length ? '<div class="bloque">' + motivo.join('') + '</div>' : '') +
           '<div class="datos"><div class="fila"><b>Fechas</b><div class="ffechas">' + fs.join('') + '</div></div></div>' +
-          bloque(ETIQUETA.DESCRIPCION, lineas(t.DESCRIPCION)) +
+          largo('DESCRIPCION') +
           (personas.length ? '<div class="bloque"><h3>Personas</h3>' + personas.join('') + '</div>' : '') +
-          (deps.length ? '<div class="bloque"><h3>Espera a</h3>' + deps.map(rel).join('') + '</div>' : '') +
+          (deps.length || ab('DEPENDE') ? '<div class="bloque"><h3>Espera a</h3>' + espera + '</div>' : '') +
           (bloquea.length ? '<div class="bloque"><h3>La esperan</h3>' + bloquea.map(rel).join('') + '</div>' : '') +
-          (docs.length ? '<div class="bloque"><h3>' + ETIQUETA.DOCUMENTOS_RELEVANTES + '</h3>' + docs.join('') + '</div>' : '') +
-          bloque(ETIQUETA.CONCLUSIONES, lineas(t.CONCLUSIONES)) +
+          largo('DOCUMENTOS_RELEVANTES', docs.join('')) +
+          largo('CONCLUSIONES') + anadir +
           '<div class="bloque hist"><h3>Bitácora (lo más reciente arriba)</h3>' +
             (SOLO_LEE || t._nueva ? '' : '<div class="edit"><div class="campo"><label class="u-oculto" for="tb-nota">Apuntar una nota</label><textarea id="tb-nota" rows="2" placeholder="Apuntar una nota…"></textarea></div>' +
               '<div class="pie"><button type="button" class="sec" data-anotar>Apuntar</button></div></div>') +
@@ -696,7 +1015,7 @@
       }
       ctx.alCambiar(function (t) {
         if ([T, TI, TE, TD].indexOf(t) >= 0) { pintarTablero(); if (t !== T && t !== TD) pintarFiltros(); }
-        if (abiertaId && !editando && [T, TE, TD, TB].indexOf(t) >= 0) pintarFicha();
+        if (abiertaId && !ocupado() && [T, TE, TD, TB].indexOf(t) >= 0) pintarFicha();
       });
       abrirFiltros(!!F._ab);
       pintarFiltros(); pintarTablero();
@@ -711,7 +1030,31 @@
         tab.innerHTML = '<p class="u-error kb-vacio">No se han podido leer las tareas.</p><p class="u-nota kb-vacio">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Pulsa ↻ o vuelve a abrir la sección.</p>';
       });
       gente().catch(function () {});
-      this._cerrar = function () { el.classList.remove('kb'); document.documentElement.classList.remove('fv-abierta'); urlFicha(''); };
+
+      // T0386: en directo. Cuando alguien (otra persona, el agente, Telegram) cambia una tarea, sus dependencias o la bitácora,
+      // la base avisa (Realtime) y el tablero se pone al día solo, en un segundo; si es la de la ficha abierta, también su bitácora.
+      // Los avisos de un momento se juntan en una lectura; mientras se arrastra una tarjeta, espera a que se suelte.
+      var directo = null, tDirecto = null, pendiente = {};
+      function alDirecto() {
+        tDirecto = null;
+        if (!ctx.abierta()) { pendiente = {}; return; }
+        if (arr) { tDirecto = setTimeout(alDirecto, 1000); return; }
+        var p = pendiente; pendiente = {};
+        var todo = p['*'], ts = [];
+        if (todo || p.tareas || p.dependencias) ts.push(T, TD);
+        if (ts.length) ctx.tablas.refrescar(ts, true).catch(function () {});
+        if (abiertaId && (todo || p.bitacora || p.tareas)) bitacora(abiertaId, true).catch(function () {});
+      }
+      if (ctx.enDirecto) {
+        directo = ctx.enDirecto(['tareas', 'dependencias', 'bitacora'], function (tabla) {
+          pendiente[tabla] = 1;
+          if (!tDirecto) tDirecto = setTimeout(alDirecto, 800);
+        });
+      }
+      this._cerrar = function () {
+        if (directo) { directo.cerrar(); directo = null; }
+        if (tDirecto) { clearTimeout(tDirecto); tDirecto = null; }
+        el.classList.remove('kb', 'tb'); document.documentElement.classList.remove('fv-abierta'); urlFicha(''); };
     },
     cerrar: function () { if (this._cerrar) this._cerrar(); }
   });

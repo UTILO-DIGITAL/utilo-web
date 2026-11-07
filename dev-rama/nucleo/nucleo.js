@@ -141,6 +141,7 @@
   function credDe(r) {
     var o = { persona: r.persona, correo: r.correo || '', perfil: r.perfil || '', admin: !!r.admin, negocio: r.negocio || '', dev: r.dev || '', secciones: r.secciones || [],
       version: r.version || '', versiones: Array.isArray(r.versiones) ? r.versiones : [] }; // T0283
+    if (r.persona_id) o.persona_id = r.persona_id; // T0387: con Supabase, el id de la persona (acceso.personas)
     if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
     return o;
   }
@@ -450,6 +451,8 @@
    * - llamar(fn, args): una función de su «api» del motor (recibe ctx en el motor). Devuelve una promesa.
    * - aviso(texto): mensaje corto abajo de la pantalla. ponerTitulo(texto): cambia el título de la cabecera.
    * - abierta(): si la sección sigue abierta (para no pintar tarde en otra).
+   * - enDirecto(tablas, f) (T0386, solo con Supabase; si no, null): f(tabla) en cuanto cambia algo en esas tablas de la base.
+   * - personaId (T0387, solo con Supabase; si no, ''): el id de quien ha entrado, el de las columnas persona (ASIGNADO…).
    */
   function ctxDe(s) {
     return {
@@ -459,13 +462,16 @@
       como: cred.como || null, verComo: cred.admin && !cred.como && !window.UG.sinComo ? verComo : null, // T0386: con Supabase, no
       // T0273: el nombre con el que se apunta lo que hace (HISTORIAL…), como en el motor: «Javi Canela como Ana».
       autor: cred.como ? cred.como.persona + ' como ' + cred.persona : cred.persona,
+      personaId: cred.persona_id || '', // T0387
       correo: cred.correo || '', secciones: todas().map(function (x) { return x.enPerfil ? { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true } : { id: x.id, titulo: x.titulo }; }),
       tablas: tablas(),
       alCambiar: function (f) { (oyentes[s.id] = oyentes[s.id] || []).push(f); },
       llamar: llamar,
       aviso: aviso,
       ponerTitulo: function (t) { if (actual === s.id) $('n-titulo').textContent = t; },
-      abierta: function () { return actual === s.id; }
+      abierta: function () { return actual === s.id; },
+      // T0386: con Supabase, enDirecto(tablas, f): f(tabla) en cuanto cambia algo en esas tablas de la base (null si no se puede).
+      enDirecto: window.UG && typeof window.UG.enDirecto === 'function' ? function (ts, f) { return window.UG.enDirecto(ts, f); } : null
     };
   }
 

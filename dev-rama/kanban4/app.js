@@ -14,7 +14,11 @@
   var CLAVE = 'kanban_' + (C.clave || 'negocio');
   // T0133: carpeta de este archivo (…/kanban/), para cargar los módulos de las secciones (economia.js…).
   var BASE = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/[^/]*$/, '') : '../kanban/'; })();
-  var VERSION_MODULOS = '48'; // T0207 · T0208 · T0149 · T0213 · T0218 · T0224 · T0225 · T0230 · T0231 · T0232 · T0233 · T0228 · T0234 · T0235 · T0238 · T0237 · T0240 · T0246 · T0241 · T0399 (también el ?v= de las hojas del tablero)
+  var VERSION_MODULOS = '49'; // T0207 · T0208 · T0149 · T0213 · T0218 · T0224 · T0225 · T0230 · T0231 · T0232 · T0233 · T0228 · T0234 · T0235 · T0238 · T0237 · T0240 · T0246 · T0241 · T0399 · T0406 (también el ?v= de las hojas del tablero)
+  // T0406: un negocio que ya trabaja en otra web deja este kanban solo para mirar: KANBAN.soloLectura = { texto, enlace }.
+  // Sale un aviso arriba con el enlace y no se deja hacer nada que guarde (lo que dice ESCRIBE).
+  var SOLO_LECTURA = C.soloLectura && C.soloLectura.texto ? C.soloLectura : null;
+  var ESCRIBE = /Guardar|Cambiar|Crear|Editar|Eliminar|Restaurar|Decidir|Mover|Anotar|Borrar/;
   var VERSION_ICONO = '2'; // T0222: el ?v= de los iconos del index.html de cada negocio (sube con ellos)
   // T0150: diseño de PROTOCOLO DISEÑO UTILO. Solo para los negocios que tienen su marca.css (index.html con marca: '…').
   // Los demás (Konamigas hasta T0149) siguen exactamente como antes.
@@ -44,7 +48,19 @@
   function borrar() { try { localStorage.removeItem(CLAVE); } catch (e) {} }
 
   /** Llamada al motor con la llave de Google de la persona (google.js). */
-  function llamar(cuerpo) { return window.UG.llamar(C.api, cuerpo); }
+  function llamar(cuerpo) {
+    if (SOLO_LECTURA && ESCRIBE.test(String(cuerpo && cuerpo.fn || ''))) return Promise.reject(new Error(SOLO_LECTURA.texto));
+    return window.UG.llamar(C.api, cuerpo);
+  }
+
+  /** T0406: la franja de aviso de un kanban solo para mirar (vacía si no lo es). */
+  function avisoSoloLectura() {
+    if (!SOLO_LECTURA) return '';
+    var a = SOLO_LECTURA.enlace ? ' <a href="' + texto(SOLO_LECTURA.enlace) + '" style="color:inherit;font-weight:700;text-decoration:underline">' +
+      texto(SOLO_LECTURA.boton || 'Abrir la nueva') + '</a>' : '';
+    return '<div class="k-solo-lectura" role="alert" style="background:#FFF4D6;color:#5C4400;border-bottom:1px solid #E8C770;' +
+      'padding:10px 16px;font:600 14px/1.4 system-ui,sans-serif;text-align:center">⚠️ ' + texto(SOLO_LECTURA.texto) + a + '</div>';
+  }
 
   /** Llamada sin llave: solo «inicio» (nombre y colores del negocio para la pantalla de entrada). */
   function llamarSinLlave(cuerpo) {
@@ -117,7 +133,8 @@
     // Sustituye a google.script.run dentro de la página que genera el motor. T0190: con la llave de Google (google.js),
     // y sin pisar window.google, que es también donde está la librería de Google.
     return '(function(){var API=' + JSON.stringify(C.api) + ',K=' + JSON.stringify(CLAVE) + ';' +
-      'function llamar(fn,args){return window.UG.llamar(API,{fn:fn,args:args}).catch(function(e){' +
+      'var SL=' + JSON.stringify(SOLO_LECTURA ? SOLO_LECTURA.texto : '') + ',ESC=' + String(ESCRIBE) + ';' + // T0406
+      'function llamar(fn,args){if(SL&&ESC.test(fn)){alert(SL);return Promise.reject(new Error(SL));}return window.UG.llamar(API,{fn:fn,args:args}).catch(function(e){' +
       'if(e.acceso||/^(CONECTAR|CREAR):/.test(e.message)){if(e.acceso){try{localStorage.removeItem(K)}catch(x){}}location.reload();}throw e;});}' +
       'function run(s,f,u){return new Proxy({},{get:function(_,k){' +
       'if(k==="withSuccessHandler")return function(h){return run(h,f,u)};' +
@@ -357,7 +374,7 @@
   function pintarSeccion(cred, secs, s) {
     document.title = infoSeccion(s).t + ' · ' + (C.nombreApp || 'App');
     if (MARCA) document.body.className = 'u u-con-barra'; // T0150
-    document.body.innerHTML = barra(seccionesBarra(secs, cred.perfil), s, cred) + '<div id="sx-panel">' + htmlSeccion(s, cred) + '</div>';
+    document.body.innerHTML = avisoSoloLectura() + barra(seccionesBarra(secs, cred.perfil), s, cred) + '<div id="sx-panel">' + htmlSeccion(s, cred) + '</div>';
     menuPlegado(); // T0225
     window.SX_CTX = ctxModulos(cred); // T0133
     abrirModulo(document.getElementById('sx-panel'));
@@ -456,6 +473,7 @@
           else html += sc;
         }
       }
+      if (SOLO_LECTURA) html = html.replace(/<body[^>]*>/i, function (m) { return m + avisoSoloLectura(); }); // T0406: el aviso, lo primero
       document.open();
       document.write(html);
       document.close();
