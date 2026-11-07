@@ -1,6 +1,14 @@
 {
-  "version": "5.7-1.2",
+  "version": "5.8-1.3",
   "versiones": [
+    {
+      "v": "5.8-1.3",
+      "fecha": "07/11/2026",
+      "novedades": [
+        "En la ficha de una tarea, pulsa cualquier dato para cambiarlo ahí mismo.",
+        "En el móvil, mantén pulsada una tarjeta para ordenarla o pasarla a otro estado con el dedo."
+      ]
+    },
     {
       "v": "5.7-1.2",
       "fecha": "06/11/2026",

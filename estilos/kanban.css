@@ -614,3 +614,46 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
 .u .kb #alta-form .edit { padding: 0; gap: var(--e3); }
 .u .kb #alta-error:not(:empty) { display: block; }
 @media (min-width: 900px) { .u .n-main.kb .filtros, .u .n-main.kb .tablero { padding-left: var(--e5); padding-right: var(--e5); } }
+
+/* T0386: en la plataforma (tablero.js, .tb), una columna plegada en el ordenador se queda en lo que ocupa su cabecera, con el
+   nombre en horizontal, como sin plegar (en los kanban de los clientes, franja estrecha con el nombre en vertical). */
+@media (min-width: 900px) {
+  .u .tb .col.plegada h2.ch { writing-mode: horizontal-tb; white-space: nowrap; min-height: calc(2.4em + 2 * var(--e2) + 3px); min-width: 0;
+    padding: var(--e2) var(--e2) var(--e2) var(--e1); border-left: 0; border-bottom: 3px solid var(--estado); }
+  .u .tb .col.plegada h2.ch .n { margin: 0 0 0 var(--e2); }
+  .u .tb .col.plegada h2.ch .fl { display: block; }
+}
+
+/* T0386: en la ficha, cada dato se cambia pulsándolo */
+.u .kb-ficha [data-ed] { cursor: pointer; border-radius: var(--radio-peq); }
+.u .kb-ficha [data-ed]:focus-visible { outline: 2px solid var(--color-principal-oscuro); outline-offset: 2px; }
+@media (hover: hover) {
+  .u .kb-ficha [data-ed]:hover { outline: 1px dashed var(--color-principal-oscuro); outline-offset: 2px; }
+  .u .kb-ficha .bloque[data-ed]:hover { outline-offset: -1px; }
+}
+.u .kb-ficha .fed-abierto input, .u .kb-ficha .fed-abierto select, .u .kb-ficha .fed-abierto textarea { max-width: 100%; }
+.u .kb-ficha .ftag.fed-abierto { padding: 0; background: none; }
+.u .kb-ficha .ftag.fed-abierto select, .u .kb-ficha .ftag.fed-abierto input { min-height: 36px; }
+.u .kb-ficha h1.fed-abierto input { width: 100%; font: inherit; color: var(--color-texto); padding: 2px var(--e2); }
+.u .kb-ficha .ffecha.fed-abierto input { font: 700 16px/1.4 var(--fuente-texto); }
+.u .kb-ficha p.fed-abierto { display: flex; align-items: center; gap: var(--e2); flex-wrap: wrap; }
+.u .kb-ficha .bloque .fed-abierto { margin-top: var(--e2); }
+.u .fanadir { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); margin: var(--e3) var(--e4); }
+.u .fanadir > span { font: 700 12px/1.3 var(--fuente-texto); color: var(--color-principal-oscuro); text-transform: uppercase; }
+.u .fmas { min-height: 36px; padding: 0 var(--e3); border: 1px dashed var(--color-principal-oscuro); border-radius: var(--radio-peq); background: none;
+  color: var(--color-principal-oscuro); font: 600 14px/1 var(--fuente-texto); cursor: pointer; }
+.u .bloque .fmas { margin-top: var(--e2); }
+.u .fmas:hover { background: var(--color-superficie); }
+.u .frel-fila { display: flex; align-items: center; gap: var(--e1); }
+.u .frel-fila + .frel-fila { margin-top: var(--e1); }
+.u .frel-fila .frel { flex: 1 1 auto; min-width: 0; }
+.u .fquitar { flex: none; width: 40px; height: 40px; border: 0; border-radius: 50%; background: none; color: var(--color-suave);
+  font: 400 22px/1 var(--fuente-texto); cursor: pointer; }
+.u .fquitar:hover { background: var(--color-superficie); color: var(--color-error); }
+
+/* T0386: en el móvil, mantener pulsada una tarjeta la coge para moverla con el dedo (tablero.js) */
+@media (hover: none) {
+  .u .tb .card { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+  .u .tb .card.kb-cogida { opacity: 1; transform: scale(1.03); box-shadow: 0 8px 24px rgba(0, 0, 0, .22); position: relative; z-index: 2; }
+}
+@media (max-width: 640px) { .u .tb .tablero.kb-arrastre .col { min-height: 0; } }

@@ -17,6 +17,8 @@
 <meta name="theme-color" content="#0E8A7A">
 <link rel="stylesheet" href="../marca.css?v=47">
 <link rel="stylesheet" href="../../estilos/base.css?v=85">
+<!-- T0386: como una aplicación: deslizar el dedo de lado no lleva a la página de atrás (en el iPhone, eso solo instalada) -->
+<style>html, body { overscroll-behavior-x: none; }</style>
 <script>
   window.KANBAN = {
     clave: 'utilo-plataforma',
@@ -28,7 +30,7 @@
 </head>
 <body class="u">
 <div class="kz"><div class="kz-caja kz-centro" role="status"><div class="u-carga"></div><p>Cargando…</p></div></div>
-<script src="montaje.js?v=b5255dbf07"></script>
+<script src="montaje.js?v=d6e9671592"></script>
 <script src="../../kanban4/tablas.js?v=53"></script>
 <script src="../../nucleo/supabase.js?v=2"></script>
 <script src="../../nucleo/acceso-supabase.js?v=3"></script>
