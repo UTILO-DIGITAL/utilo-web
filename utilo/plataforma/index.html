@@ -14,13 +14,14 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Utilo">
-<!-- T0421: instalada en el iPhone, la página llega hasta arriba y la franja de la hora va del color de la marca (base.css) -->
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0E8A7A">
 <link rel="stylesheet" href="../marca.css?v=47">
-<link rel="stylesheet" href="../../estilos/base.css?v=88">
+<link rel="stylesheet" href="../../estilos/base.css?v=89">
 <!-- T0386: como una aplicación: deslizar el dedo de lado no lleva a la página de atrás (en el iPhone, eso solo instalada) -->
-<style>html, body { overscroll-behavior-x: none; }</style>
+<style>html, body { overscroll-behavior-x: none; }
+  /* T0421: la franja de arriba del iPhone (la hora y la batería) toma el color de html: el de la marca. El body, con el fondo
+     de la página, cubre toda la pantalla; al estirar la página arriba o abajo no se ve el verde. */
+  html { background: #0E8A7A; overscroll-behavior-y: none; }</style>
 <script>
   window.KANBAN = {
     clave: 'utilo-plataforma',
@@ -32,7 +33,7 @@
 </head>
 <body class="u">
 <div class="kz"><div class="kz-caja kz-centro" role="status"><div class="u-carga"></div><p>Cargando…</p></div></div>
-<script src="montaje.js?v=f65efac74b"></script>
+<script src="montaje.js?v=4d4b414abb"></script>
 <script src="../../kanban4/tablas.js?v=53"></script>
 <script src="../../nucleo/supabase.js?v=2"></script>
 <script src="../../nucleo/acceso-supabase.js?v=4"></script>

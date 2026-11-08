@@ -942,3 +942,13 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
   .u #alta-btn.en-mas .en-mas-t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .u #alta-btn.en-mas .en-mas-mas { font-size: 32px; }
 }
+/* T0422 · Tareas, como Entregas: buscar y «Filtros» en una línea (los filtros, en la hoja); el mismo + para crear. */
+.u .kb .filtros.tb-fil { display: flex; align-items: center; gap: var(--e3); flex-wrap: nowrap; }
+.u .kb .filtros.tb-fil .busca { flex: 1 1 auto; min-width: 0; max-width: 420px; }
+.u .kb .filtros.tb-fil .busca input { width: 100%; }
+.u .kb .filtros.tb-fil .en-filtros { flex: none; margin-left: auto; }
+/* T0422 · La hoja de filtros, como mucho el 88 % del alto: lo de dentro se desplaza y los botones se quedan abajo, a la vista. */
+.u #alta-velo.en-hoja #alta-form { max-height: 88vh; max-height: 88dvh; overflow-y: auto; overscroll-behavior: contain; }
+.u #alta-velo.en-hoja #alta-form .botones { position: sticky; bottom: calc(-1 * var(--e4)); margin-bottom: calc(-1 * var(--e4)); padding: var(--e3) 0 var(--e4);
+  background: var(--color-fondo); }
+.u #alta-velo.en-hoja .en-hoja-cab { position: sticky; top: calc(-1 * var(--e4)); margin-top: calc(-1 * var(--e4)); padding-top: var(--e4); background: var(--color-fondo); z-index: 1; }

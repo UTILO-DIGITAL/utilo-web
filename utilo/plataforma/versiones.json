@@ -1,6 +1,13 @@
 {
-  "version": "5.12-1.7",
+  "version": "5.13-1.8",
   "versiones": [
+    {
+      "v": "5.13-1.8",
+      "fecha": "08/11/2026",
+      "novedades": [
+        "En Tareas, los filtros y las columnas están en un solo botón, como en Entregas, y se crea con el mismo botón +; ya no hace falta recargar en ninguna pantalla."
+      ]
+    },
     {
       "v": "5.12-1.7",
       "fecha": "07/11/2026",

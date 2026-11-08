@@ -117,7 +117,6 @@
   var RAIZ = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/utilo\/secciones\/[^/]*$/, '') : '../../'; })();
   var VERSION = (function () { var s = document.currentScript && document.currentScript.src; var m = s && /[?&]v=([^&]+)/.exec(s); return m ? m[1] : '1'; })();
   var ICO_MAPA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14"/><path d="M15 6v14"/></svg>';
-  var ICO_RECARGAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>';
   var ICO_BIEN = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>';
   var ICO_FUERA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';
   var TI = 'INICIATIVAS';
@@ -202,7 +201,7 @@
         var h = '<header class="pm-cab"><div><p class="pm-hola">' + texto(saludo(d) + ', ' + String(ctx.persona || '').split(' ')[0]) + '</p>' +
           '<p class="pm-fecha">' + texto(hoyLargo(d)) + '</p></div>' +
           '<span class="pm-acc">' + (MAPA ? '<a class="sec pm-mapa" href="?s=entregas&amp;v=mapa" data-sx="ENTREGAS">' + ICO_MAPA + 'Ver el mapa</a>' : '') +
-          '<button id="pm-rec" class="sec recarga" type="button" title="Traer lo último" aria-label="Traer lo último">' + ICO_RECARGAR + '</button></span></header>';
+          '</span></header>'; // T0422: sin ↻ (va en directo), como Tareas y Entregas
         h += '<div class="pm-res">' +
           cifra('pm-espera', r.esperan, r.esperan === 1 ? 'te espera' : 'te esperan',
             [r.respuestas ? uno(r.respuestas, 'respuesta', 'respuestas') : '', r.revisiones ? uno(r.revisiones, 'revisión', 'revisiones') : ''].filter(String).join(' · '), r.esperan ? ' pm-cifra-pr' : '') +
@@ -264,17 +263,8 @@
         if (a && a.tagName === 'TEXTAREA') { a.focus(); a.selectionStart = a.selectionEnd = a.value.length; }
       }
 
-      function refrescar(b) {
-        b.disabled = true; b.classList.add('girando');
-        Promise.all([ctx.tablas.refrescar([T, TI], true), gente()]).then(function () { if (ctx.abierta()) ctx.aviso('Al día.'); }, function (e) {
-          if (ctx.abierta()) ctx.aviso('No se ha podido actualizar: ' + String(e.message).replace(/^\w+:\s*/, ''));
-        }).then(function () { b.disabled = false; b.classList.remove('girando'); });
-      }
-
       cont.addEventListener('click', function (e) {
         if (e.target.closest('[data-lanzar-no]')) { lanzarId = ''; pintar(); return; }
-        var rec = e.target.closest('#pm-rec');
-        if (rec) { refrescar(rec); return; }
         var ir = e.target.closest('[data-ir]'), dst = ir && cont.querySelector('#' + ir.getAttribute('data-ir'));
         if (dst) dst.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
@@ -314,7 +304,7 @@
       pintar();
       ctx.tablas.leer([T, TI]).then(function () { leido = true; if (ctx.abierta()) pintar(); }, function (e) {
         leido = true;
-        cont.innerHTML = '<p class="u-error">No se han podido leer tus tareas.</p><p class="u-nota">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Pulsa ↻ o vuelve a abrir la sección.</p>';
+        cont.innerHTML = '<p class="u-error">No se han podido leer tus tareas.</p><p class="u-nota">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Vuelve a abrir la sección.</p>';
       });
       gente().catch(function () {});
 

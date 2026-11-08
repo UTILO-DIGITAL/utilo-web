@@ -9,10 +9,11 @@
  * - Vista (arriba): «8 columnas» (todas menos Aplazada y Descartada), «Todas» (los diez estados) o «Agrupadas» (Necesita tu
  *   respuesta con Bloqueada y Para revisar con Aprobada; el estado exacto, en la tarjeta). La primera vez, la de
  *   config.VISTA; después, la última de este dispositivo. Entregadas y Descartadas, solo las de los últimos días (Filtros).
- * - En directo: con Supabase, lo que cambie otra persona (o el agente) sale solo en un segundo (Realtime); ↻ sigue para forzarlo.
+ * - En directo: con Supabase, lo que cambie otra persona (o el agente) sale solo en un segundo (Realtime); sin ↻ (T0422).
  * - Ordenar a mano: arrastrada dentro de su columna, la tarjeta se queda donde se suelta (el mismo orden para todos; las que no
  *   se han tocado, debajo, con el de siempre). Al cambiar de estado, vuelve al de siempre. Las cerradas, por fecha.
- * - Filtros: iniciativa, entrega, persona (en manos de, asignada, pide o revisa), épica y prioridad; y buscar.
+ * - Filtros: iniciativa, entrega, persona (en manos de, asignada, pide o revisa), épica y prioridad, y las columnas, en una hoja
+ *   con botones (T0422, como en Entregas); buscar, al lado. Crear, con el + flotante.
  * - Las personas son su id en la base: el nombre sale de personas_gestion().
  * - Se pinta al momento con lo guardado en el dispositivo y se refresca por detrás.
  * - Mover (arrastrando en el ordenador, con el desplegable en el móvil o desde la ficha): solo a los estados a los que se
@@ -31,8 +32,9 @@
   var T = 'TABLERO', TI = 'INICIATIVAS', TE = 'ENTREGAS', TD = 'DEPENDENCIAS', TB = 'BITACORA';
   var RAIZ = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/utilo\/secciones\/[^/]*$/, '') : '../../'; })();
   var VERSION = (function () { var s = document.currentScript && document.currentScript.src; var m = s && /[?&]v=([^&]+)/.exec(s); return m ? m[1] : '1'; })();
-  var ICO_RECARGAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>';
   var ICO_VOLVER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>';
+  var ICO_FILTROS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>';
+  var ICO_CERRAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 
   /** Los estados, en el orden del flujo, con su color de estilos/base.css y quién mueve ficha. */
   var ESTADOS = ['Esperando', 'En cola', 'En curso', 'Necesita tu respuesta', 'Bloqueada', 'Para revisar', 'Aprobada', 'Entregada', 'Aplazada', 'Descartada'];
@@ -153,17 +155,14 @@
 
       el.classList.add('kb', 'tb'); // tb: lo propio de la plataforma en estilos/kanban.css
       el.innerHTML =
-        '<div class="filtros">' +
+        // T0422 (decidido por Javi, como en Entregas): buscar y «Filtros» en una línea; las columnas y los filtros, en una hoja
+        // con botones; sin ↻ (el tablero va en directo); crear, con el + flotante.
+        '<div class="filtros tb-fil">' +
           '<label class="busca"><span class="u-oculto">Buscar tareas</span><input type="search" id="kb-busca" placeholder="Buscar tareas" autocomplete="off"></label>' +
-          '<label class="tb-vista"><span class="u-oculto">Vista</span><select id="kb-vista" aria-label="Vista del tablero">' +
-            Object.keys(VISTAS).map(function (k) { return '<option value="' + k + '"' + (k === F.vista ? ' selected' : '') + '>' + texto(VISTAS[k].titulo) + '</option>'; }).join('') +
-          '</select></label>' +
-          '<button id="kb-fil" class="sec k-fil" type="button" aria-controls="kb-mas" aria-expanded="false">Filtros<span id="kb-fil-n" class="k-fil-n" hidden></span></button>' +
-          '<div id="kb-mas" class="k-mas" hidden></div>' +
-          '<span class="act"><button id="kb-rec" class="sec recarga" type="button" title="Traer lo último" aria-label="Traer lo último">' + ICO_RECARGAR + '</button></span>' +
+          '<button id="kb-fil" class="sec en-filtros" type="button" aria-haspopup="dialog">' + ICO_FILTROS + '<span>Filtros</span><span id="kb-fil-n" class="k-fil-n" hidden></span></button>' +
         '</div>' +
         '<div id="kb-tab" class="tablero"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div>' +
-        (SOLO_LEE ? '' : '<button id="alta-btn" type="button">Añadir tarea</button>') +
+        (SOLO_LEE ? '' : '<button id="alta-btn" class="en-mas" type="button" aria-label="Nueva tarea" title="Nueva tarea"><span class="en-mas-mas" aria-hidden="true">+</span><span class="en-mas-t">Nueva tarea</span></button>') +
         '<div class="fv-velo" id="kb-fv"><div class="fv-caja kb-ficha" role="dialog" aria-modal="true" aria-labelledby="kb-f-tit" id="kb-ficha"></div></div>' +
         '<div id="alta-velo"><form id="alta-form" novalidate></form></div>';
       var $ = function (id) { return el.querySelector('#' + id); };
@@ -206,43 +205,62 @@
         } },
         { k: 'P', t: 'Prioridad', vs: function () { return ['!!!!', '!!!', '!!', '!'].map(function (v) { return [v, v]; }); } }
       ];
-      function pintarFiltros() {
-        $('kb-mas').innerHTML = FILTROS.map(function (f) {
-          var v = F[f.k] || '';
-          return '<label>' + texto(f.t) + '<select data-f="' + f.k + '"><option value="">' + (f.k === 'PERSONA' ? 'Todas las personas' : 'Todas') + '</option>' +
-            f.vs().map(function (x) { return '<option value="' + texto(x[0]) + '"' + (x[0] === v ? ' selected' : '') + '>' + texto(x[1]) + '</option>'; }).join('') + '</select></label>';
-        }).join('') +
-          '<label>Entregadas y descartadas en los últimos (días)<input type="number" min="0" id="kb-dias" value="' + F.dias + '"></label>';
-        cuenta();
-      }
+      /** T0422 · Los filtros, en una hoja que sube desde abajo (como en Entregas): las columnas, cada filtro y las cerradas, en
+       *  botones. Cambian el tablero al momento; «Ver N tareas» cierra. */
+      var DIAS_OP = [7, 30, 90];
+      function pintarFiltros() { cuenta(); if (altaVelo.classList.contains('en-hoja')) pintarHoja(); }
       function cuenta() {
         var k = FILTROS.filter(function (f) { return F[f.k]; }).length + (F.dias !== DIAS ? 1 : 0);
         var s = $('kb-fil-n'); s.textContent = k ? String(k) : ''; s.hidden = !k;
         $('kb-fil').title = k ? k + (k === 1 ? ' filtro puesto' : ' filtros puestos') : 'Sin filtros';
+        return k;
       }
-      function abrirFiltros(ab) { $('kb-mas').hidden = !ab; $('kb-fil').setAttribute('aria-expanded', ab ? 'true' : 'false'); F._ab = ab; guardarLocal(CLAVE + '_f', F); }
-      $('kb-fil').onclick = function () { abrirFiltros($('kb-mas').hidden); };
-      $('kb-mas').addEventListener('change', function (e) {
-        var s = e.target.closest('[data-f]');
-        if (s) F[s.getAttribute('data-f')] = s.value;
-        // Otra iniciativa: la entrega elegida puede no ser suya; y el desplegable de entregas cambia.
-        if (s && s.getAttribute('data-f') === 'INICIATIVA') {
-          var en = F.ENTREGA && F.ENTREGA !== '-' ? ctx.tablas.fila(TE, F.ENTREGA) : null;
-          if (en && F.INICIATIVA && en.INICIATIVA !== F.INICIATIVA) F.ENTREGA = '';
-          guardarLocal(CLAVE + '_f', F); pintarFiltros(); pintarTablero(); return;
-        }
-        if (e.target.id === 'kb-dias') { var n = parseInt(e.target.value, 10); F.dias = isNaN(n) || n < 0 ? DIAS : n; e.target.value = F.dias; }
-        guardarLocal(CLAVE + '_f', F); cuenta(); pintarTablero();
+      function chips(nombre, attr, vs, actual) {
+        return '<h3 class="en-hoja-h">' + texto(nombre) + '</h3><div class="en-chips" role="group" aria-label="' + texto(nombre) + '">' + vs.map(function (x) {
+          return '<button type="button" class="en-chip" ' + attr + '="' + texto(x[0]) + '" aria-pressed="' + (String(x[0]) === String(actual)) + '">' + texto(x[1]) + '</button>';
+        }).join('') + '</div>';
+      }
+      function pintarHoja() {
+        var n = tareas().filter(pasa).length, dias = DIAS_OP.indexOf(DIAS) < 0 ? DIAS_OP.concat([DIAS]).sort(function (a, b) { return a - b; }) : DIAS_OP;
+        if (dias.indexOf(F.dias) < 0) dias = dias.concat([F.dias]).sort(function (a, b) { return a - b; });
+        altaForm.innerHTML = '<div class="en-hoja-cab"><h2>Filtros</h2><button type="button" class="en-hoja-x" data-cancelar-alta aria-label="Cerrar" title="Cerrar">' + ICO_CERRAR + '</button></div>' +
+          chips('Columnas', 'data-vista', Object.keys(VISTAS).map(function (k) { return [k, VISTAS[k].titulo]; }), F.vista) +
+          FILTROS.map(function (f) {
+            var vs = f.vs();
+            return vs.length ? chips(f.t, 'data-f-' + f.k.toLowerCase(), [['', f.k === 'PERSONA' ? 'Todas' : 'Todas']].concat(vs), F[f.k] || '') : '';
+          }).join('') +
+          chips('Entregadas y descartadas', 'data-dias', dias.map(function (d) { return [d, 'Últimos ' + d + ' días']; }), F.dias) +
+          '<div class="botones"><button type="button" class="sec" data-quitar-filtros' + (cuenta() ? '' : ' disabled') + '>Quitar filtros</button>' +
+          '<button type="submit" class="pri">' + (n === 1 ? 'Ver 1 tarea' : 'Ver ' + n + ' tareas') + '</button></div>';
+      }
+      function abrirHoja() {
+        pintarHoja();
+        altaForm.onsubmit = function (ev) { ev.preventDefault(); cerrarVelo(); };
+        altaVelo.classList.add('en-hoja');
+        abrirVelo();
+        var b = altaForm.querySelector('.en-chip[aria-pressed=true]'); if (b) b.focus();
+      }
+      $('kb-fil').onclick = abrirHoja;
+      altaForm.addEventListener('click', function (e) {
+        if (!altaVelo.classList.contains('en-hoja')) return;
+        var b = e.target.closest('.en-chip, [data-quitar-filtros]');
+        if (!b) return;
+        var foco = '';
+        if (b.hasAttribute('data-quitar-filtros')) { FILTROS.forEach(function (f) { F[f.k] = ''; }); F.dias = DIAS; foco = '.pri'; }
+        else if (b.hasAttribute('data-vista')) { F.vista = b.getAttribute('data-vista'); foco = '[data-vista="' + F.vista + '"]'; }
+        else if (b.hasAttribute('data-dias')) { F.dias = Number(b.getAttribute('data-dias')); foco = '[data-dias="' + F.dias + '"]'; }
+        else FILTROS.forEach(function (f) {
+          var at = 'data-f-' + f.k.toLowerCase();
+          if (!b.hasAttribute(at)) return;
+          F[f.k] = b.getAttribute(at); foco = '[' + at + '="' + F[f.k] + '"]';
+          // Otra iniciativa: la entrega elegida puede no ser suya.
+          if (f.k === 'INICIATIVA') { var en = F.ENTREGA && F.ENTREGA !== '-' ? ctx.tablas.fila(TE, F.ENTREGA) : null; if (en && F.INICIATIVA && en.INICIATIVA !== F.INICIATIVA) F.ENTREGA = ''; }
+        });
+        guardarLocal(CLAVE + '_f', F); pintarTablero(); pintarHoja(); cuenta();
+        var x = foco && altaForm.querySelector(foco); if (x) x.focus();
       });
-      $('kb-vista').onchange = function () { F.vista = this.value; guardarLocal(CLAVE + '_f', F); pintarTablero(); };
       var tBusca = 0;
       $('kb-busca').addEventListener('input', function () { var v = this.value; clearTimeout(tBusca); tBusca = setTimeout(function () { F.busca = v.trim().toLowerCase(); pintarTablero(); }, 120); });
-      $('kb-rec').onclick = function () {
-        var b = this; b.disabled = true; b.classList.add('girando');
-        Promise.all([ctx.tablas.refrescar([T, TI, TE, TD], true), gente()]).then(function () { if (ctx.abierta()) ctx.aviso('Tablero al día.'); }, function (e) {
-          if (ctx.abierta()) ctx.aviso('No se ha podido actualizar: ' + String(e.message).replace(/^\w+:\s*/, ''));
-        }).then(function () { b.disabled = false; b.classList.remove('girando'); });
-      };
 
       function pasa(t) {
         if (F.busca) {
@@ -561,7 +579,7 @@
         document.documentElement.classList.add('fv-abierta');
         var p = altaForm.querySelector('input,textarea,select'); if (p) p.focus();
       }
-      function cerrarVelo() { altaVelo.classList.remove('abierto'); if (!abiertaId) document.documentElement.classList.remove('fv-abierta'); altaForm.onsubmit = null; }
+      function cerrarVelo() { altaVelo.classList.remove('abierto', 'en-hoja'); if (!abiertaId) document.documentElement.classList.remove('fv-abierta'); altaForm.onsubmit = null; }
       altaVelo.addEventListener('click', function (e) { if (e.target === altaVelo || e.target.closest('[data-cancelar-alta]')) cerrarVelo(); });
       altaVelo.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.stopPropagation(); cerrarVelo(); } });
 
@@ -667,7 +685,7 @@
       function abrirAlta() {
         var dflt = { INICIATIVA: F.INICIATIVA || (ctx.tablas.fila(TI, 'UTILO') ? 'UTILO' : ((ctx.tablas.filas(TI)[0] || {}).ID || '')), ENTREGA: F.ENTREGA && F.ENTREGA !== '-' ? F.ENTREGA : '',
           EPICA: F.EPICA || '', ASIGNADO: yo(), P: '!!', T: 'S', PUBLICAR: false };
-        altaForm.innerHTML = '<h2>Añadir tarea</h2><div class="edit">' + htmlCampos(dflt, true) + '</div><div id="alta-error" role="alert"></div>' +
+        altaForm.innerHTML = '<h2>Nueva tarea</h2><div class="edit">' + htmlCampos(dflt, true) + '</div><div id="alta-error" role="alert"></div>' +
           '<div class="botones"><button type="button" class="sec" data-cancelar-alta>Cancelar</button><button type="submit" class="pri">Crear tarea</button></div>';
         abrirVelo();
         altaForm.onsubmit = function (e) {
@@ -1060,7 +1078,7 @@
         if ([T, TI, TE, TD].indexOf(t) >= 0) { pintarTablero(); if (t !== T && t !== TD) pintarFiltros(); }
         if (abiertaId && !ocupado() && [T, TE, TD, TB].indexOf(t) >= 0) pintarFicha();
       });
-      abrirFiltros(!!F._ab);
+      delete F._ab; // T0422: los filtros ya no se quedan abiertos
       pintarFiltros(); pintarTablero();
       ctx.tablas.leer([T, TI, TE, TD]).then(function () {
         leido = true;
@@ -1070,7 +1088,7 @@
         if (pedida && tarea(pedida)) abrirFicha(pedida, true);
       }, function (e) {
         leido = true;
-        tab.innerHTML = '<p class="u-error kb-vacio">No se han podido leer las tareas.</p><p class="u-nota kb-vacio">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Pulsa ↻ o vuelve a abrir la sección.</p>';
+        tab.innerHTML = '<p class="u-error kb-vacio">No se han podido leer las tareas.</p><p class="u-nota kb-vacio">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Vuelve a abrir la sección.</p>';
       });
       gente().catch(function () {});
 

@@ -1902,12 +1902,8 @@ html .u .u-velo, html .u .gs5 .gs-velo, html .u #alta-velo, html .u .ver-velo, h
 }
 
 /* ---------- Barra de arriba del iPhone (T0421) ----------
- * Con «apple-mobile-web-app-status-bar-style: black-translucent» (la plataforma de Utilo, instalada en la pantalla de inicio),
- * la página llega hasta arriba, por debajo de la hora, la batería y la isla. Esa franja (env(safe-area-inset-top)) se pinta
- * del color de la marca, fija, y lo de la página empieza debajo; las ventanas, también. Sin esa etiqueta (o fuera del
- * iPhone), la franja mide 0 y no cambia nada. */
-body.u { padding-top: env(safe-area-inset-top, 0px); }
-body.u::before { content: ''; position: fixed; z-index: 1000; top: 0; left: 0; right: 0; height: env(safe-area-inset-top, 0px);
-  background: var(--color-principal); pointer-events: none; }
-html .u .u-velo, html .u .gs5 .gs-velo, html .u #alta-velo, html .u .ver-velo, html .u .sol-velo, html .u .fv-velo {
-  top: calc(var(--tope, 0px) + env(safe-area-inset-top, 0px)); }
+ * La franja de la hora es del color del fondo de html (la plataforma de Utilo lo pone del de la marca en su index.html);
+ * el body, con el fondo de la página, ocupa al menos toda la pantalla, así que ese color solo se ve arriba. La página ya no
+ * llega por debajo de la hora (black-translucent): en iOS 26 dejaba un difuminado blanco arriba y subía la barra de
+ * secciones, con un hueco debajo. */
+body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
