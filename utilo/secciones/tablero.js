@@ -88,7 +88,19 @@
     ENTREGA: 'Entrega', DEADLINE: 'Fecha límite', DISPONIBLE_DESDE: 'No empezar antes del', FECHA_CIERRE: 'Cerrada el', REVISAR_EL: 'Se vuelve a mirar el',
     DESCRIPCION: 'Qué hay que hacer', DOCUMENTOS_RELEVANTES: 'Documentos', CONCLUSIONES: 'Conclusiones', PREGUNTA: 'Pregunta', MOTIVO: 'Motivo',
     MOTIVO_BLOQUEO: 'Motivo del bloqueo', HERRAMIENTA: 'Herramienta', EMPLEADO: 'Empleado IA', TITULO: 'Título', DEPENDE: 'Espera a' };
-  var OBLIGA = { TITULO: 'Título', DESCRIPCION: 'Qué hay que hacer', INICIATIVA: 'Iniciativa', ASIGNADO: 'Asignada a' };
+  var OBLIGA = { TITULO: 'Título', DESCRIPCION: 'Qué hay que hacer', INICIATIVA: 'Iniciativa', ASIGNADO: 'Asignada a', P: 'Prioridad', T: 'Tamaño' };
+  /** T0074: la épica que se sugiere a una tarea nueva de la entrega e: la que más llevan sus tareas (sin las descartadas); a
+   *  igualdad, la de la tarea más reciente. '' sin entrega o si ninguna de sus tareas tiene épica. */
+  function epicaSugerida(ts, e) {
+    if (!e) return '';
+    var n = {}, ult = {};
+    ts.forEach(function (t) {
+      if (t.ENTREGA !== e || !t.EPICA || t.ESTADO === 'Descartada' || t._nueva) return;
+      n[t.EPICA] = (n[t.EPICA] || 0) + 1;
+      if (!ult[t.EPICA] || String(t.ID) > ult[t.EPICA]) ult[t.EPICA] = String(t.ID);
+    });
+    return Object.keys(n).sort(function (a, b) { return n[b] - n[a] || ult[b].localeCompare(ult[a]); })[0] || '';
+  }
   /** T0386: lo que se guarda al cambiar el dato k de la tarea t desde la ficha: { cambios, antes }, { mal } si no vale, o null si no
    *  cambia nada. entregasDe(ini) da los id de las entregas de una iniciativa: al cambiar de iniciativa, la entrega que no es suya se quita. */
   function cambioDe(t, k, v, entregasDe) {
@@ -739,8 +751,6 @@
 
       /* ---------- formulario: crear y editar ---------- */
 
-      /** Mi id de persona (por el nombre con el que he entrado). */
-      function yo() { for (var k in GENTE) if (GENTE[k] === ctx.persona) return k; return ''; }
       function opciones(vs, v, vacio) {
         return (vacio !== false ? '<option value="">' + texto(vacio || 'Elige…') + '</option>' : '') +
           vs.map(function (x) { return '<option value="' + texto(x[0]) + '"' + (x[0] === v ? ' selected' : '') + '>' + texto(x[1]) + '</option>'; }).join('');
@@ -779,11 +789,12 @@
           campo('INICIATIVA', 'Iniciativa', '<select id="tb-f-INICIATIVA" required>' + opciones(ctx.tablas.filas(TI).map(function (i) { return [i.ID, i.NOMBRE || i.ID]; }), ini) + '</select>') +
           campo('ENTREGA', 'Entrega', '<select id="tb-f-ENTREGA">' + opciones(entregasDe(ini), val('ENTREGA'), 'Sin entrega') + '</select>', true) +
           campo('EPICA', 'Épica', '<select id="tb-f-EPICA">' + opciones(epicasCon(val('EPICA')), val('EPICA'), 'Sin épica') + '<option value="' + OTRA + '">Otra épica…</option></select>' +
-            '<input type="text" id="tb-f-EPICA-nueva" autocomplete="off" placeholder="Nombre de la épica nueva" aria-label="Épica nueva" hidden>', true) +
+            '<input type="text" id="tb-f-EPICA-nueva" autocomplete="off" placeholder="Nombre de la épica nueva" aria-label="Épica nueva" hidden>' +
+            (nueva ? '<div class="ayuda" id="tb-f-EPICA-sug" hidden>La que más llevan las tareas de esta entrega. Puedes cambiarla.</div>' : ''), true) +
           campo('ASIGNADO', 'Asignada a', '<select id="tb-f-ASIGNADO" required>' + opciones(gentes(), val('ASIGNADO')) + '</select>') +
           campo('REVISA', 'La revisa', '<select id="tb-f-REVISA">' + opciones(gentes(), val('REVISA'), nueva ? 'La misma persona' : 'Elige…') + '</select>', nueva) +
-          campo('P', 'Prioridad', '<select id="tb-f-P" required>' + opciones(['!!!!', '!!!', '!!', '!'].map(function (x) { return [x, x]; }), val('P'), false) + '</select>') +
-          campo('T', 'Tamaño', '<select id="tb-f-T" required>' + opciones(['XS', 'S', 'M', 'L', 'XL'].map(function (x) { return [x, x]; }), val('T'), false) + '</select>') +
+          campo('P', 'Prioridad', '<select id="tb-f-P" required>' + opciones(['!!!!', '!!!', '!!', '!'].map(function (x) { return [x, x]; }), val('P'), nueva ? 'Elige…' : false) + '</select>') +
+          campo('T', 'Tamaño', '<select id="tb-f-T" required>' + opciones(['XS', 'S', 'M', 'L', 'XL'].map(function (x) { return [x, x]; }), val('T'), nueva ? 'Elige…' : false) + '</select>') +
           campo('DEADLINE', 'Fecha límite', '<input type="date" id="tb-f-DEADLINE" value="' + texto(val('DEADLINE')) + '">', true) +
           campo('DISPONIBLE_DESDE', 'No empezar antes del', '<input type="date" id="tb-f-DISPONIBLE_DESDE" value="' + texto(val('DISPONIBLE_DESDE')) + '">', true, 'Hasta ese día espera, y luego pasa sola a la cola.') +
           campo('DEPENDE', 'Espera a', '<div class="deps" data-deps="' + texto(deps.join(',')) + '">' + deps.map(chipDep).join('') + '</div>' +
@@ -796,7 +807,18 @@
           '<div class="campo"><label><input type="checkbox" id="tb-f-PUBLICAR"' + (t.PUBLICAR ? ' checked' : '') + '> Al aprobarla, hay que publicarla o enviarla</label>' +
           '<div class="ayuda">Si no, al aprobarla pasa sola a Entregada.</div></div>';
       }
-      /** Contador del título, entregas según la iniciativa y «espera a». */
+      /** T0074: en Nueva tarea, la épica de la entrega elegida, si quien crea la tarea no ha elegido otra. */
+      function sugerirEpica(f) {
+        var s = f.querySelector('#tb-f-EPICA'), a = f.querySelector('#tb-f-EPICA-sug');
+        if (!s || !a) return;
+        var antes = s.getAttribute('data-sugerida') || '';
+        if (s.value && s.value !== antes) return; // la ha elegido quien la crea (o viene del filtro): no se toca
+        var v = epicaSugerida(tareas(), f.querySelector('#tb-f-ENTREGA').value); // está en el desplegable: sale de las mismas tareas
+        s.value = v;
+        s.setAttribute('data-sugerida', v);
+        a.hidden = !v;
+      }
+      /** Contador del título, entregas según la iniciativa, la épica sugerida y «espera a». */
       function vivo(f) {
         f.addEventListener('input', function (e) {
           var l = e.target.getAttribute && e.target.getAttribute('data-limite');
@@ -805,8 +827,9 @@
           k.textContent = n + ' / ' + l; k.classList.toggle('mal', n > Number(l));
         });
         f.addEventListener('change', function (e) {
-          if (e.target.id === 'tb-f-INICIATIVA') { f.querySelector('#tb-f-ENTREGA').innerHTML = opciones(entregasDe(e.target.value), '', 'Sin entrega'); return; }
-          if (e.target.id === 'tb-f-EPICA') { var en = f.querySelector('#tb-f-EPICA-nueva'); en.hidden = e.target.value !== OTRA; if (!en.hidden) en.focus(); return; }
+          if (e.target.id === 'tb-f-INICIATIVA') { f.querySelector('#tb-f-ENTREGA').innerHTML = opciones(entregasDe(e.target.value), '', 'Sin entrega'); sugerirEpica(f); return; }
+          if (e.target.id === 'tb-f-ENTREGA') { sugerirEpica(f); return; }
+          if (e.target.id === 'tb-f-EPICA') { var sg = f.querySelector('#tb-f-EPICA-sug'); if (sg) sg.hidden = true; var en = f.querySelector('#tb-f-EPICA-nueva'); en.hidden = e.target.value !== OTRA; if (!en.hidden) en.focus(); return; }
           if (!e.target.hasAttribute('data-anadir-dep') || !e.target.value) return;
           var d = f.querySelector('[data-deps]'), ya = d.getAttribute('data-deps') ? d.getAttribute('data-deps').split(',') : [];
           if (ya.indexOf(e.target.value) < 0) { ya.push(e.target.value); d.setAttribute('data-deps', ya.join(',')); d.insertAdjacentHTML('beforeend', chipDep(e.target.value)); }
@@ -834,6 +857,8 @@
         if (!o.DESCRIPCION) mal.push('Qué hay que hacer: falta.');
         if (!o.INICIATIVA) mal.push('Iniciativa: falta.');
         if (!o.ASIGNADO) mal.push('Asignada a: falta.');
+        if (!o.P) mal.push('Prioridad: falta.');
+        if (!o.T) mal.push('Tamaño: falta.');
         return { valores: o, deps: deps, mal: mal };
       }
       /** Las dependencias de id: las que faltan se crean y las que sobran se quitan. */
@@ -845,12 +870,14 @@
       }
 
       function abrirAlta() {
-        // T0423: con una sola opción elegida en un filtro, la tarea nueva la lleva.
+        // T0423: con una sola opción elegida en un filtro, la tarea nueva la lleva. T0074: prioridad, tamaño y asignada no vienen
+        // puestas (se eligen, para que nadie deje un !! o una S sin pensarlo); la épica, la de la entrega si no hay filtro.
         var una = function (k) { return F[k].length === 1 && F[k][0] !== '-' ? F[k][0] : ''; };
         var dflt = { INICIATIVA: una('INICIATIVA') || (ctx.tablas.fila(TI, 'UTILO') ? 'UTILO' : ((ctx.tablas.filas(TI)[0] || {}).ID || '')), ENTREGA: una('ENTREGA'),
-          EPICA: una('EPICA'), ASIGNADO: yo(), P: '!!', T: 'S', PUBLICAR: false };
+          EPICA: una('EPICA'), P: una('P'), PUBLICAR: false };
         altaForm.innerHTML = '<h2>Nueva tarea</h2><div class="edit">' + htmlCampos(dflt, true) + '</div><div id="alta-error" role="alert"></div>' +
           '<div class="botones"><button type="button" class="sec" data-cancelar-alta>Cancelar</button><button type="submit" class="pri">Crear tarea</button></div>';
+        sugerirEpica(altaForm);
         abrirVelo();
         altaForm.onsubmit = function (e) {
           e.preventDefault();

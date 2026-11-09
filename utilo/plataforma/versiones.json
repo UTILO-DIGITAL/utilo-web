@@ -1,6 +1,13 @@
 {
-  "version": "5.15-1.10",
+  "version": "5.15-1.11",
   "versiones": [
+    {
+      "v": "5.15-1.11",
+      "fecha": "09/11/2026",
+      "novedades": [
+        "Al crear una tarea, la prioridad, el tamaño y quién la lleva se eligen siempre, y la épica se propone sola según la entrega."
+      ]
+    },
     {
       "v": "5.15-1.10",
       "fecha": "09/11/2026",
