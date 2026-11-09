@@ -9,10 +9,26 @@
      va al Supabase de DEV (utilo-dev, con la copia del DAILY de verdad) con el montaje de la rama (utilo/plataforma/montaje.js).
      Entrar con Google pide que esta dirección esté en Authentication › URL Configuration › Redirect URLs de utilo-dev.
      No la carga ninguna página de producción. -->
+<!-- T0424: instalada en el iPhone, la página llega por debajo de la hora y la isla (black-translucent) y todo lo que queda
+     ahí debajo es verde, como en la prueba de DEV (dev/barra/) que Javi vio bien en iOS 26: el body (que es el que se desplaza
+     en el móvil) lleva el verde arriba, una franja verde fija tapa la zona de la hora al desplazar, y la página empieza
+     debajo. Fuera del iPhone, env(safe-area-inset-top) mide 0 y no cambia nada. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0E8A7A">
 <link rel="stylesheet" href="../../utilo/marca.css?v=47">
 <link rel="stylesheet" href="../../estilos/base.css?v=90">
 <!-- T0386: como una aplicación: deslizar el dedo de lado no lleva a la página de atrás (en el iPhone, eso solo instalada) -->
-<style>html, body { overscroll-behavior-x: none; }</style>
+<style>html, body { overscroll-behavior-x: none; }
+  /* T0424: la barra de la hora del iPhone, integrada (ver la etiqueta black-translucent de arriba). */
+  html { background: #0E8A7A; overscroll-behavior-y: none; }
+  /* En el móvil el body es el que se desplaza (alto de la pantalla): verde arriba, y #sx-panel tapa con el crema lo de debajo. */
+  @media (max-width: 899px) { body.u { background: linear-gradient(#0E8A7A, #0E8A7A) top / 100% 50% no-repeat, var(--color-fondo); } }
+  body.u::before { content: ''; position: fixed; z-index: 1000; top: 0; left: 0; right: 0; height: env(safe-area-inset-top, 0px);
+    background: #0E8A7A; pointer-events: none; }
+  #sx-panel { min-height: 100%; box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); background: var(--color-fondo); }
+  #sx-panel > .n-cab:first-child { margin-top: calc(-1 * env(safe-area-inset-top, 0px)); padding-top: calc(env(safe-area-inset-top, 0px) + var(--e4)); }
+  html .u .u-velo, html .u .gs5 .gs-velo, html .u #alta-velo, html .u .ver-velo, html .u .sol-velo, html .u .fv-velo, html .u .kz {
+    top: calc(var(--tope, 0px) + env(safe-area-inset-top, 0px)); }</style>
 <script>
   window.KANBAN = {
     clave: 'dev-plataforma',
