@@ -9,10 +9,11 @@
  * - Vista (arriba): «8 columnas» (todas menos Aplazada y Descartada), «Todas» (los diez estados) o «Agrupadas» (Necesita tu
  *   respuesta con Bloqueada y Para revisar con Aprobada; el estado exacto, en la tarjeta). La primera vez, la de
  *   config.VISTA; después, la última de este dispositivo. Entregadas y Descartadas, solo las de los últimos días (Filtros).
- * - En directo: con Supabase, lo que cambie otra persona (o el agente) sale solo en un segundo (Realtime); ↻ sigue para forzarlo.
+ * - En directo: con Supabase, lo que cambie otra persona (o el agente) sale solo en un segundo (Realtime); sin ↻ (T0422).
  * - Ordenar a mano: arrastrada dentro de su columna, la tarjeta se queda donde se suelta (el mismo orden para todos; las que no
  *   se han tocado, debajo, con el de siempre). Al cambiar de estado, vuelve al de siempre. Las cerradas, por fecha.
- * - Filtros: iniciativa, entrega, persona (en manos de, asignada, pide o revisa), épica y prioridad; y buscar.
+ * - Filtros: iniciativa, entrega, persona (en manos de, asignada, pide o revisa), épica y prioridad, y las columnas, en una hoja
+ *   con botones (T0422, como en Entregas); buscar, al lado. Crear, con el + flotante.
  * - Las personas son su id en la base: el nombre sale de personas_gestion().
  * - Se pinta al momento con lo guardado en el dispositivo y se refresca por detrás.
  * - Mover (arrastrando en el ordenador, con el desplegable en el móvil o desde la ficha): solo a los estados a los que se
@@ -29,10 +30,11 @@
 (function () {
   'use strict';
   var T = 'TABLERO', TI = 'INICIATIVAS', TE = 'ENTREGAS', TD = 'DEPENDENCIAS', TB = 'BITACORA';
-  var RAIZ = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/utilo\/secciones\/[^/]*$/, '') : '../../'; })();
-  var VERSION = (function () { var s = document.currentScript && document.currentScript.src; var m = s && /[?&]v=([^&]+)/.exec(s); return m ? m[1] : '1'; })();
-  var ICO_RECARGAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>';
+  var RAIZ = (function () { var s = typeof document !== 'undefined' && document.currentScript && document.currentScript.src; return s ? s.replace(/utilo\/secciones\/[^/]*$/, '') : '../../'; })();
+  var VERSION = (function () { var s = typeof document !== 'undefined' && document.currentScript && document.currentScript.src; var m = s && /[?&]v=([^&]+)/.exec(s); return m ? m[1] : '1'; })();
   var ICO_VOLVER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>';
+  var ICO_FILTROS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>';
+  var ICO_CERRAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 
   /** Los estados, en el orden del flujo, con su color de estilos/base.css y quién mueve ficha. */
   var ESTADOS = ['Esperando', 'En cola', 'En curso', 'Necesita tu respuesta', 'Bloqueada', 'Para revisar', 'Aprobada', 'Entregada', 'Aplazada', 'Descartada'];
@@ -104,6 +106,79 @@
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function leerLocal(k, d) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
   function guardarLocal(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  /* ---------- T0423 · LA HOJA DE FILTROS: igual en tablero.js y entregas.js (probar-plataforma.js comprueba que no se separan) ----------
+   * Cada filtro es un grupo de botones. Los de «varias» (iniciativa, entrega, persona…) dejan elegir más de uno: «Todas» quita
+   * lo elegido. Un grupo con más de HOJA_MAX opciones enseña las primeras (y las elegidas), «Ver las otras N» y un buscador; las
+   * opciones «al buscar» (p. ej. las entregas ya cerradas) solo salen buscándolas. */
+  var HOJA_MAX = 8;
+  function sinTildes(s) { return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  /** Lo elegido en un filtro, siempre en lista (antes de T0423 se guardaba un texto: '' era «Todas»). */
+  function lista(v) { return (Array.isArray(v) ? v : v === '' || v == null ? [] : [v]).filter(function (x) { return x !== '' && x != null; }).map(String); }
+  /** Lo elegido tras pulsar «v»: con varias, se añade o se quita («» quita todo); si no, solo ese. */
+  function elegirEn(actual, v, varias) {
+    if (!varias) return v;
+    if (v === '') return [];
+    var l = lista(actual), i = l.indexOf(String(v));
+    if (i >= 0) l.splice(i, 1); else l.push(String(v));
+    return l;
+  }
+  /** Un grupo de la hoja. o: { k, t, vs: [[valor, texto, alBuscar]], sel, varias, abierto, buscar }. */
+  function grupoHoja(o) {
+    var sel = o.varias ? lista(o.sel) : [String(o.sel)];
+    var larga = o.vs.filter(function (x) { return !x[2]; }).length > HOJA_MAX, mas = 0, k = 0;
+    var vs = !larga ? o.vs : o.vs.slice().sort(function (a, b) { return (sel.indexOf(String(b[0])) >= 0) - (sel.indexOf(String(a[0])) >= 0); }); // larga: las elegidas, primero
+    var bs = vs.map(function (x) {
+      var p = sel.indexOf(String(x[0])) >= 0, oculta = false;
+      if (!p && x[2]) oculta = true;
+      else if (!x[2] && k++ >= HOJA_MAX && larga && !o.abierto && !p) { oculta = true; mas++; }
+      return '<button type="button" class="en-chip" data-g="' + texto(o.k) + '" data-v="' + texto(x[0]) + '" data-txt="' + texto(sinTildes(x[1])) + '"' +
+        ' aria-pressed="' + p + '"' + (oculta ? ' data-oculta hidden' : '') + '>' + texto(x[1]) + '</button>';
+    });
+    if (o.varias) bs.unshift('<button type="button" class="en-chip" data-g="' + texto(o.k) + '" data-v="" aria-pressed="' + !sel.length + '">Todas</button>');
+    var buscador = larga || vs.some(function (x) { return x[2]; });
+    return '<div class="en-grupo" data-grupo="' + texto(o.k) + '"><h3 class="en-hoja-h">' + texto(o.t) +
+        (o.varias && sel.length ? ' <span class="en-hoja-cu">' + (sel.length === 1 ? '1 elegida' : sel.length + ' elegidas') + '</span>' : '') + '</h3>' +
+      (buscador ? '<input type="search" class="en-hoja-busca" data-gbusca="' + texto(o.k) + '" placeholder="' + texto(o.buscar || 'Buscar') + '" aria-label="' + texto(o.buscar || 'Buscar') + '" autocomplete="off">' : '') +
+      '<div class="en-chips' + (o.varias ? ' varias' : '') + '" role="group" aria-label="' + texto(o.t) + '">' + bs.join('') + '</div>' +
+      (mas ? '<button type="button" class="en-hoja-mas" data-gmas="' + texto(o.k) + '">' + (mas === 1 ? 'Ver otra' : 'Ver las otras ' + mas) + '</button>' : '') +
+      '<p class="en-hoja-nada" hidden>Ninguna con ese nombre.</p></div>';
+  }
+  /** Buscar dentro de un grupo: salen las que coinciden (también las «al buscar») y las elegidas. */
+  function buscarEnGrupo(input) {
+    var q = sinTildes(input.value.trim()), g = input.closest('.en-grupo'), n = 0;
+    [].forEach.call(g.querySelectorAll('.en-chip[data-txt]'), function (b) {
+      var ve = q ? b.getAttribute('aria-pressed') === 'true' || q.split(/\s+/).every(function (p) { return b.getAttribute('data-txt').indexOf(p) >= 0; }) : !b.hasAttribute('data-oculta');
+      b.hidden = !ve; if (ve) n++;
+    });
+    var m = g.querySelector('.en-hoja-mas'); if (m) m.hidden = !!q;
+    g.querySelector('.en-hoja-nada').hidden = !q || n > 0;
+  }
+  /** Vuelve a pintar la hoja sin perder lo buscado, por dónde iba ni el foco. */
+  function repintarHoja(form, pintar, foco) {
+    var bs = {}, y = form.scrollTop;
+    [].forEach.call(form.querySelectorAll('[data-gbusca]'), function (i) { if (i.value) bs[i.getAttribute('data-gbusca')] = i.value; });
+    pintar();
+    form.scrollTop = y;
+    Object.keys(bs).forEach(function (k) { var i = form.querySelector('[data-gbusca="' + k + '"]'); if (i) { i.value = bs[k]; buscarEnGrupo(i); } });
+    var x = foco && form.querySelector(foco); if (x) try { x.focus({ preventScroll: true }); } catch (e) { x.focus(); }
+  }
+  /** Los botones de la hoja: elegir(k, v) cambia el filtro; «Ver las otras» abre el grupo; el buscador filtra sin volver a pintar. */
+  function atenderHoja(form, velo, o) {
+    form.addEventListener('click', function (ev) {
+      if (!velo.classList.contains('en-hoja')) return;
+      var m = ev.target.closest('[data-gmas]');
+      if (m) { var g = m.getAttribute('data-gmas'); o.abiertos[g] = 1; repintarHoja(form, o.pintar, ''); return; }
+      var b = ev.target.closest('.en-chip[data-g]');
+      if (b) {
+        var k = b.getAttribute('data-g'), v = b.getAttribute('data-v');
+        o.elegir(k, v);
+        repintarHoja(form, o.pintar, '[data-g="' + k + '"][data-v="' + (window.CSS && CSS.escape ? CSS.escape(v) : v) + '"]');
+      } else if (ev.target.closest('[data-quitar-filtros]')) { o.quitar(); repintarHoja(form, o.pintar, '.pri'); }
+    });
+    form.addEventListener('input', function (ev) { if (ev.target.hasAttribute('data-gbusca')) buscarEnGrupo(ev.target); });
+    form.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' && ev.target.hasAttribute && ev.target.hasAttribute('data-gbusca')) ev.preventDefault(); });
+  }
+  /* ---------- FIN DE LA HOJA DE FILTROS ---------- */
   /** 'aaaa-mm-dd' (o con hora) → 'dd/mm/aaaa' */
   function fechaEs(s) { var m = /^(\d{4})-(\d\d)-(\d\d)(?:T(\d\d:\d\d))?/.exec(String(s || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] + (m[4] ? ' ' + m[4] : '') : String(s || ''); }
   /** Días de hoy a esa fecha ('aaaa-mm-dd'); null si no hay. */
@@ -115,6 +190,91 @@
   }
   function hoyISO() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
   function lineas(s) { return String(s || '').split('\n').map(function (l) { return l.replace(/\s+$/, ''); }).filter(function (l) { return l.trim(); }); }
+
+  /* ---------- T0420 · los textos largos de la ficha, ordenados para leerlos de un vistazo ---------- */
+
+  // Los apartados que escriben /empezar y /cerrar («DECISIONES:» en una línea sola) y su título en la ficha. SOLICITUD, sin título.
+  var APARTADOS = { SOLICITUD: '', DECISIONES: 'Decisiones', ABIERTO: 'Queda abierto', PENDIENTE: 'Pendiente', PASOS: 'Pasos', NOTAS: 'Notas', CRITERIO: 'Está bien hecho cuando' };
+  var HECHO = /^Est(?:á|a|ará) (?:bien )?hech[oa] cuando\s+/i;
+  /** Un párrafo, una frase por línea: corta tras . ! ? … si sigue una mayúscula (no un número: «1) …»). */
+  function frases(s) {
+    return String(s || '').replace(/([.!?…])\s+(?=[«¿¡("]?[A-ZÁÉÍÓÚÜÑ])/g, '$1\n').split('\n').map(function (x) { return x.trim(); }).filter(String);
+  }
+  /** «Pasos: 1) uno; 2) dos.» → { intro: 'Pasos:', pasos: ['uno', 'dos.'] }; null si la frase no numera al menos dos. */
+  function numerada(f) {
+    if (!/(^|\s)1\)\s/.test(f) || !/\s2\)\s/.test(f)) return null;
+    var partes = f.split(/(?:^|\s)(?=\d{1,2}\)\s)/), intro = /^\d{1,2}\)\s/.test(partes[0]) ? '' : partes.shift().trim();
+    return { intro: intro, pasos: partes.map(function (p) { return p.replace(/^\d{1,2}\)\s+/, '').replace(/[;,]\s*$/, '').trim(); }) };
+  }
+  /**
+   * Un texto largo de la ficha (Qué hay que hacer, Conclusiones) en partes, sin tocar lo guardado:
+   * [{ tit, fecha?, anadido?, cosas: [{ p } | { hecho } | { li, quien } | { intro, pasos }] }]
+   * - «SOLICITUD:», «DECISIONES:», «ABIERTO:»… (APARTADOS), solos o al empezar la línea: un apartado con su título.
+   * - «Añadido después (fecha, quién): …»: un apartado aparte, con lo de los paréntesis como fecha.
+   * - Un párrafo, una frase por línea; «Está bien hecho cuando …», aparte; «1) … 2) …», numerada.
+   * - «- …»: lista; «(Javi)» al final, a quién le toca.
+   */
+  function partesTexto(s) {
+    var out = [], cur = null;
+    var may = function (x) { return x.charAt(0).toUpperCase() + x.slice(1); };
+    function nuevo(tit, extra) { cur = { tit: tit, cosas: [] }; if (extra) Object.keys(extra).forEach(function (k) { cur[k] = extra[k]; }); out.push(cur); }
+    function parrafo(txt) {
+      if (!cur) nuevo('');
+      frases(txt).forEach(function (f) {
+        if (HECHO.test(f)) { cur.cosas.push({ hecho: may(f.replace(HECHO, '')) }); return; }
+        var n = numerada(f);
+        if (n) { n.intro = may(n.intro); n.pasos = n.pasos.map(may); }
+        cur.cosas.push(n || { p: may(f) });
+      });
+    }
+    lineas(s).forEach(function (l) {
+      var m;
+      if ((m = /^\s*[-•*]\s+(.*)$/.exec(l))) {
+        if (!cur) nuevo('');
+        var q = /\s*\(([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚáéíóúÑñü ]{0,30})\)\.?$/.exec(m[1]);
+        cur.cosas.push(q ? { li: may(m[1].slice(0, q.index).replace(/[.:;,]$/, '')), quien: q[1] } : { li: may(m[1]) });
+        return;
+      }
+      if ((m = /^Añadido después\s*(?:\(([^)]*)\))?\s*:\s*(.*)$/i.exec(l))) { nuevo('Añadido después', { anadido: true, fecha: m[1] || '' }); if (m[2]) parrafo(m[2]); return; }
+      if ((m = /^([A-ZÁÉÍÓÚÑ_]+):\s*(.*)$/.exec(l)) && m[1] in APARTADOS) { nuevo(APARTADOS[m[1]]); if (m[2]) parrafo(m[2]); return; }
+      parrafo(l);
+    });
+    return out.filter(function (x) { return x.cosas.length; });
+  }
+  /** El texto con sus enlaces: cada https://… se puede pulsar y se lee corto. */
+  function conEnlaces(s) {
+    return texto(s).replace(/https?:\/\/[^\s<]+/g, function (u) {
+      var fin = /[.,;:)»]+$/.exec(u), resto = fin ? fin[0] : '';
+      if (resto) u = u.slice(0, -resto.length);
+      var corto = u.replace(/^https?:\/\/(www\.)?/, '');
+      var pr = /^github\.com\/[^/]+\/([^/]+)\/pull\/(\d+)/.exec(corto);
+      corto = pr ? pr[1] + ' #' + pr[2] : corto.length > 42 ? corto.slice(0, 40) + '…' : corto;
+      return '<a href="' + u + '" target="_blank" rel="noopener">' + corto + '</a>' + resto;
+    });
+  }
+  /** Las partes de partesTexto en HTML. */
+  function htmlTexto(s) {
+    return partesTexto(s).map(function (x) {
+      var h = '', lista = false;
+      x.cosas.forEach(function (c) {
+        if (c.li != null) {
+          if (!lista) { h += '<ul class="fx-lista">'; lista = true; }
+          h += '<li>' + conEnlaces(c.li) + (c.quien ? ' <span class="fx-quien">' + texto(c.quien) + '</span>' : '') + '</li>';
+          return;
+        }
+        if (lista) { h += '</ul>'; lista = false; }
+        if (c.hecho != null) h += '<div class="fx-hecho"><small>Está bien hecho cuando</small><p>' + conEnlaces(c.hecho) + '</p></div>';
+        else if (c.pasos) h += (c.intro ? '<p>' + conEnlaces(c.intro) + '</p>' : '') + '<ol class="fx-pasos">' + c.pasos.map(function (p) { return '<li>' + conEnlaces(p) + '</li>'; }).join('') + '</ol>';
+        else h += '<p>' + conEnlaces(c.p) + '</p>';
+      });
+      if (lista) h += '</ul>';
+      var tit = x.tit ? '<h4>' + texto(x.tit) + (x.fecha ? ' <span>' + texto(x.fecha) + '</span>' : '') + '</h4>' : '';
+      return '<div class="fx-parte' + (x.anadido ? ' fx-anadido' : '') + '">' + tit + h + '</div>';
+    }).join('');
+  }
+  var CALC = { frases: frases, numerada: numerada, partesTexto: partesTexto, htmlTexto: htmlTexto, conEnlaces: conEnlaces };
+  // En las pruebas (node, sin navegador), solo las cuentas.
+  if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /** La hoja del tablero, una vez por página. Mientras llega, la sección no se ve (sin ella se pintaría sin estilos un momento). */
   function estilos(el) {
@@ -153,17 +313,14 @@
 
       el.classList.add('kb', 'tb'); // tb: lo propio de la plataforma en estilos/kanban.css
       el.innerHTML =
-        '<div class="filtros">' +
+        // T0422 (decidido por Javi, como en Entregas): buscar y «Filtros» en una línea; las columnas y los filtros, en una hoja
+        // con botones; sin ↻ (el tablero va en directo); crear, con el + flotante.
+        '<div class="filtros tb-fil">' +
           '<label class="busca"><span class="u-oculto">Buscar tareas</span><input type="search" id="kb-busca" placeholder="Buscar tareas" autocomplete="off"></label>' +
-          '<label class="tb-vista"><span class="u-oculto">Vista</span><select id="kb-vista" aria-label="Vista del tablero">' +
-            Object.keys(VISTAS).map(function (k) { return '<option value="' + k + '"' + (k === F.vista ? ' selected' : '') + '>' + texto(VISTAS[k].titulo) + '</option>'; }).join('') +
-          '</select></label>' +
-          '<button id="kb-fil" class="sec k-fil" type="button" aria-controls="kb-mas" aria-expanded="false">Filtros<span id="kb-fil-n" class="k-fil-n" hidden></span></button>' +
-          '<div id="kb-mas" class="k-mas" hidden></div>' +
-          '<span class="act"><button id="kb-rec" class="sec recarga" type="button" title="Traer lo último" aria-label="Traer lo último">' + ICO_RECARGAR + '</button></span>' +
+          '<button id="kb-fil" class="sec en-filtros" type="button" aria-haspopup="dialog">' + ICO_FILTROS + '<span>Filtros</span><span id="kb-fil-n" class="k-fil-n" hidden></span></button>' +
         '</div>' +
         '<div id="kb-tab" class="tablero"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div>' +
-        (SOLO_LEE ? '' : '<button id="alta-btn" type="button">Añadir tarea</button>') +
+        (SOLO_LEE ? '' : '<button id="alta-btn" class="en-mas" type="button" aria-label="Nueva tarea" title="Nueva tarea"><span class="en-mas-mas" aria-hidden="true">+</span><span class="en-mas-t">Nueva tarea</span></button>') +
         '<div class="fv-velo" id="kb-fv"><div class="fv-caja kb-ficha" role="dialog" aria-modal="true" aria-labelledby="kb-f-tit" id="kb-ficha"></div></div>' +
         '<div id="alta-velo"><form id="alta-form" novalidate></form></div>';
       var $ = function (id) { return el.querySelector('#' + id); };
@@ -190,70 +347,85 @@
 
       /* ---------- filtros ---------- */
 
+      // T0423: en los de «varias» se eligen varias opciones (una lista; sin ninguna, todas).
       var FILTROS = [
-        { k: 'INICIATIVA', t: 'Iniciativa', vs: function () { return ctx.tablas.filas(TI).map(function (i) { return [i.ID, i.NOMBRE || i.ID]; }); } },
-        { k: 'ENTREGA', t: 'Entrega', vs: function () {
-          // Con una iniciativa elegida, solo sus entregas.
-          var usadas = {}; tareas().forEach(function (t) { if (t.ENTREGA && (!F.INICIATIVA || t.INICIATIVA === F.INICIATIVA)) usadas[t.ENTREGA] = t.ENTREGA_CORTA || t.ENTREGA; });
-          return ctx.tablas.filas(TE).filter(function (e) { return usadas[e.ID]; }).map(function (e) { return [e.ID, usadas[e.ID] + ' · ' + (e.NOMBRE || '')]; }).concat([['-', 'Sin entrega']]);
+        { k: 'INICIATIVA', t: 'Iniciativa', buscar: 'Buscar iniciativa', vs: function () { return ctx.tablas.filas(TI).map(function (i) { return [i.ID, i.NOMBRE || i.ID]; }); } },
+        { k: 'ENTREGA', t: 'Entrega', buscar: 'Buscar entrega', vs: function () {
+          // Con iniciativas elegidas, solo sus entregas. Las entregadas y descartadas no salen a la vista: se buscan.
+          var ini = lista(F.INICIATIVA), usadas = {};
+          tareas().forEach(function (t) { if (t.ENTREGA && (!ini.length || ini.indexOf(t.INICIATIVA) >= 0)) usadas[t.ENTREGA] = t.ENTREGA_CORTA || t.ENTREGA; });
+          var es = ctx.tablas.filas(TE).filter(function (e) { return usadas[e.ID]; }).sort(function (a, b) {
+            return (CERRADOS.indexOf(a.ESTADO) >= 0) - (CERRADOS.indexOf(b.ESTADO) >= 0) || String(a.INICIATIVA).localeCompare(String(b.INICIATIVA)) || Number(b.NUMERO) - Number(a.NUMERO);
+          });
+          return [['-', 'Sin entrega']].concat(es.map(function (e) { return [e.ID, usadas[e.ID] + ' · ' + (e.NOMBRE || ''), CERRADOS.indexOf(e.ESTADO) >= 0]; }));
         } },
-        { k: 'PERSONA', t: 'Persona', vs: function () {
+        { k: 'PERSONA', t: 'Persona', buscar: 'Buscar persona', vs: function () {
           return Object.keys(GENTE).map(function (id) { return [id, GENTE[id]]; }).sort(function (a, b) { return a[1].localeCompare(b[1]); });
         } },
-        { k: 'EPICA', t: 'Épica', vs: function () {
+        { k: 'EPICA', t: 'Épica', buscar: 'Buscar épica', vs: function () {
           var vs = []; tareas().forEach(function (t) { if (t.EPICA && vs.indexOf(t.EPICA) < 0) vs.push(t.EPICA); });
           return vs.sort().map(function (v) { return [v, v]; });
         } },
         { k: 'P', t: 'Prioridad', vs: function () { return ['!!!!', '!!!', '!!', '!'].map(function (v) { return [v, v]; }); } }
       ];
-      function pintarFiltros() {
-        $('kb-mas').innerHTML = FILTROS.map(function (f) {
-          var v = F[f.k] || '';
-          return '<label>' + texto(f.t) + '<select data-f="' + f.k + '"><option value="">' + (f.k === 'PERSONA' ? 'Todas las personas' : 'Todas') + '</option>' +
-            f.vs().map(function (x) { return '<option value="' + texto(x[0]) + '"' + (x[0] === v ? ' selected' : '') + '>' + texto(x[1]) + '</option>'; }).join('') + '</select></label>';
-        }).join('') +
-          '<label>Entregadas y descartadas en los últimos (días)<input type="number" min="0" id="kb-dias" value="' + F.dias + '"></label>';
-        cuenta();
-      }
+      FILTROS.forEach(function (f) { F[f.k] = lista(F[f.k]); }); // lo guardado antes de T0423, un texto
+      /** T0422 · Los filtros, en una hoja que sube desde abajo (como en Entregas): las columnas, cada filtro y las cerradas, en
+       *  botones. Cambian el tablero al momento; «Ver N tareas» cierra. T0423: la hoja, con atenderHoja (igual en Entregas). */
+      var DIAS_OP = [7, 30, 90], ABIERTOS = {};
+      function pintarFiltros() { cuenta(); if (altaVelo.classList.contains('en-hoja')) repintarHoja(altaForm, pintarHoja, ''); }
       function cuenta() {
-        var k = FILTROS.filter(function (f) { return F[f.k]; }).length + (F.dias !== DIAS ? 1 : 0);
+        var k = FILTROS.filter(function (f) { return lista(F[f.k]).length; }).length + (F.dias !== DIAS ? 1 : 0);
         var s = $('kb-fil-n'); s.textContent = k ? String(k) : ''; s.hidden = !k;
         $('kb-fil').title = k ? k + (k === 1 ? ' filtro puesto' : ' filtros puestos') : 'Sin filtros';
+        return k;
       }
-      function abrirFiltros(ab) { $('kb-mas').hidden = !ab; $('kb-fil').setAttribute('aria-expanded', ab ? 'true' : 'false'); F._ab = ab; guardarLocal(CLAVE + '_f', F); }
-      $('kb-fil').onclick = function () { abrirFiltros($('kb-mas').hidden); };
-      $('kb-mas').addEventListener('change', function (e) {
-        var s = e.target.closest('[data-f]');
-        if (s) F[s.getAttribute('data-f')] = s.value;
-        // Otra iniciativa: la entrega elegida puede no ser suya; y el desplegable de entregas cambia.
-        if (s && s.getAttribute('data-f') === 'INICIATIVA') {
-          var en = F.ENTREGA && F.ENTREGA !== '-' ? ctx.tablas.fila(TE, F.ENTREGA) : null;
-          if (en && F.INICIATIVA && en.INICIATIVA !== F.INICIATIVA) F.ENTREGA = '';
-          guardarLocal(CLAVE + '_f', F); pintarFiltros(); pintarTablero(); return;
-        }
-        if (e.target.id === 'kb-dias') { var n = parseInt(e.target.value, 10); F.dias = isNaN(n) || n < 0 ? DIAS : n; e.target.value = F.dias; }
-        guardarLocal(CLAVE + '_f', F); cuenta(); pintarTablero();
+      function pintarHoja() {
+        var n = tareas().filter(pasa).length, dias = DIAS_OP.indexOf(DIAS) < 0 ? DIAS_OP.concat([DIAS]).sort(function (a, b) { return a - b; }) : DIAS_OP;
+        if (dias.indexOf(F.dias) < 0) dias = dias.concat([F.dias]).sort(function (a, b) { return a - b; });
+        altaForm.innerHTML = '<div class="en-hoja-cab"><h2>Filtros</h2><button type="button" class="en-hoja-x" data-cancelar-alta aria-label="Cerrar" title="Cerrar">' + ICO_CERRAR + '</button></div>' +
+          grupoHoja({ k: 'vista', t: 'Columnas', vs: Object.keys(VISTAS).map(function (k) { return [k, VISTAS[k].titulo]; }), sel: F.vista }) +
+          FILTROS.map(function (f) {
+            var vs = f.vs();
+            return vs.length ? grupoHoja({ k: f.k, t: f.t, vs: vs, sel: F[f.k], varias: true, abierto: ABIERTOS[f.k], buscar: f.buscar }) : '';
+          }).join('') +
+          grupoHoja({ k: 'dias', t: 'Entregadas y descartadas', vs: dias.map(function (d) { return [d, 'Últimos ' + d + ' días']; }), sel: F.dias }) +
+          '<div class="botones"><button type="button" class="sec" data-quitar-filtros' + (cuenta() ? '' : ' disabled') + '>Quitar filtros</button>' +
+          '<button type="submit" class="pri">' + (n === 1 ? 'Ver 1 tarea' : 'Ver ' + n + ' tareas') + '</button></div>';
+      }
+      function abrirHoja() {
+        Object.keys(ABIERTOS).forEach(function (k) { delete ABIERTOS[k]; });
+        pintarHoja();
+        altaForm.onsubmit = function (ev) { ev.preventDefault(); cerrarVelo(); };
+        altaVelo.classList.add('en-hoja');
+        abrirVelo();
+        var b = altaForm.querySelector('.en-chip[aria-pressed=true]'); if (b) b.focus();
+      }
+      $('kb-fil').onclick = abrirHoja;
+      atenderHoja(altaForm, altaVelo, {
+        abiertos: ABIERTOS, pintar: pintarHoja,
+        elegir: function (k, v) {
+          if (k === 'vista') F.vista = v;
+          else if (k === 'dias') F.dias = Number(v);
+          else {
+            F[k] = elegirEn(F[k], v, true);
+            // Otras iniciativas: fuera las entregas elegidas que no son suyas.
+            if (k === 'INICIATIVA' && F.INICIATIVA.length) F.ENTREGA = F.ENTREGA.filter(function (id) { var e = id === '-' ? null : ctx.tablas.fila(TE, id); return !e || F.INICIATIVA.indexOf(e.INICIATIVA) >= 0; });
+          }
+          guardarLocal(CLAVE + '_f', F); pintarTablero(); cuenta();
+        },
+        quitar: function () { FILTROS.forEach(function (f) { F[f.k] = []; }); F.dias = DIAS; guardarLocal(CLAVE + '_f', F); pintarTablero(); cuenta(); }
       });
-      $('kb-vista').onchange = function () { F.vista = this.value; guardarLocal(CLAVE + '_f', F); pintarTablero(); };
       var tBusca = 0;
       $('kb-busca').addEventListener('input', function () { var v = this.value; clearTimeout(tBusca); tBusca = setTimeout(function () { F.busca = v.trim().toLowerCase(); pintarTablero(); }, 120); });
-      $('kb-rec').onclick = function () {
-        var b = this; b.disabled = true; b.classList.add('girando');
-        Promise.all([ctx.tablas.refrescar([T, TI, TE, TD], true), gente()]).then(function () { if (ctx.abierta()) ctx.aviso('Tablero al día.'); }, function (e) {
-          if (ctx.abierta()) ctx.aviso('No se ha podido actualizar: ' + String(e.message).replace(/^\w+:\s*/, ''));
-        }).then(function () { b.disabled = false; b.classList.remove('girando'); });
-      };
 
       function pasa(t) {
         if (F.busca) {
           var hay = [t.ID, t.TITULO, t.DESCRIPCION, t.EPICA, t.ENTREGA_CORTA, enManos(t), nombre(t.ASIGNADO)].join(' ').toLowerCase();
           return F.busca.split(/\s+/).every(function (p) { return hay.indexOf(p) >= 0; });
         }
-        if (F.INICIATIVA && t.INICIATIVA !== F.INICIATIVA) return false;
-        if (F.ENTREGA && (F.ENTREGA === '-' ? !!t.ENTREGA : t.ENTREGA !== F.ENTREGA)) return false;
-        if (F.PERSONA && [t.EN_MANOS_TIPO === 'persona' ? t.EN_MANOS_DE : '', t.ASIGNADO, t.PIDE, t.REVISA].indexOf(F.PERSONA) < 0) return false;
-        if (F.EPICA && t.EPICA !== F.EPICA) return false;
-        if (F.P && t.P !== F.P) return false;
+        var en = function (k, v) { return !F[k].length || F[k].indexOf(String(v)) >= 0; }; // T0423: cualquiera de las elegidas
+        if (!en('INICIATIVA', t.INICIATIVA) || !en('ENTREGA', t.ENTREGA || '-') || !en('EPICA', t.EPICA) || !en('P', t.P)) return false;
+        if (F.PERSONA.length && ![t.EN_MANOS_TIPO === 'persona' ? t.EN_MANOS_DE : '', t.ASIGNADO, t.PIDE, t.REVISA].some(function (p) { return p && F.PERSONA.indexOf(String(p)) >= 0; })) return false;
         if (CERRADOS.indexOf(t.ESTADO) >= 0) { var d = dias(t.FECHA_CIERRE); return d === null || -d <= F.dias; }
         return true;
       }
@@ -561,7 +733,7 @@
         document.documentElement.classList.add('fv-abierta');
         var p = altaForm.querySelector('input,textarea,select'); if (p) p.focus();
       }
-      function cerrarVelo() { altaVelo.classList.remove('abierto'); if (!abiertaId) document.documentElement.classList.remove('fv-abierta'); altaForm.onsubmit = null; }
+      function cerrarVelo() { altaVelo.classList.remove('abierto', 'en-hoja'); if (!abiertaId) document.documentElement.classList.remove('fv-abierta'); altaForm.onsubmit = null; }
       altaVelo.addEventListener('click', function (e) { if (e.target === altaVelo || e.target.closest('[data-cancelar-alta]')) cerrarVelo(); });
       altaVelo.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.stopPropagation(); cerrarVelo(); } });
 
@@ -572,6 +744,13 @@
       function opciones(vs, v, vacio) {
         return (vacio !== false ? '<option value="">' + texto(vacio || 'Elige…') + '</option>' : '') +
           vs.map(function (x) { return '<option value="' + texto(x[0]) + '"' + (x[0] === v ? ' selected' : '') + '>' + texto(x[1]) + '</option>'; }).join('');
+      }
+      /** T0420: las épicas que ya tienen las tareas (y v, si es otra), por orden, para un desplegable. */
+      var OTRA = '__otra';
+      function epicasCon(v) {
+        var ep = []; tareas().forEach(function (x) { if (x.EPICA && ep.indexOf(x.EPICA) < 0) ep.push(x.EPICA); });
+        if (v && v !== OTRA && ep.indexOf(v) < 0) ep.push(v);
+        return ep.sort().map(function (e) { return [e, e]; });
       }
       function gentes() { return Object.keys(GENTE).map(function (k) { return [k, GENTE[k]]; }).sort(function (a, b) { return a[1].localeCompare(b[1]); }); }
       function entregasDe(ini) {
@@ -589,8 +768,7 @@
       }
       /** Los campos de la tarea t (o de una nueva, con t = valores por defecto). */
       function htmlCampos(t, nueva) {
-        var ini = t.INICIATIVA, epicas = [];
-        tareas().forEach(function (x) { if (x.EPICA && epicas.indexOf(x.EPICA) < 0) epicas.push(x.EPICA); });
+        var ini = t.INICIATIVA;
         var deps = nueva ? (t._deps || []) : esperaA(String(t.ID));
         var cand = tareas().filter(function (x) { return CERRADOS.indexOf(x.ESTADO) < 0 && !x._nueva && String(x.ID) !== String(t.ID || ''); })
           .sort(function (a, b) { return String(b.ID).localeCompare(String(a.ID)); });
@@ -600,8 +778,8 @@
           campo('DESCRIPCION', 'Qué hay que hacer', '<textarea id="tb-f-DESCRIPCION" rows="4" required>' + texto(val('DESCRIPCION')) + '</textarea>', false, 'Tal cual lo pide quien lo pide.') +
           campo('INICIATIVA', 'Iniciativa', '<select id="tb-f-INICIATIVA" required>' + opciones(ctx.tablas.filas(TI).map(function (i) { return [i.ID, i.NOMBRE || i.ID]; }), ini) + '</select>') +
           campo('ENTREGA', 'Entrega', '<select id="tb-f-ENTREGA">' + opciones(entregasDe(ini), val('ENTREGA'), 'Sin entrega') + '</select>', true) +
-          campo('EPICA', 'Épica', '<input type="text" id="tb-f-EPICA" value="' + texto(val('EPICA')) + '" list="tb-epicas" autocomplete="off"><datalist id="tb-epicas">' +
-            epicas.sort().map(function (e) { return '<option value="' + texto(e) + '">'; }).join('') + '</datalist>', true) +
+          campo('EPICA', 'Épica', '<select id="tb-f-EPICA">' + opciones(epicasCon(val('EPICA')), val('EPICA'), 'Sin épica') + '<option value="' + OTRA + '">Otra épica…</option></select>' +
+            '<input type="text" id="tb-f-EPICA-nueva" autocomplete="off" placeholder="Nombre de la épica nueva" aria-label="Épica nueva" hidden>', true) +
           campo('ASIGNADO', 'Asignada a', '<select id="tb-f-ASIGNADO" required>' + opciones(gentes(), val('ASIGNADO')) + '</select>') +
           campo('REVISA', 'La revisa', '<select id="tb-f-REVISA">' + opciones(gentes(), val('REVISA'), nueva ? 'La misma persona' : 'Elige…') + '</select>', nueva) +
           campo('P', 'Prioridad', '<select id="tb-f-P" required>' + opciones(['!!!!', '!!!', '!!', '!'].map(function (x) { return [x, x]; }), val('P'), false) + '</select>') +
@@ -628,6 +806,7 @@
         });
         f.addEventListener('change', function (e) {
           if (e.target.id === 'tb-f-INICIATIVA') { f.querySelector('#tb-f-ENTREGA').innerHTML = opciones(entregasDe(e.target.value), '', 'Sin entrega'); return; }
+          if (e.target.id === 'tb-f-EPICA') { var en = f.querySelector('#tb-f-EPICA-nueva'); en.hidden = e.target.value !== OTRA; if (!en.hidden) en.focus(); return; }
           if (!e.target.hasAttribute('data-anadir-dep') || !e.target.value) return;
           var d = f.querySelector('[data-deps]'), ya = d.getAttribute('data-deps') ? d.getAttribute('data-deps').split(',') : [];
           if (ya.indexOf(e.target.value) < 0) { ya.push(e.target.value); d.setAttribute('data-deps', ya.join(',')); d.insertAdjacentHTML('beforeend', chipDep(e.target.value)); }
@@ -646,6 +825,7 @@
       function leerForm(f) {
         var o = {}, mal = [];
         COLS.forEach(function (n) { var x = f.querySelector('#tb-f-' + n); if (x) o[n] = n === 'TITULO' ? x.value.trim().replace(/\.+$/, '') : x.value.trim(); });
+        if (o.EPICA === OTRA) { var en = f.querySelector('#tb-f-EPICA-nueva'); o.EPICA = en ? en.value.trim().toUpperCase() : ''; }
         o.URGENTE = f.querySelector('#tb-f-URGENTE').checked;
         o.PUBLICAR = f.querySelector('#tb-f-PUBLICAR').checked;
         var d = f.querySelector('[data-deps]'), deps = d && d.getAttribute('data-deps') ? d.getAttribute('data-deps').split(',').filter(String) : [];
@@ -665,9 +845,11 @@
       }
 
       function abrirAlta() {
-        var dflt = { INICIATIVA: F.INICIATIVA || (ctx.tablas.fila(TI, 'UTILO') ? 'UTILO' : ((ctx.tablas.filas(TI)[0] || {}).ID || '')), ENTREGA: F.ENTREGA && F.ENTREGA !== '-' ? F.ENTREGA : '',
-          EPICA: F.EPICA || '', ASIGNADO: yo(), P: '!!', T: 'S', PUBLICAR: false };
-        altaForm.innerHTML = '<h2>Añadir tarea</h2><div class="edit">' + htmlCampos(dflt, true) + '</div><div id="alta-error" role="alert"></div>' +
+        // T0423: con una sola opción elegida en un filtro, la tarea nueva la lleva.
+        var una = function (k) { return F[k].length === 1 && F[k][0] !== '-' ? F[k][0] : ''; };
+        var dflt = { INICIATIVA: una('INICIATIVA') || (ctx.tablas.fila(TI, 'UTILO') ? 'UTILO' : ((ctx.tablas.filas(TI)[0] || {}).ID || '')), ENTREGA: una('ENTREGA'),
+          EPICA: una('EPICA'), ASIGNADO: yo(), P: '!!', T: 'S', PUBLICAR: false };
+        altaForm.innerHTML = '<h2>Nueva tarea</h2><div class="edit">' + htmlCampos(dflt, true) + '</div><div id="alta-error" role="alert"></div>' +
           '<div class="botones"><button type="button" class="sec" data-cancelar-alta>Cancelar</button><button type="submit" class="pri">Crear tarea</button></div>';
         abrirVelo();
         altaForm.onsubmit = function (e) {
@@ -723,6 +905,7 @@
       /* ---------- cambiar un dato pulsándolo en la ficha (T0386) ---------- */
 
       var LARGO = { DESCRIPCION: 6, DOCUMENTOS_RELEVANTES: 4, CONCLUSIONES: 4 }; // textos de varias líneas: se guardan con «Guardar»
+      var epicaNueva = false; // T0420: en la ficha, se está escribiendo una épica que aún no existe
       function ocupado() { return editando || !!cambiando; }
       function puedeCambiar(t) { return !SOLO_LEE && !t._nueva && CERRADOS.indexOf(t.ESTADO) < 0; }
       /** Los atributos de un dato que se cambia pulsándolo (nada si no se puede). */
@@ -731,11 +914,8 @@
       function control(t, k) {
         var v = t[k] == null ? '' : String(t[k]), lab = ' aria-label="' + texto(ETIQUETA[k] || k) + '"', vs, vacio = false;
         if (k === 'TITULO') return '<input type="text" id="fed" autocomplete="off" value="' + texto(v) + '"' + lab + '>';
-        if (k === 'EPICA') {
-          var ep = []; tareas().forEach(function (x) { if (x.EPICA && ep.indexOf(x.EPICA) < 0) ep.push(x.EPICA); });
-          return '<input type="text" id="fed" list="fed-epicas" autocomplete="off" value="' + texto(v) + '"' + lab + '><datalist id="fed-epicas">' +
-            ep.sort().map(function (e) { return '<option value="' + texto(e) + '">'; }).join('') + '</datalist>';
-        }
+        // T0420: la épica, con desplegable como las demás etiquetas; «Otra épica…» deja escribir una nueva.
+        if (k === 'EPICA' && epicaNueva) return '<input type="text" id="fed" autocomplete="off" value="" placeholder="Nombre de la épica nueva" aria-label="Épica nueva">';
         if (k === 'DEADLINE' || k === 'DISPONIBLE_DESDE') return '<input type="date" id="fed" value="' + texto(v) + '"' + lab + '>';
         if (LARGO[k]) return '<textarea id="fed" rows="' + LARGO[k] + '"' + lab + '>' + texto(v) + '</textarea>' +
           '<div class="pie"><button type="button" class="sec" data-fed-no>Cancelar</button><button type="button" class="accion" data-fed-ok>Guardar</button></div>';
@@ -744,7 +924,7 @@
         return '<select id="fed"' + lab + '>' + opciones(o.vs, o.v, o.vacio) + '</select>';
       }
       /** Los datos que se eligen de una lista (en el ordenador, un desplegable; en el móvil, la ventanita de elegir). */
-      var DE_LISTA = { INICIATIVA: 1, ENTREGA: 1, ASIGNADO: 1, REVISA: 1, P: 1, T: 1, DEPENDE: 1 };
+      var DE_LISTA = { INICIATIVA: 1, ENTREGA: 1, EPICA: 1, ASIGNADO: 1, REVISA: 1, P: 1, T: 1, DEPENDE: 1 };
       /** Las opciones de un dato de lista: { vs: [[valor, texto]], v: el de ahora, vacio: el texto de la opción vacía o false }. */
       function opcionesDe(t, k) {
         var v = t[k] == null ? '' : String(t[k]), vs = [], vacio = false;
@@ -756,6 +936,8 @@
         }
         if (k === 'INICIATIVA') vs = ctx.tablas.filas(TI).map(function (i) { return [i.ID, i.NOMBRE || i.ID]; });
         else if (k === 'ENTREGA') { vs = entregasDe(t.INICIATIVA); if (v && !vs.some(function (x) { return x[0] === v; })) vs.unshift([v, t.ENTREGA_CORTA || v]); vacio = 'Sin entrega'; }
+        // T0420: la épica, de la lista de las que ya hay; la última opción, «Otra épica…», deja escribir una nueva.
+        else if (k === 'EPICA') { vs = epicasCon(v).concat([[OTRA, 'Otra épica…']]); vacio = 'Sin épica'; }
         else if (k === 'ASIGNADO') vs = gentes();
         else if (k === 'REVISA') { vs = gentes(); vacio = 'Nadie'; }
         else if (k === 'P') vs = ['!!!!', '!!!', '!!', '!'].map(function (x) { return [x, x]; });
@@ -790,6 +972,7 @@
         guardarCampo(k, b.getAttribute('data-elegir'));
       });
       function abrirCampo(k) {
+        epicaNueva = false;
         if (TACTIL && DE_LISTA[k]) { elegir(k); return; }
         cambiando = k; pintarFicha();
         var x = caja.querySelector('#fed');
@@ -800,7 +983,7 @@
         if (x.tagName === 'SELECT' && x.showPicker && !TACTIL) { try { x.showPicker(); } catch (e) {} }
       }
       function cerrarCampo() {
-        var k = cambiando; cambiando = ''; pintarFicha();
+        var k = cambiando; cambiando = ''; epicaNueva = false; pintarFicha();
         var x = caja.querySelector('[data-ed="' + k + '"]'); if (x) x.focus();
       }
       function guardarCampo(k, v) {
@@ -808,6 +991,8 @@
         if (!t || !k) return;
         var id = String(t.ID);
         if (k === 'DEPENDE') { cerrarCampo(); if (v) cambiarDeps(id, esperaA(id).concat([v])); return; }
+        if (k === 'EPICA' && v === OTRA) { cambiando = 'EPICA'; epicaNueva = true; pintarFicha(); var n = caja.querySelector('#fed'); if (n) n.focus(); return; }
+        if (k === 'EPICA' && epicaNueva) { v = String(v || '').trim().toUpperCase(); epicaNueva = false; if (!v) { cerrarCampo(); return; } }
         var r = cambioDe(t, k, v, function (ini) { return entregasDe(ini).map(function (x) { return x[0]; }); });
         if (r && r.mal) { ctx.aviso(r.mal); var x = caja.querySelector('#fed'); if (x) x.focus(); return; }
         if (r) ctx.tablas.actualizar(T, id, r.cambios, { fn: 'tablasActualizar', args: ['TAREAS', id, r.cambios, { antes: r.antes }] }).then(function () {
@@ -870,6 +1055,16 @@
           if (ctx.abierta() && abiertaId === id && !ocupado()) pintarFicha();
         }, function (e) { if (ctx.abierta() && abiertaId === id) ctx.aviso('No se ha podido leer la bitácora: ' + String(e.message).replace(/^\w+:\s*/, '')); });
       }
+      /**
+       * T0420 · Quien pulsa Volver (o Escape, o fuera): si la ficha se abrió al llegar desde otra sección (una tarea de Para mí o
+       * de Entregas), vuelve a ella tal como estaba (atrás); si no, al tablero.
+       */
+      var vieneDe = null;
+      function salirFicha() {
+        if (!abiertaId) return;
+        if (vieneDe && ctx.volver) { vieneDe = null; ctx.volver(); return; }
+        cerrarFicha();
+      }
       function cerrarFicha() {
         if (!abiertaId) return;
         abiertaId = ''; editando = false; cambiando = '';
@@ -885,7 +1080,7 @@
         } catch (e) {}
       }
       fv.addEventListener('click', function (e) {
-        if (e.target === fv || e.target.closest('[data-cerrar]')) { cerrarFicha(); return; }
+        if (e.target === fv || e.target.closest('[data-cerrar]')) { salirFicha(); return; }
         // Un desplegable abierto se cierra al tocar fuera de él (si el toque no abre otra cosa, no hace nada más).
         var abierto = cambiando && caja.querySelector('select#fed' + (TACTIL ? ', input[type=date]#fed' : ''));
         if (abierto && !e.target.closest('.fed-abierto')) { cerrarCampo(); if (!e.target.closest('[data-ed],[data-rel],button,a,select,input,textarea')) return; }
@@ -926,7 +1121,7 @@
         }
         var d = e.target.getAttribute && e.target.getAttribute('data-ed');
         if (d && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); abrirCampo(d); return; }
-        if (e.key === 'Escape') { if (cambiando) cerrarCampo(); else if (editando) { editando = false; pintarFicha(); } else cerrarFicha(); }
+        if (e.key === 'Escape') { if (cambiando) cerrarCampo(); else if (editando) { editando = false; pintarFicha(); } else salirFicha(); }
       });
 
       function bloque(tit, ls, attrs) {
@@ -966,6 +1161,8 @@
           if (ab(k)) return '<div class="bloque fed-abierto"><h3>' + texto(ETIQUETA[k]) + '</h3><div class="edit">' + control(t, k) + '</div></div>';
           return html != null ? (html ? '<div class="bloque"' + pulsa(t, k) + '><h3>' + texto(ETIQUETA[k]) + '</h3>' + html + '</div>' : '') : bloque(ETIQUETA[k], lineas(t[k]), pulsa(t, k));
         };
+        // T0420: Qué hay que hacer y Conclusiones, por partes (apartados, frases, listas, «está bien hecho cuando»).
+        var largoFx = function (k) { var h = htmlTexto(t[k]); return largo(k, h ? '<div class="fx">' + h + '</div>' : ''); };
         var fs = [];
         var n = dias(t.DEADLINE), p = '', c = '';
         if (!t.DEADLINE) { p = 'sin fecha límite'; c = 'nada'; }
@@ -1025,18 +1222,18 @@
         if (t.MOTIVO_BLOQUEO) motivo.push('<p><b>Bloqueada:</b> ' + texto(t.MOTIVO_BLOQUEO) + '</p>');
         if (t.MOTIVO) motivo.push('<p><b>Motivo:</b> ' + texto(t.MOTIVO) + '</p>');
         caja.innerHTML =
-          '<div class="barra"><button type="button" class="volver" data-cerrar>' + ICO_VOLVER + 'Volver al tablero</button></div>' +
+          '<div class="barra"><button type="button" class="volver" data-cerrar>' + ICO_VOLVER + texto(vieneDe ? 'Volver a ' + vieneDe.titulo : 'Volver al tablero') + '</button></div>' +
           '<div class="cab"><div class="id"><span class="n">' + texto(id) + '</span></div>' +
             (ab('TITULO') ? '<h1 id="kb-f-tit" class="fed-abierto">' + control(t, 'TITULO') + '</h1>' : '<h1 id="kb-f-tit"' + pulsa(t, 'TITULO') + '>' + texto(t.TITULO) + '</h1>') + '</div>' +
           '<div class="fmeta">' + tags.join('') + '</div>' + estado +
           (motivo.length ? '<div class="bloque">' + motivo.join('') + '</div>' : '') +
           '<div class="datos"><div class="fila"><b>Fechas</b><div class="ffechas">' + fs.join('') + '</div></div></div>' +
-          largo('DESCRIPCION') +
+          largoFx('DESCRIPCION') +
           (personas.length ? '<div class="bloque"><h3>Personas</h3>' + personas.join('') + '</div>' : '') +
           (deps.length || ab('DEPENDE') ? '<div class="bloque"><h3>Espera a</h3>' + espera + '</div>' : '') +
           (bloquea.length ? '<div class="bloque"><h3>La esperan</h3>' + bloquea.map(rel).join('') + '</div>' : '') +
           largo('DOCUMENTOS_RELEVANTES', docs.join('')) +
-          largo('CONCLUSIONES') + anadir +
+          largoFx('CONCLUSIONES') + anadir +
           '<div class="bloque hist"><h3>Bitácora (lo más reciente arriba)</h3>' +
             (SOLO_LEE || t._nueva ? '' : '<div class="edit"><div class="campo"><label class="u-oculto" for="tb-nota">Apuntar una nota</label><textarea id="tb-nota" rows="2" placeholder="Apuntar una nota…"></textarea></div>' +
               '<div class="pie"><button type="button" class="sec" data-anotar>Apuntar</button></div></div>') +
@@ -1060,17 +1257,17 @@
         if ([T, TI, TE, TD].indexOf(t) >= 0) { pintarTablero(); if (t !== T && t !== TD) pintarFiltros(); }
         if (abiertaId && !ocupado() && [T, TE, TD, TB].indexOf(t) >= 0) pintarFicha();
       });
-      abrirFiltros(!!F._ab);
+      delete F._ab; // T0422: los filtros ya no se quedan abiertos
       pintarFiltros(); pintarTablero();
       ctx.tablas.leer([T, TI, TE, TD]).then(function () {
         leido = true;
         if (!ctx.abierta()) return;
         pintarFiltros(); pintarTablero();
         var pedida = new URLSearchParams(location.search).get('t');
-        if (pedida && tarea(pedida)) abrirFicha(pedida, true);
+        if (pedida && tarea(pedida)) { vieneDe = ctx.desde || null; abrirFicha(pedida, true); }
       }, function (e) {
         leido = true;
-        tab.innerHTML = '<p class="u-error kb-vacio">No se han podido leer las tareas.</p><p class="u-nota kb-vacio">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Pulsa ↻ o vuelve a abrir la sección.</p>';
+        tab.innerHTML = '<p class="u-error kb-vacio">No se han podido leer las tareas.</p><p class="u-nota kb-vacio">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Vuelve a abrir la sección.</p>';
       });
       gente().catch(function () {});
 

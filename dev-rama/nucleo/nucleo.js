@@ -526,7 +526,7 @@
    * URL; href, si el enlace lleva algo más para la sección (T0269: ?s=kanban&asignado=…).
    */
   function abrir(id, push, href) {
-    var s = seccion(id) || menu()[0];
+    var s = seccion(id) || menu()[0], antes = actual;
     if (abierta && abierta.def && abierta.def.cerrar) { try { abierta.def.cerrar(); } catch (e) {} }
     abierta = null;
     oyentes[actual] = [];
@@ -537,7 +537,13 @@
     });
     $('n-titulo').textContent = s.titulo;
     document.title = s.titulo + ' · ' + (C.nombreApp || cred.negocio || '');
-    if (push) history.pushState({ s: s.id }, '', href && /^\?s=/.test(href) ? href : '?s=' + s.id.toLowerCase());
+    if (push) {
+      // T0420: cuánto habías bajado donde estabas y de qué sección vienes, para que «atrás» (o «Volver a …» de la ficha de
+      // una tarea abierta desde Para mí o Entregas) te deje donde estabas.
+      try { history.replaceState(Object.assign({}, history.state, { y: bajado() }), ''); } catch (e) {}
+      history.pushState({ s: s.id, desde: antes && antes !== s.id ? antes : '' }, '', href && /^\?s=/.test(href) ? href : '?s=' + s.id.toLowerCase());
+    }
+    var y = (!push && history.state && history.state.y) || 0;
     window.scrollTo(0, 0); document.body.scrollTop = 0;
     // T0292: cada sección recibe un <main> nuevo, sin los oyentes que le pusieron las de antes (si no, un clic en otra
     // sección también lo atendía la anterior, y volver a una le duplicaba los suyos).
@@ -551,10 +557,22 @@
       el.innerHTML = '';
       abierta = { id: s.id, def: def };
       def.abrir(el, ctxDe(s));
+      if (y) alSitio(s.id, y);
     }, function () {
       clearTimeout(t);
       if (actual === s.id) el.innerHTML = '<p>No se ha podido cargar ' + texto(s.titulo) + '.</p><p class="u-nota">Comprueba la conexión y vuelve a abrir la sección.</p>';
     });
+  }
+
+  function bajado() { return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0; }
+  /** T0420 · Vuelve a bajar hasta y en cuanto la sección es lo bastante larga (pinta con lo guardado y luego trae lo último). */
+  function alSitio(id, y) {
+    var n = 0;
+    (function paso() {
+      if (actual !== id) return;
+      window.scrollTo(0, y);
+      if (Math.abs(bajado() - y) > 2 && ++n < 25) setTimeout(paso, 80);
+    })();
   }
 
   /** El JS de una sección, una vez. */
@@ -586,6 +604,7 @@
    * - personaId (T0387, solo con Supabase; si no, ''): el id de quien ha entrado, el de las columnas persona (ASIGNADO…).
    * - roles (T0417, solo con Supabase; si no, []): sus roles, [{ rol, ambito, ambito_id }], para no ofrecer lo que la base no le
    *   deja (en qué iniciativas es responsable). La que manda sigue siendo la base.
+   * - desde y volver() (T0420): la sección de la que se viene con un enlace ({ id, titulo } o null) y volver a ella como estaba.
    */
   function ctxDe(s) {
     return {
@@ -597,6 +616,9 @@
       autor: cred.como ? cred.como.persona + ' como ' + cred.persona : cred.persona,
       personaId: cred.persona_id || '', // T0387
       roles: cred.roles || [], // T0417
+      // T0420: la sección de la que vienes ({ id, titulo }, o null si se ha entrado directo) y volver a ella como estaba.
+      desde: (function () { var d = history.state && history.state.desde, x = d && seccion(d); return x ? { id: x.id, titulo: x.titulo } : null; })(),
+      volver: function () { history.back(); },
       correo: cred.correo || '', secciones: todas().map(function (x) { return x.enPerfil ? { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true } : { id: x.id, titulo: x.titulo }; }),
       tablas: tablas(),
       alCambiar: function (f) { (oyentes[s.id] = oyentes[s.id] || []).push(f); },
@@ -758,6 +780,7 @@
     if (a.getAttribute('data-sx') === 'PERFIL' && sinPerfil() && (seccion('PERFIL') || {}).propia) { verPerfil(); return; }
     abrir(a.getAttribute('data-sx'), true, a.getAttribute('href'));
   });
+  try { history.scrollRestoration = 'manual'; } catch (e) {} // T0420: dónde estabas lo pone abrir() (alSitio)
   window.addEventListener('popstate', function () { if (cred) abrir(pedida() || menu()[0].id, false); });
 
   /* ---------- arranque ---------- */

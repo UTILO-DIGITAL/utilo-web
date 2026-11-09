@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prueba barra</title>
+<!-- T0424 · Prueba en DEV (no la carga producción): ¿se integra la franja de la hora del iPhone (iOS 26) con
+     black-translucent y todo lo de arriba en verde? Se añade a la pantalla de inicio y se mira. -->
+<link rel="manifest" href="manifest.webmanifest?v=1">
+<link rel="apple-touch-icon" href="../../utilo/icono-180.png?v=2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Prueba barra">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0E8A7A">
+<style>
+  html, body { margin: 0; background: #0E8A7A; font: 16px/1.4 -apple-system, system-ui, sans-serif; }
+  /* La cabecera llega hasta arriba (por debajo de la hora y la isla) y es fija: lo que hay bajo la franja siempre es verde. */
+  .cab { position: fixed; top: 0; left: 0; right: 0; z-index: 2; background: #0E8A7A; color: #fff;
+    padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 14px; }
+  .cab h1 { margin: 0; font-size: 26px; }
+  main { background: #FFFCF7; color: #1d2b2a; min-height: 100vh; min-height: 100dvh; box-sizing: border-box;
+    padding: calc(env(safe-area-inset-top, 0px) + 80px) 16px calc(env(safe-area-inset-bottom, 0px) + 90px); }
+  .tarjeta { background: #fff; border: 1px solid #e3ddd3; border-radius: 12px; padding: 14px; margin: 0 0 12px; }
+  code { font-size: 13px; }
+  nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; justify-content: space-around; background: #FFFCF7;
+    border-top: 1px solid #e3ddd3; padding: 10px 0 calc(env(safe-area-inset-bottom, 0px) + 6px); font-weight: 600; color: #0E8A7A; }
+</style>
+</head>
+<body>
+<header class="cab"><h1>Prueba barra</h1></header>
+<main>
+  <div class="tarjeta"><b>¿Qué mirar?</b> Arriba, la hora, el wifi y la batería en blanco sobre verde, sin franja clara ni difuminado.
+    Abajo, la barra pegada al borde, sin hueco. Desplaza la página: la franja tiene que seguir verde.</div>
+  <div class="tarjeta" id="datos">Cargando datos…</div>
+  <div class="tarjeta">Texto de relleno para poder desplazar.</div>
+  <div class="tarjeta">Texto de relleno para poder desplazar.</div>
+  <div class="tarjeta">Texto de relleno para poder desplazar.</div>
+  <div class="tarjeta">Texto de relleno para poder desplazar.</div>
+  <div class="tarjeta">Texto de relleno para poder desplazar.</div>
+  <div class="tarjeta">Texto de relleno para poder desplazar.</div>
+</main>
+<nav><span>Para mí</span><span>Tareas</span><span>Entregas</span></nav>
+<script>
+  (function () {
+    var t = document.createElement('div');
+    t.style.cssText = 'position:fixed;top:0;left:0;height:env(safe-area-inset-top,0px);width:1px;visibility:hidden';
+    document.body.appendChild(t);
+    var b = document.createElement('div');
+    b.style.cssText = 'position:fixed;bottom:0;left:0;height:env(safe-area-inset-bottom,0px);width:1px;visibility:hidden';
+    document.body.appendChild(b);
+    var sa = !!(window.matchMedia && matchMedia('(display-mode: standalone)').matches) || !!navigator.standalone;
+    document.getElementById('datos').innerHTML = '<b>Datos</b> (mándame una captura):<br><code>' +
+      'instalada: ' + (sa ? 'sí' : 'no (ábrela desde el icono)') + '<br>margen arriba: ' + t.offsetHeight + ' px · abajo: ' + b.offsetHeight + ' px<br>' +
+      'alto: ' + innerHeight + ' de ' + screen.height + ' px · ' + navigator.userAgent.replace(/^.*?OS ([\d_]+).*$/, 'iOS $1') + '</code>';
+  })();
+</script>
+</body>
+</html>
