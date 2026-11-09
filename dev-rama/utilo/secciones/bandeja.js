@@ -462,6 +462,7 @@
         tDirecto = setTimeout(function () { tDirecto = null; if (ctx.abierta()) ctx.tablas.refrescar([T], true).catch(function () {}); }, 800);
       });
       this._cerrar = function () {
+        el.classList.remove('kb', 'tb'); document.documentElement.classList.remove('fv-abierta'); // como Tareas: la sección siguiente, con su margen
         if (directo) { directo.cerrar(); directo = null; }
         if (tDirecto) { clearTimeout(tDirecto); tDirecto = null; }
       };
