@@ -1041,6 +1041,15 @@ body.u-con-barra .rp-toast { bottom: calc(var(--alto-barra, 64px) + var(--e2) + 
 .u .pd-f { margin-left: auto; color: var(--color-suave); font-variant-numeric: tabular-nums; }
 .u .pd-txt { margin: var(--e2) 0 var(--e1); white-space: pre-wrap; overflow-wrap: anywhere; }
 .u .pd-m { overflow-wrap: anywhere; }
+/* T0427 · La conversación de una petición y lo que el cliente puede hacer con ella. */
+.u .pd-r-cli { background: transparent; border: 1px dashed var(--color-linea); }
+.u .pd-rf { font-weight: 400; color: var(--color-suave); font-variant-numeric: tabular-nums; }
+.u .pd-acc { display: flex; flex-wrap: wrap; gap: var(--e2); margin-top: var(--e2); }
+.u .pd-retirar { border-color: transparent; text-decoration: underline; }
+.u .pd-mform { display: flex; flex-direction: column; gap: var(--e2); margin-top: var(--e2); padding: var(--e3); border: 1px solid var(--color-linea); border-radius: var(--radio); }
+.u .pd-mform textarea { width: 100%; }
+.u .pd-mq { margin: 0; }
+.u .pd-mb { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--e2); }
 .u .pd-r { margin-top: var(--e2); padding: var(--e2) var(--e3); border-radius: var(--radio); background: var(--color-bloque); font-size: 14px;
   white-space: pre-wrap; overflow-wrap: anywhere; }
 .u .pd-r b { display: block; font-size: 12px; color: var(--color-principal-oscuro); text-transform: uppercase; letter-spacing: .02em; }

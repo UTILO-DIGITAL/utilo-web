@@ -1009,6 +1009,14 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
 .u .bjp-tarea:hover b, .u .bjp-tarea:focus-visible b { text-decoration: underline; }
 .u .bjp-est { display: inline-block; margin-left: var(--e1); padding: 0 var(--e2); border-radius: var(--radio-peq); background: var(--color-bloque); font-size: 12px; font-weight: 700; }
 .u .bjp-resp span { font-weight: 700; }
+/* T0427 · La conversación con el cliente en la Bandeja. */
+.u .bjp-conv { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e1); }
+.u .bjp-m { padding: var(--e1) var(--e2); border-left: 3px solid var(--estado-ec); background: var(--color-bloque); border-radius: 0 var(--radio-peq) var(--radio-peq) 0; overflow-wrap: anywhere; }
+.u .bjp-m-cli { border-left-color: var(--estado-pr); background: transparent; border: 1px dashed var(--color-linea); border-left: 3px solid var(--estado-pr); }
+.u .bjp-m-int { opacity: .75; }
+.u .bjp-mq { font-weight: 700; }
+.u .bjp-mq small { font-weight: 400; color: var(--color-suave); }
+.u .bjp-esc { background: var(--estado-pr); color: #fff; border-color: var(--estado-pr); }
 .u .bjp-ve { color: var(--color-suave); }
 .u .bjp-form { flex-direction: column; align-items: stretch; }
 .u .bjp-bs { display: flex; justify-content: flex-end; gap: var(--e2); }

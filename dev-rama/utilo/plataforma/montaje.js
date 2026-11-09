@@ -16,7 +16,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Para mí",
    "icono": "<path d=\"M4 13h4l2 3h4l2-3h4\"/><path d=\"M6.5 5h11L20 13v6H4v-6z\"/>",
    "web": "utilo/secciones/parami.js",
-   "version": "59a8379c10",
+   "version": "d2078c13a5",
    "perfiles": "todos",
    "config": {},
    "api": [
@@ -30,7 +30,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Tareas",
    "icono": "<rect x=\"3\" y=\"4\" width=\"5\" height=\"16\" rx=\"1\"/><rect x=\"10\" y=\"4\" width=\"5\" height=\"11\" rx=\"1\"/><rect x=\"17\" y=\"4\" width=\"4\" height=\"7\" rx=\"1\"/>",
    "web": "utilo/secciones/tablero.js",
-   "version": "2429d906dd",
+   "version": "d6171c845a",
    "perfiles": "todos",
    "config": {
     "VISTA": "ocho",
@@ -50,7 +50,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Entregas",
    "icono": "<path d=\"M3 7l9-4 9 4-9 4-9-4z\"/><path d=\"M3 7v10l9 4 9-4V7\"/><path d=\"M12 11v10\"/>",
    "web": "utilo/secciones/entregas.js",
-   "version": "ddc8e8c2b0",
+   "version": "056acc990f",
    "perfiles": "todos",
    "config": {
     "VISTA": "Mapa",
@@ -69,7 +69,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Bandeja",
    "icono": "<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><path d=\"M3 7l9 6 9-6\"/>",
    "web": "utilo/secciones/bandeja.js",
-   "version": "7e027165eb",
+   "version": "7efee60eb9",
    "perfiles": [
     "admin",
     "responsable",
@@ -80,18 +80,20 @@ window.NUCLEO_MONTAJE = {
     "responder_solicitud",
     "descartar_solicitud",
     "solicitud_a_tarea",
+    "reabrir_solicitud",
+    "marcar_visto",
     "personas_gestion"
    ],
    "cifra": {
     "tabla": "BANDEJA",
     "donde": {
-     "ESTADO": "Nueva",
+     "POR_ATENDER": true,
      "PUEDO_DECIDIR": true
     },
     "directo": [
      "solicitudes"
     ],
-    "que": "nuevas"
+    "que": "por atender"
    }
   }
  ],
@@ -731,7 +733,8 @@ window.NUCLEO_MONTAJE = {
        "Nueva",
        "Convertida en tarea",
        "Respondida",
-       "Descartada"
+       "Descartada",
+       "Retirada"
       ]
      },
      {
@@ -750,6 +753,10 @@ window.NUCLEO_MONTAJE = {
      {
       "nombre": "FECHA_DECISION",
       "tipo": "fecha_hora"
+     },
+     {
+      "nombre": "PENDIENTE",
+      "tipo": "booleano"
      }
     ],
     "restricciones": {
@@ -773,6 +780,85 @@ window.NUCLEO_MONTAJE = {
      ],
      "solicitudes_decidido_por_fkey": [
       "DECIDIDO_POR"
+     ]
+    }
+   },
+   "MENSAJES": {
+    "db": "mensajes",
+    "clave": "ID",
+    "prefijo": "M",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "SOLICITUD",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "SOLICITUDES"
+     },
+     {
+      "nombre": "FECHA",
+      "tipo": "fecha_hora",
+      "obligatoria": true
+     },
+     {
+      "nombre": "DE",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Cliente",
+       "Utilo"
+      ]
+     },
+     {
+      "nombre": "QUIEN",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "TIPO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Añadido",
+       "Respuesta",
+       "Cambio",
+       "Retirada",
+       "Descartada",
+       "Reabierta"
+      ]
+     },
+     {
+      "nombre": "TEXTO",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "ENLACE",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "INTERNO",
+      "tipo": "booleano"
+     }
+    ],
+    "restricciones": {
+     "mensajes_pkey": [
+      "ID"
+     ],
+     "mensajes_id_formato": [
+      "ID"
+     ],
+     "mensajes_solicitud_fkey": [
+      "SOLICITUD"
+     ],
+     "mensajes_de_valores": [
+      "DE"
+     ],
+     "mensajes_tipo_valores": [
+      "TIPO"
      ]
     }
    },
@@ -1059,7 +1145,8 @@ window.NUCLEO_MONTAJE = {
        "Nueva",
        "Convertida en tarea",
        "Respondida",
-       "Descartada"
+       "Descartada",
+       "Retirada"
       ]
      },
      {
@@ -1078,6 +1165,10 @@ window.NUCLEO_MONTAJE = {
      {
       "nombre": "FECHA_DECISION",
       "tipo": "fecha_hora"
+     },
+     {
+      "nombre": "PENDIENTE",
+      "tipo": "booleano"
      },
      {
       "nombre": "TAREA_TITULO",
@@ -1100,6 +1191,10 @@ window.NUCLEO_MONTAJE = {
      },
      {
       "nombre": "PUEDO_DECIDIR",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "POR_ATENDER",
       "tipo": "booleano"
      }
     ],
