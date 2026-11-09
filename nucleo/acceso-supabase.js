@@ -194,6 +194,7 @@
         var o = { id: s.id, titulo: s.titulo, icono: s.icono, web: s.web, version: s.version, config: s.config || {} };
         if (s.enPerfil) o.enPerfil = true;
         if (s.menu === false) o.menu = false;
+        if (s.cifra) o.cifra = s.cifra; // T0412: el número del menú (nucleo.js · cifras)
         return o;
       }).filter(function (s) { return s.menu !== false; });
       return {

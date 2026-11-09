@@ -12,6 +12,8 @@
  * Si la respondida es AUTÓNOMA y vuelve a En cola, un recuadro (hasta cerrarlo) lleva a lanzar «Autónomo» en GitHub: con el
  * agente en la fase 1 nadie la coge sola. En Lo siguiente, las autónomas llevan su etiqueta.
  * - En curso: lo demás que tiene entre manos (sin las vencidas), con su fase y quién la lleva.
+ * - T0412 · Te espera también lleva las solicitudes Nuevas de los clientes que puede atender (vista BANDEJA, si tiene la
+ *   Bandeja en su menú): las urgentes delante y, entre ellas, la más antigua arriba. Cada una abre la Bandeja con ella a la vista.
  * Arriba, el saludo, un enlace al mapa de Entregas (T0415, si se ve) y tres cifras (te esperan, en curso, tu cola). Debajo, en una pantalla grande tres columnas (Te espera |
  * Lo siguiente | Avisos y En curso), en una mediana dos (Te espera | lo demás) y en el móvil una. Cada tarjeta dice de quién viene (quién la hace o
  * pregunta), su iniciativa si se ven varias y, en una revisión, su PR. Los nombres, de personas_gestion() (guardados).
@@ -84,12 +86,22 @@
   /** ¿Hay que lanzar «Autónomo» para que siga? Si es AUTÓNOMA y, al responderla, ha vuelto a En cola (no a Esperando). */
   function lanzar(t, estado) { return !!(t && t.AUTONOMA) && estado === 'En cola'; }
 
-  /** Las cifras de arriba: lo que te espera (respuestas y revisiones), lo tuyo En curso (y cuántas vencidas) y tu cola. */
-  function resumen(filas, yo, hoy) {
+  /** T0412 · Las solicitudes Nuevas que puede atender (vista BANDEJA): urgentes delante; entre ellas, la más antigua arriba. */
+  function solicitudes(filas) {
+    return (filas || []).filter(function (s) { return s.ESTADO === 'Nueva' && s.PUEDO_DECIDIR; }).sort(function (a, b) {
+      return ((b.URGENTE ? 1 : 0) - (a.URGENTE ? 1 : 0)) || (ms(a.FECHA) - ms(b.FECHA)) || String(a.ID).localeCompare(String(b.ID));
+    });
+  }
+
+  /** Las cifras de arriba: lo que te espera (respuestas, revisiones y, T0412, solicitudes de clientes), lo tuyo En curso (y
+   *  cuántas vencidas) y tu cola. sols: las filas de la vista BANDEJA (o nada). */
+  function resumen(filas, yo, hoy, sols) {
     var es = esperan(filas, yo), mias = yo ? (filas || []).filter(function (t) { return t.ASIGNADO === yo; }) : [];
     var cola = mias.filter(function (t) { return t.ESTADO === 'En cola'; });
+    var ss = solicitudes(sols);
     return {
-      esperan: es.length,
+      esperan: es.length + ss.length,
+      solicitudes: ss.length,
       respuestas: es.filter(function (t) { return t.ESTADO === 'Necesita tu respuesta'; }).length,
       revisiones: es.filter(function (t) { return t.ESTADO === 'Para revisar'; }).length,
       enCurso: mias.filter(function (t) { return t.ESTADO === 'En curso'; }).length,
@@ -109,7 +121,7 @@
     return r;
   }
 
-  var CALC = { lanzar: lanzar, esperan: esperan, siguientes: siguientes, avisos: avisos, enCurso: enCurso, resumen: resumen, prDe: prDe, hace: hace, diasEntre: diasEntre, hoyIso: hoyIso };
+  var CALC = { solicitudes: solicitudes, lanzar: lanzar, esperan: esperan, siguientes: siguientes, avisos: avisos, enCurso: enCurso, resumen: resumen, prDe: prDe, hace: hace, diasEntre: diasEntre, hoyIso: hoyIso };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -120,6 +132,7 @@
   var ICO_BIEN = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>';
   var ICO_FUERA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';
   var TI = 'INICIATIVAS';
+  var TS = 'BANDEJA'; // T0412: las solicitudes de los clientes
   /** Días que una tarea puede esperar sin que se marque: el plan avisa si nadie revisa en 3 días. */
   var DIAS_ANTIGUA = 3;
   /** La acción «Autónomo» en GitHub (Run workflow, con la tarea). En el móvil, en el navegador con la versión de escritorio. */
@@ -159,6 +172,8 @@
       var yo = ctx.personaId || '';
       // T0415 · Un enlace al mapa de Entregas, si quien ha entrado tiene Entregas en su menú.
       var MAPA = (ctx.secciones || []).some(function (s) { return s && s.id === 'ENTREGAS'; });
+      // T0412 · Las solicitudes de los clientes, si quien ha entrado tiene la Bandeja en su menú.
+      var BANDEJA = (ctx.secciones || []).some(function (s) { return s && s.id === 'BANDEJA'; });
       var CLAVE = 'pm_' + String(ctx.correo || ctx.persona || '').toLowerCase().replace(/\W+/g, '');
       var GENTE = leerLocal(CLAVE + '_gente', {});   // id de persona → nombre (personas_gestion), guardado en el dispositivo
       var leido = false;
@@ -194,7 +209,8 @@
         var fs = ctx.tablas.filas(T), d = new Date(), hoy = hoyIso(d), ahora = d.getTime();
         if (!fs.length && !leido) { cont.innerHTML = '<p class="pm-vacio">Cargando lo tuyo…</p>'; return; }
         if (!yo) { cont.innerHTML = '<p class="pm-vacio">No sabemos quién eres en la base todavía. Vuelve a entrar.</p>'; return; }
-        var es = esperan(fs, yo), si = siguientes(fs, yo), av = avisos(fs, yo, hoy), ec = enCurso(fs, yo, hoy), r = resumen(fs, yo, hoy);
+        var sols = BANDEJA ? ctx.tablas.filas(TS) : [], ss = solicitudes(sols);
+        var es = esperan(fs, yo), si = siguientes(fs, yo), av = avisos(fs, yo, hoy), ec = enCurso(fs, yo, hoy), r = resumen(fs, yo, hoy, sols);
         var varias = fs.reduce(function (o, t) { o[t.INICIATIVA] = 1; return o; }, {});
         varias = Object.keys(varias).length > 1;
 
@@ -204,7 +220,8 @@
           '</span></header>'; // T0422: sin ↻ (va en directo), como Tareas y Entregas
         h += '<div class="pm-res">' +
           cifra('pm-espera', r.esperan, r.esperan === 1 ? 'te espera' : 'te esperan',
-            [r.respuestas ? uno(r.respuestas, 'respuesta', 'respuestas') : '', r.revisiones ? uno(r.revisiones, 'revisión', 'revisiones') : ''].filter(String).join(' · '), r.esperan ? ' pm-cifra-pr' : '') +
+            [r.respuestas ? uno(r.respuestas, 'respuesta', 'respuestas') : '', r.revisiones ? uno(r.revisiones, 'revisión', 'revisiones') : '',
+              r.solicitudes ? uno(r.solicitudes, 'solicitud', 'solicitudes') : ''].filter(String).join(' · '), r.esperan ? ' pm-cifra-pr' : '') +
           cifra(r.vencidas ? 'pm-avisos' : 'pm-sig', r.enCurso, 'en curso', r.vencidas ? '<span class="pm-mal">' + uno(r.vencidas, 'vencida', 'vencidas') + '</span>' : '', r.vencidas ? ' pm-cifra-bl' : '') +
           cifra('pm-sig', r.enCola, 'en tu cola', r.autonomas ? uno(r.autonomas, 'autónoma', 'autónomas') : '') + '</div>';
         if (lanzarId) h += '<div class="pm-lanzar" role="status"><p><b>' + texto(lanzarId) + '</b> vuelve a la cola y es autónoma. Para que el agente la haga ya, ' +
@@ -212,7 +229,19 @@
           '<div class="pm-lanzar-b"><a class="u-btn" href="' + AUTONOMO + '" target="_blank" rel="noopener">Lanzar Autónomo</a>' +
           '<button type="button" class="u-btn u-btn-texto" data-lanzar-no>Ahora no</button></div></div>';
 
-        var izq = bloque('pm-espera', 'Te espera', es.length, es.length ? '<ul class="pm-l">' + es.map(function (t) {
+        // T0412 · Las solicitudes de los clientes, delante: lo que pide un cliente lleva su tiempo esperando.
+        var htmlSols = ss.map(function (s) {
+          var ini = ctx.tablas.fila(TI, s.INICIATIVA), cuanto = hace(s.FECHA, ahora);
+          var vieja = diasEntre(hoyIso(new Date(Date.parse(s.FECHA) || ahora)), hoy) >= DIAS_ANTIGUA;
+          var txt = String(s.TEXTO || '').replace(/\s+/g, ' ').trim();
+          return '<li class="pm-c ' + (s.URGENTE ? 's-bl' : 's-pr') + '"><a class="pm-t" href="?s=bandeja&amp;sol=' + encodeURIComponent(s.ID) + '" data-sx="BANDEJA">' +
+            '<span class="pm-top"><span class="pm-id">' + texto(s.ID) + '</span><span class="pm-ini">' + texto((ini && ini.NOMBRE) || s.INICIATIVA) + '</span>' +
+              (s.URGENTE ? '<span class="u-chip">Urgente</span>' : '') + '</span>' +
+            '<span class="pm-tit">' + texto(txt.length > 140 ? txt.slice(0, 139).replace(/\s+\S*$/, '') + '…' : txt) + '</span>' +
+            '<span class="pm-meta"><span class="n-estado n-e-pr">Atender</span><span>' + texto(String(s.TIPO || '').toLowerCase() + ' · lo pide ' + s.PERSONA) + '</span>' +
+              (cuanto ? '<span class="pm-hace' + (vieja ? ' vieja' : '') + '">' + texto(cuanto) + '</span>' : '') + '</span></a></li>';
+        }).join('');
+        var izq = bloque('pm-espera', 'Te espera', es.length + ss.length, es.length + ss.length ? '<ul class="pm-l">' + htmlSols + es.map(function (t) {
           var resp = t.ESTADO === 'Necesita tu respuesta', cuanto = hace(t.ESTADO_DESDE, ahora);
           var quien = t.EMPLEADO || t.ASIGNADO !== yo ? deQuien(t) : '';   // si la lleva quien mira, no se dice
           var vieja = diasEntre(hoyIso(new Date(Date.parse(t.ESTADO_DESDE) || ahora)), hoy) >= DIAS_ANTIGUA;
@@ -228,7 +257,7 @@
             : '<div class="pm-acc">' + (pr ? '<a class="u-btn" href="' + texto(pr.url) + '" target="_blank" rel="noopener">' + ICO_FUERA + 'Ver la PR #' + pr.numero + '</a>' : '') +
               '<a class="u-btn' + (pr ? ' u-btn-texto' : '') + '" href="' + ficha(t) + '" data-sx="TABLERO">Abrir la ficha para revisarla</a></div>';
           return tarjeta(t, 's-pr', dentro, despues, varias);
-        }).join('') + '</ul>' : '<div class="pm-libre">' + ICO_BIEN + '<p><b>Nada te espera.</b> Ninguna pregunta ni revisión pendiente.</p></div>');
+        }).join('') + '</ul>' : '<div class="pm-libre">' + ICO_BIEN + '<p><b>Nada te espera.</b> Ninguna pregunta' + (BANDEJA ? ', revisión ni solicitud pendiente.' : ' ni revisión pendiente.') + '</p></div>');
 
         var cen = bloque('pm-sig', 'Lo siguiente', 0, si.length ? '<ol class="pm-l">' + si.map(function (t) {
           var dl = dia(t.DEADLINE), q = dl ? diasEntre(hoy, dl) : null;
@@ -300,9 +329,9 @@
         });
       }
 
-      ctx.alCambiar(function (t) { if (t === T || t === TI) pintar(); });
+      ctx.alCambiar(function (t) { if (t === T || t === TI || t === TS) pintar(); });
       pintar();
-      ctx.tablas.leer([T, TI]).then(function () { leido = true; if (ctx.abierta()) pintar(); }, function (e) {
+      ctx.tablas.leer(BANDEJA ? [T, TI, TS] : [T, TI]).then(function () { leido = true; if (ctx.abierta()) pintar(); }, function (e) {
         leido = true;
         cont.innerHTML = '<p class="u-error">No se han podido leer tus tareas.</p><p class="u-nota">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Vuelve a abrir la sección.</p>';
       });
@@ -310,9 +339,9 @@
 
       // En directo (como Tareas): si alguien cambia una tarea, sus dependencias o su bitácora, se vuelve a leer el tablero.
       var directo = null, tDirecto = null;
-      if (ctx.enDirecto) directo = ctx.enDirecto(['tareas', 'dependencias', 'bitacora'], function () {
+      if (ctx.enDirecto) directo = ctx.enDirecto(['tareas', 'dependencias', 'bitacora'].concat(BANDEJA ? ['solicitudes'] : []), function () {
         if (tDirecto) return;
-        tDirecto = setTimeout(function () { tDirecto = null; if (ctx.abierta()) ctx.tablas.refrescar([T], true).catch(function () {}); }, 800);
+        tDirecto = setTimeout(function () { tDirecto = null; if (ctx.abierta()) ctx.tablas.refrescar(BANDEJA ? [T, TS] : [T], true).catch(function () {}); }, 800);
       });
       this._cerrar = function () {
         if (directo) { directo.cerrar(); directo = null; }

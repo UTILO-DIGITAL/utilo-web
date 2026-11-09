@@ -1,6 +1,13 @@
 {
-  "version": "5.14.2-1.9.2",
+  "version": "5.15-1.10",
   "versiones": [
+    {
+      "v": "5.15-1.10",
+      "fecha": "09/11/2026",
+      "novedades": [
+        "La Bandeja está en la plataforma: ves lo que piden los clientes, respondes, creas la tarea o la descartas, y el menú te dice cuántas nuevas tienes."
+      ]
+    },
     {
       "v": "5.14.2-1.9.2",
       "fecha": "09/11/2026",

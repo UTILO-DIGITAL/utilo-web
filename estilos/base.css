@@ -226,7 +226,8 @@ body.u-con-barra { padding-bottom: calc(var(--alto-barra) + var(--e1) + env(safe
   body.u-menu-plegado .sx.u-sx .sx-plegar svg { transform: rotate(180deg); }
   body.u-menu-plegado .sx.u-sx a { justify-content: center; padding: 0; position: relative; }
   body.u-menu-plegado .sx.u-sx a > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  body.u-menu-plegado .sx.u-sx a .bj-n { position: absolute; top: 2px; right: 2px; margin: 0; min-width: 18px; padding: 0 4px; font-size: 11px; line-height: 18px; }
+  body.u-menu-plegado .sx.u-sx a .bj-n { position: absolute; top: 2px; right: 2px; margin: 0; min-width: 18px; padding: 0 4px; font-size: 11px; line-height: 18px;
+    width: auto; height: auto; overflow: visible; clip: auto; } /* T0412: el número del menú sigue a la vista con el menú plegado (la regla de arriba esconde los textos) */
 }
 .sx.u-sx .sx-plegar, .sx.u-sx .sx-cab { display: none; }
 @media (min-width: 900px) { .sx.u-sx .sx-cab { display: flex; } .sx.u-sx .sx-plegar { display: inline-flex; } }
