@@ -16,7 +16,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Para mí",
    "icono": "<path d=\"M4 13h4l2 3h4l2-3h4\"/><path d=\"M6.5 5h11L20 13v6H4v-6z\"/>",
    "web": "utilo/secciones/parami.js",
-   "version": "71d5e5f0cf",
+   "version": "59a8379c10",
    "perfiles": "todos",
    "config": {},
    "api": [
@@ -30,7 +30,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Tareas",
    "icono": "<rect x=\"3\" y=\"4\" width=\"5\" height=\"16\" rx=\"1\"/><rect x=\"10\" y=\"4\" width=\"5\" height=\"11\" rx=\"1\"/><rect x=\"17\" y=\"4\" width=\"4\" height=\"7\" rx=\"1\"/>",
    "web": "utilo/secciones/tablero.js",
-   "version": "8919d7f7f3",
+   "version": "2429d906dd",
    "perfiles": "todos",
    "config": {
     "VISTA": "ocho",
@@ -50,7 +50,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Entregas",
    "icono": "<path d=\"M3 7l9-4 9 4-9 4-9-4z\"/><path d=\"M3 7v10l9 4 9-4V7\"/><path d=\"M12 11v10\"/>",
    "web": "utilo/secciones/entregas.js",
-   "version": "5b200c59d1",
+   "version": "ddc8e8c2b0",
    "perfiles": "todos",
    "config": {
     "VISTA": "Mapa",
@@ -62,6 +62,37 @@ window.NUCLEO_MONTAJE = {
     "mover_entrega",
     "cambiar_tarea"
    ]
+  },
+  {
+   "id": "BANDEJA",
+   "modulo": "bandeja",
+   "titulo": "Bandeja",
+   "icono": "<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><path d=\"M3 7l9 6 9-6\"/>",
+   "web": "utilo/secciones/bandeja.js",
+   "version": "886a06b76e",
+   "perfiles": [
+    "admin",
+    "responsable",
+    "colaborador"
+   ],
+   "config": {},
+   "api": [
+    "responder_solicitud",
+    "descartar_solicitud",
+    "solicitud_a_tarea",
+    "personas_gestion"
+   ],
+   "cifra": {
+    "tabla": "BANDEJA",
+    "donde": {
+     "ESTADO": "Nueva",
+     "PUEDO_DECIDIR": true
+    },
+    "directo": [
+     "solicitudes"
+    ],
+    "que": "nuevas"
+   }
   }
  ],
  "perfilEnMenu": false,
@@ -639,6 +670,112 @@ window.NUCLEO_MONTAJE = {
      ]
     }
    },
+   "SOLICITUDES": {
+    "db": "solicitudes",
+    "clave": "ID",
+    "prefijo": "S",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "INICIATIVA",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "INICIATIVAS"
+     },
+     {
+      "nombre": "FECHA",
+      "tipo": "fecha_hora",
+      "obligatoria": true
+     },
+     {
+      "nombre": "PERSONA",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "TIPO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Cambio o mejora",
+       "Algo no funciona",
+       "Duda"
+      ]
+     },
+     {
+      "nombre": "URGENTE",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "TEXTO",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ENLACE",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "VERSION",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "ESTADO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Nueva",
+       "Convertida en tarea",
+       "Respondida",
+       "Descartada"
+      ]
+     },
+     {
+      "nombre": "TAREA",
+      "tipo": "ref",
+      "ref": "TAREAS"
+     },
+     {
+      "nombre": "RESPUESTA",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "DECIDIDO_POR",
+      "tipo": "persona"
+     },
+     {
+      "nombre": "FECHA_DECISION",
+      "tipo": "fecha_hora"
+     }
+    ],
+    "restricciones": {
+     "solicitudes_pkey": [
+      "ID"
+     ],
+     "solicitudes_id_formato": [
+      "ID"
+     ],
+     "solicitudes_iniciativa_fkey": [
+      "INICIATIVA"
+     ],
+     "solicitudes_tipo_valores": [
+      "TIPO"
+     ],
+     "solicitudes_estado_valores": [
+      "ESTADO"
+     ],
+     "solicitudes_tarea_fkey": [
+      "TAREA"
+     ],
+     "solicitudes_decidido_por_fkey": [
+      "DECIDIDO_POR"
+     ]
+    }
+   },
    "TABLERO": {
     "db": "tablero",
     "clave": "ID",
@@ -856,6 +993,114 @@ window.NUCLEO_MONTAJE = {
      {
       "nombre": "DESBLOQUEA",
       "tipo": "numero"
+     }
+    ],
+    "restricciones": {}
+   },
+   "BANDEJA": {
+    "db": "bandeja",
+    "clave": "ID",
+    "de": "SOLICITUDES",
+    "soloLeer": true,
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "INICIATIVA",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "INICIATIVAS"
+     },
+     {
+      "nombre": "FECHA",
+      "tipo": "fecha_hora",
+      "obligatoria": true
+     },
+     {
+      "nombre": "PERSONA",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "TIPO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Cambio o mejora",
+       "Algo no funciona",
+       "Duda"
+      ]
+     },
+     {
+      "nombre": "URGENTE",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "TEXTO",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ENLACE",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "VERSION",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "ESTADO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Nueva",
+       "Convertida en tarea",
+       "Respondida",
+       "Descartada"
+      ]
+     },
+     {
+      "nombre": "TAREA",
+      "tipo": "ref",
+      "ref": "TAREAS"
+     },
+     {
+      "nombre": "RESPUESTA",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "DECIDIDO_POR",
+      "tipo": "persona"
+     },
+     {
+      "nombre": "FECHA_DECISION",
+      "tipo": "fecha_hora"
+     },
+     {
+      "nombre": "TAREA_TITULO",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "TAREA_ESTADO",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "ESTADO_CLIENTE",
+      "tipo": "lista",
+      "valores": [
+       "Recibida",
+       "En marcha",
+       "Hecha",
+       "Respondida",
+       "No la haremos"
+      ]
+     },
+     {
+      "nombre": "PUEDO_DECIDIR",
+      "tipo": "booleano"
      }
     ],
     "restricciones": {}

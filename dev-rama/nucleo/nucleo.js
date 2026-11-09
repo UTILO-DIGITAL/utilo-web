@@ -276,6 +276,7 @@
     T = window.UT.crear({ llamar: llamar, clave: C.clave || 'negocio', persona: copiaDe(cred), aviso: aviso });
     T.en('cambio', function (tabla, info) {
       (oyentes[actual] || []).forEach(function (f) { try { f(tabla, info); } catch (e) { if (window.console) console.error(e); } });
+      contarCifras(tabla); // T0412
     });
     return T;
   }
@@ -308,7 +309,8 @@
       menu().map(function (s) {
         return '<a href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '" title="' + texto(s.titulo) + '">' +
           '<svg viewBox="0 0 24 24" aria-hidden="true">' + (s.icono || ICONO_SECCION) + '</svg><span>' + texto(s.titulo) +
-          (s.id === 'PERFIL' ? '<span class="sx-quien">' + texto(cred.persona) + '</span>' : '') + '</span></a>';
+          (s.id === 'PERFIL' ? '<span class="sx-quien">' + texto(cred.persona) + '</span>' : '') + '</span>' +
+          (s.cifra ? '<span class="bj-n hay" data-cifra="' + texto(s.id) + '" hidden></span>' : '') + '</a>'; // T0412
       }).join('') + '</div></nav>';
   }
 
@@ -331,6 +333,42 @@
     tope();
     abrir(pedida() || menu()[0].id, false);
     avisarVersiones();
+    cifras();
+  }
+
+  /* ---------- T0412 · las cifras del menú ----------
+   * Una sección con «cifra» en su modulo.json (montar.js: { tabla, donde, directo, que }) lleva en el menú cuántas filas de
+   * esa tabla cumplen «donde» (las Nuevas que puedes atender, en la Bandeja), estés en la sección que estés: el marco la lee
+   * con la misma copia de las tablas, la cuenta cada vez que esa tabla cambia y, con Supabase, la vuelve a leer en cuanto
+   * cambia algo en las tablas de «directo» (Realtime). Sin nada que contar, no se ve. */
+  var cifrasDirecto = [];
+  function contarCifras(tabla) {
+    if (!cred || !T) return;
+    menu().forEach(function (s) {
+      var c = s.cifra;
+      if (!c || (tabla && tabla !== c.tabla)) return;
+      var n = T.filas(c.tabla).filter(function (f) { return Object.keys(c.donde || {}).every(function (k) { return f[k] === c.donde[k]; }); }).length;
+      var b = document.querySelector('[data-cifra="' + s.id + '"]');
+      if (!b) return;
+      b.textContent = n ? String(n) : ''; b.hidden = !n;
+      b.parentNode.title = s.titulo + (n ? ' · ' + n + (c.que ? ' ' + c.que : '') : '');
+      b.parentNode.setAttribute('aria-label', b.parentNode.title);
+    });
+  }
+  function cifras() {
+    cifrasDirecto.forEach(function (d) { try { d.cerrar(); } catch (e) {} });
+    cifrasDirecto = [];
+    menu().filter(function (s) { return s.cifra; }).forEach(function (s) {
+      var c = s.cifra, t = tablas(), espera = 0;
+      t.leer([c.tabla]).then(function () { contarCifras(c.tabla); }, function () {});
+      if (c.directo && c.directo.length && window.UG && typeof window.UG.enDirecto === 'function') {
+        var d = window.UG.enDirecto(c.directo, function () {
+          if (espera) return;
+          espera = setTimeout(function () { espera = 0; if (T === t) t.refrescar([c.tabla], true).then(function () { contarCifras(c.tabla); }, function () {}); }, 800);
+        });
+        if (d) cifrasDirecto.push(d);
+      }
+    });
   }
 
   /* ---------- T0283 · versión y novedades ---------- */

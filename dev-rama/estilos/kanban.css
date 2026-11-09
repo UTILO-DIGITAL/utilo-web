@@ -991,3 +991,30 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
   .u .filtros.tb-fil .en-filtros { padding: 0 var(--e3); }
   .u .filtros.tb-fil .en-filtros > span:not(.k-fil-n) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 }
+
+/* ---------- T0412 · Bandeja de la plataforma (utilo/secciones/bandeja.js): las tarjetas de Para mí (.pm-*) y lo suyo ---------- */
+.u .bjp { max-width: 900px; }
+.u .n-main > .filtros.tb-fil + .bjp { padding: var(--e4) var(--e4) 96px; }
+@media (min-width: 900px) { .u .n-main > .filtros.tb-fil + .bjp { padding-left: var(--e5); padding-right: var(--e5); max-width: calc(900px + 2 * var(--e5)); } }
+.u .bjp-res { margin: 0 0 var(--e3); color: var(--color-suave); }
+.u .bjp-res b { color: var(--color-texto); }
+.u .bjp-t { cursor: default; }
+.u .bjp-texto { margin: var(--e1) 0 0; font-size: 15px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
+.u .bjp-urg { background: var(--estado-bl); color: #fff; border-color: var(--estado-bl); }
+.u .bjp-enlace { display: inline-flex; align-items: center; gap: var(--e1); align-self: start; min-height: 32px; font-size: 14px; }
+.u .bjp-enlace svg, .u .bjp-tarea svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
+.u .bjp-hecho { display: grid; gap: var(--e1); margin-top: var(--e2); padding-top: var(--e2); border-top: 1px solid var(--color-linea); font-size: 14px; }
+.u .bjp-hecho p { margin: 0; overflow-wrap: anywhere; }
+.u .bjp-tarea { color: var(--color-texto); text-decoration: none; overflow-wrap: anywhere; }
+.u .bjp-tarea:hover b, .u .bjp-tarea:focus-visible b { text-decoration: underline; }
+.u .bjp-est { display: inline-block; margin-left: var(--e1); padding: 0 var(--e2); border-radius: var(--radio-peq); background: var(--color-bloque); font-size: 12px; font-weight: 700; }
+.u .bjp-resp span { font-weight: 700; }
+.u .bjp-ve { color: var(--color-suave); }
+.u .bjp-form { flex-direction: column; align-items: stretch; }
+.u .bjp-bs { display: flex; justify-content: flex-end; gap: var(--e2); }
+.u .bjp-pedida { box-shadow: 0 0 0 2px var(--color-accion); }
+.u .bjp-cita { margin: 0 0 var(--e3); padding-left: var(--e3); border-left: 3px solid var(--color-linea); color: var(--color-texto); overflow-wrap: anywhere; }
+.u .bjp-cita span { color: var(--color-suave); }
+.u .bjp-dos { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e3); }
+.u #bjp-t-verbo.mal { color: var(--estado-bl); font-weight: 700; }
+@media (max-width: 480px) { .u .bjp-dos { grid-template-columns: 1fr; } }
