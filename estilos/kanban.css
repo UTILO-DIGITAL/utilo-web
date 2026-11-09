@@ -518,6 +518,22 @@ body.ver-entregas .filtros, body.ver-entregas #tablero, body.ver-entregas .bj { 
   background: var(--color-superficie); color: var(--color-texto); font: inherit; resize: vertical; box-sizing: border-box; }
 .u .fresp .pie { display: flex; justify-content: flex-end; }
 .u .bloque ul { margin: 2px 0; padding-left: 18px; }
+/* T0420 · Qué hay que hacer y Conclusiones, por partes: una frase por línea, apartados con su título, listas y el «está bien hecho cuando» aparte */
+.u .bloque .fx { line-height: 1.5; max-width: 72ch; }
+.u .bloque .fx p { margin: 0 0 var(--e2); }
+.u .bloque .fx-parte + .fx-parte { margin-top: var(--e3); padding-top: var(--e3); border-top: 1px solid var(--color-linea); }
+.u .bloque .fx h4 { margin: 0 0 var(--e2); font: 700 14px/1.3 var(--fuente-texto); color: var(--color-texto); }
+.u .bloque .fx h4 span { font-weight: 400; color: var(--color-suave); font-size: 13px; }
+.u .bloque .fx-anadido h4 { color: var(--color-suave); font-weight: 600; }
+.u .bloque .fx-lista, .u .bloque .fx-pasos { margin: 0 0 var(--e2); padding-left: 22px; }
+.u .bloque .fx-lista li, .u .bloque .fx-pasos li { margin: 0 0 var(--e1); }
+.u .bloque .fx-quien { display: inline-block; padding: 0 7px; border-radius: 999px; background: var(--color-superficie); border: 1px solid var(--color-linea);
+  font-size: 12px; color: var(--color-suave); white-space: nowrap; }
+.u .bloque .fx-hecho { margin: var(--e2) 0; padding: var(--e2) var(--e3); background: var(--color-superficie); border-left: 4px solid var(--color-bien); border-radius: var(--radio); }
+.u .bloque .fx-hecho small { display: block; font: 700 12px/1.3 var(--fuente-texto); color: var(--color-bien); text-transform: uppercase; margin-bottom: 2px; }
+.u .bloque .fx-hecho p { margin: 0; }
+.u .bloque .fx a { overflow-wrap: anywhere; }
+.u #tb-f-EPICA-nueva { margin-top: var(--e2); }
 .u .bloque .hist { font-variant-numeric: tabular-nums; }
 .u .bloque .hito { margin: 0; padding: var(--e2) 0; } /* T0058: una línea por hito del historial */
 .u .bloque .hito + .hito { border-top: 1px solid var(--color-linea); }
@@ -942,13 +958,36 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
   .u #alta-btn.en-mas .en-mas-t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .u #alta-btn.en-mas .en-mas-mas { font-size: 32px; }
 }
-/* T0422 · Tareas, como Entregas: buscar y «Filtros» en una línea (los filtros, en la hoja); el mismo + para crear. */
-.u .kb .filtros.tb-fil { display: flex; align-items: center; gap: var(--e3); flex-wrap: nowrap; }
-.u .kb .filtros.tb-fil .busca { flex: 1 1 auto; min-width: 0; max-width: 420px; }
-.u .kb .filtros.tb-fil .busca input { width: 100%; }
-.u .kb .filtros.tb-fil .en-filtros { flex: none; margin-left: auto; }
+/* T0422 · Tareas, como Entregas: buscar y «Filtros» en una línea (los filtros, en la hoja); el mismo + para crear.
+   T0423 · La misma barra, igual y en el mismo sitio en Tareas y en Entregas: pegada a la cabecera, a todo el ancho, con buscar a
+   la izquierda y «Filtros» a la derecha. Entregas deja su margen de arriba a la barra, como el tablero. */
+.u .filtros.tb-fil { display: flex; align-items: center; gap: var(--e3); flex-wrap: nowrap; }
+.u .filtros.tb-fil .busca { flex: 1 1 auto; min-width: 0; max-width: 420px; }
+.u .filtros.tb-fil .busca input { width: 100%; }
+.u .filtros.tb-fil .en-filtros { flex: none; margin-left: auto; }
+.u .n-main:has(> .filtros.tb-fil) { padding: 0; max-width: none; }
+.u .n-main > .filtros.tb-fil + .mp { padding: var(--e4); }
+@media (min-width: 900px) { .u .n-main > .filtros.tb-fil, .u .n-main > .filtros.tb-fil + .mp { padding-left: var(--e5); padding-right: var(--e5); } }
 /* T0422 · La hoja de filtros, como mucho el 88 % del alto: lo de dentro se desplaza y los botones se quedan abajo, a la vista. */
 .u #alta-velo.en-hoja #alta-form { max-height: 88vh; max-height: 88dvh; overflow-y: auto; overscroll-behavior: contain; }
 .u #alta-velo.en-hoja #alta-form .botones { position: sticky; bottom: calc(-1 * var(--e4)); margin-bottom: calc(-1 * var(--e4)); padding: var(--e3) 0 var(--e4);
   background: var(--color-fondo); }
 .u #alta-velo.en-hoja .en-hoja-cab { position: sticky; top: calc(-1 * var(--e4)); margin-top: calc(-1 * var(--e4)); padding-top: var(--e4); background: var(--color-fondo); z-index: 1; }
+/* T0423 · La hoja de filtros: en los grupos de «varias», lo elegido lleva ✓ (se ve que se pueden marcar más); un grupo largo, con
+   su buscador y «Ver las otras N». */
+.u .en-chips.varias .en-chip[aria-pressed=true]:not([data-v=""])::before { content: '✓'; margin-right: 6px; }
+.u .en-chip[hidden], .u .en-hoja-mas[hidden], .u .en-hoja-nada[hidden] { display: none; }
+.u .en-hoja-cu { margin-left: var(--e1); font-weight: 600; text-transform: none; color: var(--color-suave); }
+.u .en-hoja-busca { width: 100%; max-width: 420px; margin: 0 0 var(--e2); font-size: 16px; }
+.u .en-hoja-mas { margin-top: var(--e2); min-height: 44px; padding: 0; border: 0; background: none; color: var(--color-principal-oscuro);
+  font: 700 15px/1 var(--fuente-texto); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.u .en-hoja-nada { margin: var(--e2) 0 0; color: var(--color-suave); font-size: 14px; }
+/* T0423 · En Entregas, Mapa | Lista en la barra, entre buscar y «Filtros» (pedido por Javi). En el móvil no cabe todo con
+   texto: «Filtros» se queda en su icono y el número, en Tareas y en Entregas igual. */
+.u .filtros.tb-fil .mp-vistas { flex: none; align-self: center; }
+.u .filtros.tb-fil .mp-vistas .sec { min-width: 0; min-height: 44px; padding: 0 var(--e3); }
+.u .filtros.tb-fil .mp-vistas + .en-filtros { margin-left: 0; }
+@media (max-width: 640px) {
+  .u .filtros.tb-fil .en-filtros { padding: 0 var(--e3); }
+  .u .filtros.tb-fil .en-filtros > span:not(.k-fil-n) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+}

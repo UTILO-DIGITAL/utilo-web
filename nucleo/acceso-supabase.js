@@ -11,6 +11,9 @@
  *   con la sesión de quien ha entrado. Quién puede qué lo dicen las reglas por fila: aquí no se comprueba nada que importe.
  * - Sin «entrar como otra persona» (sinComo): con Supabase, cada uno entra con su sesión.
  * - El entorno: DEV si la página está en utilo-web/dev-rama/; si no, producción. Cada uno con su proyecto (montaje.supabase).
+ * - T0391 · Entrar con un código al correo (montaje.entrar con 'codigo'): pedirCodigo(correo) pide a Auth que lo envíe y
+ *   entrarConCodigo(correo, codigo) lo cambia por la sesión. En local y DEV el correo no sale: buzon(correo) lo lee del
+ *   buzón de pruebas. correos.* son los de quien ha entrado (Perfil: añadir otro, confirmado con su código).
  *
  * window.KANBAN = { clave, marca, nombreApp, supabase: true } y window.NUCLEO_MONTAJE (montaje.js) van antes; después,
  * kanban4/tablas.js, nucleo/supabase.js, este archivo y nucleo/nucleo.js. En el modo local, local-navegador.js cambia
@@ -98,6 +101,63 @@
     });
   }
 
+  /* ---------- T0391 · entrar con un código al correo ---------- */
+
+  function correoValido(c) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c); }
+  function motivoAuth(j) { return String((j && (j.msg || j.error_description || j.message || j.error)) || '').trim(); }
+  function demasiados(j) { return !!j && (/^over_.*rate_limit$/.test(j.error_code || '') || j.code === 429 || /rate limit|too many/i.test(motivoAuth(j))); }
+
+  /**
+   * Pide a Auth que envíe un código a ese correo. Se resuelve igual si el correo no tiene acceso (el hook no deja crear su
+   * usuario): así la página no dice qué correos son de alguien. Solo falla si el correo no tiene forma de correo, si se han
+   * pedido demasiados o si no hay conexión.
+   */
+  function pedirCodigo(correo) {
+    var c = bajo(correo);
+    if (!correoValido(c)) return Promise.reject(new Error('Escribe tu correo entero (nombre@dominio.com).'));
+    return auth('otp', { email: c, create_user: true }).then(function (r) {
+      if (r.ok) return c;
+      if (demasiados(r.j)) throw new Error('Has pedido muchos códigos seguidos: espera unos minutos y vuelve a pedirlo.');
+      if (r.j && r.j.error_code === 'validation_failed') throw new Error('Escribe tu correo entero (nombre@dominio.com).');
+      return c; // sin acceso (el hook) u otro «no»: lo mismo que si se hubiera enviado
+    }, function () { throw new Error('No hay conexión: revisa internet y vuelve a pedir el código.'); });
+  }
+
+  /** Cambia el código por la sesión. Un código equivocado y uno caducado, Auth los dice igual. */
+  function entrarConCodigo(correo, codigo) {
+    var c = bajo(correo), k = String(codigo == null ? '' : codigo).replace(/\s+/g, '');
+    // Auth manda 6 u 8 cifras según el proyecto (Email OTP Length en el panel): vale el largo que llegue.
+    if (!/^\d{6,10}$/.test(k)) return Promise.reject(new Error('El código son las cifras que te han llegado al correo.'));
+    return auth('verify', { type: 'email', email: c, token: k }).then(function (r) {
+      if (!r.ok || !r.j.access_token) {
+        if (demasiados(r.j)) throw new Error('Has probado demasiadas veces: espera unos minutos y pide otro código.');
+        throw new Error('El código no es ese o ha caducado. Revísalo o pide otro.');
+      }
+      guardar(sesionDe(r.j));
+      return true;
+    }, function () { throw new Error('No hay conexión: revisa internet y vuelve a probar.'); });
+  }
+
+  /** Local y DEV: los últimos correos del buzón de pruebas a ese correo (sin entrar), o null si aquí no hay buzón. */
+  function buzon(correo) {
+    if (ENTORNO === 'prod' || !URL_SB) return Promise.resolve(null);
+    return fetch(URL_SB + '/rest/v1/rpc/buzon_de_pruebas', { method: 'POST', headers: { apikey: P.clave, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ correo: bajo(correo) }) })
+      .then(function (r) { return r.ok ? r.json() : null; }, function () { return null; });
+  }
+
+  /** Los correos de quien ha entrado (Perfil): leer, añadir con su código, confirmar y quitar. */
+  var correos = {
+    mios: function () { return capa().rpc('mis_correos', {}); },
+    anadir: function (c) {
+      c = bajo(c);
+      if (!correoValido(c)) return Promise.reject(new Error('Escribe el correo entero (nombre@dominio.com).'));
+      return capa().rpc('anadir_correo', { correo: c });
+    },
+    confirmar: function (c, k) { return capa().rpc('confirmar_correo', { correo: bajo(c), codigo: String(k == null ? '' : k).replace(/\s+/g, '') }); },
+    quitar: function (c) { return capa().rpc('quitar_correo', { correo: bajo(c) }); }
+  };
+
   /* ---------- las tablas y las funciones ---------- */
 
   var funciones = [];
@@ -183,6 +243,12 @@
         return new Promise(function () {}); // la página se va
       });
     },
+    /** T0391 · Cómo se entra en esta web (montaje.js: nucleo.entrar): 'google' y/o 'codigo', en ese orden en la pantalla. */
+    formas: function () { var f = [].concat(M.entrar || ['google']).filter(function (x) { return x === 'google' || x === 'codigo'; }); return f.length ? f : ['google']; },
+    pedirCodigo: pedirCodigo,
+    entrarConCodigo: entrarConCodigo,
+    buzon: buzon,
+    correos: correos,
     llamar: llamar,
     seccion: function (api, cuerpo, clave) {
       return llamar(api, cuerpo).catch(function (e) {

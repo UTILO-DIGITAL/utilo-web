@@ -149,8 +149,21 @@
   }
 
   /** Si una entrega sale con ese filtro: en marcha; con las entregadas de los últimos días; o todas. */
-  function grupoDe(e) { return e.ESTADO === 'Entregada' ? 'Entregadas' : e.ESTADO === 'Aplazada' ? 'Aplazadas' : e.ESTADO === 'Descartada' ? '' : 'En marcha'; }
-  function seVe(e, ver) { return ver === 'Todas' || grupoDe(e) === ver; }
+  function grupoDe(e) { return e.ESTADO === 'Entregada' ? 'Entregadas' : e.ESTADO === 'Aplazada' ? 'Aplazadas' : e.ESTADO === 'Descartada' ? 'Descartadas' : 'En marcha'; }
+  /** T0423 · Los grupos elegidos en «Ver» (varios; sin ninguno, todas). Lo de antes, un texto: «Todas» o un grupo. */
+  var GRUPOS_VER = ['En marcha', 'Aplazadas', 'Entregadas', 'Descartadas'];
+  function verDe(v) {
+    if (v === 'Todas') return [];
+    var l = (Array.isArray(v) ? v : v ? [v] : []).filter(function (x) { return GRUPOS_VER.indexOf(x) >= 0; });
+    return l.length || (Array.isArray(v) && !v.length) ? l : ['En marcha'];
+  }
+  function seVe(e, ver) { var l = verDe(ver); return !l.length || l.indexOf(grupoDe(e)) >= 0; }
+  /** T0423 · Si una entrega sale con lo buscado (todas las palabras): su código (U22), nombre, qué incluye y criterio. */
+  function coincide(e, q, inicial) {
+    var ps = sinTildes(q).trim().split(/\s+/).filter(Boolean);
+    var hay = sinTildes([e.ID, (inicial || '') + (e.NUMERO == null ? '' : e.NUMERO), e.NOMBRE, e.QUE_INCLUYE, e.CRITERIO].join(' '));
+    return ps.every(function (p) { return hay.indexOf(p) >= 0; });
+  }
 
   /**
    * Las esperas entre entregas: [{ de, a, n, abiertas, pares: [{ tarea, de }] }] (de y a, IDs de entrega; la flecha va de
@@ -217,12 +230,15 @@
 
   /**
    * Todo el dibujo, sin tocar la página: { desde, hasta, pxDia, ancho, alto, hoyX, meses, carriles, cajas, flechas, sueltas, resumen }.
-   * d: { entregas, iniciativas, tareas, deps }; o: { hoy, ancho, ver, ini }.
+   * d: { entregas, iniciativas, tareas, deps }; o: { hoy, ancho, ver, ini, busca } (T0423: ver e ini, listas; busca, texto).
    */
   function plano(d, o) {
     o = o || {};
-    var hoy = dia(o.hoy) || hoyIso(), ver = VER.indexOf(o.ver) >= 0 ? o.ver : VER[0];
-    var ES = (d.entregas || []).filter(function (e) { return seVe(e, ver, hoy) && (!o.ini || e.INICIATIVA === o.ini); });
+    var hoy = dia(o.hoy) || hoyIso(), ver = verDe(o.ver), inis = lista(o.ini), inicial = {};
+    (d.iniciativas || []).forEach(function (i) { inicial[i.ID] = i.INICIAL; });
+    var ES = (d.entregas || []).filter(function (e) {
+      return seVe(e, ver) && (!inis.length || inis.indexOf(e.INICIATIVA) >= 0) && (!o.busca || coincide(e, o.busca, inicial[e.INICIATIVA]));
+    });
     // Los carriles: las iniciativas activas primero; entre ellas, la que tiene más entregas en marcha arriba; a igualdad, en su orden.
     var IS = (d.iniciativas || []).slice(), orden = {}, vivas = {};
     IS.forEach(function (i, k) { orden[i.ID] = k; });
@@ -389,7 +405,81 @@
     }).sort(function (a, b) { return String(b.ID).localeCompare(String(a.ID)); });
   }
 
-  var CALC = { plano: plano, tramo: tramo, empezada: empezada, trabajoPorTarea: trabajoPorTarea, inicioTrabajo: inicioTrabajo, TRABAJO: TRABAJO, progreso: progreso, marcas: marcas, seVe: seVe, esperas: esperas, enFilas: enFilas, linea: linea,
+  /* ---------- T0423 · LA HOJA DE FILTROS: igual en tablero.js y entregas.js (probar-plataforma.js comprueba que no se separan) ----------
+   * Cada filtro es un grupo de botones. Los de «varias» (iniciativa, entrega, persona…) dejan elegir más de uno: «Todas» quita
+   * lo elegido. Un grupo con más de HOJA_MAX opciones enseña las primeras (y las elegidas), «Ver las otras N» y un buscador; las
+   * opciones «al buscar» (p. ej. las entregas ya cerradas) solo salen buscándolas. */
+  var HOJA_MAX = 8;
+  function sinTildes(s) { return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  /** Lo elegido en un filtro, siempre en lista (antes de T0423 se guardaba un texto: '' era «Todas»). */
+  function lista(v) { return (Array.isArray(v) ? v : v === '' || v == null ? [] : [v]).filter(function (x) { return x !== '' && x != null; }).map(String); }
+  /** Lo elegido tras pulsar «v»: con varias, se añade o se quita («» quita todo); si no, solo ese. */
+  function elegirEn(actual, v, varias) {
+    if (!varias) return v;
+    if (v === '') return [];
+    var l = lista(actual), i = l.indexOf(String(v));
+    if (i >= 0) l.splice(i, 1); else l.push(String(v));
+    return l;
+  }
+  /** Un grupo de la hoja. o: { k, t, vs: [[valor, texto, alBuscar]], sel, varias, abierto, buscar }. */
+  function grupoHoja(o) {
+    var sel = o.varias ? lista(o.sel) : [String(o.sel)];
+    var larga = o.vs.filter(function (x) { return !x[2]; }).length > HOJA_MAX, mas = 0, k = 0;
+    var vs = !larga ? o.vs : o.vs.slice().sort(function (a, b) { return (sel.indexOf(String(b[0])) >= 0) - (sel.indexOf(String(a[0])) >= 0); }); // larga: las elegidas, primero
+    var bs = vs.map(function (x) {
+      var p = sel.indexOf(String(x[0])) >= 0, oculta = false;
+      if (!p && x[2]) oculta = true;
+      else if (!x[2] && k++ >= HOJA_MAX && larga && !o.abierto && !p) { oculta = true; mas++; }
+      return '<button type="button" class="en-chip" data-g="' + texto(o.k) + '" data-v="' + texto(x[0]) + '" data-txt="' + texto(sinTildes(x[1])) + '"' +
+        ' aria-pressed="' + p + '"' + (oculta ? ' data-oculta hidden' : '') + '>' + texto(x[1]) + '</button>';
+    });
+    if (o.varias) bs.unshift('<button type="button" class="en-chip" data-g="' + texto(o.k) + '" data-v="" aria-pressed="' + !sel.length + '">Todas</button>');
+    var buscador = larga || vs.some(function (x) { return x[2]; });
+    return '<div class="en-grupo" data-grupo="' + texto(o.k) + '"><h3 class="en-hoja-h">' + texto(o.t) +
+        (o.varias && sel.length ? ' <span class="en-hoja-cu">' + (sel.length === 1 ? '1 elegida' : sel.length + ' elegidas') + '</span>' : '') + '</h3>' +
+      (buscador ? '<input type="search" class="en-hoja-busca" data-gbusca="' + texto(o.k) + '" placeholder="' + texto(o.buscar || 'Buscar') + '" aria-label="' + texto(o.buscar || 'Buscar') + '" autocomplete="off">' : '') +
+      '<div class="en-chips' + (o.varias ? ' varias' : '') + '" role="group" aria-label="' + texto(o.t) + '">' + bs.join('') + '</div>' +
+      (mas ? '<button type="button" class="en-hoja-mas" data-gmas="' + texto(o.k) + '">' + (mas === 1 ? 'Ver otra' : 'Ver las otras ' + mas) + '</button>' : '') +
+      '<p class="en-hoja-nada" hidden>Ninguna con ese nombre.</p></div>';
+  }
+  /** Buscar dentro de un grupo: salen las que coinciden (también las «al buscar») y las elegidas. */
+  function buscarEnGrupo(input) {
+    var q = sinTildes(input.value.trim()), g = input.closest('.en-grupo'), n = 0;
+    [].forEach.call(g.querySelectorAll('.en-chip[data-txt]'), function (b) {
+      var ve = q ? b.getAttribute('aria-pressed') === 'true' || q.split(/\s+/).every(function (p) { return b.getAttribute('data-txt').indexOf(p) >= 0; }) : !b.hasAttribute('data-oculta');
+      b.hidden = !ve; if (ve) n++;
+    });
+    var m = g.querySelector('.en-hoja-mas'); if (m) m.hidden = !!q;
+    g.querySelector('.en-hoja-nada').hidden = !q || n > 0;
+  }
+  /** Vuelve a pintar la hoja sin perder lo buscado, por dónde iba ni el foco. */
+  function repintarHoja(form, pintar, foco) {
+    var bs = {}, y = form.scrollTop;
+    [].forEach.call(form.querySelectorAll('[data-gbusca]'), function (i) { if (i.value) bs[i.getAttribute('data-gbusca')] = i.value; });
+    pintar();
+    form.scrollTop = y;
+    Object.keys(bs).forEach(function (k) { var i = form.querySelector('[data-gbusca="' + k + '"]'); if (i) { i.value = bs[k]; buscarEnGrupo(i); } });
+    var x = foco && form.querySelector(foco); if (x) try { x.focus({ preventScroll: true }); } catch (e) { x.focus(); }
+  }
+  /** Los botones de la hoja: elegir(k, v) cambia el filtro; «Ver las otras» abre el grupo; el buscador filtra sin volver a pintar. */
+  function atenderHoja(form, velo, o) {
+    form.addEventListener('click', function (ev) {
+      if (!velo.classList.contains('en-hoja')) return;
+      var m = ev.target.closest('[data-gmas]');
+      if (m) { var g = m.getAttribute('data-gmas'); o.abiertos[g] = 1; repintarHoja(form, o.pintar, ''); return; }
+      var b = ev.target.closest('.en-chip[data-g]');
+      if (b) {
+        var k = b.getAttribute('data-g'), v = b.getAttribute('data-v');
+        o.elegir(k, v);
+        repintarHoja(form, o.pintar, '[data-g="' + k + '"][data-v="' + (window.CSS && CSS.escape ? CSS.escape(v) : v) + '"]');
+      } else if (ev.target.closest('[data-quitar-filtros]')) { o.quitar(); repintarHoja(form, o.pintar, '.pri'); }
+    });
+    form.addEventListener('input', function (ev) { if (ev.target.hasAttribute('data-gbusca')) buscarEnGrupo(ev.target); });
+    form.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' && ev.target.hasAttribute && ev.target.hasAttribute('data-gbusca')) ev.preventDefault(); });
+  }
+  /* ---------- FIN DE LA HOJA DE FILTROS ---------- */
+
+  var CALC = { plano: plano, tramo: tramo, empezada: empezada, trabajoPorTarea: trabajoPorTarea, inicioTrabajo: inicioTrabajo, TRABAJO: TRABAJO, progreso: progreso, marcas: marcas, seVe: seVe, verDe: verDe, coincide: coincide, lista: lista, elegirEn: elegirEn, grupoHoja: grupoHoja, esperas: esperas, enFilas: enFilas, linea: linea,
     diasEntre: diasEntre, mas: mas, M: M, VER: VER, VISTAS: VISTAS, grupoDe: grupoDe,
     pasosEntrega: pasosEntrega, pideEntrega: pideEntrega, enCursoDe: enCursoDe, siguienteNumero: siguienteNumero, cambioEntrega: cambioEntrega, nuevaEntrega: nuevaEntrega, candidatas: candidatas, MAX_EN_CURSO: MAX_EN_CURSO };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
@@ -451,23 +541,37 @@
       estilos(el);
       var C = ctx.config || {};
       var CLAVE = 'en_' + String(ctx.correo || ctx.persona || '').toLowerCase().replace(/\W+/g, '');
-      var F = leerLocal(CLAVE + '_f', {});   // { vista, ver, ini }: los filtros valen para las dos vistas
+      var F = leerLocal(CLAVE + '_f', {});   // { vista, ver, ini }: los filtros valen para las dos vistas (T0423: ver e ini, listas)
       var pedida = String(new URLSearchParams(location.search).get('v') || '').toLowerCase();
       if (pedida === 'mapa' || pedida === 'lista') F.vista = pedida === 'mapa' ? 'Mapa' : 'Lista';
       if (VISTAS.indexOf(F.vista) < 0) F.vista = VISTAS.indexOf(C.VISTA) >= 0 ? C.VISTA : 'Mapa';
-      if (VER.indexOf(F.ver) < 0) F.ver = VER.indexOf(C.VER) >= 0 ? C.VER : 'En marcha';
+      var VER_DEF = verDe(VER.indexOf(C.VER) >= 0 ? C.VER : 'En marcha');
+      F.ver = F.ver === undefined ? VER_DEF.slice() : verDe(F.ver);
+      F.ini = lista(F.ini);
+      F.busca = '';
       delete F.verMapa;
       var leido = false, sel = '', P = null, primera = true, anchoVisto = 0;
+      // T0420: la entrega abierta en el mapa va en la dirección (?caja=; ?e= es su ficha, T0417), para que al volver de la
+      // ficha de una tarea siga abierta.
+      var selPedida = String(new URLSearchParams(location.search).get('caja') || '');
+      function urlSel() {
+        try {
+          var u = new URL(location.href);
+          if (sel) u.searchParams.set('caja', sel); else u.searchParams.delete('caja');
+          history.replaceState(history.state, '', u.pathname + u.search);
+        } catch (e) {}
+      }
       // Sin la clase «en»: en kanban.css es la vista de la 4.x, que solo se ve con body.ver-entregas.
-      el.innerHTML = '<section class="mp en-nucleo"><div class="en-fil">' +
-        '<div class="mp-vistas" role="group" aria-label="Vista">' + VISTAS.map(function (v) {
-          return '<button type="button" class="sec" data-vista="' + v + '" aria-pressed="' + (v === F.vista) + '">' + v + '</button>';
-        }).join('') + '</div>' +
-        // T0422 (decidido por Javi): en una línea, la vista y «Filtros», que abre una hoja con Ver e Iniciativa. Sin ↻: las
-        // entregas también van en directo. Crear, con el botón flotante (+), como «Añadir tarea» en Tareas.
-        '<button id="en-filtros" class="sec en-filtros" type="button" aria-haspopup="dialog">' + ICO_FILTROS + '<span>Filtros</span>' +
+      // T0423: arriba, la misma barra que en Tareas y en el mismo sitio: buscar, la vista (Mapa o Lista, a la vista: pedido por
+      // Javi) y «Filtros», que abre una hoja con Ver e Iniciativa. Sin ↻: las entregas van en directo. Crear, con el +.
+      el.innerHTML = '<div class="filtros tb-fil">' +
+          '<label class="busca"><span class="u-oculto">Buscar entregas</span><input type="search" id="en-busca" placeholder="Buscar entregas" autocomplete="off"></label>' +
+          '<div class="mp-vistas" role="group" aria-label="Vista">' + VISTAS.map(function (v) {
+            return '<button type="button" class="sec" data-vista="' + v + '" aria-pressed="' + (v === F.vista) + '">' + v + '</button>';
+          }).join('') + '</div>' +
+          '<button id="en-filtros" class="sec en-filtros" type="button" aria-haspopup="dialog">' + ICO_FILTROS + '<span>Filtros</span>' +
           '<span id="en-fil-n" class="k-fil-n" hidden></span></button>' +
-        '</div>' +
+        '</div><section class="mp en-nucleo">' +
         '<div id="en-vmapa"><p id="mp-res" class="mp-res" aria-live="polite"></p>' +
         '<div class="mp-cuerpo"><div class="mp-izq"><div id="mp-marco" class="mp-marco" tabindex="0" aria-label="Mapa de las entregas en el tiempo"></div>' +
         '<ul class="mp-ley">' + GRUPOS.map(function (g) { return '<li class="' + g.cls + '">' + texto(g.varias) + '</li>'; }).join('') +
@@ -514,7 +618,7 @@
       function pintarMapa() {
         var ancho = marco.clientWidth || 0;
         anchoVisto = ancho;
-        P = plano(datos(), { hoy: hoyIso(), ancho: ancho, ver: F.ver, ini: F.ini });
+        P = plano(datos(), { hoy: hoyIso(), ancho: ancho, ver: F.ver, ini: F.ini, busca: F.busca });
         if (sel && !P.cajas.some(function (c) { return c.id === sel; })) cerrarDetalle(true);
         var r = P.resumen, partes = [];
         if (r.entregas) {
@@ -635,18 +739,19 @@
         sec.classList.add('con-det');
       }
 
-      function seleccionar(id) {
+      function seleccionar(id, quieto) {
         var antes = sel;
         sel = sel === id ? '' : id;
+        urlSel();
         pintarDetalle();
         pintarMapa(); // con el detalle al lado, el mapa tiene otro ancho
         if (sel) {
           pintarDetalle();
-          if (!antes && window.matchMedia && !window.matchMedia('(min-width: 1200px)').matches && det.scrollIntoView) det.scrollIntoView({ block: 'start', behavior: 'smooth' });
+          if (!antes && !quieto && window.matchMedia && !window.matchMedia('(min-width: 1200px)').matches && det.scrollIntoView) det.scrollIntoView({ block: 'start', behavior: 'smooth' });
         }
       }
       function cerrarDetalle(sinPintar) {
-        sel = ''; det.hidden = true; det.innerHTML = ''; sec.classList.remove('con-det');
+        sel = ''; urlSel(); det.hidden = true; det.innerHTML = ''; sec.classList.remove('con-det');
         if (!sinPintar) pintarMapa();
       }
 
@@ -691,10 +796,10 @@
       }
       function pintarLista() {
         var EL = ctx.tablas.filas(TE).slice();
-        var ls = EL.filter(function (e) { return (F.ver === 'Todas' || grupoDe(e) === F.ver) && (!F.ini || e.INICIATIVA === F.ini); });
+        var ls = EL.filter(seFiltra);
         // Primero las que están en marcha, después las aplazadas, las entregadas y las descartadas. Las que aún se hacen, por
         // fecha prevista (la más cercana arriba); las cerradas, por número, de la última a la primera.
-        var orden = { 'En marcha': 0, 'Aplazadas': 1, 'Entregadas': 2, '': 3 };
+        var orden = { 'En marcha': 0, 'Aplazadas': 1, 'Entregadas': 2, 'Descartadas': 3 };
         ls.sort(function (a, b) {
           var ga = orden[grupoDe(a)], gb = orden[grupoDe(b)];
           if (ga !== gb) return ga - gb;
@@ -870,7 +975,7 @@
       function abrirNueva() {
         var IS = iniciativasQueLlevo();
         if (!IS.length) { ctx.aviso('Crea entregas quien lleva la iniciativa (responsable o admin).'); return; }
-        var ini = IS.some(function (i) { return i.ID === F.ini; }) ? F.ini : IS.some(function (i) { return i.ID === 'UTILO'; }) ? 'UTILO' : IS[0].ID;
+        var ini = F.ini.length === 1 && IS.some(function (i) { return i.ID === F.ini[0]; }) ? F.ini[0] : IS.some(function (i) { return i.ID === 'UTILO'; }) ? 'UTILO' : IS[0].ID;
         var numero = function (x) { var i = ctx.tablas.fila(TI, x); return ((i && i.INICIAL) || '') + siguienteNumero(ctx.tablas.filas(TE), x); };
         altaForm.innerHTML = '<h2>Nueva entrega</h2><div class="edit">' +
           '<div class="campo"><label class="lab" for="en-n-ini">Iniciativa</label><select id="en-n-ini">' + IS.map(function (i) {
@@ -903,7 +1008,7 @@
               cerrarVelo();
               var e = ctx.tablas.fila(TE, id);
               ctx.aviso('Creada ' + (e ? cortoDe(e) + ' · ' + e.NOMBRE : id) + '.');
-              if (e && F.ver !== 'En marcha' && F.ver !== 'Todas') { F.ver = 'En marcha'; guardarLocal(CLAVE + '_f', F); }
+              if (e && !seVe(e, F.ver)) { F.ver.push('En marcha'); guardarLocal(CLAVE + '_f', F); } // T0423: que se vea la nueva
               pintar();
               abrirFicha(id);
             });
@@ -1091,49 +1196,53 @@
       /* ---------- las dos vistas ---------- */
       function esMapa() { return F.vista === 'Mapa'; }
       /* ---------- T0422 · los filtros, en una hoja que sube desde abajo ---------- */
-      var VER_DEF = VER.indexOf(C.VER) >= 0 ? C.VER : 'En marcha';
       /** Cuántos filtros hay puestos (distintos de los de siempre), para el número de «Filtros». */
-      function filtrosPuestos() { return (F.ver !== VER_DEF ? 1 : 0) + (F.ini ? 1 : 0); }
-      function cuantasSeVen() { return ctx.tablas.filas(TE).filter(function (e) { return seVe(e, F.ver) && (!F.ini || e.INICIATIVA === F.ini); }).length; }
+      function mismos(a, b) { return a.slice().sort().join('|') === b.slice().sort().join('|'); }
+      function filtrosPuestos() { return (mismos(F.ver, VER_DEF) ? 0 : 1) + (F.ini.length ? 1 : 0); }
+      function seFiltra(e) {
+        var i = ctx.tablas.fila(TI, e.INICIATIVA);
+        return seVe(e, F.ver) && (!F.ini.length || F.ini.indexOf(e.INICIATIVA) >= 0) && (!F.busca || coincide(e, F.busca, i && i.INICIAL));
+      }
+      function cuantasSeVen() { return ctx.tablas.filas(TE).filter(seFiltra).length; }
+      var ABIERTOS = {};
       function pintarHoja() {
         var IS = ctx.tablas.filas(TI), n = cuantasSeVen();
-        var chips = function (grupo, vs, actual) {
-          return '<div class="en-chips" role="group" aria-label="' + texto(grupo) + '">' + vs.map(function (x) {
-            return '<button type="button" class="en-chip" data-' + (grupo === 'Ver' ? 'ver' : 'ini') + '="' + texto(x[0]) + '" aria-pressed="' + (x[0] === actual) + '">' + texto(x[1]) + '</button>';
-          }).join('') + '</div>';
-        };
         altaForm.innerHTML = '<div class="en-hoja-cab"><h2>Filtros</h2><button type="button" class="en-hoja-x" data-cancelar-alta aria-label="Cerrar" title="Cerrar">' + ICO_CERRAR + '</button></div>' +
-          '<h3 class="en-hoja-h">Ver</h3>' + chips('Ver', VER.map(function (v) { return [v, v]; }), F.ver) +
-          (IS.length > 1 ? '<h3 class="en-hoja-h">Iniciativa</h3>' + chips('Iniciativa', [['', 'Todas']].concat(IS.map(function (i) { return [i.ID, i.NOMBRE || i.ID]; })), F.ini || '') : '') +
+          grupoHoja({ k: 'ver', t: 'Ver', vs: GRUPOS_VER.map(function (v) { return [v, v]; }), sel: F.ver, varias: true }) +
+          (IS.length > 1 ? grupoHoja({ k: 'ini', t: 'Iniciativa', vs: IS.map(function (i) { return [i.ID, i.NOMBRE || i.ID]; }), sel: F.ini, varias: true, abierto: ABIERTOS.ini, buscar: 'Buscar iniciativa' }) : '') +
           '<div class="botones"><button type="button" class="sec" data-quitar-filtros' + (filtrosPuestos() ? '' : ' disabled') + '>Quitar filtros</button>' +
           '<button type="submit" class="pri">' + (n === 1 ? 'Ver 1 entrega' : 'Ver ' + n + ' entregas') + '</button></div>';
       }
       function abrirFiltros() {
+        Object.keys(ABIERTOS).forEach(function (k) { delete ABIERTOS[k]; });
         pintarHoja();
         altaForm.onsubmit = function (ev) { ev.preventDefault(); cerrarVelo(); };
         altaVelo.classList.add('en-hoja');
         abrirVelo();
         var b = altaForm.querySelector('.en-chip[aria-pressed=true]'); if (b) b.focus();
       }
-      altaForm.addEventListener('click', function (ev) {
-        if (!altaVelo.classList.contains('en-hoja')) return;
-        var v = ev.target.closest('[data-ver]'), i = ev.target.closest('[data-ini]');
-        if (v) F.ver = v.getAttribute('data-ver');
-        else if (i) F.ini = i.getAttribute('data-ini');
-        else if (ev.target.closest('[data-quitar-filtros]')) { F.ver = VER_DEF; F.ini = ''; }
-        else return;
-        guardarLocal(CLAVE + '_f', F); pintar(); pintarHoja();
-        var foco = altaForm.querySelector(v ? '[data-ver="' + F.ver + '"]' : i ? '[data-ini="' + F.ini + '"]' : '.pri'); if (foco) foco.focus();
+      atenderHoja(altaForm, altaVelo, {
+        abiertos: ABIERTOS, pintar: pintarHoja,
+        elegir: function (k, v) {
+          if (k === 'ver') F.ver = elegirEn(F.ver, v, true);
+          else if (k === 'ini') F.ini = elegirEn(F.ini, v, true);
+          guardarLocal(CLAVE + '_f', F); pintar();
+        },
+        quitar: function () { F.ver = VER_DEF.slice(); F.ini = []; guardarLocal(CLAVE + '_f', F); pintar(); }
       });
+      var tBusca = 0;
+      $('en-busca').addEventListener('input', function () { var v = this.value; clearTimeout(tBusca); tBusca = setTimeout(function () { F.busca = v.trim(); pintar(); }, 120); });
       $('en-filtros').onclick = abrirFiltros;
 
       function pintar() {
-        if (F.ini && !ctx.tablas.fila(TI, F.ini)) F.ini = '';
+        F.ini = F.ini.filter(function (i) { return ctx.tablas.fila(TI, i); });
+        [].forEach.call(el.querySelectorAll('[data-vista]'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-vista') === F.vista)); });
         var k = filtrosPuestos(), fn = $('en-fil-n');
         fn.textContent = k ? String(k) : ''; fn.hidden = !k;
-        $('en-filtros').title = k ? (k === 1 ? '1 filtro puesto: ' : k + ' filtros puestos: ') + [F.ver !== VER_DEF ? F.ver : '', F.ini ? ((ctx.tablas.fila(TI, F.ini) || {}).NOMBRE || F.ini) : ''].filter(Boolean).join(', ') : 'Sin filtros: ' + VER_DEF.toLowerCase();
+        var verTxt = function (l) { return l.length ? l.join(', ').toLowerCase() : 'todas'; };
+        $('en-filtros').title = k ? (k === 1 ? '1 filtro puesto: ' : k + ' filtros puestos: ') + [mismos(F.ver, VER_DEF) ? '' : verTxt(F.ver),
+          F.ini.map(function (i) { return (ctx.tablas.fila(TI, i) || {}).NOMBRE || i; }).join(', ')].filter(Boolean).join('; ') : 'Sin filtros: ' + verTxt(VER_DEF);
         $('alta-btn').hidden = !iniciativasQueLlevo().length; // T0417: solo quien lleva alguna iniciativa
-        [].forEach.call(el.querySelectorAll('[data-vista]'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-vista') === F.vista)); });
         $('en-vmapa').hidden = !esMapa();
         $('en-lista').hidden = esMapa();
         if (esMapa()) { pintarMapa(); if (sel) pintarDetalle(); }
@@ -1141,9 +1250,9 @@
       }
 
       el.addEventListener('click', function (ev) {
-        var v = ev.target.closest && ev.target.closest('[data-vista]');
-        if (v && el.contains(v)) {
-          if (F.vista !== v.getAttribute('data-vista')) { F.vista = v.getAttribute('data-vista'); guardarLocal(CLAVE + '_f', F); pintar(); }
+        var vi = ev.target.closest && ev.target.closest('[data-vista]');
+        if (vi && el.contains(vi)) {
+          if (F.vista !== vi.getAttribute('data-vista')) { F.vista = vi.getAttribute('data-vista'); guardarLocal(CLAVE + '_f', F); pintar(); }
           return;
         }
         var fi = ev.target.closest && ev.target.closest('[data-ficha]');
@@ -1178,6 +1287,9 @@
         leido = true;
         if (!ctx.abierta()) return;
         pintar();
+        // T0420: la que estaba abierta al irte (?caja=), otra vez abierta, sin mover la pantalla (el marco te deja donde estabas).
+        if (selPedida && !sel && esMapa() && P && P.cajas.some(function (c) { return c.id === selPedida; })) seleccionar(selPedida, true);
+        selPedida = '';
         var pedidaE = new URLSearchParams(location.search).get('e'); // T0417: ?e=E0023 abre su ficha
         if (pedidaE && ctx.tablas.fila(TE, pedidaE)) abrirFicha(pedidaE, true);
       }, function (e) {

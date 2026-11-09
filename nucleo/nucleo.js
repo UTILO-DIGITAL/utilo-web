@@ -101,6 +101,9 @@
       var titulo = C.nombreApp || ini.titulo || ini.negocio || 'Entrar';
       document.title = titulo;
       var ant = leer() || {};
+      // T0391: con Supabase, la web puede entrar también (o solo) con un código al correo.
+      var formas = window.UG.formas ? window.UG.formas() : ['google'];
+      if (formas.indexOf('codigo') >= 0) { entrarConCodigo(ini, titulo, ant, aviso, formas); return; }
       pantalla('<div class="kz-caja" id="n-entrar">' + bandaDev(ini.nucleo.dev) + '<h1>' + texto(titulo) + '</h1>' +
         '<p class="kz-ayuda">' + texto(ant.persona ? 'Vuelve a entrar con tu cuenta de Google, ' + ant.persona.split(' ')[0] + '.' :
           'Entra con la cuenta de Google con la que te han dado acceso.') + '</p>' +
@@ -122,6 +125,102 @@
       };
       b.focus();
     }, function (e) { falloPantalla(e.message); });
+  }
+
+  /**
+   * T0391 · Entrar con un código al correo (y, si la web lo tiene también, con Google): primero el correo y «Enviarme un
+   * código»; después, las 6 cifras y «Entrar». En local y DEV el correo no sale: «Ver el buzón de pruebas» lo enseña aquí.
+   */
+  function entrarConCodigo(ini, titulo, ant, aviso, formas) {
+    var conGoogle = formas.indexOf('google') >= 0, correo = bajo(ant.correo || (window.UG.correo && window.UG.correo()) || '');
+    function listo(r) {
+      window.UG.recordarCorreo(r.correo || '');
+      var c = credDe(r);
+      guardar(c); borrarComo(); marco(c);
+    }
+    function paso1(msg) {
+      pantalla('<div class="kz-caja" id="n-entrar">' + bandaDev(ini.nucleo.dev) + '<h1>' + texto(titulo) + '</h1>' +
+        '<p class="kz-ayuda">' + texto(ant.persona ? 'Hola, ' + ant.persona.split(' ')[0] + '. Te enviamos un código a tu correo para volver a entrar.' :
+          'Escribe tu correo y te enviamos un código para entrar. Sin contraseñas.') + '</p>' +
+        '<form id="n-f-correo" class="kz-form" novalidate><label>Tu correo<input type="email" id="n-correo" autocomplete="email" inputmode="email" ' +
+          'autocapitalize="off" spellcheck="false" value="' + texto(correo) + '" required></label>' +
+        '<button type="submit" class="u-btn u-btn-accion">Enviarme un código</button></form>' +
+        (conGoogle ? '<p class="kz-o">o</p><button type="button" class="u-btn" id="n-google">' + (ant.persona ? 'Continuar con Google' : 'Entrar con Google') + '</button>' : '') +
+        '<p class="kz-aviso" id="n-aviso-entrar" role="alert">' + texto(msg || '') + '</p></div>');
+      var f = $('n-f-correo'), b = f.querySelector('button'), i = $('n-correo');
+      f.onsubmit = function (e) {
+        e.preventDefault();
+        b.disabled = true; b.textContent = 'Enviando…'; $('n-aviso-entrar').textContent = '';
+        window.UG.pedirCodigo(i.value).then(function (c) { correo = c; paso2(''); }, function (x) {
+          b.disabled = false; b.textContent = 'Enviarme un código'; $('n-aviso-entrar').textContent = x.message; i.focus();
+        });
+      };
+      if (conGoogle) {
+        var g = $('n-google');
+        g.onclick = function () {
+          g.disabled = true; g.textContent = 'Entrando…';
+          window.UG.entrar().then(function () { return entrar(); }).then(listo, function (x) {
+            g.disabled = false; g.textContent = ant.persona ? 'Continuar con Google' : 'Entrar con Google';
+            $('n-aviso-entrar').textContent = String(x.message).replace(/^ACCESO:\s*/, '');
+          });
+        };
+      }
+      (i.value ? b : i).focus();
+    }
+    function paso2(msg) {
+      var dev = !!ini.nucleo.dev;
+      pantalla('<div class="kz-caja" id="n-entrar">' + bandaDev(ini.nucleo.dev) + '<h1>' + texto(titulo) + '</h1>' +
+        '<p class="kz-ayuda">Te hemos enviado un código a <strong>' + texto(correo) + '</strong>. Escríbelo aquí: caduca en 10 minutos.</p>' +
+        '<form id="n-f-codigo" class="kz-form" novalidate><label>Código<input type="text" id="n-codigo" class="kz-codigo" inputmode="numeric" ' +
+          'autocomplete="one-time-code" pattern="[0-9]*" maxlength="10" required></label>' +
+        '<button type="submit" class="u-btn u-btn-accion">Entrar</button></form>' +
+        '<p class="kz-aviso" id="n-aviso-entrar" role="alert">' + texto(msg || '') + '</p>' +
+        '<p class="kz-ayuda">¿No te llega? Mira en el correo no deseado. Si tampoco está, puede que ese correo no sea el que diste al apuntarte: pídeselo a quien te dio de alta.</p>' +
+        '<div class="kz-otros"><button type="button" class="u-btn" id="n-otro">Enviarme otro código</button>' +
+        '<button type="button" class="u-btn" id="n-cambiar">Usar otro correo</button></div>' +
+        (dev ? '<button type="button" class="u-btn" id="n-buzon">Ver el buzón de pruebas</button><div id="n-buzon-ver" class="kz-buzon" hidden></div>' : '') +
+        '</div>');
+      var f = $('n-f-codigo'), b = f.querySelector('button'), i = $('n-codigo');
+      // Al pegar el código o al ponerlo el móvil (lo sugiere del correo), entra solo; escrito a mano, con «Entrar». Auth
+      // manda 6 u 8 cifras según el proyecto: no se sabe cuántas faltan.
+      var antes = 0;
+      i.oninput = function () {
+        i.value = i.value.replace(/\D+/g, '').slice(0, 10);
+        var de_golpe = i.value.length - antes >= 6; antes = i.value.length;
+        if (de_golpe && !b.disabled) { if (f.requestSubmit) f.requestSubmit(); else f.onsubmit(new Event('submit')); }
+      };
+      f.onsubmit = function (e) {
+        if (e && e.preventDefault) e.preventDefault();
+        b.disabled = true; b.textContent = 'Entrando…'; $('n-aviso-entrar').textContent = '';
+        window.UG.entrarConCodigo(correo, i.value).then(function () { return entrar(); }).then(listo, function (x) {
+          b.disabled = false; b.textContent = 'Entrar';
+          $('n-aviso-entrar').textContent = String(x.message).replace(/^ACCESO:\s*/, '');
+          i.select(); i.focus();
+        });
+      };
+      $('n-otro').onclick = function () {
+        var o = $('n-otro');
+        o.disabled = true; o.textContent = 'Enviando…';
+        window.UG.pedirCodigo(correo).then(function () {
+          o.textContent = 'Enviado: mira tu correo'; $('n-aviso-entrar').textContent = '';
+          setTimeout(function () { if ($('n-otro')) { o.disabled = false; o.textContent = 'Enviarme otro código'; } }, 30000);
+        }, function (x) { o.disabled = false; o.textContent = 'Enviarme otro código'; $('n-aviso-entrar').textContent = x.message; });
+      };
+      $('n-cambiar').onclick = function () { paso1(''); };
+      if (dev) {
+        $('n-buzon').onclick = function () {
+          var v = $('n-buzon-ver');
+          window.UG.buzon(correo).then(function (ms) {
+            v.hidden = false;
+            v.innerHTML = !ms ? '<p class="u-nota">Aquí no hay buzón de pruebas para ' + texto(correo) + ' (solo los correos de prueba, como los de @ejemplo.com).</p>' :
+              !ms.length ? '<p class="u-nota">No ha llegado nada a ' + texto(correo) + '. Si el correo no está dado de alta, no se envía ningún código.</p>' :
+              '<p class="u-nota">Buzón de pruebas: los correos no salen de verdad.</p><p><strong>' + texto(ms[0].asunto) + '</strong></p><p>' + texto(ms[0].texto).replace(/\n/g, '<br>') + '</p>';
+          });
+        };
+      }
+      i.focus();
+    }
+    paso1(aviso);
   }
 
   /** Falta conectar con la web el Excel de los accesos (permiso «solo los archivos de esta web», T0201). */
@@ -304,6 +403,7 @@
       '<div class="n-perfil-cab"><h2 id="n-perfil-t">Tu perfil</h2><button type="button" class="n-perfil-x" id="n-perfil-cerrar" aria-label="Cerrar" title="Cerrar">' +
       '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' + htmlPerfil() + '</div></div>';
     document.body.appendChild(velo);
+    correosPerfil();
     function cerrar() {
       document.removeEventListener('keydown', tecla, true);
       if (velo.parentNode) velo.parentNode.removeChild(velo);
@@ -426,7 +526,7 @@
    * URL; href, si el enlace lleva algo más para la sección (T0269: ?s=kanban&asignado=…).
    */
   function abrir(id, push, href) {
-    var s = seccion(id) || menu()[0];
+    var s = seccion(id) || menu()[0], antes = actual;
     if (abierta && abierta.def && abierta.def.cerrar) { try { abierta.def.cerrar(); } catch (e) {} }
     abierta = null;
     oyentes[actual] = [];
@@ -437,13 +537,19 @@
     });
     $('n-titulo').textContent = s.titulo;
     document.title = s.titulo + ' · ' + (C.nombreApp || cred.negocio || '');
-    if (push) history.pushState({ s: s.id }, '', href && /^\?s=/.test(href) ? href : '?s=' + s.id.toLowerCase());
+    if (push) {
+      // T0420: cuánto habías bajado donde estabas y de qué sección vienes, para que «atrás» (o «Volver a …» de la ficha de
+      // una tarea abierta desde Para mí o Entregas) te deje donde estabas.
+      try { history.replaceState(Object.assign({}, history.state, { y: bajado() }), ''); } catch (e) {}
+      history.pushState({ s: s.id, desde: antes && antes !== s.id ? antes : '' }, '', href && /^\?s=/.test(href) ? href : '?s=' + s.id.toLowerCase());
+    }
+    var y = (!push && history.state && history.state.y) || 0;
     window.scrollTo(0, 0); document.body.scrollTop = 0;
     // T0292: cada sección recibe un <main> nuevo, sin los oyentes que le pusieron las de antes (si no, un clic en otra
     // sección también lo atendía la anterior, y volver a una le duplicaba los suyos).
     var viejo = $('n-sec'), el = viejo.cloneNode(false);
     viejo.parentNode.replaceChild(el, viejo);
-    if (s.propia) { el.innerHTML = htmlPerfil(); return; }
+    if (s.propia) { el.innerHTML = htmlPerfil(); correosPerfil(); return; }
     var t = setTimeout(function () { if (actual === s.id && !el.childNodes.length) el.innerHTML = '<div class="kz-centro" role="status"><div class="u-carga"></div></div>'; }, 150);
     cargar(s).then(function (def) {
       clearTimeout(t);
@@ -451,10 +557,22 @@
       el.innerHTML = '';
       abierta = { id: s.id, def: def };
       def.abrir(el, ctxDe(s));
+      if (y) alSitio(s.id, y);
     }, function () {
       clearTimeout(t);
       if (actual === s.id) el.innerHTML = '<p>No se ha podido cargar ' + texto(s.titulo) + '.</p><p class="u-nota">Comprueba la conexión y vuelve a abrir la sección.</p>';
     });
+  }
+
+  function bajado() { return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0; }
+  /** T0420 · Vuelve a bajar hasta y en cuanto la sección es lo bastante larga (pinta con lo guardado y luego trae lo último). */
+  function alSitio(id, y) {
+    var n = 0;
+    (function paso() {
+      if (actual !== id) return;
+      window.scrollTo(0, y);
+      if (Math.abs(bajado() - y) > 2 && ++n < 25) setTimeout(paso, 80);
+    })();
   }
 
   /** El JS de una sección, una vez. */
@@ -486,6 +604,7 @@
    * - personaId (T0387, solo con Supabase; si no, ''): el id de quien ha entrado, el de las columnas persona (ASIGNADO…).
    * - roles (T0417, solo con Supabase; si no, []): sus roles, [{ rol, ambito, ambito_id }], para no ofrecer lo que la base no le
    *   deja (en qué iniciativas es responsable). La que manda sigue siendo la base.
+   * - desde y volver() (T0420): la sección de la que se viene con un enlace ({ id, titulo } o null) y volver a ella como estaba.
    */
   function ctxDe(s) {
     return {
@@ -497,6 +616,9 @@
       autor: cred.como ? cred.como.persona + ' como ' + cred.persona : cred.persona,
       personaId: cred.persona_id || '', // T0387
       roles: cred.roles || [], // T0417
+      // T0420: la sección de la que vienes ({ id, titulo }, o null si se ha entrado directo) y volver a ella como estaba.
+      desde: (function () { var d = history.state && history.state.desde, x = d && seccion(d); return x ? { id: x.id, titulo: x.titulo } : null; })(),
+      volver: function () { history.back(); },
       correo: cred.correo || '', secciones: todas().map(function (x) { return x.enPerfil ? { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true } : { id: x.id, titulo: x.titulo }; }),
       tablas: tablas(),
       alCambiar: function (f) { (oyentes[s.id] = oyentes[s.id] || []).push(f); },
@@ -530,10 +652,95 @@
       (cred.como ? '<button type="button" class="u-btn" data-n-volver>Volver a mi cuenta</button>' :
         '<div class="n-botones">' + (cred.admin && !window.UG.sinComo ? '<button type="button" class="u-btn" data-n-como>Entrar como otra persona</button>' : '') +
         '<a class="u-btn" href="?salir">Cerrar sesión</a></div>' +
-        '<p class="u-nota">Al cerrar la sesión tendrás que volver a entrar con tu cuenta de Google.</p>') +
+        '<p class="u-nota">' + (conCodigo() ? 'Al cerrar la sesión tendrás que volver a entrar con un código a tu correo.' :
+          'Al cerrar la sesión tendrás que volver a entrar con tu cuenta de Google.') + '</p>') +
+      (window.UG.correos && !cred.como ? '<div class="n-correos" id="n-correos"></div>' : '') +
       (dentro.length ? '<div class="n-botones">' + dentro.map(function (s) {
         return '<a class="u-btn" href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '">' + texto(s.titulo) + '</a>';
       }).join('') + '</div>' : '') + '</div>' + htmlVersion();
+  }
+
+  function conCodigo() { return !!(window.UG.formas && window.UG.formas().indexOf('codigo') >= 0); }
+
+  /**
+   * T0391 · «Tus correos» en el Perfil del marco (con Supabase): con cualquiera de ellos entras en tu misma cuenta. Añadir
+   * uno manda un código a ese correo, que se escribe aquí mismo; hasta entonces sale «por confirmar». El principal no se
+   * quita. Lo pinta en #n-correos cuando contesta la base.
+   */
+  function correosPerfil() {
+    var caja = $('n-correos'), C2 = window.UG.correos;
+    if (!caja || !C2) return;
+    var aviso2 = '', pidiendo = '';
+    function pintar(lista) {
+      if (!document.body.contains(caja)) return;
+      lista = lista || [];
+      var pend = lista.filter(function (x) { return x.pendiente; });
+      caja.innerHTML = '<h3>Tus correos</h3><p class="u-nota">Puedes entrar con cualquiera de ellos: siempre es tu misma cuenta.</p>' +
+        '<ul class="n-correos-lista">' + lista.map(function (x) {
+          return '<li><span>' + texto(x.correo) + '</span><span class="u-nota">' + (x.principal ? 'principal' : x.pendiente ? 'por confirmar' : '') + '</span>' +
+            (x.principal ? '' : '<button type="button" class="u-btn" data-n-quitar="' + texto(x.correo) + '">Quitar</button>') + '</li>';
+        }).join('') + '</ul>' +
+        pend.map(function (x) {
+          return '<form class="kz-form n-correo-codigo" data-n-confirmar="' + texto(x.correo) + '"><label>Código que ha llegado a ' + texto(x.correo) +
+            '<input type="text" class="kz-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="10"></label>' +
+            '<div class="n-botones"><button type="submit" class="u-btn u-btn-accion">Confirmar</button>' +
+            '<button type="button" class="u-btn" data-n-reenviar="' + texto(x.correo) + '">Enviar otro código</button>' +
+            (window.UG.entorno !== 'prod' && window.UG.buzon ? '<button type="button" class="u-btn" data-n-buzon="' + texto(x.correo) + '">Ver el buzón de pruebas</button>' : '') +
+            '</div></form>';
+        }).join('') +
+        '<form class="kz-form" id="n-correo-nuevo" novalidate><label>Añadir otro correo<input type="email" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false" value="' + texto(pidiendo) + '"></label>' +
+        '<button type="submit" class="u-btn">Enviarme un código</button></form>' +
+        '<p class="kz-aviso" role="status">' + texto(aviso2) + '</p>';
+      var nuevo = $('n-correo-nuevo');
+      nuevo.onsubmit = function (e) {
+        e.preventDefault();
+        var i = nuevo.querySelector('input'), b = nuevo.querySelector('button');
+        pidiendo = i.value; b.disabled = true; b.textContent = 'Enviando…';
+        C2.anadir(i.value).then(function (r) { pidiendo = ''; aviso2 = 'Te hemos enviado un código a ' + r.correo + ': escríbelo aquí arriba.'; cargar(); },
+          function (x) { b.disabled = false; b.textContent = 'Enviarme un código'; aviso2 = String(x.message).replace(/^\w+:\s*/, ''); pintar(lista); });
+      };
+      Array.prototype.forEach.call(caja.querySelectorAll('[data-n-confirmar]'), function (f) {
+        f.onsubmit = function (e) {
+          e.preventDefault();
+          var b = f.querySelector('button[type=submit]');
+          b.disabled = true;
+          C2.confirmar(f.getAttribute('data-n-confirmar'), f.querySelector('input').value).then(function (r) {
+            aviso2 = r && r.ok ? 'Listo: ya puedes entrar también con ' + r.correo + '.' : (r && r.error) || 'No se ha podido confirmar.';
+            cargar();
+          }, function (x) { b.disabled = false; aviso2 = String(x.message).replace(/^\w+:\s*/, ''); pintar(lista); });
+        };
+      });
+      Array.prototype.forEach.call(caja.querySelectorAll('[data-n-reenviar]'), function (b) {
+        b.onclick = function () {
+          b.disabled = true;
+          C2.anadir(b.getAttribute('data-n-reenviar')).then(function (r) { aviso2 = 'Te hemos enviado otro código a ' + r.correo + '.'; cargar(); },
+            function (x) { b.disabled = false; aviso2 = String(x.message).replace(/^\w+:\s*/, ''); pintar(lista); });
+        };
+      });
+      // Local y DEV: el código del buzón de pruebas, como en la pantalla de entrar.
+      Array.prototype.forEach.call(caja.querySelectorAll('[data-n-buzon]'), function (b) {
+        b.onclick = function () {
+          window.UG.buzon(b.getAttribute('data-n-buzon')).then(function (ms) {
+            aviso2 = !ms ? 'Aquí no hay buzón de pruebas para ese correo.' : !ms.length ? 'No ha llegado nada a ese correo.' : 'Buzón de pruebas: ' + ms[0].asunto;
+            pintar(lista);
+          });
+        };
+      });
+      Array.prototype.forEach.call(caja.querySelectorAll('[data-n-quitar]'), function (b) {
+        b.onclick = function () {
+          var c = b.getAttribute('data-n-quitar');
+          if (b.getAttribute('data-seguro') !== '1') { b.setAttribute('data-seguro', '1'); b.textContent = '¿Seguro? Quitar'; return; }
+          b.disabled = true;
+          C2.quitar(c).then(function () { aviso2 = 'Quitado: con ' + c + ' ya no se entra en tu cuenta.'; cargar(); },
+            function (x) { b.disabled = false; aviso2 = String(x.message).replace(/^\w+:\s*/, ''); pintar(lista); });
+        };
+      });
+    }
+    function cargar() {
+      C2.mios().then(pintar, function (x) { if (document.body.contains(caja)) caja.innerHTML = '<h3>Tus correos</h3><p class="kz-aviso">' + texto(String(x.message).replace(/^\w+:\s*/, '')) + '</p>'; });
+    }
+    caja.innerHTML = '<h3>Tus correos</h3><p class="u-nota">Cargando…</p>';
+    cargar();
   }
 
   /** Comprueba con el motor quién eres y qué ves; si ha cambiado, vuelve a pintar el marco. */
@@ -573,6 +780,7 @@
     if (a.getAttribute('data-sx') === 'PERFIL' && sinPerfil() && (seccion('PERFIL') || {}).propia) { verPerfil(); return; }
     abrir(a.getAttribute('data-sx'), true, a.getAttribute('href'));
   });
+  try { history.scrollRestoration = 'manual'; } catch (e) {} // T0420: dónde estabas lo pone abrir() (alSitio)
   window.addEventListener('popstate', function () { if (cred) abrir(pedida() || menu()[0].id, false); });
 
   /* ---------- arranque ---------- */

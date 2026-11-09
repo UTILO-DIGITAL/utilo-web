@@ -1,6 +1,14 @@
 {
-  "version": "5.13-1.8",
+  "version": "5.14-1.9",
   "versiones": [
+    {
+      "v": "5.14-1.9",
+      "fecha": "09/11/2026",
+      "novedades": [
+        "La ficha de una tarea se lee de un vistazo, la épica se elige de una lista y, al abrir una tarea desde Para mí o Entregas, «Volver» te deja donde estabas.",
+        "En Tareas y Entregas los filtros están en el mismo sitio, se pueden elegir varias opciones a la vez y, si hay muchas, se buscan."
+      ]
+    },
     {
       "v": "5.13-1.8",
       "fecha": "08/11/2026",
