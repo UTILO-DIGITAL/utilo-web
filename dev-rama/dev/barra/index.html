@@ -50,6 +50,16 @@
     html.v-lvh, html.v-lvh > body.u.u-con-barra { height: 100lvh; }
     html.v-lvh .sx.u-sx { bottom: calc(100dvh - 100lvh); }
   }
+  /* flujo: nada fijo. La pantalla entera (100lvh) es una columna: arriba se desplaza #sx-panel y debajo va la barra, como un
+     trozo más de la página. Lo de fuera de la ventana corta de iOS se pinta si es contenido normal, no si es fijo. */
+  @media (max-width: 899px) {
+    html.v-flujo, html.v-flujo > body.u.u-con-barra { height: 100dvh; overflow: hidden; }
+    html.v-flujo > body.u.u-con-barra { display: flex; flex-direction: column; padding-bottom: 0 !important; min-height: 0; }
+    html.v-flujo #sx-panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
+    html.v-flujo .sx.u-sx { position: static; order: 2; flex: none; }
+  }
+  /* Instalada, la pantalla entera: iOS da una ventana más corta (100dvh) que la pantalla (100lvh). */
+  @media (max-width: 899px) and (display-mode: standalone) { html.v-flujo, html.v-flujo > body.u.u-con-barra { height: 100lvh; } }
   .bt-v { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
   .bt-v a { padding: 8px 10px; border: 1px solid var(--color-linea); border-radius: 8px; text-decoration: none; }
   .bt-v a.si { background: var(--color-principal-oscuro); color: #fff; }
@@ -75,7 +85,7 @@
   var q = new URLSearchParams(location.search), v = q.get('v') || 'actual', c = q.get('c') || 'corto';
   document.documentElement.className = 'v-' + v;
   var b = [];
-  ['actual', 'lvh', 'columna', 'dvh'].forEach(function (x) { ['corto', 'largo'].forEach(function (y) {
+  ['actual', 'flujo', 'lvh', 'columna', 'dvh'].forEach(function (x) { ['corto', 'largo'].forEach(function (y) {
     b.push('<a class="' + (x === v && y === c ? 'si' : '') + '" href="?v=' + x + '&c=' + y + '">' + x + ' · ' + y + '</a>'); }); });
   document.getElementById('vs').innerHTML = b.join('');
   if (c === 'largo') document.getElementById('relleno').innerHTML = Array.apply(null, Array(40)).map(function (_, i) { return '<p>Fila de relleno ' + (i + 1) + '</p>'; }).join('');
@@ -93,7 +103,7 @@
   addEventListener('load', medir); addEventListener('resize', medir); setTimeout(medir, 500);
   // Instalada y abierta desde la pantalla de inicio (sin ?v=), o con ?ciclo=: pasa sola por las seis, 6 s cada una, y vuelve a empezar.
   var orden = ['lvh|corto', 'lvh|largo', 'actual|corto'];
-  if (!q.has('v') && navigator.standalone && !q.has('ciclo')) { location.replace('?v=lvh&c=largo'); return; }
+  if (!q.has('v') && navigator.standalone && !q.has('ciclo')) { location.replace('?v=flujo&c=corto'); return; }
   if (q.has('ciclo')) {
     var i = (Number(q.get('ciclo')) || 0) % orden.length, x = orden[i].split('|');
     if (!q.has('v')) { location.replace('?v=' + x[0] + '&c=' + x[1] + '&ciclo=' + i); return; }
