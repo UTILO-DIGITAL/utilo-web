@@ -1000,7 +1000,7 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
 .u .bjp-res b { color: var(--color-texto); }
 .u .bjp-t { cursor: default; grid-template-columns: minmax(0, 1fr); }
 /* T0427 · Las etiquetas de arriba saltan de línea: sin esto, «El cliente ha escrito» ensanchaba la tarjeta y la página (467 px en
-   una pantalla de 390), y el iPhone instalado descolocaba la barra de abajo. */
+   una pantalla de 390). */
 .u .bjp-t .pm-top { flex-wrap: wrap; row-gap: var(--e1); min-width: 0; }
 .u .bjp-t .u-chip { white-space: normal; }
 .u .bjp-c, .u .bjp-l { min-width: 0; max-width: 100%; }

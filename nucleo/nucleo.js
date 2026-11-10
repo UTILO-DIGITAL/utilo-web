@@ -248,8 +248,7 @@
 
   /** En DEV, la banda «DEV · rama · commit · modo» (la misma que DEV.gs del motor: colores fijos, solo en DEV). */
   function bandaDev(t) {
-    // T0424: debajo de la hora del iPhone (con black-translucent la página llega hasta arriba; fuera, mide 0).
-    return t ? '<div role="status" style="position:sticky;top:env(safe-area-inset-top,0px);margin-top:env(safe-area-inset-top,0px);z-index:99999;padding:6px 12px;font:600 13px/1.35 system-ui,sans-serif;text-align:center;' +
+    return t ? '<div role="status" style="position:sticky;top:0;z-index:99999;padding:6px 12px;font:600 13px/1.35 system-ui,sans-serif;text-align:center;' +
       'color:#1C1C1C;background:#FFE08A;border-bottom:2px solid #B88A00;overflow-wrap:anywhere">' + texto(t) + '</div>' : '';
   }
 
