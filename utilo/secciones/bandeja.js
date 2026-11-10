@@ -3,7 +3,10 @@
  *
  * Lo que piden los clientes desde Pedir a Utilo (vista BANDEJA: la tabla SOLICITUDES con su tarea, lo que ve el cliente y si
  * quien mira puede decidir). Sustituye a la Bandeja del kanban 4.x, que queda de solo lectura (decidido por Javi).
- * - Arriba, buscar y «Filtros» (la hoja de siempre: Ver y Cliente). Por defecto, las Nuevas.
+ * - Arriba, buscar y «Filtros» (la hoja de siempre: Ver y Cliente). Por defecto, lo que está por atender (T0427: las Nuevas y
+ *   las que tienen algo del cliente sin ver).
+ * - T0427 · Debajo de cada una, su conversación con el cliente (MENSAJES): lo que añade o contesta, cómo la cambia o la retira,
+ *   las respuestas de Utilo, el descarte y la reapertura. «Visto» quita el aviso sin contestar; «Reabrir», en una Descartada.
  * - Las Nuevas, primero: las urgentes delante y, entre ellas, lo más antiguo arriba (lo que lleva más tiempo esperando). Lo
  *   demás, de lo último decidido a lo más antiguo.
  * - Cada solicitud, con las palabras del cliente: quién la pide, de qué cliente, cuándo, qué es, si es urgente y su captura.
@@ -18,9 +21,9 @@
  */
 (function () {
   'use strict';
-  var T = 'BANDEJA', TI = 'INICIATIVAS';
-  var VER = ['Nuevas', 'Con tarea', 'Respondidas', 'Descartadas'];
-  var VER_DEF = ['Nuevas'];
+  var T = 'BANDEJA', TI = 'INICIATIVAS', TM = 'MENSAJES';
+  var VER = ['Por atender', 'Con tarea', 'Respondidas', 'Descartadas', 'Retiradas'];
+  var VER_DEF = ['Por atender'];
   var TITULO_MAX = 50;
   var HERRAMIENTAS = ['Chat', 'Cowork', 'Claude Code'];
 
@@ -104,8 +107,10 @@
   function ms(s) { var t = s ? Date.parse(s) : NaN; return isNaN(t) ? 0 : t; }
 
   /** En qué grupo de «Ver» está una solicitud. */
+  function porAtender(s) { return !!s && (s.ESTADO === 'Nueva' || !!s.PENDIENTE || !!s.POR_ATENDER); }
   function grupo(s) {
-    return s.ESTADO === 'Nueva' ? 'Nuevas' : s.ESTADO === 'Convertida en tarea' ? 'Con tarea' : s.ESTADO === 'Respondida' ? 'Respondidas' : 'Descartadas';
+    return porAtender(s) ? 'Por atender' : s.ESTADO === 'Convertida en tarea' ? 'Con tarea' : s.ESTADO === 'Respondida' ? 'Respondidas' :
+      s.ESTADO === 'Retirada' ? 'Retiradas' : 'Descartadas';
   }
 
   /** ¿Sale con estos filtros? F: { ver: [], ini: [], busca } (ver vacío: todas). */
@@ -119,28 +124,46 @@
     return q.split(/\s+/).every(function (p) { return en.indexOf(p) >= 0; });
   }
 
-  /** El orden: las Nuevas primero (urgentes delante y, a igualdad, la más antigua arriba); lo demás, lo último decidido arriba. */
+  /** El orden: lo que está por atender primero (urgentes delante y, a igualdad, lo más antiguo arriba); lo demás, lo último
+   *  decidido arriba. */
   function ordenar(filas) {
     return (filas || []).slice().sort(function (a, b) {
-      var na = a.ESTADO === 'Nueva', nb = b.ESTADO === 'Nueva';
+      var na = porAtender(a), nb = porAtender(b);
       if (na !== nb) return na ? -1 : 1;
       if (na) return ((b.URGENTE ? 1 : 0) - (a.URGENTE ? 1 : 0)) || (ms(a.FECHA) - ms(b.FECHA)) || String(a.ID).localeCompare(String(b.ID));
       return (ms(b.FECHA_DECISION || b.FECHA) - ms(a.FECHA_DECISION || a.FECHA)) || String(b.ID).localeCompare(String(a.ID));
     });
   }
 
-  /** Lo que se puede hacer con ella: crear la tarea, responder, descartar (si quien mira puede decidir). */
+  /** Lo que se puede hacer con ella (si quien mira puede decidir): crear la tarea, responder (las veces que haga falta),
+   *  descartar una Nueva, «Visto» si el cliente ha escrito y reabrir una Descartada (T0427). */
   function acciones(s) {
-    if (!s || !s.PUEDO_DECIDIR || s.ESTADO === 'Descartada') return [];
+    if (!s || !s.PUEDO_DECIDIR) return [];
     var a = [];
-    if (!s.TAREA) a.push('tarea');
-    if (!String(s.RESPUESTA || '').trim()) a.push('responder');
+    if (s.PENDIENTE) a.push('visto');
+    if (s.ESTADO === 'Descartada') { a.push('reabrir'); return a; }
+    if (!s.TAREA && s.ESTADO !== 'Retirada') a.push('tarea');
+    a.push('responder');
     if (s.ESTADO === 'Nueva') a.push('descartar');
     return a;
   }
 
-  /** Las Nuevas que puede atender quien mira (las del menú y las de Para mí). */
-  function pendientes(filas) { return (filas || []).filter(function (s) { return s.ESTADO === 'Nueva' && s.PUEDO_DECIDIR; }); }
+  /** Las que puede atender quien mira y están por atender (las del menú y las de Para mí). */
+  function pendientes(filas) { return (filas || []).filter(function (s) { return porAtender(s) && s.PUEDO_DECIDIR; }); }
+
+  /** T0427 · Cómo se lee cada mensaje de la conversación en la Bandeja. */
+  function lineaMensaje(m) {
+    var q = m.QUIEN || '';
+    switch (m.TIPO) {
+      case 'Añadido': return q + ' (cliente) añade';
+      case 'Respuesta': return q + ' responde';
+      case 'Cambio': return q + ' (cliente) cambia lo que pedía. Antes';
+      case 'Retirada': return q + ' (cliente) la retira';
+      case 'Descartada': return q + ' la descarta';
+      case 'Reabierta': return q + ' la reabre';
+      default: return q;
+    }
+  }
 
   /** El título que se propone: su primera frase, hasta 50 caracteres, sin punto final (como gestion.titulo_de de la base). */
   function tituloDe(t) {
@@ -152,9 +175,10 @@
   function infinitivo(t) { return /^[A-ZÁÉÍÓÚÑ][a-záéíóúñü]+(ar|er|ir|ír)(se|lo|la|los|las|le|les)?([^a-záéíóúñü]|$)/.test(String(t || '')); }
 
   /** La frase de lo que ve el cliente, en sus palabras. */
-  var VE = { 'Recibida': 'la ve Recibida', 'En marcha': 'la ve En marcha', 'Hecha': 'la ve Hecha', 'Respondida': 've la respuesta', 'No la haremos': 've «No la haremos» y el motivo' };
+  var VE = { 'Recibida': 'la ve Recibida', 'En marcha': 'la ve En marcha', 'Hecha': 'la ve Hecha', 'Respondida': 've la respuesta', 'No la haremos': 've «No la haremos» y el motivo',
+    'Retirada': 'la ve Retirada' };
 
-  var CALC = { grupo: grupo, seVe: seVe, ordenar: ordenar, acciones: acciones, pendientes: pendientes, tituloDe: tituloDe, infinitivo: infinitivo,
+  var CALC = { grupo: grupo, seVe: seVe, ordenar: ordenar, acciones: acciones, pendientes: pendientes, tituloDe: tituloDe, infinitivo: infinitivo, lineaMensaje: lineaMensaje,
     grupoHoja: grupoHoja, lista: lista, elegirEn: elegirEn, VER: VER };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
@@ -225,15 +249,22 @@
       function nombre(id) { return id ? GENTE[id] || '' : ''; }
       function cliente(id) { var i = ctx.tablas.fila(TI, id); return (i && i.NOMBRE) || id; }
       function solicitudes() { return ctx.tablas.filas(T); }
+      /** T0427 · La conversación de una solicitud, en orden. */
+      function mensajes(id) {
+        return ctx.tablas.filas(TM).filter(function (m) { return m.SOLICITUD === id; })
+          .sort(function (a, b) { return (ms(a.FECHA) - ms(b.FECHA)) || String(a.ID).localeCompare(String(b.ID)); });
+      }
 
       /* ---------- una solicitud ---------- */
 
       function tarjeta(s, ahora) {
         var acc = acciones(s), id = s.ID;
-        var cls = s.ESTADO === 'Nueva' ? (s.URGENTE ? 's-bl' : 's-pr') : s.ESTADO === 'Descartada' ? 's-ni' : s.TAREA ? 's-ec' : 's-co';
+        var cls = porAtender(s) ? (s.URGENTE ? 's-bl' : 's-pr') : s.ESTADO === 'Descartada' || s.ESTADO === 'Retirada' ? 's-ni' : s.TAREA ? 's-ec' : 's-co';
         var h = '<li class="pm-c bjp-c ' + cls + (id === pedida ? ' bjp-pedida' : '') + '" id="bjp-' + texto(id) + '"><div class="pm-t bjp-t">' +
           '<span class="pm-top"><span class="pm-id">' + texto(id) + '</span>' + '<span class="pm-ini">' + texto(cliente(s.INICIATIVA)) + '</span>' +
-            (s.URGENTE ? '<span class="u-chip bjp-urg">Urgente</span>' : '') + '<span class="u-chip">' + texto(s.TIPO) + '</span></span>' +
+            (s.URGENTE ? '<span class="u-chip bjp-urg">Urgente</span>' : '') + '<span class="u-chip">' + texto(s.TIPO) + '</span>' +
+            (s.PENDIENTE ? '<span class="u-chip bjp-esc">' + (s.ESTADO === 'Retirada' ? 'La ha retirado' : 'El cliente ha escrito') + '</span>' :
+              s.ESTADO === 'Retirada' ? '<span class="u-chip">Retirada por el cliente</span>' : '') + '</span>' +
           '<span class="pm-meta"><span><b>' + texto(s.PERSONA) + '</b></span><span>' + texto(hace(s.FECHA, ahora)) + '</span>' +
             (s.VERSION ? '<span title="Versión de su web">v' + texto(String(s.VERSION).replace(/^v/i, '')) + '</span>' : '') + '</span>' +
           '<p class="bjp-texto">' + texto(s.TEXTO) + '</p>' +
@@ -242,23 +273,36 @@
         var hecho = [];
         if (s.TAREA) hecho.push('<a class="bjp-tarea" href="?s=tablero&amp;t=' + encodeURIComponent(s.TAREA) + '" data-sx="TABLERO"><b>' + texto(s.TAREA) + '</b> ' +
           texto(s.TAREA_TITULO || '') + (s.TAREA_ESTADO ? ' <span class="bjp-est">' + texto(s.TAREA_ESTADO) + '</span>' : '') + '</a>');
-        if (String(s.RESPUESTA || '').trim()) hecho.push('<p class="bjp-resp"><span>' + (s.ESTADO === 'Descartada' ? 'Descartada' : 'Respondida') +
+        // T0427 · La conversación; las de antes, sin ella, con su respuesta como entonces.
+        var ms = mensajes(id);
+        if (ms.length) hecho.push('<ol class="bjp-conv">' + ms.map(function (m) {
+          var ok = m.ENLACE && /^https:\/\//.test(m.ENLACE);
+          return '<li class="bjp-m' + (m.DE === 'Cliente' ? ' bjp-m-cli' : '') + (m.INTERNO ? ' bjp-m-int' : '') + '"><span class="bjp-mq">' + texto(lineaMensaje(m)) +
+            ' <small>' + texto(hace(m.FECHA, ahora)) + (m.INTERNO ? ' · no lo ve el cliente' : '') + '</small></span>' +
+            (m.TEXTO ? ' «' + texto(m.TEXTO) + '»' : '') + (ok ? ' <a href="' + texto(m.ENLACE) + '" target="_blank" rel="noopener">Ver la captura</a>' : '') + '</li>';
+        }).join('') + '</ol>');
+        else if (String(s.RESPUESTA || '').trim()) hecho.push('<p class="bjp-resp"><span>' + (s.ESTADO === 'Descartada' ? 'Descartada' : 'Respondida') +
           (s.DECIDIDO_POR && nombre(s.DECIDIDO_POR) ? ' por ' + texto(nombre(s.DECIDIDO_POR)) : '') + ':</span> «' + texto(s.RESPUESTA) + '»</p>');
         if (s.ESTADO !== 'Nueva') hecho.push('<p class="bjp-ve">El cliente ' + texto(VE[s.ESTADO_CLIENTE] || 'la ve ' + (s.ESTADO_CLIENTE || '')) + '.</p>');
         else hecho.push('<p class="bjp-ve">' + (s.PUEDO_DECIDIR ? 'Nadie la ha atendido todavía: el cliente la ve Recibida.' : 'La atiende quien encarga tareas en ' + texto(cliente(s.INICIATIVA)) + '.') + '</p>');
         h += '<div class="bjp-hecho">' + hecho.join('') + '</div></div>';
         // Responder o descartar: la caja, debajo; si no, los botones.
         if (abierto.id === id && acc.indexOf(abierto.que) >= 0) {
-          var desc = abierto.que === 'descartar', k = id + ':' + abierto.que;
-          h += '<form class="pm-resp bjp-form" data-enviar="' + texto(abierto.que) + '" data-id="' + texto(id) + '">' +
-            '<label class="u-oculto" for="bjp-r-' + texto(id) + '">' + (desc ? 'Por qué no se hará' : 'Tu respuesta') + '</label>' +
-            '<textarea id="bjp-r-' + texto(id) + '" rows="3" placeholder="' + (desc ? 'Por qué no la haremos (lo verá el cliente)…' : 'Tu respuesta (la verá el cliente)…') + '"' + (enviando[id] ? ' disabled' : '') + '>' + texto(borrador[k] || '') + '</textarea>' +
+          var q = abierto.que, k = id + ':' + q;
+          var TXT = { descartar: ['Por qué no se hará', 'Por qué no la haremos (lo verá el cliente)…', 'Descartar'],
+            reabrir: ['Por qué se reabre', 'Por qué la reabrimos (no lo ve el cliente)…', 'Reabrir'],
+            responder: ['Tu respuesta', 'Tu respuesta (la verá el cliente)…', 'Responder'] }[q];
+          h += '<form class="pm-resp bjp-form" data-enviar="' + texto(q) + '" data-id="' + texto(id) + '">' +
+            '<label class="u-oculto" for="bjp-r-' + texto(id) + '">' + TXT[0] + '</label>' +
+            '<textarea id="bjp-r-' + texto(id) + '" rows="3" placeholder="' + TXT[1] + '"' + (enviando[id] ? ' disabled' : '') + '>' + texto(borrador[k] || '') + '</textarea>' +
             '<div class="bjp-bs"><button type="button" class="u-btn u-btn-texto" data-cerrar>Cancelar</button>' +
-            '<button class="u-btn" type="submit"' + (enviando[id] ? ' disabled' : '') + '>' + (enviando[id] ? 'Enviando…' : desc ? 'Descartar' : 'Responder') + '</button></div></form>';
+            '<button class="u-btn" type="submit"' + (enviando[id] ? ' disabled' : '') + '>' + (enviando[id] ? 'Enviando…' : TXT[2]) + '</button></div></form>';
         } else if (acc.length) {
           h += '<div class="pm-acc bjp-acc">' +
             (acc.indexOf('tarea') >= 0 ? '<button type="button" class="u-btn" data-hacer="tarea" data-id="' + texto(id) + '"' + (enviando[id] ? ' disabled' : '') + '>Crear la tarea</button>' : '') +
             (acc.indexOf('responder') >= 0 ? '<button type="button" class="u-btn" data-hacer="responder" data-id="' + texto(id) + '">Responder</button>' : '') +
+            (acc.indexOf('reabrir') >= 0 ? '<button type="button" class="u-btn" data-hacer="reabrir" data-id="' + texto(id) + '">Reabrir</button>' : '') +
+            (acc.indexOf('visto') >= 0 ? '<button type="button" class="u-btn u-btn-texto" data-hacer="visto" data-id="' + texto(id) + '"' + (enviando[id] ? ' disabled' : '') + '>Visto</button>' : '') +
             (acc.indexOf('descartar') >= 0 ? '<button type="button" class="u-btn u-btn-texto" data-hacer="descartar" data-id="' + texto(id) + '">Descartar</button>' : '') + '</div>';
         }
         return h + '</li>';
@@ -283,12 +327,12 @@
         var ves = ordenar(fs.filter(function (s) { return seVe(s, F) || (recientes[s.ID] && seVe(s, { ver: [], ini: F.ini, busca: F.busca })); }));
         var nuevas = pendientes(fs), urg = nuevas.filter(function (s) { return s.URGENTE; }).length;
         $('bjp-res').innerHTML = nuevas.length
-          ? '<b>' + (nuevas.length === 1 ? '1 nueva' : nuevas.length + ' nuevas') + '</b> por atender' + (urg ? ' · <span class="pm-mal">' + (urg === 1 ? '1 urgente' : urg + ' urgentes') + '</span>' : '')
+          ? '<b>' + nuevas.length + '</b> por atender' + (urg ? ' · <span class="pm-mal">' + (urg === 1 ? '1 urgente' : urg + ' urgentes') + '</span>' : '')
           : 'Nada nuevo por atender.';
         var h;
         if (ves.length) h = '<ul class="pm-l bjp-l">' + ves.map(function (s) { return tarjeta(s, ahora); }).join('') + '</ul>';
         else if (!fs.length) h = '<div class="pm-libre">' + ICO_BIEN + '<p><b>La Bandeja está vacía.</b> Lo que pidan los clientes desde Pedir a Utilo llegará aquí.</p></div>';
-        else if (mismos(F.ver, VER_DEF) && !F.ini.length && !F.busca) h = '<div class="pm-libre">' + ICO_BIEN + '<p><b>Todo atendido.</b> No hay ninguna solicitud nueva.</p>' +
+        else if (mismos(F.ver, VER_DEF) && !F.ini.length && !F.busca) h = '<div class="pm-libre">' + ICO_BIEN + '<p><b>Todo atendido.</b> Nada nuevo de los clientes.</p>' +
           '<button type="button" class="u-btn u-btn-texto" data-ver-todas>Ver todas</button></div>';
         else h = '<p class="pm-vacio">Ninguna solicitud con estos filtros.</p><button type="button" class="u-btn u-btn-texto" data-quitar>Quitar filtros</button>';
         // Repintar no quita lo que se estaba escribiendo: vuelve el foco a la misma caja, al final.
@@ -318,6 +362,14 @@
         if (!b) return;
         var id = b.getAttribute('data-id'), que = b.getAttribute('data-hacer');
         if (que === 'tarea') { abrirTarea(id); return; }
+        if (que === 'visto') {
+          if (enviando[id]) return;
+          enviando[id] = true; pintar();
+          ctx.llamar('marcar_visto', [{ solicitud: id }]).then(function () { recientes[id] = 1; return ctx.tablas.refrescar([T], true); },
+            function (er) { if (ctx.abierta()) ctx.aviso('No se ha guardado: ' + String(er.message).replace(/^\w+:\s*/, '')); })
+            .then(function () { delete enviando[id]; if (ctx.abierta()) pintar(); }, function () { delete enviando[id]; if (ctx.abierta()) pintar(); });
+          return;
+        }
         abierto = { id: id, que: que }; pintar();
         var t = cont.querySelector('#bjp-r-' + id); if (t) t.focus();
       });
@@ -330,14 +382,15 @@
         if (!f) return;
         e.preventDefault();
         var id = f.getAttribute('data-id'), que = f.getAttribute('data-enviar'), a = f.querySelector('textarea'), txt = a ? a.value.trim() : '';
-        if (!txt) { if (a) a.focus(); ctx.aviso(que === 'descartar' ? 'Escribe el motivo: lo verá el cliente.' : 'Escribe la respuesta antes de enviarla.'); return; }
+        if (!txt) { if (a) a.focus(); ctx.aviso(que === 'descartar' ? 'Escribe el motivo: lo verá el cliente.' : que === 'reabrir' ? 'Escribe por qué se reabre.' : 'Escribe la respuesta antes de enviarla.'); return; }
         if (enviando[id]) return;
         enviando[id] = true; pintar();
-        var p = que === 'descartar' ? ctx.llamar('descartar_solicitud', [{ solicitud: id, motivo: txt }]) : ctx.llamar('responder_solicitud', [{ solicitud: id, texto: txt }]);
+        var p = que === 'descartar' ? ctx.llamar('descartar_solicitud', [{ solicitud: id, motivo: txt }]) :
+          que === 'reabrir' ? ctx.llamar('reabrir_solicitud', [{ solicitud: id, motivo: txt }]) : ctx.llamar('responder_solicitud', [{ solicitud: id, texto: txt }]);
         p.then(function () {
           delete borrador[id + ':' + que]; abierto = { id: '', que: '' }; recientes[id] = 1;
-          if (ctx.abierta()) ctx.aviso(que === 'descartar' ? id + ' descartada: el cliente verá el motivo.' : 'Respondida: el cliente ya ve tu respuesta a ' + id + '.');
-          return ctx.tablas.refrescar([T], true);
+          if (ctx.abierta()) ctx.aviso(que === 'descartar' ? id + ' descartada: el cliente verá el motivo.' : que === 'reabrir' ? id + ' vuelve a estar por atender: el cliente la ve Recibida.' : 'Respondida: el cliente ya ve tu respuesta a ' + id + '.');
+          return ctx.tablas.refrescar([T, TM], true);
         }, function (er) {
           if (ctx.abierta()) ctx.aviso('No se ha guardado: ' + String(er.message).replace(/^\w+:\s*/, ''));
         }).then(function () { delete enviando[id]; if (ctx.abierta()) pintar(); }, function () { delete enviando[id]; if (ctx.abierta()) pintar(); });
@@ -447,9 +500,9 @@
         });
       }
 
-      ctx.alCambiar(function (t) { if (t === T || t === TI) pintar(); });
+      ctx.alCambiar(function (t) { if (t === T || t === TI || t === TM) pintar(); });
       pintar();
-      ctx.tablas.leer([T, TI]).then(function () { leido = true; if (ctx.abierta()) { pintar(); irAPedida(); } }, function (e) {
+      ctx.tablas.leer([T, TM, TI]).then(function () { leido = true; if (ctx.abierta()) { pintar(); irAPedida(); } }, function (e) {
         leido = true;
         cont.innerHTML = '<p class="u-error">No se ha podido leer la Bandeja.</p><p class="u-nota">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Vuelve a abrir la sección.</p>';
       });
@@ -457,9 +510,9 @@
 
       // En directo: llega una petición, o alguien responde o crea su tarea (y la tarea cambia de estado).
       var directo = null, tDirecto = null;
-      if (ctx.enDirecto) directo = ctx.enDirecto(['solicitudes', 'tareas'], function () {
+      if (ctx.enDirecto) directo = ctx.enDirecto(['solicitudes', 'mensajes', 'tareas'], function () {
         if (tDirecto) return;
-        tDirecto = setTimeout(function () { tDirecto = null; if (ctx.abierta()) ctx.tablas.refrescar([T], true).catch(function () {}); }, 800);
+        tDirecto = setTimeout(function () { tDirecto = null; if (ctx.abierta()) ctx.tablas.refrescar([T, TM], true).catch(function () {}); }, 800);
       });
       this._cerrar = function () {
         el.classList.remove('kb', 'tb'); document.documentElement.classList.remove('fv-abierta'); // como Tareas: la sección siguiente, con su margen

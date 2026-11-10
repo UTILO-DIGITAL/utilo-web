@@ -7,8 +7,12 @@
  *   petición aparece arriba con «Enviando» y el formulario queda libre; si Utilo dice que no, desaparece, el texto vuelve
  *   al formulario y se dice por qué.
  * - La captura se reduce aquí (como mucho 1600 px, JPG) antes de mandarla. Se puede elegir o pegar (Ctrl+V).
- * - Estados que ve el cliente: Recibida, En marcha, Hecha, Respondida y No la haremos, con el color del estado del kanban.
- * - config: AYUDA (texto de arriba). URL y CORREO_UTILO los usa el motor.
+ * - Estados que ve el cliente: Recibida, En marcha, Hecha, Respondida, No la haremos y (T0427) Retirada, con el color del
+ *   estado del kanban.
+ * - T0427 · Debajo de cada petición, su conversación con Utilo y, según lo que se pueda: «Añadir algo» (o «Contestar», si lo
+ *   último es de Utilo), con captura; «Cambiar» lo que se pidió mientras nadie la ha atendido; y «Retirar» (ya no hace
+ *   falta). Lo dice la base (puede: escribir, cambiar, retirar); el motor llama a pedirEscribir, pedirCambiar y pedirRetirar.
+ * - config: AYUDA (texto de arriba). SUPABASE_URL, SUPABASE_CLAVE y CORREO_UTILO los usa el motor.
  */
 (function () {
   'use strict';
@@ -23,8 +27,19 @@
     'En marcha': { c: 'ec', ayuda: 'Estamos en ello.' },
     'Hecha': { c: 'co', ayuda: 'Ya está hecha.' },
     'Respondida': { c: 'pr', ayuda: 'Te hemos contestado debajo.' },
-    'No la haremos': { c: 'x', ayuda: 'Te contamos el motivo debajo.' }
+    'No la haremos': { c: 'x', ayuda: 'Te contamos el motivo debajo.' },
+    'Retirada': { c: 'x', ayuda: 'La retirasteis: ya no hacía falta.' }
   };
+  /** T0427 · Cómo se lee cada mensaje de la conversación. */
+  function cabMensaje(m) {
+    if (m.de === 'Utilo') return m.tipo === 'Descartada' ? 'Por qué no la haremos' : 'Respuesta de Utilo';
+    return m.tipo === 'Retirada' ? (m.quien || 'Vosotros') + ' la retira' : (m.quien || 'Vosotros') + ' añade';
+  }
+  /** ¿Lo último que se ve es de Utilo? Entonces se «contesta»; si no, se «añade algo». */
+  function contesta(s) {
+    var ms = s.mensajes || [];
+    return ms.length ? ms[ms.length - 1].de === 'Utilo' : !!s.respuesta;
+  }
 
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   var CLAVE = 'un_pedir_' + location.pathname;
@@ -56,6 +71,7 @@
     abrir: function (el, ctx) {
       var copia = leerCopia() || {};
       var L = copia.solicitudes || null, hora = copia.hora || '', pendientes = [], captura = null, n = 0;
+      var abierto = { id: '', que: '' }, borrador = {}, capturaM = null, enviando = '';   // T0427: lo que se escribe en una petición
 
       el.innerHTML =
         '<div class="pd">' +
@@ -143,15 +159,77 @@
         if (s.urgente) meta.push('<b>Urgente</b>');
         var enlace = s._enviando ? s.captura : s.enlace;
         if (enlace && (/^https:\/\//.test(enlace) || /^data:image\//.test(enlace))) meta.push(s._enviando ? 'Con captura' : '<a href="' + texto(enlace) + '" target="_blank" rel="noopener">Ver la captura</a>');
-        return '<li class="pd-s' + (s._enviando ? ' pd-enviando' : '') + '">' +
+        var ms = s.mensajes || [];
+        var conv = ms.length ? ms.map(function (m) {
+          var ok = m.enlace && /^https:\/\//.test(m.enlace);
+          return '<div class="pd-r' + (m.de === 'Cliente' ? ' pd-r-cli' : '') + '"><b>' + texto(cabMensaje(m)) + ' <span class="pd-rf">' + texto(m.fecha) + '</span></b>' +
+            (m.texto ? texto(m.texto) : '') + (ok ? (m.texto ? ' · ' : '') + '<a href="' + texto(m.enlace) + '" target="_blank" rel="noopener">Ver la captura</a>' : '') + '</div>';
+        }).join('') : (s.respuesta ? '<div class="pd-r"><b>' + (s.estado === 'No la haremos' ? 'Por qué no la haremos' : 'Respuesta de Utilo') + '</b>' + texto(s.respuesta) + '</div>' : '');
+        return '<li class="pd-s' + (s._enviando ? ' pd-enviando' : '') + '" data-id="' + texto(s.id) + '">' +
           '<div class="pd-top">' + (s._enviando ? '<span class="u-chip">Enviando</span>' :
             E ? '<span class="pd-e pd-e-' + E.c + '" title="' + texto(E.ayuda) + '">' + texto(s.estado) + '</span>' : '') +
           '<b class="pd-tipo-t">' + texto(s.tipo) + '</b><span class="pd-f">' + texto(s.fecha) + '</span></div>' +
           '<p class="pd-txt">' + texto(s.texto) + '</p>' +
-          '<div class="u-nota pd-m">' + meta.join(' · ') + '</div>' +
-          (s.respuesta ? '<div class="pd-r"><b>' + (s.estado === 'No la haremos' ? 'Por qué no la haremos' : 'Respuesta de Utilo') + '</b>' + texto(s.respuesta) + '</div>' : '') +
-          '</li>';
+          '<div class="u-nota pd-m">' + meta.join(' · ') + '</div>' + conv + acciones(s) + '</li>';
       }
+      /* ---------- T0427 · seguir una petición: añadir o contestar, cambiar y retirar ---------- */
+      function acciones(s) {
+        var P = s.puede || {};
+        if (s._enviando || !s.id) return '';
+        if (abierto.id === s.id) {
+          var q = abierto.que, k = s.id + ':' + q, ocupado = enviando === s.id;
+          if (q === 'retirar') return '<div class="pd-mform"><p class="pd-mq"><b>¿Retirar esta petición?</b> La damos por cerrada: ya no hace falta.</p>' +
+            '<label class="u-campo"><span class="u-etiqueta">Por qué <span class="u-nota">(opcional)</span></span><textarea data-borrador="' + texto(k) + '" rows="2" maxlength="' + MAX + '">' + texto(borrador[k] || '') + '</textarea></label>' +
+            '<div class="pd-mb"><button type="button" class="u-btn" data-cerrar>No, dejarla</button><button type="button" class="u-btn u-btn-accion" data-hecho' + (ocupado ? ' disabled' : '') + '>' + (ocupado ? 'Retirando…' : 'Sí, retirarla') + '</button></div></div>';
+          var cambiar = q === 'cambiar';
+          return '<div class="pd-mform"><label class="u-campo"><span class="u-etiqueta">' + (cambiar ? 'Lo que necesitas' : contesta(s) ? 'Tu respuesta' : 'Lo que quieres añadir') + '</span>' +
+            '<textarea data-borrador="' + texto(k) + '" rows="3" maxlength="' + MAX + '">' + texto(borrador[k] != null ? borrador[k] : cambiar ? s.texto : '') + '</textarea></label>' +
+            (cambiar ? '' : capturaM ? '<div class="pd-captura"><img class="pd-mini" src="' + capturaM.url + '" alt="La captura que se enviará"><button type="button" class="u-btn" data-quitar-captura>Quitar la captura</button></div>'
+              : '<div class="pd-captura"><label class="u-btn pd-elegir"><input type="file" accept="image/*" class="u-oculto" data-captura>Añadir una captura</label></div>') +
+            '<div class="pd-mb"><button type="button" class="u-btn" data-cerrar>Cancelar</button><button type="button" class="u-btn u-btn-accion" data-hecho' + (ocupado ? ' disabled' : '') + '>' +
+            (ocupado ? 'Enviando…' : cambiar ? 'Guardar el cambio' : contesta(s) ? 'Contestar' : 'Añadir') + '</button></div></div>';
+        }
+        var b = [];
+        if (P.escribir) b.push('<button type="button" class="u-btn" data-abrir="escribir">' + (contesta(s) ? 'Contestar' : 'Añadir algo') + '</button>');
+        if (P.cambiar) b.push('<button type="button" class="u-btn" data-abrir="cambiar">Cambiar</button>');
+        if (P.retirar) b.push('<button type="button" class="u-btn pd-retirar" data-abrir="retirar">Retirar</button>');
+        return b.length ? '<div class="pd-acc">' + b.join('') + '</div>' : '';
+      }
+      function solicitud(id) { return (L || []).filter(function (s) { return s.id === id; })[0] || null; }
+      $('pd-l').addEventListener('input', function (e) { var k = e.target.getAttribute && e.target.getAttribute('data-borrador'); if (k) borrador[k] = e.target.value; });
+      $('pd-l').addEventListener('change', function (e) {
+        if (e.target.hasAttribute && e.target.hasAttribute('data-captura') && e.target.files[0]) {
+          reducir(e.target.files[0]).then(function (c) { capturaM = c; pintar(); }, function (er) { ctx.aviso(er.message); });
+        }
+      });
+      $('pd-l').addEventListener('click', function (e) {
+        var li = e.target.closest('li[data-id]'), id = li && li.getAttribute('data-id');
+        if (!id) return;
+        var a = e.target.closest('[data-abrir]');
+        if (a) { abierto = { id: id, que: a.getAttribute('data-abrir') }; capturaM = null; pintar(); var t = el.querySelector('li[data-id="' + id + '"] textarea'); if (t) t.focus(); return; }
+        if (e.target.closest('[data-cerrar]')) { abierto = { id: '', que: '' }; capturaM = null; pintar(); return; }
+        if (e.target.closest('[data-quitar-captura]')) { capturaM = null; pintar(); return; }
+        if (!e.target.closest('[data-hecho]') || enviando) return;
+        var q = abierto.que, k = id + ':' + q, s0 = solicitud(id), txt = String(borrador[k] != null ? borrador[k] : q === 'cambiar' && s0 ? s0.texto : '').trim();
+        var o = { solicitud: id }, fn = q === 'cambiar' ? 'pedirCambiar' : q === 'retirar' ? 'pedirRetirar' : 'pedirEscribir';
+        if (q === 'retirar') o.motivo = txt;
+        else {
+          if (!txt && !(q === 'escribir' && capturaM)) { ctx.aviso(q === 'cambiar' ? 'Escribe qué necesitas.' : 'Escribe qué quieres añadir.'); return; }
+          o.texto = txt;
+          if (q === 'escribir' && capturaM) o.captura = { tipo: capturaM.tipo, datos: capturaM.datos };
+        }
+        enviando = id; pintar();
+        ctx.llamar(fn, [o]).then(function (r) {
+          enviando = ''; delete borrador[k]; abierto = { id: '', que: '' }; capturaM = null;
+          if (r && r.id) L = (L || []).map(function (s) { return s.id === r.id ? r : s; });
+          guardarCopia({ solicitudes: L, hora: hora });
+          if (ctx.abierta()) { pintar(); ctx.aviso(q === 'retirar' ? 'Petición retirada.' : q === 'cambiar' ? 'Cambio guardado.' : 'Enviado a Utilo.'); }
+        }, function (er) {
+          enviando = '';
+          if (ctx.abierta()) { pintar(); ctx.aviso('No se ha podido guardar: ' + String((er && er.message) || er || '').replace(/^\w+:\s*/, '')); }
+        });
+      });
+
       function pintar() {
         var l = $('pd-l');
         if (!l) return;

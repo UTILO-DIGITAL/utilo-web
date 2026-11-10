@@ -86,9 +86,9 @@
   /** ¿Hay que lanzar «Autónomo» para que siga? Si es AUTÓNOMA y, al responderla, ha vuelto a En cola (no a Esperando). */
   function lanzar(t, estado) { return !!(t && t.AUTONOMA) && estado === 'En cola'; }
 
-  /** T0412 · Las solicitudes Nuevas que puede atender (vista BANDEJA): urgentes delante; entre ellas, la más antigua arriba. */
+  /** T0412 · Las solicitudes por atender (T0427: Nuevas o con algo del cliente sin ver) que puede atender (vista BANDEJA): urgentes delante; entre ellas, la más antigua arriba. */
   function solicitudes(filas) {
-    return (filas || []).filter(function (s) { return s.ESTADO === 'Nueva' && s.PUEDO_DECIDIR; }).sort(function (a, b) {
+    return (filas || []).filter(function (s) { return (s.POR_ATENDER || s.ESTADO === 'Nueva') && s.PUEDO_DECIDIR; }).sort(function (a, b) {
       return ((b.URGENTE ? 1 : 0) - (a.URGENTE ? 1 : 0)) || (ms(a.FECHA) - ms(b.FECHA)) || String(a.ID).localeCompare(String(b.ID));
     });
   }
@@ -238,7 +238,7 @@
             '<span class="pm-top"><span class="pm-id">' + texto(s.ID) + '</span><span class="pm-ini">' + texto((ini && ini.NOMBRE) || s.INICIATIVA) + '</span>' +
               (s.URGENTE ? '<span class="u-chip">Urgente</span>' : '') + '</span>' +
             '<span class="pm-tit">' + texto(txt.length > 140 ? txt.slice(0, 139).replace(/\s+\S*$/, '') + '…' : txt) + '</span>' +
-            '<span class="pm-meta"><span class="n-estado n-e-pr">Atender</span><span>' + texto(String(s.TIPO || '').toLowerCase() + ' · lo pide ' + s.PERSONA) + '</span>' +
+            '<span class="pm-meta"><span class="n-estado n-e-pr">' + (s.ESTADO === 'Nueva' ? 'Atender' : s.ESTADO === 'Retirada' ? 'La ha retirado' : 'Ha escrito') + '</span><span>' + texto(String(s.TIPO || '').toLowerCase() + ' · lo pide ' + s.PERSONA) + '</span>' +
               (cuanto ? '<span class="pm-hace' + (vieja ? ' vieja' : '') + '">' + texto(cuanto) + '</span>' : '') + '</span></a></li>';
         }).join('');
         var izq = bloque('pm-espera', 'Te espera', es.length + ss.length, es.length + ss.length ? '<ul class="pm-l">' + htmlSols + es.map(function (t) {

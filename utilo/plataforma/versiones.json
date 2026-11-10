@@ -1,6 +1,14 @@
 {
-  "version": "5.15-1.11",
+  "version": "5.16-1.12",
   "versiones": [
+    {
+      "v": "5.16-1.12",
+      "fecha": "10/11/2026",
+      "novedades": [
+        "La Bandeja enseña la conversación con el cliente, avisa cuando el cliente escribe y deja responder varias veces y reabrir una descartada.",
+        "La pantalla de entrar vuelve a verse limpia en el móvil."
+      ]
+    },
     {
       "v": "5.15-1.11",
       "fecha": "09/11/2026",
