@@ -16,7 +16,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Para mí",
    "icono": "<path d=\"M4 13h4l2 3h4l2-3h4\"/><path d=\"M6.5 5h11L20 13v6H4v-6z\"/>",
    "web": "utilo/secciones/parami.js",
-   "version": "de73ad2a60",
+   "version": "fc40305952",
    "perfiles": "todos",
    "config": {},
    "api": [
@@ -30,7 +30,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Tareas",
    "icono": "<rect x=\"3\" y=\"4\" width=\"5\" height=\"16\" rx=\"1\"/><rect x=\"10\" y=\"4\" width=\"5\" height=\"11\" rx=\"1\"/><rect x=\"17\" y=\"4\" width=\"4\" height=\"7\" rx=\"1\"/>",
    "web": "utilo/secciones/tablero.js",
-   "version": "83ef674292",
+   "version": "1f6301d29f",
    "perfiles": "todos",
    "config": {
     "VISTA": "ocho",
@@ -50,7 +50,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Entregas",
    "icono": "<path d=\"M3 7l9-4 9 4-9 4-9-4z\"/><path d=\"M3 7v10l9 4 9-4V7\"/><path d=\"M12 11v10\"/>",
    "web": "utilo/secciones/entregas.js",
-   "version": "9108a0a8bf",
+   "version": "35a9faf086",
    "perfiles": "todos",
    "config": {
     "VISTA": "Mapa",
@@ -69,7 +69,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Bandeja",
    "icono": "<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><path d=\"M3 7l9 6 9-6\"/>",
    "web": "utilo/secciones/bandeja.js",
-   "version": "b36034e052",
+   "version": "a97384d9b2",
    "perfiles": [
     "admin",
     "responsable",
@@ -109,11 +109,6 @@ window.NUCLEO_MONTAJE = {
    "clave": "sb_publishable_bKp5qCd6Gk5NaToFOz0Wig_dKxkLaKV",
    "nombre": "utilo-dev"
   }
- },
- "avisos": {
-  "prod": "BHp2TxwWY_cf6BApFlnLVEwrXViN5kk9qwkIxVy5Yqkb1e70nVJLRyEOWrO9M7EETy-JSkRJubJA9xIxrwKS8Qw",
-  "dev": "BKK7UkLS5LCg5hNvyTuKR0Sbdwentx7D5csANbABkx17N46j1F3Iqn_KjJQmS2h9kHJvN0_eiiyq7OMIsngdk5I",
-  "local": "BJIfdofliPutdZdi__uArZkrZuoDUOb1nQXmW6ggslA7SUouH6vlFmG3J4VeOFdQyu_vpHnmTi49Ief8dxQUEX8"
  },
  "esquema": {
   "zona": "Europe/Madrid",
@@ -674,117 +669,6 @@ window.NUCLEO_MONTAJE = {
      ],
      "bitacora_entrega_fkey": [
       "ENTREGA"
-     ]
-    }
-   },
-   "SOLICITUDES": {
-    "db": "solicitudes",
-    "clave": "ID",
-    "prefijo": "S",
-    "columnas": [
-     {
-      "nombre": "ID",
-      "tipo": "id",
-      "obligatoria": true
-     },
-     {
-      "nombre": "INICIATIVA",
-      "tipo": "ref",
-      "obligatoria": true,
-      "ref": "INICIATIVAS"
-     },
-     {
-      "nombre": "FECHA",
-      "tipo": "fecha_hora",
-      "obligatoria": true
-     },
-     {
-      "nombre": "PERSONA",
-      "tipo": "texto",
-      "obligatoria": true
-     },
-     {
-      "nombre": "TIPO",
-      "tipo": "lista",
-      "obligatoria": true,
-      "valores": [
-       "Cambio o mejora",
-       "Algo no funciona",
-       "Duda"
-      ]
-     },
-     {
-      "nombre": "URGENTE",
-      "tipo": "booleano"
-     },
-     {
-      "nombre": "TEXTO",
-      "tipo": "texto",
-      "obligatoria": true
-     },
-     {
-      "nombre": "ENLACE",
-      "tipo": "texto"
-     },
-     {
-      "nombre": "VERSION",
-      "tipo": "texto"
-     },
-     {
-      "nombre": "ESTADO",
-      "tipo": "lista",
-      "obligatoria": true,
-      "valores": [
-       "Nueva",
-       "Convertida en tarea",
-       "Respondida",
-       "Descartada",
-       "Retirada"
-      ]
-     },
-     {
-      "nombre": "TAREA",
-      "tipo": "ref",
-      "ref": "TAREAS"
-     },
-     {
-      "nombre": "RESPUESTA",
-      "tipo": "texto"
-     },
-     {
-      "nombre": "DECIDIDO_POR",
-      "tipo": "persona"
-     },
-     {
-      "nombre": "FECHA_DECISION",
-      "tipo": "fecha_hora"
-     },
-     {
-      "nombre": "PENDIENTE",
-      "tipo": "booleano"
-     }
-    ],
-    "restricciones": {
-     "solicitudes_pkey": [
-      "ID"
-     ],
-     "solicitudes_id_formato": [
-      "ID"
-     ],
-     "solicitudes_iniciativa_fkey": [
-      "INICIATIVA"
-     ],
-     "solicitudes_tipo_valores": [
-      "TIPO"
-     ],
-     "solicitudes_estado_valores": [
-      "ESTADO"
-     ],
-     "solicitudes_tarea_fkey": [
-      "TAREA"
-     ],
-     "solicitudes_decidido_por_fkey": [
-      "DECIDIDO_POR"
      ]
     }
    },

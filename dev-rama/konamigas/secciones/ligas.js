@@ -310,7 +310,6 @@
     // Un aplazado no tiene acta: se cierra la de su recuperación.
     if (!p || p.ESTADO === 'Libre' || p.ESTADO === 'Anulado' || p.ESTADO === 'Aplazado' || !p.ID_INSCRIPCION_LOCAL || !p.ID_INSCRIPCION_VISITANTE) return false;
     if (String(p.FECHA || '') > hoy()) return false; // el acta se cierra el día del partido o después
-    if (quien.acta) return !!quien.acta(p); // T0394: sobre Supabase, por sus roles (quien gestiona el partido o lo arbitra)
     if (quien.admin || (quien.actaTodas || []).indexOf(quien.perfil) >= 0) return true;
     return !!quien.yo && (p.ID_ARBITRO === quien.yo || p.ID_ARBITRO_REAL === quien.yo);
   }
@@ -515,209 +514,7 @@
     return out;
   }
 
-  /* ======================= sobre Supabase (T0394) ======================= */
-  // La misma pantalla en la plataforma de Konamigas sin motor (clientes/konamigas/plataforma): lo que el motor le daba hecho
-  // (nombres, colores, quién puede) sale de las tablas y las vistas de la base, y lo que escribía, de las funciones ligas_*
-  // de T0392. Quién ve qué lo dicen las reglas por fila: aquí solo se traduce y se ofrece lo que sus roles dejan hacer.
-
-  /**
-   * Lo que puede hacer quien ha entrado, por sus roles ([{ rol, ambito, ambito_id }] de mi_acceso): lo interno (admin, socio),
-   * todo; el gestor, en sus ligas y sus partidos; el árbitro, el acta y el estado de los suyos (la base lo vuelve a mirar).
-   */
-  function rolesBase(roles) {
-    roles = roles || [];
-    var tiene = function (r, ambito, id) {
-      return roles.some(function (x) { return x.rol === r && (x.ambito === 'todo' || (x.ambito === ambito && String(x.ambito_id) === String(id))); });
-    };
-    var interno = roles.some(function (x) { return (x.rol === 'admin' || x.rol === 'socio') && x.ambito === 'todo'; });
-    var R = {
-      interno: interno,
-      gestor: interno || roles.some(function (x) { return x.rol === 'gestor'; }),
-      gestionaLiga: function (idL) { return interno || (!!idL && tiene('gestor', 'liga', idL)); },
-      gestiona: function (p) { return !!p && (interno || tiene('gestor', 'liga', p.ID_LIGA) || tiene('gestor', 'partido', p.ID)); },
-      arbitra: function (p) { return !!p && tiene('arbitro', 'partido', p.ID); },
-      /** ¿Apunta y cambia esta sanción? La de un partido, quien lo gestiona; sin partido, el gestor de la liga del equipo. */
-      sanciona: function (p, idLigaEquipo) { return p ? R.gestiona(p) : R.gestionaLiga(idLigaEquipo); }
-    };
-    return R;
-  }
-
-  /** La configuración de Ligas: la de CONFIG de la base (texto o JSON), la que manda, sobre la de config.json. */
-  function configBase(filas, cfg) {
-    var out = {}, k;
-    for (k in cfg || {}) out[k] = cfg[k];
-    (filas || []).forEach(function (f) {
-      var c = String(f.ID || ''), v = f.VALOR;
-      if (['PUNTOS', 'RESULTADO_ANULADO', 'SIN_CLASIFICACION', 'SANCION_MULTAS', 'CARTA_DIAS'].indexOf(c) < 0 || v === '' || v == null) return;
-      var x = v;
-      try { x = JSON.parse(v); } catch (e) { /* texto */ }
-      if (c === 'SIN_CLASIFICACION' && typeof x === 'string') x = x.split(',').map(function (s) { return s.trim(); }).filter(String);
-      if ((c === 'RESULTADO_ANULADO' || c === 'CARTA_DIAS') && !isFinite(num(x))) return;
-      if ((c === 'PUNTOS' || c === 'SANCION_MULTAS') && (!x || typeof x !== 'object' || Array.isArray(x))) return;
-      if (c === 'SIN_CLASIFICACION' && !Array.isArray(x)) return;
-      out[c] = x;
-    });
-    return out;
-  }
-
-  /** El staff para la pantalla, como ligasStaff del motor: { yo (su ID_STAFF o ''), staff: [{ ID, APODO, ARBITRO, GESTOR, ACTIVO, TELEFONO }] }. */
-  function staffBase(nombres, fichas, personaId) {
-    var tel = {}, yo = '';
-    (fichas || []).forEach(function (s) { tel[s.ID] = String(s.TELEFONO || ''); if (personaId && String(s.PERSONA) === String(personaId)) yo = String(s.ID); });
-    return {
-      yo: yo,
-      staff: (nombres || []).map(function (s) {
-        return { ID: String(s.ID), APODO: String(s.APODO || s.ID), ARBITRO: s.ES_ARBITRO === true, GESTOR: s.ES_GESTOR === true, ACTIVO: s.ACTIVO === true, TELEFONO: tel[s.ID] || '' };
-      }).sort(function (a, b) { return a.APODO.localeCompare(b.APODO, 'es'); })
-    };
-  }
-  /** Los colores, como ligasColores: { ID: { NOMBRE, HEX } }. */
-  function coloresBase(filas) {
-    var r = {};
-    (filas || []).forEach(function (c) { var hex = String(c.COLOR_HEX || '').trim(); r[c.ID] = { NOMBRE: String(c.NOMBRE || ''), HEX: /^#[0-9a-f]{6}$/i.test(hex) ? hex : '' }; });
-    return r;
-  }
-  function porDorsal(a, b) {
-    var x = parseInt(a.DORSAL, 10), y = parseInt(b.DORSAL, 10);
-    if (isFinite(x) && isFinite(y) && x !== y) return x - y;
-    if (isFinite(x) !== isFinite(y)) return isFinite(x) ? -1 : 1;
-    return a.NOMBRE.localeCompare(b.NOMBRE, 'es');
-  }
-  /** Las plantillas de unos equipos, como ligasJugadoras: { IE: [{ ID, JUGADORA, NOMBRE, DORSAL, ACTIVA }] }, por dorsal. */
-  function jugadorasBase(plantillas, nombres, equipos) {
-    var r = {}, nom = {};
-    (nombres || []).forEach(function (n) { nom[n.ID] = String(n.NOMBRE || ''); });
-    (equipos || []).forEach(function (e) { r[e] = []; });
-    (plantillas || []).forEach(function (i) {
-      var e = String(i.ID_INSCRIPCION_EQUIPO || '');
-      if (!r[e]) return;
-      r[e].push({ ID: String(i.ID), JUGADORA: String(i.ID_JUGADORA || ''), NOMBRE: nom[i.ID_JUGADORA] || String(i.ID_JUGADORA || i.ID), DORSAL: String(i.DORSAL == null ? '' : i.DORSAL), ACTIVA: i.ESTADO !== 'Baja' });
-    });
-    Object.keys(r).forEach(function (e) { r[e].sort(porDorsal); });
-    return r;
-  }
-  /** Los nombres de unas inscripciones de jugadora, como ligasNombres: { IJ: { J, N, D, E } }. */
-  function nombresBase(plantillas, nombres, ijs) {
-    var r = {}, nom = {}, quiero = {};
-    (nombres || []).forEach(function (n) { nom[n.ID] = String(n.NOMBRE || ''); });
-    (ijs || []).forEach(function (i) { quiero[i] = 1; });
-    (plantillas || []).forEach(function (i) {
-      if (!quiero[i.ID]) return;
-      r[i.ID] = { J: String(i.ID_JUGADORA || ''), N: nom[i.ID_JUGADORA] || String(i.ID_JUGADORA || i.ID), D: String(i.DORSAL == null ? '' : i.DORSAL), E: String(i.ID_INSCRIPCION_EQUIPO || '') };
-    });
-    return r;
-  }
-  /** Las capitanas de unos equipos, como ligasCapitanas: { IE: { EQUIPO, CAPITANA, TELEFONO } } (la vista solo da las que puede ver). */
-  function capitanasBase(filas, equipos) {
-    var r = {};
-    (filas || []).forEach(function (c) {
-      if ((equipos || []).indexOf(String(c.ID_INSCRIPCION_EQUIPO)) < 0) return;
-      r[c.ID_INSCRIPCION_EQUIPO] = { EQUIPO: String(c.NOMBRE_EQUIPO || c.ID_INSCRIPCION_EQUIPO), CAPITANA: String(c.NOMBRE || ''), TELEFONO: String(c.TELEFONO || '') };
-    });
-    return r;
-  }
-
-  /** La clasificación de una liga desde la vista CLASIFICACION, como la de clasificacion(): [{ pos, id, pj, …, jugar, racha }]. */
-  function clasDeVista(filas, idLiga) {
-    return (filas || []).filter(function (f) { return String(f.ID_LIGA) === String(idLiga); }).map(function (f) {
-      return { pos: num(f.PUESTO), id: String(f.ID_INSCRIPCION_EQUIPO), pj: num(f.PJ) || 0, pg: num(f.PG) || 0, pe: num(f.PE) || 0, pp: num(f.PP) || 0, gf: num(f.GF) || 0,
-        gc: num(f.GC) || 0, dg: num(f.DG) || 0, pts: num(f.PTS) || 0, jugar: num(f.POR_JUGAR) || 0, racha: String(f.RACHA || '') };
-    }).sort(function (a, b) { return a.pos - b.pos; });
-  }
-  /** Goles y partidos jugados de unas ligas, de la vista LIGAS_RESUMEN (sin el 0-5 de los anulados), como resumenGoles. */
-  function resumenVista(filas, ligasIds) {
-    var en = {}, g = 0, j = 0;
-    (ligasIds || []).forEach(function (l) { en[String(l)] = 1; });
-    (filas || []).forEach(function (f) { if (en[String(f.ID_LIGA)]) { g += num(f.GOLES) || 0; j += num(f.JUGADOS) || 0; } });
-    return { goles: g, jugados: j, media: j ? Math.round(g / j * 10) / 10 : 0 };
-  }
-  /**
-   * Las goleadoras por persona de unas ligas, desde la vista GOLEADORAS, como rankingPersonas: [{ clave ('J:' su ID_JUGADORA),
-   * ijs, equipos, goles }], de más a menos.
-   */
-  function rankingVista(filas, ligasIds) {
-    var en = {}, g = {}, l = [];
-    (ligasIds || []).forEach(function (x) { en[String(x)] = 1; });
-    (filas || []).forEach(function (f) {
-      if (!en[String(f.ID_LIGA)]) return;
-      var ij = String(f.ID_INSCRIPCION_JUGADORA), k = f.ID_JUGADORA ? 'J:' + f.ID_JUGADORA : 'I:' + ij;
-      if (!g[k]) { g[k] = { clave: k, ijs: [], equipos: [], goles: 0 }; l.push(g[k]); }
-      g[k].goles += num(f.GOLES) || 0;
-      if (g[k].ijs.indexOf(ij) < 0) g[k].ijs.push(ij);
-      var e = String(f.ID_INSCRIPCION_EQUIPO || '');
-      if (e && g[k].equipos.indexOf(e) < 0) g[k].equipos.push(e);
-    });
-    return l.sort(function (a, b) { return b.goles - a.goles || orden(a.clave, b.clave); });
-  }
-  /**
-   * Las estadísticas de una jugadora (sus inscripciones ijs) desde las vistas, como estadisticasJugadora: sus goles por
-   * temporada con sus equipos y los partidos que jugaron (de la clasificación). Sin mejor partido: la vista no lo da.
-   */
-  function estadisticasVista(gol, clas, ijs) {
-    var mias = {}, t = {}, total = 0, pj = {};
-    (ijs || []).forEach(function (i) { mias[String(i)] = 1; });
-    (clas || []).forEach(function (c) { pj[c.ID_INSCRIPCION_EQUIPO] = num(c.PJ) || 0; });
-    (gol || []).forEach(function (f) {
-      if (!mias[String(f.ID_INSCRIPCION_JUGADORA)]) return;
-      var tem = String(f.ID_TEMPORADA || ''), x = t[tem] || (t[tem] = { temporada: tem, equipos: [], ligas: [], goles: 0, jugados: 0 });
-      var n = num(f.GOLES) || 0;
-      x.goles += n; total += n;
-      if (x.equipos.indexOf(f.ID_INSCRIPCION_EQUIPO) < 0) { x.equipos.push(f.ID_INSCRIPCION_EQUIPO); x.jugados += pj[f.ID_INSCRIPCION_EQUIPO] || 0; }
-      if (x.ligas.indexOf(f.ID_LIGA) < 0) x.ligas.push(f.ID_LIGA);
-    });
-    return { total: total, temporadas: Object.keys(t).map(function (k) { return t[k]; }).sort(function (a, b) { return orden(b.temporada, a.temporada); }), mejor: null };
-  }
-
-  /**
-   * Lo que el motor hacía con una función (ligasActa…) → la función de la base y sus argumentos por nombre ({ fn, args: [{…}] }),
-   * con los mismos valores que da la pantalla. justificante es la función del servidor que paga al rival con su PDF.
-   */
-  function aBase(fn, a) {
-    a = a || [];
-    var vacio = function (v) { return v === '' || v == null ? null : v; };
-    var x = function (f, o) { return { fn: f, args: [o] }; };
-    switch (fn) {
-      case 'ligasActa':
-        return x('ligas_acta', { partido: a[0], goles_local: a[1].GOLES_LOCAL, goles_visitante: a[1].GOLES_VISITANTE, arbitro_real: vacio(a[1].ID_ARBITRO_REAL),
-          notas: a[1].NOTAS == null ? null : String(a[1].NOTAS),
-          goles: (a[1].goles || []).map(function (g) { return { id_inscripcion_equipo: g.ID_INSCRIPCION_EQUIPO, id_inscripcion_jugadora: vacio(g.ID_INSCRIPCION_JUGADORA), tipo: vacio(g.TIPO) }; }) });
-      case 'ligasPartido': return x('ligas_partido', { partido: a[0], cambios: a[1] || {} });
-      case 'ligasMover': return x('ligas_mover', { partido: a[0], hueco: a[1] });
-      case 'ligasJornadas': return x('ligas_jornadas', { liga: a[0], a: a[1], b: a[2] });
-      case 'ligasRecuperar': return x('ligas_recuperar', { fecha: a[0], asignaciones: (a[1] || []).map(function (y) { return { partido: y.id, hueco: y.hueco }; }) });
-      case 'ligasSancion': return x('ligas_sancion', { sancion: vacio(a[0]), valores: a[1] || {} });
-      case 'ligasSancionQuitar': return x('ligas_sancion_quitar', { sancion: a[0] });
-      case 'ligasSancionesFaltan': return x('ligas_sanciones_faltan', { partidos: a[0] || [] });
-      case 'ligasSancionCuentas': return x('ligas_sancion_cuentas', { sancion: a[0] });
-      case 'ligasSancionPagar':
-        return a[1] === 'rival' ? x('justificante', { sancion: a[0], fecha: (a[2] || {}).fecha, cuenta: (a[2] || {}).cuenta })
-          : x('ligas_sancion_pagar', { sancion: a[0], que: a[1], fecha: (a[2] || {}).fecha, cuenta: (a[2] || {}).cuenta });
-      case 'ligasSancionDespagar': return x('ligas_sancion_despagar', { sancion: a[0], que: a[1] });
-      default: throw new Error('Sobre Supabase no hay ' + fn + '.');
-    }
-  }
-  /** Las tablas que cambia cada función de la base, para volver a leerlas al acabar (la base no devuelve las filas como el motor). */
-  var REFRESCA = { ligasActa: ['PARTIDOS', 'GOLES', 'CLASIFICACION', 'GOLEADORAS', 'LIGAS_RESUMEN'],
-    ligasPartido: ['PARTIDOS', 'GOLES', 'SANCIONES', 'CLASIFICACION', 'GOLEADORAS', 'LIGAS_RESUMEN'],
-    ligasMover: ['PARTIDOS'], ligasJornadas: ['PARTIDOS'], ligasRecuperar: ['PARTIDOS', 'CLASIFICACION'], ligasSancion: ['SANCIONES'],
-    ligasSancionPagar: ['SANCIONES'], ligasSancionDespagar: ['SANCIONES'] };
-  function refrescaBase(fn) { return (REFRESCA[fn] || []).slice(); }
-  /** Las cuentas para cobrar o pagar una sanción (ligas_sancion_cuentas), como ligasSancionCuentas: { cuentas: [{ ID, NOMBRE, TIPO }], defecto, gestor: { ID, APODO }, aviso }. */
-  function cuentasBase(r) {
-    r = r || {};
-    return { cuentas: (r.cuentas || []).map(function (c) { return { ID: String(c.id), NOMBRE: String(c.nombre || c.id), TIPO: String(c.tipo || '') }; }),
-      defecto: r.defecto || '', gestor: r.gestor ? { ID: String(r.gestor.id), APODO: String(r.gestor.apodo || r.gestor.id) } : null, aviso: r.aviso || '' };
-  }
-  /** La carta de la base (ligas_carta: { dias, min, a_tiempo, usada, usada_fecha, tipo }) como cartaAplazamiento: { dias, min, usada: { ID, FECHA } o null, tipo }. */
-  function cartaBase(r) {
-    r = r || {};
-    return { dias: num(r.dias), min: num(r.min), usada: r.usada ? { ID: String(r.usada), FECHA: String(r.usada_fecha || '') } : null, tipo: r.tipo || '' };
-  }
-
   var CALC = { hoy: hoy, estadoCopia: estadoCopia, fecha: fecha, fechaDia: fechaDia, lunes: lunes, sumarDias: sumarDias, temporadaActual: temporadaActual, ligasDe: ligasDe,
-    rolesBase: rolesBase, configBase: configBase, staffBase: staffBase, coloresBase: coloresBase, jugadorasBase: jugadorasBase, nombresBase: nombresBase,
-    capitanasBase: capitanasBase, clasDeVista: clasDeVista, resumenVista: resumenVista, rankingVista: rankingVista, estadisticasVista: estadisticasVista,
-    aBase: aBase, refrescaBase: refrescaBase, cuentasBase: cuentasBase, cartaBase: cartaBase,
     jornadas: jornadas, jornadaInicial: jornadaInicial, clasificacion: clasificacion, goleadoras: goleadoras, golesEquipo: golesEquipo,
     descansan: descansan, equiposDe: equiposDe, puedeActa: puedeActa, conResultado: conResultado, incompleto: incompleto, huecosMover: huecosMover, huecoEn: huecoEn, arbitroEn: arbitroEn, jornadaMovible: jornadaMovible,
     textoAviso: textoAviso, fechaLarga: fechaLarga, recuperacionDe: recuperacionDe, aplazadosPendientes: aplazadosPendientes, huecosLibres: huecosLibres,
@@ -729,10 +526,6 @@
   /* ======================= pantalla ======================= */
 
   var TABLAS = ['TEMPORADAS', 'COMPETICIONES', 'LIGAS', 'PARTIDOS', 'GOLES', 'CAMPOS', 'INSTALACIONES', 'CALENDARIO', 'INSCRIPCIONES_EQUIPOS', 'HUECOS', 'SANCIONES'];
-  // T0394 · Sobre Supabase: los equipos, de la vista sin datos de factura; los nombres del staff y los colores, de sus tablas;
-  // la clasificación y las goleadoras, de sus vistas (públicas: las ve entera quien solo ve sus partidos); CONFIG, la que manda.
-  var TABLAS_BASE = TABLAS.map(function (t) { return t === 'INSCRIPCIONES_EQUIPOS' ? 'EQUIPOS_INSCRITOS' : t; })
-    .concat(['STAFF', 'STAFF_NOMBRES', 'COLORES', 'CONFIG', 'CLASIFICACION', 'GOLEADORAS', 'LIGAS_RESUMEN']);
   // T0297 · Los tipos de SANCIONES · TIPO (su YAML). El motor comprueba lo que se guarda.
   var TIPOS_SANCION = ['No presentado', 'Aplazamiento fuera de plazo', 'Aplazamiento sin carta', 'Retraso', 'Alineación indebida', 'Conducta', 'Otro'];
   var TIPOS_PARTIDO = ['No presentado', 'Aplazamiento fuera de plazo', 'Aplazamiento sin carta']; // las que pone sola el partido (normativa 1b)
@@ -762,11 +555,7 @@
 
   window.UN.registrar('LIGAS', {
     abrir: function (el, ctx) {
-      var T = ctx.tablas, cfg = ctx.config || {}, cfg0 = cfg;
-      // T0394 · Sobre Supabase (la plataforma de Konamigas sin motor): lo mismo, con las tablas, las vistas y las funciones de la
-      // base. Quién puede qué sale de sus roles (R); quién ve qué lo dicen las reglas por fila.
-      var SB = !!(window.UG && window.UG.supabase), R = SB ? rolesBase(ctx.roles) : null;
-      var TABLAS_V = SB ? TABLAS_BASE : TABLAS, EQ = SB ? 'EQUIPOS_INSCRITOS' : 'INSCRIPCIONES_EQUIPOS';
+      var T = ctx.tablas, cfg = ctx.config || {};
       var pest = String(cfg.PESTANAS || Object.keys(PESTANAS).join(',')).split(',').map(function (s) { s = s.trim().toUpperCase(); return ANTES[s] || s; })
         .filter(function (s, i, l) { return PESTANAS[s] && l.indexOf(s) === i; });
       if (!pest.length) pest = Object.keys(PESTANAS);
@@ -775,88 +564,15 @@
       var staff = guardadoJson(KSTAFF) || { yo: '', staff: [] }, colores = guardadoJson(KCOL) || {}, KNOM = CLAVE + 'nombres';
       var nomG = guardadoJson(KNOM); if (nomG) Object.keys(nomG).forEach(function (k) { if (!NOM[k]) NOM[k] = nomG[k]; });
       var quien = { admin: !!ctx.admin, perfil: ctx.perfil, actaTodas: lista(cfg.ACTA_TODAS), yo: staff.yo };
-      if (SB) quien.acta = function (p) { return R.gestiona(p) || R.arbitra(p); };
-      var programa = SB ? R.gestor : !!ctx.admin || lista(cfg.PROGRAMAR).indexOf(ctx.perfil) >= 0;
-      var sanciona = SB ? R.gestor : !!ctx.admin || lista(cfg.SANCIONAR).indexOf(ctx.perfil) >= 0; // T0297: apunta, cambia y quita sanciones
-      var ponePrecio = SB ? R.interno : !!ctx.admin || lista(cfg.SANCION_IMPORTE).indexOf(ctx.perfil) >= 0; // T0297: solo Socio cambia el importe de una multa
-      // T0394 · Sobre Supabase, cada cosa por sus roles: el gestor programa y sanciona en sus ligas y sus partidos, no en todos.
-      function programaL(idL) { return SB ? R.gestionaLiga(idL) : programa; }
-      function programaP(p) { return SB ? R.gestiona(p) : programa; }
-      function sancionaP(p) { return SB ? R.gestiona(p) : sanciona; }
-      function sancionaE(e) { return SB ? R.gestionaLiga(e && e.ID_LIGA) : sanciona; }
-      function sancionaS(s) {
-        if (!SB) return sanciona;
-        var e = ix.eq[String(s.ID_INSCRIPCION_EQUIPO || '')];
-        return R.sanciona(s.ID_PARTIDO ? T.fila('PARTIDOS', s.ID_PARTIDO) || { ID: s.ID_PARTIDO } : null, e && e.ID_LIGA);
-      }
-
-      /* ---------- con el motor o con la base (T0394) ---------- */
-
-      var nada = function () {};
-      /** El cambio que hace una función del motor (ligasActa…) o, sobre Supabase, la de la base (aBase): { fn, args, motor }. */
-      function op(fn, args) { var o = SB ? aBase(fn, args) : { fn: fn, args: args }; o.motor = fn; return o; }
-      /** Sobre Supabase, al acabar bien, vuelve a leer lo que ha cambiado la base (no devuelve las filas como el motor). */
-      function tras(o, h) {
-        if (SB) h.then(function () { T.refrescar(refrescaBase(o.motor)).catch(nada); }, nada);
-        return h;
-      }
-      /** Cambia una fila al momento y la escribe con su función (la del motor o la de la base). */
-      function cambiar(tabla, id, cambios, fn, args) { var o = op(fn, args); return tras(o, T.actualizar(tabla, id, cambios, o)); }
-      /** La parte de una tabla con esos valores en col (para no bajar enteras las plantillas). */
-      function partes(n, col, valores) {
-        var p = {}, h = 0, k = col + ':' + valores.slice().sort().join(',');
-        for (var i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) | 0;
-        p[n] = { clave: col + ':' + valores.length + ':' + h, col: col, valores: valores };
-        return T.leer([n], { partes: p });
-      }
-      /** Lo que la pantalla pedía al motor: con el Sheet, igual; sobre Supabase, de las vistas o de las funciones de la base. */
-      function llamarL(fn, args) {
-        if (!SB) return ctx.llamar(fn, args);
-        var eqs = [].concat(args[0] || []).map(String).filter(Boolean);
-        var conNombres = function (col) {
-          var ps = T.filas('PLANTILLAS').filter(function (i) { return eqs.indexOf(String(i[col])) >= 0; });
-          var js = ps.map(function (i) { return String(i.ID_JUGADORA || ''); }).filter(function (j, i, l) { return j && l.indexOf(j) === i; });
-          return js.length ? partes('NOMBRES_JUGADORAS', 'ID', js) : Promise.resolve();
-        };
-        if (fn === 'ligasJugadoras') {
-          if (!eqs.length) return Promise.resolve({});
-          return partes('PLANTILLAS', 'ID_INSCRIPCION_EQUIPO', eqs).then(function () { return conNombres('ID_INSCRIPCION_EQUIPO'); })
-            .then(function () { return jugadorasBase(T.filas('PLANTILLAS'), T.filas('NOMBRES_JUGADORAS'), eqs); });
-        }
-        if (fn === 'ligasNombres') {
-          if (!eqs.length) return Promise.resolve({});
-          return partes('PLANTILLAS', 'ID', eqs).then(function () { return conNombres('ID'); })
-            .then(function () { return nombresBase(T.filas('PLANTILLAS'), T.filas('NOMBRES_JUGADORAS'), eqs); });
-        }
-        if (fn === 'ligasCapitanas') return T.leer(['CONTACTOS_CAPITANAS']).then(function () { return capitanasBase(T.filas('CONTACTOS_CAPITANAS'), eqs); });
-        var o = op(fn, args), h = ctx.llamar(o.fn, o.args); // quien llama vuelve a leer lo que haga falta
-        return fn === 'ligasSancionCuentas' ? h.then(cuentasBase) : h;
-      }
-      /** La carta de aplazamiento de un equipo para un partido, de la base (ligas_carta): una promesa, guardada mientras está abierta. */
-      var cartas = {};
-      function cartaDe(p, ie, aviso) {
-        var k = p.ID + '|' + ie + '|' + aviso;
-        if (!cartas[k]) {
-          cartas[k] = ctx.llamar('ligas_carta', [{ partido: p.ID, equipo: ie, aviso: aviso }]).then(function (r) { cartas[k].ya = cartaBase(r); return cartas[k].ya; });
-          cartas[k].catch(function () { delete cartas[k]; });
-        }
-        return cartas[k];
-      }
-      /** La carta si ya ha llegado; si no, null, y alLlegar() cuando llegue (para volver a pintar el formulario). */
-      function cartaYa(p, ie, aviso, alLlegar) {
-        if (!aviso) return null;
-        var c = cartaDe(p, ie, aviso);
-        if (c.ya) return c.ya;
-        if (alLlegar) c.then(function () { alLlegar(); }, function (e) { if (ctx.abierta()) ctx.aviso('No se ha podido mirar la carta: ' + String(e.message).replace(/^\w+:\s*/, '')); });
-        return null;
-      }
+      var programa = !!ctx.admin || lista(cfg.PROGRAMAR).indexOf(ctx.perfil) >= 0;
+      var sanciona = !!ctx.admin || lista(cfg.SANCIONAR).indexOf(ctx.perfil) >= 0; // T0297: apunta, cambia y quita sanciones
+      var ponePrecio = !!ctx.admin || lista(cfg.SANCION_IMPORTE).indexOf(ctx.perfil) >= 0; // T0297: solo Socio cambia el importe de una multa
       // comp: la competición elegida ('*' = todas, solo en Partidos); fecha: el día de juego abierto en Partidos; golAmbito:
       // las goleadoras de la liga o de toda la competición; q: lo que se busca en Goleadoras.
       var S = { tab: pest.indexOf(guardado(CLAVE + 'tab')) >= 0 ? guardado(CLAVE + 'tab') : '', temp: guardado(CLAVE + 'temp'), comp: guardado(CLAVE + 'comp'),
-        liga: guardado(CLAVE + 'liga'), fecha: '', jornada: null, golAmbito: guardado(CLAVE + 'golamb') || 'liga', q: '', mios: guardado(CLAVE + 'mios2') ? guardado(CLAVE + 'mios2') === 'si' : SB ? !R.gestor : !programa && lista(cfg.ACTA_TODAS).indexOf(ctx.perfil) < 0, leido: false };
-      // Un árbitro viene a ver sus partidos: entra en Partidos, de todas las competiciones y solo los suyos. T0394: sobre
-      // Supabase, también la capitana y la jugadora (solo ven los de su equipo).
-      var arbitra = SB ? !R.gestor : !programa && quien.actaTodas.indexOf(ctx.perfil) < 0;
+        liga: guardado(CLAVE + 'liga'), fecha: '', jornada: null, golAmbito: guardado(CLAVE + 'golamb') || 'liga', q: '', mios: guardado(CLAVE + 'mios2') ? guardado(CLAVE + 'mios2') === 'si' : !programa && lista(cfg.ACTA_TODAS).indexOf(ctx.perfil) < 0, leido: false };
+      // Un árbitro viene a ver sus partidos: entra en Partidos, de todas las competiciones y solo los suyos.
+      var arbitra = !programa && quien.actaTodas.indexOf(ctx.perfil) < 0;
       // T0277: desde Perfil (?s=ligas&partido=PAR…, al tocar un partido o un acta por cerrar) se abre la ficha de ese partido,
       // con Partidos en su día detrás. El parámetro se quita de la dirección para que al volver no se abra otra vez.
       var urlP = new URL(location.href), pedido = urlP.searchParams.get('partido') || '';
@@ -883,7 +599,7 @@
 
       // Árbitros y gestores no tienen ECONOMIA: sus cobros y su nivel salen de una copia en COMPETICION que el motor rehace
       // al apuntar un pago en Economía y cada noche. Quien puede (ACTUALIZAR_PAGOS, Socio) ve al final cómo está y la rehace.
-      var copiaEl = el.querySelector('#lg-copia'), copiaPuede = !SB && (!!ctx.admin || lista(cfg.ACTUALIZAR_PAGOS).indexOf(ctx.perfil) >= 0), copiaE = null, copiando = false;
+      var copiaEl = el.querySelector('#lg-copia'), copiaPuede = !!ctx.admin || lista(cfg.ACTUALIZAR_PAGOS).indexOf(ctx.perfil) >= 0, copiaE = null, copiando = false;
       function pintarCopia() {
         if (!copiaPuede || !copiaE) { copiaEl.hidden = true; return; }
         var x = estadoCopia(copiaE, hoy() + 'T00:00');
@@ -915,14 +631,8 @@
 
       var d, ix, temp, ligas, comps, actual, todas;
       function preparar() {
-        if (SB) { // T0394: lo que daba el motor (ligasStaff, ligasColores) y la configuración de la base, la que manda
-          cfg = configBase(T.filas('CONFIG'), cfg0);
-          staff = staffBase(T.filas('STAFF_NOMBRES'), T.filas('STAFF'), ctx.personaId);
-          quien.yo = staff.yo;
-          colores = coloresBase(T.filas('COLORES'));
-        }
         d = { temp: T.filas('TEMPORADAS'), comp: T.filas('COMPETICIONES'), ligas: T.filas('LIGAS'), par: T.filas('PARTIDOS'), gol: T.filas('GOLES'),
-          cam: T.filas('CAMPOS'), ins: T.filas('INSTALACIONES'), cal: T.filas('CALENDARIO'), eq: T.filas(EQ), hue: T.filas('HUECOS'),
+          cam: T.filas('CAMPOS'), ins: T.filas('INSTALACIONES'), cal: T.filas('CALENDARIO'), eq: T.filas('INSCRIPCIONES_EQUIPOS'), hue: T.filas('HUECOS'),
           san: T.filas('SANCIONES') || [] };
         ix = { comp: indice(d.comp), liga: indice(d.ligas), cam: indice(d.cam), ins: indice(d.ins), cal: indice(d.cal, 'FECHA'), eq: indice(d.eq),
           staff: indice(staff.staff) };
@@ -934,11 +644,9 @@
         ligas.forEach(function (x) { if (comps.indexOf(x.comp) < 0) comps.push(x.comp); });
         // «Todas» solo en Partidos; en las demás pestañas, la primera competición.
         todas = S.comp === '*' && S.tab === 'PARTIDOS';
-        // T0394: sobre Supabase, sin nada elegido, el gestor entra en una liga que lleva (no ve los partidos de las demás).
-        var suya = SB ? ligas.filter(function (x) { return R.gestionaLiga(x.liga.ID); })[0] : null;
-        var comp = comps.filter(function (c) { return c.ID === S.comp; })[0] || (suya && suya.comp) || comps[0] || null;
+        var comp = comps.filter(function (c) { return c.ID === S.comp; })[0] || comps[0] || null;
         var deComp = ligas.filter(function (x) { return comp && x.comp.ID === comp.ID; });
-        actual = deComp.filter(function (x) { return x.liga.ID === S.liga; })[0] || (suya && suya.comp === comp ? suya : null) || deComp[0] || null;
+        actual = deComp.filter(function (x) { return x.liga.ID === S.liga; })[0] || deComp[0] || null;
       }
       function nomLiga(l) { return String(l.NOMBRE || l.ID) + (l.DIA_SEMANA && String(l.NOMBRE).indexOf(l.DIA_SEMANA) < 0 ? ' · ' + l.DIA_SEMANA : ''); }
       function nomComp(c) { return c ? String(c.NOMBRE_COMERCIAL || c.NOMBRE || c.ID) : ''; }
@@ -982,8 +690,8 @@
         chkMios.checked = S.mios;
         elige.innerHTML = htmlElige();
         pintarResumen();
-        if (!temp) { cont.innerHTML = '<p class="u-vacio">Todavía no hay temporadas.' + (SB ? '' : ' Añade la primera en la tabla TEMPORADAS del Excel COMPETICION.') + '</p>'; return; }
-        if (!actual) { cont.innerHTML = '<p class="u-vacio">Esta temporada todavía no tiene ligas.' + (SB ? '' : ' Se crean en las tablas COMPETICIONES y LIGAS del Excel COMPETICION.') + '</p>'; return; }
+        if (!temp) { cont.innerHTML = '<p class="u-vacio">Todavía no hay temporadas. Añade la primera en la tabla TEMPORADAS del Excel COMPETICION.</p>'; return; }
+        if (!actual) { cont.innerHTML = '<p class="u-vacio">Esta temporada todavía no tiene ligas. Se crean en las tablas COMPETICIONES y LIGAS del Excel COMPETICION.</p>'; return; }
         cont.innerHTML = ({ PARTIDOS: htmlPartidos, CLASIFICACION: htmlClasificacion, GOLEADORAS: htmlGoleadoras })[S.tab]();
         [].forEach.call(el.querySelectorAll('.lg-fila-chips [aria-pressed=true]'), function (sel) {
           var p = sel.parentNode;
@@ -1066,7 +774,7 @@
           roto ? '<span class="lg-pav lg-av-no">En PARTIDOS falta el ' + (p.ID_INSCRIPCION_LOCAL ? 'visitante' : 'local') + ' (' + texto(p.ID) + '): no cuenta en la clasificación</span>' : '',
           av ? '<span class="lg-pav ' + av.clase + '">' + texto(av.texto) + (p.MOTIVO && CON_MOTIVO.indexOf(p.ESTADO) >= 0 ? ' · ' + texto(p.MOTIVO) : '') + '</span>' : '',
           avisoMultas(p).map(function (t) { return '<span class="lg-pav lg-av-no">' + texto(t) + '</span>'; }).join(''),
-          sancionaP(p) && faltaSancion(p) ? '<span class="lg-pav lg-av-si">Sin su sanción de no presentado</span>' : ''].join('');
+          sanciona && faltaSancion(p) ? '<span class="lg-pav lg-av-si">Sin su sanción de no presentado</span>' : ''].join('');
         return '<button type="button" class="lg-p' + (esMio(p) ? ' lg-mio' : '') + (CON_MOTIVO.indexOf(p.ESTADO) >= 0 ? ' lg-p-fuera' : '') + '" data-p="' + texto(p.ID) + '"' +
           ' aria-label="' + texto(titulo(p) + ', ' + (p.HORA || '') + ', ' + campo(p.ID_CAMPO) + (res ? ', ' + gl + ' a ' + gv : '')) + '">' + info +
           (libre ? '<span class="lg-pl"></span><span class="lg-pc lg-pvs">' + texto(equipo(p.ID_INSCRIPCION_LOCAL || p.ID_INSCRIPCION_VISITANTE) || 'Campo libre') + '</span><span class="lg-pv"></span>'
@@ -1139,14 +847,14 @@
             ' uno de los dos equipos en COMPETICION · PARTIDOS (' + texto(rotos.slice(0, 6).map(function (p) { return p.ID; }).join(', ') + (rotos.length > 6 ? '…' : '')) +
             '). No cuentan en la clasificación ni en las goleadoras, y quién descansa puede salir mal. Avisa a quien administra para completarlos.</p>';
           // T0297: anulados por culpa de un equipo sin su sanción (de antes de las sanciones): se apuntan de una vez.
-          var sinSan = partidosLiga(actual.liga.ID).filter(function (p) { return sancionaP(p) && faltaSancion(p); });
+          var sinSan = sanciona ? partidosLiga(actual.liga.ID).filter(faltaSancion) : [];
           if (sinSan.length) h += '<div class="lg-pend-rec"><span><b>' + sinSan.length + (sinSan.length === 1 ? ' partido anulado por culpa de un equipo sin su sanción' : ' partidos anulados por culpa de un equipo sin su sanción') + '</b>' +
             '<small>' + texto(sinSan.map(function (p) { return 'J' + p.JORNADA + ' ' + equipo(p.ANULADO_POR); }).join(' · ')) + '</small></span>' +
             '<button type="button" class="u-btn" data-accion="sanciones"' + (S.apuntandoSan ? ' disabled' : '') + '>' + (S.apuntandoSan ? 'Apuntando…' : 'Apuntar sus sanciones') + '</button></div>';
           var pend = aplazadosPendientes(d.par, actual.liga.ID);
           if (pend.length) h += '<div class="lg-pend-rec"><span><b>' + pend.length + (pend.length === 1 ? ' partido aplazado' : ' partidos aplazados') + ' por recuperar</b>' +
             '<small>' + texto(pend.map(function (p) { return 'J' + p.JORNADA + ' ' + titulo(p); }).join(' · ')) + '</small></span>' +
-            (programaL(actual.liga.ID) ? '<button type="button" class="u-btn" data-accion="recuperar">Recuperar en huecos libres</button>' : '') + '</div>';
+            (programa ? '<button type="button" class="u-btn" data-accion="recuperar">Recuperar en huecos libres</button>' : '') + '</div>';
         }
         var ps = partidosVistos(), dias = diasDeJuego(ps);
         if (!dias.length) return h + '<p class="u-vacio">' + (S.mios && quien.yo ? 'No tienes partidos aquí. Quita «Solo mis partidos» para ver todos.' : 'Todavía no hay partidos.') + '</p>';
@@ -1165,7 +873,7 @@
         var titu = todas ? fechaDia(dia.fecha) : dia.jr ? 'Jornada de recuperación' : 'Jornada ' + dia.jornadas.join(' y ');
         var sub = (todas ? '' : fechaDia(dia.fecha)) + (dia.fecha === hoy() ? (todas ? 'Hoy' : ' · hoy') : '');
         S.jornada = !todas && dia.jornadas.length === 1 ? dia.jornadas[0] : null;
-        var mov = programaL(actual.liga.ID) && S.jornada !== null && jornadaMovible(partidosLiga(actual.liga.ID), S.jornada, hoy()).ok;
+        var mov = programa && S.jornada !== null && jornadaMovible(partidosLiga(actual.liga.ID), S.jornada, hoy()).ok;
         h += '<div class="lg-jcab"><h2 class="n-grupo' + (dia.jr ? ' lg-jr-t' : '') + '">' + texto(titu) + '</h2>' +
           (sub || mov ? '<p class="lg-jfecha">' + (sub ? '<span>' + texto(sub) + '</span>' : '') +
             (mov ? '<button type="button" class="lg-jcambiar" data-accion="jornadas" title="Intercambiar la fecha con otra jornada"><span aria-hidden="true">⇄</span> Cambiar de fecha</button>' : '') + '</p>' : '') + '</div>';
@@ -1202,10 +910,9 @@
         var ps = partidosLiga(actual.liga.ID), nombres = {};
         d.eq.forEach(function (e) { nombres[e.ID] = e.NOMBRE_EQUIPO; });
         var nAn = nAnulado();
-        // T0394: sobre Supabase, la de la vista (la calcula la base con todos los partidos, también los que no ves).
-        var cl = SB ? clasDeVista(T.filas('CLASIFICACION'), actual.liga.ID) : clasificacion(ps, equiposLiga(actual.liga.ID), cfg.PUNTOS, nombres, nAn);
+        var cl = clasificacion(ps, equiposLiga(actual.liga.ID), cfg.PUNTOS, nombres, nAn);
         if (!cl.length) return h + '<p class="u-vacio">Esta liga todavía no tiene equipos ni partidos.</p>';
-        var P = cfg.PUNTOS || {}, jugados = SB ? resumenVista(T.filas('LIGAS_RESUMEN'), [actual.liga.ID]).jugados : ps.filter(conResultado).length;
+        var P = cfg.PUNTOS || {}, jugados = ps.filter(conResultado).length;
         h += '<div class="u-tabla-caja"><table class="u-tabla lg-clas"><thead><tr><th class="num">#</th><th>Equipo</th><th class="num" title="Jugados">PJ</th>' +
           '<th class="num" title="Ganados">G</th><th class="num" title="Empatados">E</th><th class="num" title="Perdidos">P</th>' +
           '<th class="num u-solo-ancho" title="Goles a favor">GF</th><th class="num u-solo-ancho" title="Goles en contra">GC</th><th class="num" title="Diferencia de goles">DG</th><th class="num">Pts</th>' +
@@ -1213,7 +920,7 @@
           cl.map(function (e) {
             // T0297: en rojo solo lo que debe el equipo; una sanción ya pagada es solo información.
             var nSan = sancionesDe(d.san, { equipo: e.id }).length, debe = multasPendientes(d.san, e.id, null).total;
-            var ra = htmlRacha(SB ? e.racha.split('').map(function (r) { return { r: r }; }) : racha(ps, e.id, 5, nAn));
+            var ra = htmlRacha(racha(ps, e.id, 5, nAn));
             return '<tr><td class="num">' + e.pos + '</td><td class="u-tabla-t"><button type="button" class="lg-eqf" data-eqf="' + texto(e.id) + '"><span class="lg-eqt">' + punto(e.id) + texto(equipo(e.id)) + '</span></button>' +
               (ra ? '<div class="u-solo-movil">' + ra + '</div>' : '') +
               (debe ? '<div class="u-nota lg-san-nota">Debe ' + euros(debe) + ' de multa</div>' : nSan ? '<div class="u-nota">' + nSan + (nSan === 1 ? ' sanción' : ' sanciones') + '</div>' : '') +
@@ -1232,7 +939,7 @@
         if (!xs.length) return '';
         var nombre = { G: 'ganado', E: 'empatado', P: 'perdido' };
         return '<span class="lg-racha" aria-label="Últimos partidos: ' + texto(xs.map(function (x) { return nombre[x.r]; }).join(', ')) + '">' + xs.map(function (x) {
-          return '<span class="lg-ef-r lg-ef-' + x.r + '"' + (x.p ? ' title="' + texto('J' + x.p.JORNADA + ' · ' + x.a + '–' + x.b + ' contra ' + equipo(x.rival)) + '"' : '') + '>' + x.r + '</span>';
+          return '<span class="lg-ef-r lg-ef-' + x.r + '" title="' + texto('J' + x.p.JORNADA + ' · ' + x.a + '–' + x.b + ' contra ' + equipo(x.rival)) + '">' + x.r + '</span>';
         }).join('') + '</span>';
       }
       function nomJugadora(eq, id) {
@@ -1243,7 +950,7 @@
       function cargarJugadoras(eqs) {
         eqs = eqs.filter(function (e) { return e && !JUG[e]; });
         if (!eqs.length) return Promise.resolve();
-        return llamarL('ligasJugadoras', [eqs]).then(function (r) { Object.keys(r || {}).forEach(function (e) { JUG[e] = r[e]; }); });
+        return ctx.llamar('ligasJugadoras', [eqs]).then(function (r) { Object.keys(r || {}).forEach(function (e) { JUG[e] = r[e]; }); });
       }
 
       /**
@@ -1252,10 +959,10 @@
        */
       function ambitoGoleadoras() {
         var a = S.golAmbito === 'temporada' || S.golAmbito === 'historico' ? S.golAmbito : 'liga';
-        if (a === 'historico') return { ambito: a, ps: d.par, eqs: [], ligas: d.ligas.map(function (l) { return String(l.ID); }) };
+        if (a === 'historico') return { ambito: a, ps: d.par, eqs: [] };
         var idL = a === 'temporada' ? ligas.map(function (x) { return String(x.liga.ID); }) : [String(actual.liga.ID)];
         return {
-          ambito: a, ligas: idL,
+          ambito: a,
           ps: d.par.filter(function (p) { return idL.indexOf(String(p.ID_LIGA)) >= 0; }),
           eqs: d.eq.filter(function (e) { return idL.indexOf(String(e.ID_LIGA)) >= 0 && e.ESTADO !== 'Baja'; }).map(function (e) { return String(e.ID); })
         };
@@ -1283,8 +990,7 @@
           '<p class="u-nota">Cuentan los goles apuntados en las actas. Los goles sin asignar (en propia o de una sustituta) y los de puntualidad no son de ninguna jugadora. Toca una jugadora para ver sus temporadas.</p>';
       }
       function htmlGolRes() {
-        // T0394: sobre Supabase, de la vista GOLEADORAS (la base cuenta todos los goles, también los de partidos que no ves).
-        var A = ambitoGoleadoras(), ids = A.ps.map(function (p) { return p.ID; }), rk = SB ? rankingVista(T.filas('GOLEADORAS'), A.ligas) : rankingPersonas(d.gol, ids, NOM), porClave = {};
+        var A = ambitoGoleadoras(), ids = A.ps.map(function (p) { return p.ID; }), rk = rankingPersonas(d.gol, ids, NOM), porClave = {};
         rk.forEach(function (x) { porClave[x.clave] = x; });
         var puesto = function (n) { return 1 + rk.filter(function (x) { return x.goles > n; }).length; };
         var claveIJ = function (ij, jugadora) { var n = NOM[ij]; return n && n.J ? 'J:' + n.J : jugadora ? 'J:' + jugadora : 'I:' + ij; };
@@ -1298,7 +1004,7 @@
             (conEquipo ? '<small>' + texto(nombreEquipos(eqs)) + '</small>' : '') + '</span></span></button>' +
             '<span class="lg-n u-cifra">' + n + '<small>' + (n === 1 ? ' gol' : ' goles') + '</small></span></li>';
         };
-        var R = SB ? resumenVista(T.filas('LIGAS_RESUMEN'), A.ligas) : resumenGoles(A.ps), top = rk[0];
+        var R = resumenGoles(A.ps), top = rk[0];
         var h = '<div class="lg-stats"><div><b class="u-cifra">' + R.goles + '</b><span>goles</span></div><div><b class="u-cifra">' + R.jugados + '</b><span>partidos jugados</span></div>' +
           '<div><b class="u-cifra">' + String(R.media).replace('.', ',') + '</b><span>goles por partido</span></div>' +
           '<div><b>' + (top ? texto(nomIJ(top.ijs[0])) : '—') + '</b><span>' + (top ? 'máxima goleadora · ' + top.goles + ' goles' : 'máxima goleadora') + '</span></div></div>';
@@ -1342,7 +1048,7 @@
        */
       function cargarGoleadoras() {
         var A = ambitoGoleadoras(), ids = A.ps.map(function (p) { return p.ID; }), faltan = [];
-        (SB ? rankingVista(T.filas('GOLEADORAS'), A.ligas) : rankingPersonas(d.gol, ids, {})).forEach(function (x) { x.ijs.forEach(function (ij) { if (!NOM[ij]) faltan.push(ij); }); });
+        rankingPersonas(d.gol, ids, {}).forEach(function (x) { x.ijs.forEach(function (ij) { if (!NOM[ij]) faltan.push(ij); }); });
         var eqs = A.eqs.filter(function (e) { return !JUG[e]; }), trozos = [];
         for (var i = 0; i < eqs.length; i += 60) trozos.push(eqs.slice(i, i + 60));
         if (!faltan.length && !trozos.length) return;
@@ -1356,7 +1062,7 @@
         if (!ijs.length) return Promise.resolve();
         var trozos = [];
         for (var i = 0; i < ijs.length; i += 5000) trozos.push(ijs.slice(i, i + 5000));
-        return Promise.all(trozos.map(function (t) { return llamarL('ligasNombres', [t]); })).then(function (rs) {
+        return Promise.all(trozos.map(function (t) { return ctx.llamar('ligasNombres', [t]); })).then(function (rs) {
           rs.forEach(function (r) { Object.keys(r || {}).forEach(function (k) { NOM[k] = r[k]; }); });
           guardadoJson(KNOM, NOM);
         });
@@ -1370,9 +1076,7 @@
         var pintarFicha = function () {
           var ijs = clave.indexOf('J:') === 0 ? Object.keys(NOM).filter(function (k) { return 'J:' + NOM[k].J === clave; }) : [clave.slice(2)];
           if (ij && ijs.indexOf(ij) < 0) ijs.push(ij);
-          // T0394: sobre Supabase, de las vistas (sus goles de siempre y los partidos de sus equipos, de la clasificación).
-          if (SB) T.filas('GOLEADORAS').forEach(function (f) { if ('J:' + f.ID_JUGADORA === clave && ijs.indexOf(String(f.ID_INSCRIPCION_JUGADORA)) < 0) ijs.push(String(f.ID_INSCRIPCION_JUGADORA)); });
-          var E = SB ? estadisticasVista(T.filas('GOLEADORAS'), T.filas('CLASIFICACION'), ijs) : estadisticasJugadora(d.gol, d.par, ijs, temporadaDeLiga), nombre = nomIJ(ijs[0] || ij);
+          var E = estadisticasJugadora(d.gol, d.par, ijs, temporadaDeLiga), nombre = nomIJ(ijs[0] || ij);
           var mp = E.mejor && T.fila('PARTIDOS', E.mejor.partido);
           var html = '<h2 id="lg-vt">' + texto(nombre) + '</h2>' +
             '<div class="lg-stats"><div><b class="u-cifra">' + E.total + '</b><span>' + (E.total === 1 ? 'gol' : 'goles') + ' en total</span></div>' +
@@ -1391,8 +1095,7 @@
           ventana(html);
         };
         // Para tener todas sus temporadas hacen falta los nombres de todas las que han marcado alguna vez (se guardan en el dispositivo).
-        var todas = (SB ? rankingVista(T.filas('GOLEADORAS'), d.ligas.map(function (l) { return l.ID; })) : rankingPersonas(d.gol, d.par.map(function (p) { return p.ID; }), {}))
-          .reduce(function (l, x) { return l.concat(x.ijs); }, []);
+        var todas = rankingPersonas(d.gol, d.par.map(function (p) { return p.ID; }), {}).reduce(function (l, x) { return l.concat(x.ijs); }, []);
         var faltan = todas.filter(function (i) { return !NOM[i]; });
         if (!faltan.length) { pintarFicha(); return; }
         ventana('<h2 id="lg-vt">Buscando sus temporadas…</h2><div class="kz-centro" role="status"><div class="u-carga"></div></div>');
@@ -1474,20 +1177,20 @@
           fila('Pidió aplazarlo', texto(p.APLAZADO_POR ? equipo(p.APLAZADO_POR) + (p.AVISO_APLAZAMIENTO ? ', avisó el ' + fecha(p.AVISO_APLAZAMIENTO) : '') +
             (p.ESTADO === 'Anulado' ? ' (no se aplazó: lo pierde)' : '') : '')) +
           fila('Notas', texto(p.NOTAS)) + '</dl>';
-        var sp = sancionesDe(T.filas('SANCIONES'), { partido: p.ID }), sanNueva = sancionaP(p) && !p._nueva && !!(L || V);
+        var sp = sancionesDe(T.filas('SANCIONES'), { partido: p.ID }), sanNueva = sanciona && !p._nueva && !!(L || V);
         if (sanNueva && faltaSancion(p)) html += '<div class="lg-pend-rec"><span><b>' + texto(equipo(p.ANULADO_POR) + ' no se presentó, pero aún no tiene su sanción de no presentado') + '</b>' +
           '<small>Se anuló antes de que existieran las sanciones (o a mano en el Excel). Se apunta con la multa de siempre.</small></span>' +
           '<button type="button" class="u-btn" id="lg-san-falta">Apuntar su sanción</button></div>';
         if (sp.length) html += '<h3 class="lg-sub">' + (sp.length === 1 ? 'Sanción' : 'Sanciones') + '</h3>' + htmlSanciones(sp, 'partido');
-        var mover = programaP(p) && !p._nueva && p.ESTADO === 'Programado' && String(p.FECHA || '') >= hoy();
+        var mover = programa && !p._nueva && p.ESTADO === 'Programado' && String(p.FECHA || '') >= hoy();
         // T0297 (Javi): un solo botón para el acta y el estado; apuntar otra sanción, como enlace (la de no presentarse va sola).
         var estado = !p._nueva && quePuede(p).length > 0;
         // T0297: al árbitro, en sus partidos por jugar, cuándo podrá decir qué pasó (antes solo veía «Cerrar»).
-        if (!estado && !programaP(p) && arbitraEste(p) && p.ESTADO === 'Programado' && String(p.FECHA || '') > hoy())
+        if (!estado && !programa && arbitraEste(p) && p.ESTADO === 'Programado' && String(p.FECHA || '') > hoy())
           html += '<p class="u-nota">El día del partido podrás cerrar el acta o decir si un equipo no se presentó o si se suspendió.</p>';
         html += '<div class="n-botones">' + (estado ? '<button type="button" class="u-btn u-btn-accion" id="lg-prog">Acta y estado</button>' : '') +
           (mover ? '<button type="button" class="u-btn" id="lg-mover">Mover dentro del día</button>' : '') +
-          (programaP(p) && POR_RECUPERAR.indexOf(p.ESTADO) >= 0 && !recuperacionDe(d.par, p.ID) ? '<button type="button" class="u-btn" id="lg-recuperar">Recuperar en un hueco libre</button>' : '') +
+          (programa && POR_RECUPERAR.indexOf(p.ESTADO) >= 0 && !recuperacionDe(d.par, p.ID) ? '<button type="button" class="u-btn" id="lg-recuperar">Recuperar en un hueco libre</button>' : '') +
           (sanNueva ? '<button type="button" class="u-btn u-btn-texto" id="lg-san-nueva">Apuntar una sanción</button>' : '') +
           '<button type="button" class="u-btn u-btn-texto" data-cerrar>Cerrar</button></div>';
         ventana(html, function () {
@@ -1526,7 +1229,7 @@
           var din = dineroSancion(s, rival ? equipo(rival) : '');
           var dentro = '<span class="lg-san-tipo">' + texto(s.TIPO || 'Sanción') + '</span><span class="lg-san-txt"><b>' + texto(s.MOTIVO) + '</b><small>' + texto(de) + '</small>' +
             (din ? '<small class="lg-san-din' + (!s.FECHA_PAGO ? ' lg-san-debe' : '') + '">' + texto(din) + '</small>' : '') + '</span>';
-          var attr = s._nueva ? '' : sancionaS(s) ? ' data-san="' + texto(s.ID) + '"' : que === 'equipo' && p ? ' data-p="' + texto(p.ID) + '"' : '';
+          var attr = s._nueva ? '' : sanciona ? ' data-san="' + texto(s.ID) + '"' : que === 'equipo' && p ? ' data-p="' + texto(p.ID) + '"' : '';
           var cl = 'lg-san-i' + (num(s.IMPORTE) > 0 && !s.FECHA_PAGO ? ' lg-san-i-debe' : ''); // rojizo solo si el equipo debe la multa
           return '<li>' + (attr ? '<button type="button" class="' + cl + ' lg-san-b"' + attr + '>' + dentro + '</button>' : '<div class="' + cl + '">' + dentro + '</div>') + '</li>';
         }).join('') + '</ul>';
@@ -1554,8 +1257,7 @@
         // Como en la clasificación (cuenta el anulado por culpa de un equipo y los aplazados por jugar); en una copa, sus partidos.
         var nombres = {}; d.eq.forEach(function (x) { nombres[x.ID] = x.NOMBRE_EQUIPO; });
         var l = ix.liga[e.ID_LIGA], c = l && ix.comp[l.ID_COMPETICION], copa = !!c && lista(cfg.SIN_CLASIFICACION).indexOf(String(c.TIPO || '')) >= 0;
-        var fe = copa ? null : (SB ? clasDeVista(T.filas('CLASIFICACION'), e.ID_LIGA) : clasificacion(partidosLiga(e.ID_LIGA), equiposLiga(e.ID_LIGA), cfg.PUNTOS, nombres, nAnulado()))
-          .filter(function (x) { return x.id === String(e.ID); })[0];
+        var fe = copa ? null : clasificacion(partidosLiga(e.ID_LIGA), equiposLiga(e.ID_LIGA), cfg.PUNTOS, nombres, nAnulado()).filter(function (x) { return x.id === String(e.ID); })[0];
         var ps = d.par.filter(function (p) { return !p._nueva && (p.ID_INSCRIPCION_LOCAL === e.ID || p.ID_INSCRIPCION_VISITANTE === e.ID); });
         var nEq = equiposLiga(e.ID_LIGA).length;
         // Cada partido desde el equipo: su resultado (el 0-5 de un anulado por culpa de alguien, también) y si lo ganó.
@@ -1582,23 +1284,15 @@
             (jugados.length > 5 ? '<details><summary class="u-nota">Ver los ' + jugados.length + ' resultados</summary><ul class="lg-ef-ps">' + jugados.slice(5).map(linea).join('') + '</ul></details>' : '') : '') +
           '<h3 class="lg-sub">Plantilla</h3><div id="lg-ef-plantilla">' + htmlPlantilla(e.ID) + '</div>' +
           (function () { // T0297: la carta de aplazamiento de la temporada (una por equipo, en todas sus competiciones)
-            // T0394: sobre Supabase la dice la base (ligas_carta, con su próximo partido), a quien lleva la liga.
-            if (SB) return R.gestionaLiga(e.ID_LIGA) && proximo ? '<h3 class="lg-sub">Carta de aplazamiento</h3><p id="lg-ef-carta">Mirando si la tiene…</p>' : '';
             var c = carta({ ID: '', FECHA: hoy(), ID_LIGA: e.ID_LIGA }, e.ID, hoy());
             return '<h3 class="lg-sub">Carta de aplazamiento</h3><p>' + texto(c.usada ? 'Ya la ha gastado esta temporada: aplazó el partido del ' + fecha(c.usada.FECHA) + '. Otro aplazamiento le cuesta su multa.'
               : 'La tiene: puede aplazar un partido esta temporada avisando con ' + c.min + ' días como mínimo.') + '</p>';
           })() +
           '<h3 class="lg-sub">Sanciones</h3>' + (ss.length ? htmlSanciones(ss, 'equipo') : '<p class="u-vacio">No tiene sanciones.</p>') +
-          '<div class="n-botones">' + (sancionaE(e) ? '<button type="button" class="u-btn" id="lg-san-nueva">Apuntar una sanción</button>' : '') +
+          '<div class="n-botones">' + (sanciona ? '<button type="button" class="u-btn" id="lg-san-nueva">Apuntar una sanción</button>' : '') +
           '<button type="button" class="u-btn u-btn-texto" data-cerrar>Cerrar</button></div>';
         ventana(html, function () {
           fichaAbierta = 'E:' + e.ID;
-          var ce = vent.querySelector('#lg-ef-carta');
-          if (ce) cartaDe(proximo, e.ID, hoy()).then(function (c) {
-            if (!vent.contains(ce)) return;
-            ce.textContent = c.usada ? 'Ya la ha gastado esta temporada: aplazó el partido del ' + fecha(c.usada.FECHA) + '. Otro aplazamiento le cuesta su multa.'
-              : 'La tiene: puede aplazar un partido esta temporada avisando con ' + c.min + ' días como mínimo.';
-          }, function (err) { if (vent.contains(ce)) ce.textContent = 'No se ha podido mirar: ' + String(err.message).replace(/^\w+:\s*/, ''); });
           var volver = function () { fichaEquipo(e.ID); };
           vent.onclick = clicFicha(volver);
           var sn = vent.querySelector('#lg-san-nueva');
@@ -1614,8 +1308,7 @@
         var js = JUG[ie];
         if (!js) return '<p class="u-nota">Cargando la plantilla…</p>';
         var goles = {};
-        if (SB) T.filas('GOLEADORAS').forEach(function (f) { if (String(f.ID_INSCRIPCION_EQUIPO) === String(ie)) goles[f.ID_INSCRIPCION_JUGADORA] = (goles[f.ID_INSCRIPCION_JUGADORA] || 0) + (num(f.GOLES) || 0); });
-        else d.gol.forEach(function (g) { if (String(g.ID_INSCRIPCION_EQUIPO) === String(ie) && g.ID_INSCRIPCION_JUGADORA) goles[g.ID_INSCRIPCION_JUGADORA] = (goles[g.ID_INSCRIPCION_JUGADORA] || 0) + 1; });
+        d.gol.forEach(function (g) { if (String(g.ID_INSCRIPCION_EQUIPO) === String(ie) && g.ID_INSCRIPCION_JUGADORA) goles[g.ID_INSCRIPCION_JUGADORA] = (goles[g.ID_INSCRIPCION_JUGADORA] || 0) + 1; });
         var act = js.filter(function (j) { return j.ACTIVA; }), baja = js.length - act.length;
         if (!act.length) return '<p class="u-vacio">No tiene jugadoras inscritas' + (baja ? ' (' + baja + ' de baja)' : '') + '.</p>';
         return '<p class="u-nota">' + act.length + (act.length === 1 ? ' jugadora' : ' jugadoras') + (baja ? ' (y ' + baja + ' de baja)' : '') + '.</p>' +
@@ -1710,11 +1403,7 @@
               var c = {};
               Object.keys(v).forEach(function (k) { if (String(s[k] == null ? '' : s[k]) !== String(v[k])) c[k] = v[k]; });
               if (!Object.keys(c).length) { volver(); return; }
-              hecho = cambiar('SANCIONES', s.ID, c, 'ligasSancion', [s.ID, c]);
-            } else if (SB) { // T0394: la base da la sanción entera (con su importe): se apunta y se vuelve a leer
-              var oc = op('ligasSancion', ['', v]);
-              hecho = tras(oc, ctx.llamar(oc.fn, oc.args));
-              hecho.catch(function (err) { if (ctx.abierta()) ctx.aviso('No se ha apuntado: ' + String(err.message).replace(/^\w+:\s*/, '')); });
+              hecho = T.actualizar('SANCIONES', s.ID, c, { fn: 'ligasSancion', args: [s.ID, c] });
             } else hecho = T.crear('SANCIONES', v, { fn: 'ligasSancion', args: ['', v] });
             volver();
             volver.clave = fichaAbierta;
@@ -1724,7 +1413,7 @@
           if (q) q.onclick = function () {
             if (!q.getAttribute('data-ok')) { q.setAttribute('data-ok', '1'); q.textContent = 'Se quita del todo: pulsa otra vez'; return; }
             q.disabled = true; q.textContent = 'Quitando…';
-            llamarL('ligasSancionQuitar', [s.ID]).then(function () { return T.refrescar(['SANCIONES']); }).then(function () {
+            ctx.llamar('ligasSancionQuitar', [s.ID]).then(function () { return T.refrescar(['SANCIONES']); }).then(function () {
               if (!ctx.abierta()) return;
               ctx.aviso('Sanción quitada.');
               if (vent.contains(q)) volver();
@@ -1786,7 +1475,7 @@
           var sel = vent.querySelector('#lg-pg-cuenta'), ok = vent.querySelector('#lg-pg-ok');
           vent.querySelector('#lg-pg-volver').onclick = volver;
           // La multa se le paga al gestor de la liga y de su caja sale lo del rival (Javi): por defecto, su caja.
-          llamarL('ligasSancionCuentas', [s.ID]).then(function (r) {
+          ctx.llamar('ligasSancionCuentas', [s.ID]).then(function (r) {
             if (!vent.contains(sel)) return;
             sel.innerHTML = opciones((r.cuentas || []).map(function (x) { return [x.ID, x.NOMBRE]; }), r.defecto, 'Elige la cuenta');
             var g = r.gestor ? r.gestor.APODO : '';
@@ -1801,14 +1490,14 @@
             verError(mal);
             if (mal.length) return;
             var cambio = multa ? { FECHA_PAGO: f } : { FECHA_COMPENSACION: f };
-            var hecho = cambiar('SANCIONES', s.ID, cambio, 'ligasSancionPagar', [s.ID, que, { fecha: f, cuenta: c }]);
+            var hecho = T.actualizar('SANCIONES', s.ID, cambio, { fn: 'ligasSancionPagar', args: [s.ID, que, { fecha: f, cuenta: c }] });
             volver();
             var clave = fichaAbierta;
             hecho.then(function (r) {
               if (!ctx.abierta()) return;
-              ctx.aviso((multa ? 'Multa cobrada: factura ' + ((r && r.factura) || '') + ' apuntada en Economía.' : 'Pago al rival apuntado en Economía' + (r && r.archivo ? (SB ? ', con su justificante en PDF.' : ', con su justificante en Drive.') : '.')) +
+              ctx.aviso((multa ? 'Multa cobrada: factura ' + ((r && r.factura) || '') + ' apuntada en Economía.' : 'Pago al rival apuntado en Economía' + (r && r.archivo ? ', con su justificante en Drive.' : '.')) +
                 (r && r.avisos && r.avisos.length ? ' ' + r.avisos.join(' ') : ''));
-              if (r && r.archivo && /^https?:/.test(r.archivo)) justificantes[s.ID] = r.archivo; // «Ver el justificante» en la sanción, para imprimirlo o enviarlo (T0394: en Supabase, la ruta del bucket, no un enlace)
+              if (r && r.archivo) justificantes[s.ID] = r.archivo; // «Ver el justificante» en la sanción, para imprimirlo o enviarlo
               if (fichaAbierta === clave) volver();
             }, function () { if (fichaAbierta === clave) volver(); });
             hecho.catch(function () {});
@@ -1818,7 +1507,7 @@
       /** Deshacer un cobro o un pago (dos toques): quita su movimiento de Economía (ligasSancionDespagar). */
       function despagar(s, que, b, volver) {
         if (!b.getAttribute('data-ok')) { b.setAttribute('data-ok', '1'); b.textContent = 'Se quita de Economía: pulsa otra vez'; return; }
-        var hecho = cambiar('SANCIONES', s.ID, que === 'multa' ? { FECHA_PAGO: '' } : { FECHA_COMPENSACION: '' }, 'ligasSancionDespagar', [s.ID, que]);
+        var hecho = T.actualizar('SANCIONES', s.ID, que === 'multa' ? { FECHA_PAGO: '' } : { FECHA_COMPENSACION: '' }, { fn: 'ligasSancionDespagar', args: [s.ID, que] });
         var otra = function () { formSancion(T.fila('SANCIONES', s.ID) || s, null, volver); };
         otra();
         hecho.then(function () { if (ctx.abierta()) ctx.aviso('Pago deshecho.'); }, function () {});
@@ -1895,7 +1584,7 @@
             var acta = { GOLES_LOCAL: gl, GOLES_VISITANTE: gv, ID_ARBITRO_REAL: real, NOTAS: notas, goles: goles };
             var cambios = { GOLES_LOCAL: gl, GOLES_VISITANTE: gv, ESTADO: 'Jugado', ID_ARBITRO_REAL: real === p.ID_ARBITRO ? '' : real, MOTIVO: '', ANULADO_POR: '', NOTAS: notas };
             cerrar(true);
-            cambiar('PARTIDOS', p.ID, cambios, 'ligasActa', [p.ID, acta]).then(function (r) {
+            T.actualizar('PARTIDOS', p.ID, cambios, { fn: 'ligasActa', args: [p.ID, acta] }).then(function (r) {
               if (r && r.quitados) T.refrescar(['GOLES']).catch(function () {});
               if (ctx.abierta()) ctx.aviso('Acta guardada: ' + equipo(L) + ' ' + gl + ' – ' + gv + ' ' + equipo(V) + '.');
             }, function () {});
@@ -1996,8 +1685,8 @@
         });
       }
       /** Guarda un cambio de partidos (con su función del motor): la pantalla cambia al momento y sale la lista para avisar. */
-      function guardarCambio(cambios, o, pantalla, capitanas, ok) {
-        var g = tras(o, T.actualizar('PARTIDOS', cambios[0].p.ID, pantalla, o));
+      function guardarCambio(cambios, op, pantalla, capitanas, ok) {
+        var g = T.actualizar('PARTIDOS', cambios[0].p.ID, pantalla, op);
         g.catch(function () {});
         avisar(cambios, capitanas, g, ok);
       }
@@ -2028,12 +1717,12 @@
             var g = vent.querySelector('#lg-guardar');
             g.disabled = false; g.textContent = elegido.otro ? 'Intercambiar los dos partidos' : 'Mover el partido';
             g.onclick = function () {
-              guardarCambio(cambios, op('ligasMover', [p.ID, elegido.hueco.ID]), { HORA: elegido.hueco.HORA, ID_CAMPO: elegido.hueco.ID_CAMPO, ID_HUECO: elegido.hueco.ID, ID_ARBITRO: cambios[0].nuevo.ID_ARBITRO },
-                capitanas || llamarL('ligasCapitanas', [equiposDe(cambios.map(function (c) { return c.p; }))]),
+              guardarCambio(cambios, { fn: 'ligasMover', args: [p.ID, elegido.hueco.ID] }, { HORA: elegido.hueco.HORA, ID_CAMPO: elegido.hueco.ID_CAMPO, ID_HUECO: elegido.hueco.ID, ID_ARBITRO: cambios[0].nuevo.ID_ARBITRO },
+                capitanas || ctx.llamar('ligasCapitanas', [equiposDe(cambios.map(function (c) { return c.p; }))]),
                 elegido.otro ? 'Partidos intercambiados.' : 'Partido movido.');
             };
             // Las capitanas se piden ya, para que la lista salga al momento al guardar.
-            capitanas = llamarL('ligasCapitanas', [equiposDe(cambios.map(function (c) { return c.p; }))]);
+            capitanas = ctx.llamar('ligasCapitanas', [equiposDe(cambios.map(function (c) { return c.p; }))]);
             capitanas.catch(function () {});
           };
         });
@@ -2109,16 +1798,14 @@
               (repetido ? '<p class="lg-pav lg-pav-ficha lg-av-no">Dos partidos no pueden ir al mismo hueco: cambia la hora de uno.</p>' : htmlCambios(cambios));
             if (repetido) { g.disabled = true; return; }
             g.disabled = false; g.textContent = 'Recuperar ' + (sel.length === 1 ? 'el partido' : 'los ' + sel.length + ' partidos') + ' el ' + fechaDia(dia).toLowerCase();
-            capitanas = llamarL('ligasCapitanas', [equiposDe(sel)]);
+            capitanas = ctx.llamar('ligasCapitanas', [equiposDe(sel)]);
             capitanas.catch(function () {});
             g.onclick = function () {
               var a0 = cambios[0];
               var valores = { ID_LIGA: a0.p.ID_LIGA, JORNADA: a0.p.JORNADA, FECHA: dia, HORA: a0.hueco.HORA, ID_CAMPO: a0.hueco.ID_CAMPO, ID_HUECO: a0.hueco.ID,
                 ID_ARBITRO: a0.hueco.ID_ARBITRO || a0.p.ID_ARBITRO || '', ID_GESTOR: a0.p.ID_GESTOR || '', ID_INSCRIPCION_LOCAL: a0.p.ID_INSCRIPCION_LOCAL,
                 ID_INSCRIPCION_VISITANTE: a0.p.ID_INSCRIPCION_VISITANTE, ESTADO: 'Programado', ID_PARTIDO_ORIGEN: a0.p.ID };
-              var asig = cambios.map(function (c) { return { id: c.p.ID, hueco: c.hueco.ID }; }), orc = op('ligasRecuperar', [dia, asig]);
-              // T0394: sobre Supabase, la base crea los partidos nuevos y se vuelven a leer.
-              var gd = SB ? tras(orc, ctx.llamar(orc.fn, orc.args)) : T.crear('PARTIDOS', valores, orc);
+              var gd = T.crear('PARTIDOS', valores, { fn: 'ligasRecuperar', args: [dia, cambios.map(function (c) { return { id: c.p.ID, hueco: c.hueco.ID }; })] });
               gd.catch(function () {});
               avisar(cambios, capitanas, gd, cambios.length === 1 ? 'Partido recuperado.' : cambios.length + ' partidos recuperados.');
             };
@@ -2175,10 +1862,10 @@
             vent.querySelector('#lg-conf').innerHTML = '<p class="lg-regla"><b>J' + a + '</b> pasa al ' + texto(fechaDia(B.fecha).toLowerCase()) + ' y <b>J' + bj + '</b> al ' + texto(fechaDia(A.fecha).toLowerCase()) + '. ' + texto(esp) + '</p>' + htmlCambios(cambios);
             var g = vent.querySelector('#lg-guardar');
             g.disabled = false;
-            capitanas = llamarL('ligasCapitanas', [equiposDe(cambios.map(function (c) { return c.p; }))]);
+            capitanas = ctx.llamar('ligasCapitanas', [equiposDe(cambios.map(function (c) { return c.p; }))]);
             capitanas.catch(function () {});
             g.onclick = function () {
-              guardarCambio(cambios, op('ligasJornadas', [actual.liga.ID, a, bj, A.ps[0].ID]), { FECHA: B.fecha, ID_ARBITRO: cambios[0].nuevo.ID_ARBITRO }, capitanas, 'Jornadas ' + a + ' y ' + bj + ' intercambiadas.');
+              guardarCambio(cambios, { fn: 'ligasJornadas', args: [actual.liga.ID, a, bj, A.ps[0].ID] }, { FECHA: B.fecha, ID_ARBITRO: cambios[0].nuevo.ID_ARBITRO }, capitanas, 'Jornadas ' + a + ' y ' + bj + ' intercambiadas.');
               S.fecha = B.fecha; // la jornada que se estaba viendo, en su día nuevo
             };
           };
@@ -2187,7 +1874,6 @@
 
       /** ¿Arbitra este partido quien ha entrado (o puede cerrar todas las actas)? Sin mirar el estado ni el día. */
       function arbitraEste(p) {
-        if (SB) return R.gestiona(p) || R.arbitra(p);
         return !!quien.admin || (quien.actaTodas || []).indexOf(quien.perfil) >= 0 || (!!quien.yo && (p.ID_ARBITRO === quien.yo || p.ID_ARBITRO_REAL === quien.yo));
       }
       /**
@@ -2196,7 +1882,6 @@
        * también aplazado, anulado por otra causa y campo libre, cualquier día.
        */
       function quePuede(p) {
-        var programa = programaP(p); // T0394: sobre Supabase, si lleva este partido
         var dia = String(p.FECHA || '') <= hoy(), dos = !!(p.ID_INSCRIPCION_LOCAL && p.ID_INSCRIPCION_VISITANTE), arb = arbitraEste(p) && dia;
         if (!programa && (!arb || p.ESTADO === 'Aplazado' || p.ESTADO === 'Libre')) return [];
         var n = nAnulado();
@@ -2234,7 +1919,6 @@
        * y el campo se cambian moviendo el partido.
        */
       function formPartido(p) {
-        var programa = programaP(p); // T0394: sobre Supabase, si lleva este partido
         var ops = quePuede(p), ya = queEs(p);
         var conStaff = function (f, yaEsta) {
           var l = staff.staff.filter(function (s) { return f(s) && s.ACTIVO; }).map(function (s) { return s.ID; });
@@ -2290,8 +1974,7 @@
             var apl = que() === 'aplazado', sel = vent.querySelector('#lg-APLAZADO_POR'), pide = apl && sel && sel.value;
             [].forEach.call(vent.querySelectorAll('.lg-si-apl'), function (x) { x.hidden = !apl; });
             [].forEach.call(vent.querySelectorAll('.lg-si-pide'), function (x) { x.hidden = !pide; });
-            var c = pide ? (SB ? cartaYa(p, sel.value, val('lg-AVISO_APLAZAMIENTO'), verCarta) : carta(p, sel.value, val('lg-AVISO_APLAZAMIENTO'))) : null, v = vent.querySelector('#lg-veredicto');
-            if (pide && SB && !c) { if (v) { v.textContent = 'Mirando si tiene su carta…'; v.className = 'u-nota u-ancho lg-si-apl lg-si-pide'; } [].forEach.call(vent.querySelectorAll('.lg-si-paga'), function (x) { x.hidden = true; }); return; }
+            var c = pide ? carta(p, sel.value, val('lg-AVISO_APLAZAMIENTO')) : null, v = vent.querySelector('#lg-veredicto');
             if (v) { v.textContent = c ? textoCarta(c, equipo(sel.value)) : ''; v.className = 'u-nota u-ancho lg-si-apl lg-si-pide' + (c && c.tipo ? ' u-mal' : ''); }
             [].forEach.call(vent.querySelectorAll('.lg-si-paga'), function (x) { x.hidden = !(c && c.tipo); });
           }
@@ -2327,8 +2010,7 @@
                 v.APLAZADO_POR = pide; v.AVISO_APLAZAMIENTO = val('lg-AVISO_APLAZAMIENTO');
                 if (!v.AVISO_APLAZAMIENTO) mal.push('Di cuándo avisó.');
                 else if (v.AVISO_APLAZAMIENTO > String(p.FECHA || '9999')) mal.push('El aviso no puede ser después del partido.');
-                var cc = SB ? cartaYa(p, pide, v.AVISO_APLAZAMIENTO) : carta(p, pide, v.AVISO_APLAZAMIENTO), dec = vent.querySelector('input[name="lg-decide"]:checked');
-                if (!cc) { mal.push('Espera a ver si tiene su carta de aplazamiento.'); cc = {}; }
+                var cc = carta(p, pide, v.AVISO_APLAZAMIENTO), dec = vent.querySelector('input[name="lg-decide"]:checked');
                 if (cc.tipo && dec && dec.value === 'pierde') { v.ESTADO = 'Anulado'; v.ANULADO_POR = pide; }
                 if (!motivo) motivo = 'Lo pide ' + equipo(pide);
               }
@@ -2355,7 +2037,7 @@
         var an = resultadoAnulado(Object.assign({}, p, c), nAnulado());
         if (an) { pantalla.GOLES_LOCAL = an.gl; pantalla.GOLES_VISITANTE = an.gv; }
         else if (p.ESTADO === 'Anulado') { pantalla.GOLES_LOCAL = ''; pantalla.GOLES_VISITANTE = ''; }
-        var h = cambiar('PARTIDOS', p.ID, pantalla, 'ligasPartido', [p.ID, c]);
+        var h = T.actualizar('PARTIDOS', p.ID, pantalla, { fn: 'ligasPartido', args: [p.ID, c] });
         h.then(function (r) {
           if (r && r.quitados) T.refrescar(['GOLES']).catch(function () {});
           if (r && r.sanciones) T.refrescar(['SANCIONES']).catch(function () {}); // T0297: el No presentado del anulado
@@ -2370,7 +2052,7 @@
         var ids = partidosLiga(actual.liga.ID).filter(faltaSancion).map(function (p) { return p.ID; });
         if (!ids.length) return;
         S.apuntandoSan = true; pintar();
-        llamarL('ligasSancionesFaltan', [ids]).then(function (r) { return T.refrescar(['SANCIONES']).then(function () { return r; }); }).then(function (r) {
+        ctx.llamar('ligasSancionesFaltan', [ids]).then(function (r) { return T.refrescar(['SANCIONES']).then(function () { return r; }); }).then(function (r) {
           S.apuntandoSan = false;
           if (!ctx.abierta()) return;
           ctx.aviso(r.creadas === 1 ? 'Apuntada 1 sanción de no presentado.' : 'Apuntadas ' + r.creadas + ' sanciones de no presentado.');
@@ -2427,7 +2109,7 @@
         S.q = e.target.value; clearTimeout(tBusca);
         tBusca = setTimeout(function () { var r = cont.querySelector('#lg-gol-res'); if (r) r.innerHTML = htmlGolRes(); }, 150);
       });
-      ctx.alCambiar(function (t) { if (TABLAS_V.indexOf(t) >= 0 && !velo.classList.contains('abierto')) pintar(); });
+      ctx.alCambiar(function (t) { if (TABLAS.indexOf(t) >= 0 && !velo.classList.contains('abierto')) pintar(); });
       /** Pone Partidos en la temporada, competición, liga y día de un partido (T0277). false si no está. */
       function irAPartido(id) {
         var p = T.fila('PARTIDOS', id), l = p && T.fila('LIGAS', p.ID_LIGA), c = l && T.fila('COMPETICIONES', l.ID_COMPETICION);
@@ -2436,7 +2118,7 @@
         if (c) { S.temp = String(c.ID_TEMPORADA || ''); if (S.comp !== '*') S.comp = String(c.ID); S.liga = String(l.ID); }
         return true;
       }
-      ctx.tablas.leer(TABLAS_V).then(function () {
+      ctx.tablas.leer(TABLAS).then(function () {
         S.leido = true;
         var ir = pedido && irAPartido(pedido);
         pintar();
@@ -2446,15 +2128,14 @@
       }, function (e) {
         cont.innerHTML = '<p class="u-error">No se han podido leer las ligas.</p><p class="u-nota">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Vuelve a abrir la sección para probar otra vez.</p>';
       });
-      // Los nombres del staff y los colores de los equipos: los guardados, al momento; los de ahora, por detrás. T0394: sobre
-      // Supabase, de sus tablas (preparar).
-      if (!SB) ctx.llamar('ligasStaff').then(function (r) {
+      // Los nombres del staff y los colores de los equipos: los guardados, al momento; los de ahora, por detrás.
+      ctx.llamar('ligasStaff').then(function (r) {
         staff = r || staff; guardadoJson(KSTAFF, staff); quien.yo = staff.yo;
         if (ix) ix.staff = indice(staff.staff);
         if (ctx.abierta() && !velo.classList.contains('abierto')) pintar();
       }, function () {});
       if (copiaPuede) ctx.llamar('ligasPagosStaff', [false]).then(function (e) { copiaE = e || {}; pintarCopia(); }, function () {});
-      if (!SB) ctx.llamar('ligasColores').then(function (r) {
+      ctx.llamar('ligasColores').then(function (r) {
         colores = r || {}; guardadoJson(KCOL, colores);
         if (ctx.abierta() && !velo.classList.contains('abierto')) pintar();
       }, function () {});

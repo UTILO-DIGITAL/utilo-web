@@ -5,13 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Utilo DEV</title>
 <link rel="icon" href="data:,">
-<!-- T0432: para probar los avisos al móvil en DEV, se añade a la pantalla de inicio del iPhone como «Utilo DEV» (en iOS, los
-     avisos solo llegan así). El service worker es sw.js de esta carpeta, igual que el de utilo/plataforma/. -->
-<link rel="manifest" href="manifest.webmanifest?v=1">
-<link rel="apple-touch-icon" href="../../utilo/icono-180.png?v=2">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Utilo DEV">
 <!-- T0386: web de DEV de la plataforma de Utilo sobre Supabase (la de producción es utilo/plataforma/). En utilo-web/dev-rama/
      va al Supabase de DEV (utilo-dev, con la copia del DAILY de verdad) con el montaje de la rama (utilo/plataforma/montaje.js).
      Entrar con Google pide que esta dirección esté en Authentication › URL Configuration › Redirect URLs de utilo-dev.
@@ -23,7 +16,7 @@
      Probado en el iPhone de Javi (iOS 27.2). iOS la lee al añadir la app: hay que quitarla y volver a añadirla. -->
 <meta name="theme-color" content="#0E8A7A">
 <link rel="stylesheet" href="../../utilo/marca.css?v=47">
-<link rel="stylesheet" href="../../estilos/base.css?v=93">
+<link rel="stylesheet" href="../../estilos/base.css?v=92">
 <!-- T0386: como una aplicación: deslizar el dedo de lado no lleva a la página de atrás (en el iPhone, eso solo instalada) -->
 <style>html, body { overscroll-behavior-x: none; }
   html { overscroll-behavior-y: none; }
@@ -46,10 +39,10 @@
 </head>
 <body class="u">
 <div class="kz"><div class="kz-caja kz-centro" role="status"><div class="u-carga"></div><p>Cargando…</p></div></div>
-<script src="../../utilo/plataforma/montaje.js?v=96e8f6385e"></script>
+<script src="../../utilo/plataforma/montaje.js?v=73919ee94f"></script>
 <script src="../../kanban4/tablas.js?v=53"></script>
 <script src="../../nucleo/supabase.js?v=3"></script>
-<script src="../../nucleo/acceso-supabase.js?v=9"></script>
-<script src="../../nucleo/nucleo.js?v=18"></script>
+<script src="../../nucleo/acceso-supabase.js?v=8"></script>
+<script src="../../nucleo/nucleo.js?v=17"></script>
 </body>
 </html>
