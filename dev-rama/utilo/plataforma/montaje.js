@@ -110,6 +110,11 @@ window.NUCLEO_MONTAJE = {
    "nombre": "utilo-dev"
   }
  },
+ "avisos": {
+  "prod": "BHp2TxwWY_cf6BApFlnLVEwrXViN5kk9qwkIxVy5Yqkb1e70nVJLRyEOWrO9M7EETy-JSkRJubJA9xIxrwKS8Qw",
+  "dev": "BKK7UkLS5LCg5hNvyTuKR0Sbdwentx7D5csANbABkx17N46j1F3Iqn_KjJQmS2h9kHJvN0_eiiyq7OMIsngdk5I",
+  "local": "BJIfdofliPutdZdi__uArZkrZuoDUOb1nQXmW6ggslA7SUouH6vlFmG3J4VeOFdQyu_vpHnmTi49Ief8dxQUEX8"
+ },
  "esquema": {
   "zona": "Europe/Madrid",
   "tablas": {
@@ -669,6 +674,117 @@ window.NUCLEO_MONTAJE = {
      ],
      "bitacora_entrega_fkey": [
       "ENTREGA"
+     ]
+    }
+   },
+   "SOLICITUDES": {
+    "db": "solicitudes",
+    "clave": "ID",
+    "prefijo": "S",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "INICIATIVA",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "INICIATIVAS"
+     },
+     {
+      "nombre": "FECHA",
+      "tipo": "fecha_hora",
+      "obligatoria": true
+     },
+     {
+      "nombre": "PERSONA",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "TIPO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Cambio o mejora",
+       "Algo no funciona",
+       "Duda"
+      ]
+     },
+     {
+      "nombre": "URGENTE",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "TEXTO",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ENLACE",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "VERSION",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "ESTADO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Nueva",
+       "Convertida en tarea",
+       "Respondida",
+       "Descartada",
+       "Retirada"
+      ]
+     },
+     {
+      "nombre": "TAREA",
+      "tipo": "ref",
+      "ref": "TAREAS"
+     },
+     {
+      "nombre": "RESPUESTA",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "DECIDIDO_POR",
+      "tipo": "persona"
+     },
+     {
+      "nombre": "FECHA_DECISION",
+      "tipo": "fecha_hora"
+     },
+     {
+      "nombre": "PENDIENTE",
+      "tipo": "booleano"
+     }
+    ],
+    "restricciones": {
+     "solicitudes_pkey": [
+      "ID"
+     ],
+     "solicitudes_id_formato": [
+      "ID"
+     ],
+     "solicitudes_iniciativa_fkey": [
+      "INICIATIVA"
+     ],
+     "solicitudes_tipo_valores": [
+      "TIPO"
+     ],
+     "solicitudes_estado_valores": [
+      "ESTADO"
+     ],
+     "solicitudes_tarea_fkey": [
+      "TAREA"
+     ],
+     "solicitudes_decidido_por_fkey": [
+      "DECIDIDO_POR"
      ]
     }
    },

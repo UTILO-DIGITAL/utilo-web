@@ -442,7 +442,7 @@
       '<div class="n-perfil-cab"><h2 id="n-perfil-t">Tu perfil</h2><button type="button" class="n-perfil-x" id="n-perfil-cerrar" aria-label="Cerrar" title="Cerrar">' +
       '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' + htmlPerfil() + '</div></div>';
     document.body.appendChild(velo);
-    correosPerfil();
+    correosPerfil(); avisosPerfil();
     function cerrar() {
       document.removeEventListener('keydown', tecla, true);
       if (velo.parentNode) velo.parentNode.removeChild(velo);
@@ -588,7 +588,7 @@
     // sección también lo atendía la anterior, y volver a una le duplicaba los suyos).
     var viejo = $('n-sec'), el = viejo.cloneNode(false);
     viejo.parentNode.replaceChild(el, viejo);
-    if (s.propia) { el.innerHTML = htmlPerfil(); correosPerfil(); return; }
+    if (s.propia) { el.innerHTML = htmlPerfil(); correosPerfil(); avisosPerfil(); return; }
     var t = setTimeout(function () { if (actual === s.id && !el.childNodes.length) el.innerHTML = '<div class="kz-centro" role="status"><div class="u-carga"></div></div>'; }, 150);
     cargar(s).then(function (def) {
       clearTimeout(t);
@@ -694,6 +694,7 @@
         '<p class="u-nota">' + (conCodigo() ? 'Al cerrar la sesión tendrás que volver a entrar con un código a tu correo.' :
           'Al cerrar la sesión tendrás que volver a entrar con tu cuenta de Google.') + '</p>') +
       (window.UG.correos && !cred.como ? '<div class="n-correos" id="n-correos"></div>' : '') +
+      (window.UG.avisos && !cred.como ? '<div class="n-avisos" id="n-avisos"></div>' : '') +
       (dentro.length ? '<div class="n-botones">' + dentro.map(function (s) {
         return '<a class="u-btn" href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '">' + texto(s.titulo) + '</a>';
       }).join('') + '</div>' : '') + '</div>' + htmlVersion();
@@ -779,6 +780,91 @@
       C2.mios().then(pintar, function (x) { if (document.body.contains(caja)) caja.innerHTML = '<h3>Tus correos</h3><p class="kz-aviso">' + texto(String(x.message).replace(/^\w+:\s*/, '')) + '</p>'; });
     }
     caja.innerHTML = '<h3>Tus correos</h3><p class="u-nota">Cargando…</p>';
+    cargar();
+  }
+
+  /**
+   * T0432 · «Avisos al móvil» en el Perfil del marco (con Supabase y la clave de los avisos en el montaje): recibirlos en este
+   * dispositivo, mandarse uno de prueba, dejar de recibirlos y los últimos que te han llegado, con cuánto han tardado (lo
+   * apunta el móvil al recibirlos). En el iPhone solo llegan con la app en la pantalla de inicio: si no lo está, lo dice.
+   * Lo pinta en #n-avisos.
+   */
+  function avisosPerfil() {
+    var caja = $('n-avisos'), A = window.UG.avisos;
+    if (!caja || !A) return;
+    var aviso2 = '', ocupado = false;
+    function limpio(x) { return String((x && x.message) || x).replace(/^\w+:\s*/, ''); }
+    function cuando(iso) {
+      var d = new Date(iso), hoy = new Date(), ayer = new Date(Date.now() - 864e5);
+      var h = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+      if (d.toDateString() === hoy.toDateString()) return 'hoy, ' + h;
+      if (d.toDateString() === ayer.toDateString()) return 'ayer, ' + h;
+      return d.getDate() + '/' + (d.getMonth() + 1) + ', ' + h;
+    }
+    function tardo(a, b) {
+      var s = Math.max(0, Math.round((new Date(b) - new Date(a)) / 1000));
+      return s < 60 ? s + ' s' : s < 3600 ? Math.round(s / 60) + ' min' : Math.round(s / 360) / 10 + ' h';
+    }
+    /** Qué le ha pasado a un aviso, en palabras. */
+    function como(x) {
+      if (x.recibido) return 'Llegó en ' + tardo(x.enviado, x.recibido) + (x.abierto ? ' · lo abriste' : '');
+      if (x.resultado === 'Enviado') return 'No ha llegado';
+      if (x.resultado === 'Caducado') return 'No ha llegado: ese dispositivo ya no existe';
+      if (x.resultado === 'Enviando') return 'Saliendo…';
+      return 'No ha salido (' + x.resultado + ')';
+    }
+    function pintar(est, mios) {
+      if (!document.body.contains(caja)) return;
+      mios = mios || { dispositivos: [], avisos: [] };
+      var h = '<h3>Avisos al móvil</h3>', botones = '';
+      if (!est.soportado) {
+        h += '<p class="u-nota">' + (est.ios && !est.instalada ?
+          'En el iPhone, los avisos solo llegan con Utilo en la pantalla de inicio: en Safari, Compartir › Añadir a pantalla de inicio, y ábrela desde allí.' :
+          'Este navegador no puede recibir avisos.') + '</p>';
+      } else if (est.permiso === 'denied') {
+        h += '<p class="u-nota">Has dicho que no a los avisos de Utilo en este dispositivo: se cambia en sus ajustes (Notificaciones › Utilo).</p>';
+      } else if (!est.activo) {
+        h += '<p class="u-nota">Activa los avisos y te llegarán aquí, aunque no tengas Utilo abierta.</p>';
+        botones = '<button type="button" class="u-btn u-btn-accion" data-n-avisos="activar">Recibir avisos aquí</button>';
+      } else {
+        h += '<p class="u-nota">Este dispositivo recibe los avisos.</p>';
+        botones = '<button type="button" class="u-btn u-btn-accion" data-n-avisos="prueba">Mandarme un aviso de prueba</button>' +
+          '<button type="button" class="u-btn" data-n-avisos="desactivar">Dejar de recibirlos aquí</button>';
+      }
+      if (botones) h += '<div class="n-botones">' + botones + '</div>';
+      h += '<p class="kz-aviso" role="status">' + texto(aviso2) + '</p>';
+      var ds = (mios.dispositivos || []).filter(function (x) { return x.activa; });
+      if (ds.length) h += '<p class="u-nota">Los reciben: ' + texto(ds.map(function (x) { return x.dispositivo; }).join(', ')) + '.</p>';
+      var as = (mios.avisos || []).slice(0, 10);
+      if (as.length) {
+        h += '<h4>Los últimos</h4><ul class="n-avisos-lista">' + as.map(function (x) {
+          return '<li><span>' + texto(x.titulo) + '</span><span class="u-nota">' + texto(cuando(x.enviado) + ' · ' + x.dispositivo + ' · ' + como(x)) + '</span></li>';
+        }).join('') + '</ul>';
+      }
+      caja.innerHTML = h;
+      Array.prototype.forEach.call(caja.querySelectorAll('[data-n-avisos]'), function (b) {
+        b.onclick = function () {
+          if (ocupado) return;
+          var que = b.getAttribute('data-n-avisos');
+          if (que === 'desactivar' && b.getAttribute('data-seguro') !== '1') { b.setAttribute('data-seguro', '1'); b.textContent = '¿Seguro? Dejar de recibirlos'; return; }
+          ocupado = true; b.disabled = true;
+          var p = que === 'activar' ? A.activar().then(function () { aviso2 = 'Listo: los avisos te llegarán aquí. Prueba a mandarte uno.'; })
+            : que === 'prueba' ? A.prueba().then(function (r) {
+              aviso2 = !r || !r.dispositivos ? 'No hay ningún dispositivo que reciba avisos.' :
+                r.enviados ? 'Mandado' + (r.dispositivos > 1 ? ' a ' + r.enviados + ' de ' + r.dispositivos + ' dispositivos' : '') + ': tiene que llegarte en unos segundos.' :
+                'No ha salido: ' + ((r.errores || [])[0] || {}).detalle;
+            })
+            : A.desactivar().then(function () { aviso2 = 'Este dispositivo ya no recibe avisos.'; });
+          p.then(null, function (x) { aviso2 = limpio(x); }).then(function () { ocupado = false; cargar(); });
+        };
+      });
+    }
+    function cargar() {
+      A.estado().then(function (est) {
+        return A.mios().then(function (m) { pintar(est, m); }, function (x) { aviso2 = aviso2 || limpio(x); pintar(est, null); });
+      });
+    }
+    caja.innerHTML = '<h3>Avisos al móvil</h3><p class="u-nota">Cargando…</p>';
     cargar();
   }
 

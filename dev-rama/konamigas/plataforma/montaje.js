@@ -14,13 +14,44 @@ window.NUCLEO_MONTAJE = {
  "secciones": [
   {
    "id": "LIGAS",
-   "modulo": "competicion",
+   "modulo": "ligasbase",
    "titulo": "Ligas",
    "icono": "<path d=\"M8 4h8v5a4 4 0 0 1-8 0z\"/><path d=\"M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4\"/><path d=\"M12 13v4M9 20h6\"/>",
-   "web": "konamigas/secciones/competicion.js",
-   "version": "ff0041cb25",
+   "web": "konamigas/secciones/ligas.js",
+   "version": "48ff99597e",
    "perfiles": "todos",
-   "config": {},
+   "config": {
+    "PESTANAS": "PARTIDOS, CLASIFICACION, GOLEADORAS",
+    "PUNTOS": {
+     "GANAR": 3,
+     "EMPATAR": 1,
+     "PERDER": 0
+    },
+    "RESULTADO_ANULADO": 5,
+    "SIN_CLASIFICACION": [
+     "Copa",
+     "Supercopa"
+    ],
+    "SANCION_MULTAS": {
+     "No presentado": {
+      "MULTA": 60,
+      "RIVAL": 50,
+      "ARBITRO": 10
+     },
+     "Aplazamiento fuera de plazo": {
+      "MULTA": 60,
+      "RIVAL": 50,
+      "ARBITRO": 10
+     },
+     "Aplazamiento sin carta": {
+      "MULTA": 60,
+      "RIVAL": 50,
+      "ARBITRO": 10
+     }
+    },
+    "CARTA_DIAS": 7,
+    "AYUDA": ""
+   },
    "api": [
     "ligas_acta",
     "ligas_partido",
@@ -28,8 +59,6 @@ window.NUCLEO_MONTAJE = {
     "ligas_mover",
     "ligas_jornadas",
     "ligas_recuperar",
-    "ligas_huecos_mover",
-    "ligas_dias_recuperar",
     "ligas_sancion",
     "ligas_sancion_quitar",
     "ligas_sanciones_faltan",
@@ -61,6 +90,67 @@ window.NUCLEO_MONTAJE = {
  "esquema": {
   "zona": "Europe/Madrid",
   "tablas": {
+   "MODELOS": {
+    "db": "modelos",
+    "clave": "ID",
+    "prefijo": "MOD",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "NOMBRE",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "PRENDA",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_PROVEEDOR",
+      "tipo": "ref",
+      "ref": "CONTRAPARTES"
+     },
+     {
+      "nombre": "NOTAS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     },
+     {
+      "nombre": "DISENO_URL",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "PEDIDO_MINIMO",
+      "tipo": "numero"
+     },
+     {
+      "nombre": "DIAS_ENTREGA",
+      "tipo": "numero"
+     }
+    ],
+    "restricciones": {
+     "modelos_pkey": [
+      "ID"
+     ],
+     "modelos_id_formato": [
+      "ID"
+     ],
+     "modelos_id_proveedor_fkey": [
+      "ID_PROVEEDOR"
+     ],
+     "modelos_nombre_key": [
+      "NOMBRE"
+     ]
+    }
+   },
    "COLORES": {
     "db": "colores",
     "clave": "ID",
@@ -110,6 +200,546 @@ window.NUCLEO_MONTAJE = {
      ]
     }
    },
+   "MODELOS_COMPETICION": {
+    "db": "modelos_competicion",
+    "clave": "ID",
+    "prefijo": "MCO",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_COMPETICION",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "COMPETICIONES"
+     },
+     {
+      "nombre": "ID_MODELO",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "MODELOS"
+     },
+     {
+      "nombre": "CAMISETAS_INCLUIDAS",
+      "tipo": "numero",
+      "obligatoria": true
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "modelos_competicion_pkey": [
+      "ID"
+     ],
+     "modelos_competicion_id_formato": [
+      "ID"
+     ],
+     "modelos_competicion_id_competicion_fkey": [
+      "ID_COMPETICION"
+     ],
+     "modelos_competicion_id_modelo_fkey": [
+      "ID_MODELO"
+     ],
+     "modelos_competicion_id_competicion_id_modelo_key": [
+      "ID_COMPETICION",
+      "ID_MODELO"
+     ]
+    }
+   },
+   "PACKS": {
+    "db": "packs",
+    "clave": "ID",
+    "prefijo": "PCK",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_COMPETICION",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "COMPETICIONES"
+     },
+     {
+      "nombre": "DORSAL",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "TALLA",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "XS",
+       "S",
+       "M",
+       "L",
+       "XL",
+       "XXL"
+      ]
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "packs_pkey": [
+      "ID"
+     ],
+     "packs_id_formato": [
+      "ID"
+     ],
+     "packs_id_competicion_fkey": [
+      "ID_COMPETICION"
+     ],
+     "packs_talla_valores": [
+      "TALLA"
+     ],
+     "packs_id_competicion_dorsal_key": [
+      "ID_COMPETICION",
+      "DORSAL"
+     ]
+    }
+   },
+   "CATALOGO": {
+    "db": "catalogo",
+    "clave": "ID",
+    "prefijo": "CAT",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_PROVEEDOR",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "CONTRAPARTES"
+     },
+     {
+      "nombre": "ID_MODELO",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "MODELOS"
+     },
+     {
+      "nombre": "ID_COLOR",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "COLORES"
+     },
+     {
+      "nombre": "CODIGO",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "PRECIO",
+      "tipo": "importe"
+     },
+     {
+      "nombre": "ACTIVO",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "NOTAS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "catalogo_pkey": [
+      "ID"
+     ],
+     "catalogo_id_formato": [
+      "ID"
+     ],
+     "catalogo_id_proveedor_fkey": [
+      "ID_PROVEEDOR"
+     ],
+     "catalogo_id_modelo_fkey": [
+      "ID_MODELO"
+     ],
+     "catalogo_id_color_fkey": [
+      "ID_COLOR"
+     ],
+     "catalogo_id_proveedor_id_modelo_id_color_key": [
+      "ID_PROVEEDOR",
+      "ID_MODELO",
+      "ID_COLOR"
+     ]
+    }
+   },
+   "CAMISETAS": {
+    "db": "camisetas",
+    "clave": "ID",
+    "prefijo": "CMS",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_INSCRIPCION_JUGADORA",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "INSCRIPCIONES_JUGADORAS"
+     },
+     {
+      "nombre": "ID_MODELO",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "MODELOS"
+     },
+     {
+      "nombre": "ID_COLOR",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "COLORES"
+     },
+     {
+      "nombre": "TALLA",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "XS",
+       "S",
+       "M",
+       "L",
+       "XL",
+       "XXL"
+      ]
+     },
+     {
+      "nombre": "DORSAL",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "INCLUIDA",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "ID_PEDIDO",
+      "tipo": "ref",
+      "ref": "PEDIDOS"
+     },
+     {
+      "nombre": "ESTADO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Por pedir",
+       "Pedida",
+       "Por preparar",
+       "Preparada",
+       "Entregada",
+       "No llegó",
+       "Defectuosa",
+       "Sin camiseta"
+      ]
+     },
+     {
+      "nombre": "FECHA_ENTREGA",
+      "tipo": "fecha"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "camisetas_pkey": [
+      "ID"
+     ],
+     "camisetas_id_formato": [
+      "ID"
+     ],
+     "camisetas_id_inscripcion_jugadora_fkey": [
+      "ID_INSCRIPCION_JUGADORA"
+     ],
+     "camisetas_id_modelo_fkey": [
+      "ID_MODELO"
+     ],
+     "camisetas_id_color_fkey": [
+      "ID_COLOR"
+     ],
+     "camisetas_talla_valores": [
+      "TALLA"
+     ],
+     "camisetas_id_pedido_fkey": [
+      "ID_PEDIDO"
+     ],
+     "camisetas_estado_valores": [
+      "ESTADO"
+     ]
+    }
+   },
+   "PEDIDOS": {
+    "db": "pedidos",
+    "clave": "ID",
+    "prefijo": "PED",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_MODELO",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "MODELOS"
+     },
+     {
+      "nombre": "ID_TEMPORADA",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "TEMPORADAS"
+     },
+     {
+      "nombre": "ID_PROVEEDOR",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "CONTRAPARTES"
+     },
+     {
+      "nombre": "FECHA_PEDIDO",
+      "tipo": "fecha",
+      "obligatoria": true
+     },
+     {
+      "nombre": "FECHA_ESTIMADA",
+      "tipo": "fecha"
+     },
+     {
+      "nombre": "FECHA_RECIBIDO",
+      "tipo": "fecha"
+     },
+     {
+      "nombre": "CONFIRMADO",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "ID_FACTURA",
+      "tipo": "ref",
+      "ref": "FACTURAS"
+     },
+     {
+      "nombre": "ARCHIVO_URL",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "NOTAS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "pedidos_pkey": [
+      "ID"
+     ],
+     "pedidos_id_formato": [
+      "ID"
+     ],
+     "pedidos_id_modelo_fkey": [
+      "ID_MODELO"
+     ],
+     "pedidos_id_temporada_fkey": [
+      "ID_TEMPORADA"
+     ],
+     "pedidos_id_proveedor_fkey": [
+      "ID_PROVEEDOR"
+     ],
+     "pedidos_id_factura_fkey": [
+      "ID_FACTURA"
+     ]
+    }
+   },
+   "PEDIDOS_LINEAS": {
+    "db": "pedidos_lineas",
+    "clave": "ID",
+    "prefijo": "PLI",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_PEDIDO",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "PEDIDOS"
+     },
+     {
+      "nombre": "ID_COLOR",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "COLORES"
+     },
+     {
+      "nombre": "DORSAL",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "TALLA",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "XS",
+       "S",
+       "M",
+       "L",
+       "XL",
+       "XXL"
+      ]
+     },
+     {
+      "nombre": "CANTIDAD",
+      "tipo": "numero",
+      "obligatoria": true
+     },
+     {
+      "nombre": "PRECIO_UNIDAD",
+      "tipo": "importe"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "pedidos_lineas_pkey": [
+      "ID"
+     ],
+     "pedidos_lineas_id_formato": [
+      "ID"
+     ],
+     "pedidos_lineas_id_pedido_fkey": [
+      "ID_PEDIDO"
+     ],
+     "pedidos_lineas_id_color_fkey": [
+      "ID_COLOR"
+     ],
+     "pedidos_lineas_talla_valores": [
+      "TALLA"
+     ],
+     "pedidos_lineas_id_pedido_id_color_dorsal_talla_key": [
+      "ID_PEDIDO",
+      "ID_COLOR",
+      "DORSAL",
+      "TALLA"
+     ]
+    }
+   },
+   "AJUSTES_STOCK": {
+    "db": "ajustes_stock",
+    "clave": "ID",
+    "prefijo": "AJU",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "FECHA",
+      "tipo": "fecha",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_MODELO",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "MODELOS"
+     },
+     {
+      "nombre": "ID_COLOR",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "COLORES"
+     },
+     {
+      "nombre": "DORSAL",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "TALLA",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "XS",
+       "S",
+       "M",
+       "L",
+       "XL",
+       "XXL"
+      ]
+     },
+     {
+      "nombre": "CANTIDAD",
+      "tipo": "numero",
+      "obligatoria": true
+     },
+     {
+      "nombre": "TIPO",
+      "tipo": "lista",
+      "valores": [
+       "Recuento",
+       "Regalada",
+       "Donada",
+       "Perdida",
+       "Defectuosa",
+       "No llegó",
+       "Otro"
+      ]
+     },
+     {
+      "nombre": "MOTIVO",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "ajustes_stock_pkey": [
+      "ID"
+     ],
+     "ajustes_stock_id_formato": [
+      "ID"
+     ],
+     "ajustes_stock_id_modelo_fkey": [
+      "ID_MODELO"
+     ],
+     "ajustes_stock_id_color_fkey": [
+      "ID_COLOR"
+     ],
+     "ajustes_stock_talla_valores": [
+      "TALLA"
+     ],
+     "ajustes_stock_tipo_valores": [
+      "TIPO"
+     ]
+    }
+   },
    "TEMPORADAS": {
     "db": "temporadas",
     "clave": "ID",
@@ -152,6 +782,42 @@ window.NUCLEO_MONTAJE = {
       "ID"
      ],
      "temporadas_nombre_key": [
+      "NOMBRE"
+     ]
+    }
+   },
+   "FORMATOS": {
+    "db": "formatos",
+    "clave": "ID",
+    "prefijo": "FOR",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "NOMBRE",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "DESCRIPCION",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "formatos_pkey": [
+      "ID"
+     ],
+     "formatos_id_formato": [
+      "ID"
+     ],
+     "formatos_nombre_key": [
       "NOMBRE"
      ]
     }
@@ -257,6 +923,70 @@ window.NUCLEO_MONTAJE = {
      "competiciones_id_temporada_nombre_key": [
       "ID_TEMPORADA",
       "NOMBRE"
+     ]
+    }
+   },
+   "COMPETICIONES_ORIGEN": {
+    "db": "competiciones_origen",
+    "clave": "ID",
+    "prefijo": "COR",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_COMPETICION",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "COMPETICIONES"
+     },
+     {
+      "nombre": "ID_COMPETICION_ORIGEN",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "COMPETICIONES"
+     },
+     {
+      "nombre": "CRITERIO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Todos",
+       "Campeones",
+       "No campeones",
+       "Manual"
+      ]
+     },
+     {
+      "nombre": "NOTAS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "competiciones_origen_pkey": [
+      "ID"
+     ],
+     "competiciones_origen_id_formato": [
+      "ID"
+     ],
+     "competiciones_origen_id_competicion_fkey": [
+      "ID_COMPETICION"
+     ],
+     "competiciones_origen_id_competicion_origen_fkey": [
+      "ID_COMPETICION_ORIGEN"
+     ],
+     "competiciones_origen_criterio_valores": [
+      "CRITERIO"
+     ],
+     "competiciones_origen_id_competicion_id_competicion_origen_key": [
+      "ID_COMPETICION",
+      "ID_COMPETICION_ORIGEN"
      ]
     }
    },
@@ -514,6 +1244,163 @@ window.NUCLEO_MONTAJE = {
      "campos_id_instalacion_nombre_key": [
       "ID_INSTALACION",
       "NOMBRE"
+     ]
+    }
+   },
+   "CAMPOS_TEMPORADA": {
+    "db": "campos_temporada",
+    "clave": "ID",
+    "prefijo": "CTP",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_TEMPORADA",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "TEMPORADAS"
+     },
+     {
+      "nombre": "ID_CAMPO",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "CAMPOS"
+     },
+     {
+      "nombre": "ESTADO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Candidato",
+       "Negociando",
+       "Contratado",
+       "Descartado"
+      ]
+     },
+     {
+      "nombre": "PRECIO_HORA",
+      "tipo": "importe"
+     },
+     {
+      "nombre": "TIPO_IVA",
+      "tipo": "lista",
+      "valores": [
+       "21%",
+       "10%",
+       "4%",
+       "0%"
+      ]
+     },
+     {
+      "nombre": "CONDICIONES",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "NOTAS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "campos_temporada_pkey": [
+      "ID"
+     ],
+     "campos_temporada_id_formato": [
+      "ID"
+     ],
+     "campos_temporada_id_temporada_fkey": [
+      "ID_TEMPORADA"
+     ],
+     "campos_temporada_id_campo_fkey": [
+      "ID_CAMPO"
+     ],
+     "campos_temporada_estado_valores": [
+      "ESTADO"
+     ],
+     "campos_temporada_tipo_iva_valores": [
+      "TIPO_IVA"
+     ],
+     "campos_temporada_id_temporada_id_campo_key": [
+      "ID_TEMPORADA",
+      "ID_CAMPO"
+     ]
+    }
+   },
+   "DISPONIBILIDAD_CAMPOS": {
+    "db": "disponibilidad_campos",
+    "clave": "ID",
+    "prefijo": "DCA",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_CAMPO_TEMPORADA",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "CAMPOS_TEMPORADA"
+     },
+     {
+      "nombre": "DIA_SEMANA",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Lunes",
+       "Martes",
+       "Miércoles",
+       "Jueves",
+       "Viernes",
+       "Sábado",
+       "Domingo"
+      ]
+     },
+     {
+      "nombre": "HORA_DESDE",
+      "tipo": "hora",
+      "obligatoria": true
+     },
+     {
+      "nombre": "HORA_HASTA",
+      "tipo": "hora",
+      "obligatoria": true
+     },
+     {
+      "nombre": "NOTAS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     },
+     {
+      "nombre": "FECHA_DESDE",
+      "tipo": "fecha"
+     },
+     {
+      "nombre": "FECHA_HASTA",
+      "tipo": "fecha"
+     }
+    ],
+    "restricciones": {
+     "disponibilidad_campos_pkey": [
+      "ID"
+     ],
+     "disponibilidad_campos_id_formato": [
+      "ID"
+     ],
+     "disponibilidad_campos_id_campo_temporada_fkey": [
+      "ID_CAMPO_TEMPORADA"
+     ],
+     "disponibilidad_campos_dia_semana_valores": [
+      "DIA_SEMANA"
      ]
     }
    },
@@ -948,6 +1835,68 @@ window.NUCLEO_MONTAJE = {
      ]
     }
    },
+   "PREMIOS": {
+    "db": "premios",
+    "clave": "ID",
+    "prefijo": "PRM",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_COMPETICION",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "COMPETICIONES"
+     },
+     {
+      "nombre": "NOMBRE",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_INSCRIPCION_EQUIPO",
+      "tipo": "ref",
+      "ref": "INSCRIPCIONES_EQUIPOS"
+     },
+     {
+      "nombre": "ID_INSCRIPCION_JUGADORA",
+      "tipo": "ref",
+      "ref": "INSCRIPCIONES_JUGADORAS"
+     },
+     {
+      "nombre": "FECHA_ENTREGA",
+      "tipo": "fecha"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "premios_pkey": [
+      "ID"
+     ],
+     "premios_id_formato": [
+      "ID"
+     ],
+     "premios_id_competicion_fkey": [
+      "ID_COMPETICION"
+     ],
+     "premios_id_inscripcion_equipo_fkey": [
+      "ID_INSCRIPCION_EQUIPO"
+     ],
+     "premios_id_inscripcion_jugadora_fkey": [
+      "ID_INSCRIPCION_JUGADORA"
+     ],
+     "premios_id_competicion_nombre_key": [
+      "ID_COMPETICION",
+      "NOMBRE"
+     ]
+    }
+   },
    "STAFF": {
     "db": "staff",
     "clave": "ID",
@@ -1073,6 +2022,193 @@ window.NUCLEO_MONTAJE = {
      ]
     }
    },
+   "DISPONIBILIDAD_STAFF": {
+    "db": "disponibilidad_staff",
+    "clave": "ID",
+    "prefijo": "DST",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_STAFF",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "STAFF"
+     },
+     {
+      "nombre": "DIA_SEMANA",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Lunes",
+       "Martes",
+       "Miércoles",
+       "Jueves",
+       "Viernes",
+       "Sábado",
+       "Domingo"
+      ]
+     },
+     {
+      "nombre": "HORA_DESDE",
+      "tipo": "hora",
+      "obligatoria": true
+     },
+     {
+      "nombre": "HORA_HASTA",
+      "tipo": "hora",
+      "obligatoria": true
+     },
+     {
+      "nombre": "FECHA_DESDE",
+      "tipo": "fecha",
+      "obligatoria": true
+     },
+     {
+      "nombre": "FECHA_HASTA",
+      "tipo": "fecha"
+     },
+     {
+      "nombre": "NOTAS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "disponibilidad_staff_pkey": [
+      "ID"
+     ],
+     "disponibilidad_staff_id_formato": [
+      "ID"
+     ],
+     "disponibilidad_staff_id_staff_fkey": [
+      "ID_STAFF"
+     ],
+     "disponibilidad_staff_dia_semana_valores": [
+      "DIA_SEMANA"
+     ]
+    }
+   },
+   "MENSAJES_WHATSAPP": {
+    "db": "mensajes_whatsapp",
+    "clave": "ID",
+    "prefijo": "MSG",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "FECHA",
+      "tipo": "fecha",
+      "obligatoria": true
+     },
+     {
+      "nombre": "HORA",
+      "tipo": "hora",
+      "obligatoria": true
+     },
+     {
+      "nombre": "TELEFONO",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_STAFF",
+      "tipo": "ref",
+      "ref": "STAFF"
+     },
+     {
+      "nombre": "ID_PARTIDO",
+      "tipo": "ref",
+      "ref": "PARTIDOS"
+     },
+     {
+      "nombre": "TIPO",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "CATEGORIA",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "MENSAJE",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "REVISADO",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "mensajes_whatsapp_pkey": [
+      "ID"
+     ],
+     "mensajes_whatsapp_id_formato": [
+      "ID"
+     ],
+     "mensajes_whatsapp_id_staff_fkey": [
+      "ID_STAFF"
+     ],
+     "mensajes_whatsapp_id_partido_fkey": [
+      "ID_PARTIDO"
+     ]
+    }
+   },
+   "LISTAS": {
+    "db": "listas",
+    "clave": "ID",
+    "prefijo": "LIS",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "LISTA",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "VALOR",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ORDEN",
+      "tipo": "numero"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "listas_pkey": [
+      "ID"
+     ],
+     "listas_id_formato": [
+      "ID"
+     ],
+     "listas_lista_valor_key": [
+      "LISTA",
+      "VALOR"
+     ]
+    }
+   },
    "CONFIG": {
     "db": "config",
     "clave": "ID",
@@ -1100,6 +2236,1442 @@ window.NUCLEO_MONTAJE = {
     "restricciones": {
      "config_pkey": [
       "ID"
+     ]
+    }
+   },
+   "MOVIMIENTOS": {
+    "db": "movimientos",
+    "clave": "ID",
+    "prefijo": "MOV",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "FECHA",
+      "tipo": "fecha",
+      "obligatoria": true
+     },
+     {
+      "nombre": "TIPO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Ingreso",
+       "Gasto",
+       "Interno"
+      ]
+     },
+     {
+      "nombre": "CONCEPTO",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_CATEGORIA",
+      "tipo": "ref",
+      "ref": "CATEGORIAS"
+     },
+     {
+      "nombre": "BASE",
+      "tipo": "importe",
+      "obligatoria": true
+     },
+     {
+      "nombre": "TIPO_IVA",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "21%",
+       "10%",
+       "4%",
+       "0%"
+      ]
+     },
+     {
+      "nombre": "ID_CUENTA",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "CUENTAS"
+     },
+     {
+      "nombre": "ID_CUENTA_DESTINO",
+      "tipo": "ref",
+      "ref": "CUENTAS"
+     },
+     {
+      "nombre": "ID_CONTRAPARTE",
+      "tipo": "ref",
+      "ref": "CONTRAPARTES"
+     },
+     {
+      "nombre": "ID_TEMPORADA",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "TEMPORADAS"
+     },
+     {
+      "nombre": "ID_COMPETICION",
+      "tipo": "ref",
+      "ref": "COMPETICIONES"
+     },
+     {
+      "nombre": "ID_LIGA",
+      "tipo": "ref",
+      "ref": "LIGAS"
+     },
+     {
+      "nombre": "REF_TIPO",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "REF_ID",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "ID_FACTURA",
+      "tipo": "ref",
+      "ref": "FACTURAS"
+     },
+     {
+      "nombre": "NOTAS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "movimientos_pkey": [
+      "ID"
+     ],
+     "movimientos_id_formato": [
+      "ID"
+     ],
+     "movimientos_tipo_valores": [
+      "TIPO"
+     ],
+     "movimientos_id_categoria_fkey": [
+      "ID_CATEGORIA"
+     ],
+     "movimientos_tipo_iva_valores": [
+      "TIPO_IVA"
+     ],
+     "movimientos_id_cuenta_fkey": [
+      "ID_CUENTA"
+     ],
+     "movimientos_id_cuenta_destino_fkey": [
+      "ID_CUENTA_DESTINO"
+     ],
+     "movimientos_id_contraparte_fkey": [
+      "ID_CONTRAPARTE"
+     ],
+     "movimientos_id_temporada_fkey": [
+      "ID_TEMPORADA"
+     ],
+     "movimientos_id_competicion_fkey": [
+      "ID_COMPETICION"
+     ],
+     "movimientos_id_liga_fkey": [
+      "ID_LIGA"
+     ],
+     "movimientos_id_factura_fkey": [
+      "ID_FACTURA"
+     ]
+    }
+   },
+   "CATEGORIAS": {
+    "db": "categorias",
+    "clave": "ID",
+    "prefijo": "CAT",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "NOMBRE",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "TIPO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Ingreso",
+       "Gasto"
+      ]
+     },
+     {
+      "nombre": "GRUPO",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "categorias_pkey": [
+      "ID"
+     ],
+     "categorias_id_formato": [
+      "ID"
+     ],
+     "categorias_tipo_valores": [
+      "TIPO"
+     ],
+     "categorias_nombre_key": [
+      "NOMBRE"
+     ]
+    }
+   },
+   "CUENTAS": {
+    "db": "cuentas",
+    "clave": "ID",
+    "prefijo": "CUE",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "NOMBRE",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "TIPO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Banco",
+       "Caja",
+       "Socio"
+      ]
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "cuentas_pkey": [
+      "ID"
+     ],
+     "cuentas_id_formato": [
+      "ID"
+     ],
+     "cuentas_tipo_valores": [
+      "TIPO"
+     ],
+     "cuentas_nombre_key": [
+      "NOMBRE"
+     ]
+    }
+   },
+   "CONTRAPARTES": {
+    "db": "contrapartes",
+    "clave": "ID",
+    "prefijo": "CTR",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "NOMBRE",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "TIPO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Proveedor",
+       "Instalación",
+       "Sponsor",
+       "Staff",
+       "Gestoría",
+       "Otro"
+      ]
+     },
+     {
+      "nombre": "CONTACTO",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "NOTAS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "contrapartes_pkey": [
+      "ID"
+     ],
+     "contrapartes_id_formato": [
+      "ID"
+     ],
+     "contrapartes_tipo_valores": [
+      "TIPO"
+     ],
+     "contrapartes_nombre_key": [
+      "NOMBRE"
+     ]
+    }
+   },
+   "FACTURAS": {
+    "db": "facturas",
+    "clave": "ID",
+    "prefijo": "FAC",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "TIPO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Emitida",
+       "Recibida",
+       "Ticket"
+      ]
+     },
+     {
+      "nombre": "NUMERO",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "FECHA",
+      "tipo": "fecha",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_CONTRAPARTE",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "CONTRAPARTES"
+     },
+     {
+      "nombre": "BASE",
+      "tipo": "importe",
+      "obligatoria": true
+     },
+     {
+      "nombre": "TIPO_IVA",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "21%",
+       "10%",
+       "4%",
+       "0%"
+      ]
+     },
+     {
+      "nombre": "ARCHIVO_URL",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "ESTADO",
+      "tipo": "lista",
+      "valores": [
+       "Pendiente",
+       "Pagada",
+       "Anulada"
+      ]
+     },
+     {
+      "nombre": "NOTAS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "facturas_pkey": [
+      "ID"
+     ],
+     "facturas_id_formato": [
+      "ID"
+     ],
+     "facturas_tipo_valores": [
+      "TIPO"
+     ],
+     "facturas_id_contraparte_fkey": [
+      "ID_CONTRAPARTE"
+     ],
+     "facturas_tipo_iva_valores": [
+      "TIPO_IVA"
+     ],
+     "facturas_estado_valores": [
+      "ESTADO"
+     ],
+     "facturas_tipo_numero_key": [
+      "TIPO",
+      "NUMERO"
+     ]
+    }
+   },
+   "PRESUPUESTOS": {
+    "db": "presupuestos",
+    "clave": "ID",
+    "prefijo": "PRS",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_TEMPORADA",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "TEMPORADAS"
+     },
+     {
+      "nombre": "ID_COMPETICION",
+      "tipo": "ref",
+      "ref": "COMPETICIONES"
+     },
+     {
+      "nombre": "ID_CATEGORIA",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "CATEGORIAS"
+     },
+     {
+      "nombre": "IMPORTE",
+      "tipo": "importe",
+      "obligatoria": true
+     },
+     {
+      "nombre": "NOTAS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "presupuestos_pkey": [
+      "ID"
+     ],
+     "presupuestos_id_formato": [
+      "ID"
+     ],
+     "presupuestos_id_temporada_fkey": [
+      "ID_TEMPORADA"
+     ],
+     "presupuestos_id_competicion_fkey": [
+      "ID_COMPETICION"
+     ],
+     "presupuestos_id_categoria_fkey": [
+      "ID_CATEGORIA"
+     ],
+     "presupuestos_id_temporada_id_competicion_id_categoria_key": [
+      "ID_TEMPORADA",
+      "ID_COMPETICION",
+      "ID_CATEGORIA"
+     ]
+    }
+   },
+   "TARIFAS": {
+    "db": "tarifas",
+    "clave": "ID",
+    "prefijo": "TAR",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_TEMPORADA",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "TEMPORADAS"
+     },
+     {
+      "nombre": "CONCEPTO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Inscripción equipo",
+       "Árbitro partido",
+       "Gestor partido",
+       "Gestor jornada",
+       "Camiseta"
+      ]
+     },
+     {
+      "nombre": "REF_ID",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "UNIDADES_DESDE",
+      "tipo": "numero"
+     },
+     {
+      "nombre": "UNIDADES_HASTA",
+      "tipo": "numero"
+     },
+     {
+      "nombre": "PRECIO",
+      "tipo": "importe",
+      "obligatoria": true
+     },
+     {
+      "nombre": "TIPO_IVA",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "21%",
+       "10%",
+       "4%",
+       "0%"
+      ]
+     },
+     {
+      "nombre": "FECHA_DESDE",
+      "tipo": "fecha",
+      "obligatoria": true
+     },
+     {
+      "nombre": "FECHA_HASTA",
+      "tipo": "fecha"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "tarifas_pkey": [
+      "ID"
+     ],
+     "tarifas_id_formato": [
+      "ID"
+     ],
+     "tarifas_id_temporada_fkey": [
+      "ID_TEMPORADA"
+     ],
+     "tarifas_concepto_valores": [
+      "CONCEPTO"
+     ],
+     "tarifas_tipo_iva_valores": [
+      "TIPO_IVA"
+     ],
+     "tarifas_id_temporada_concepto_ref_id_unidades_desde_fe_be286e3b": [
+      "ID_TEMPORADA",
+      "CONCEPTO",
+      "REF_ID",
+      "UNIDADES_DESDE",
+      "FECHA_DESDE"
+     ]
+    }
+   },
+   "DESCUENTOS": {
+    "db": "descuentos",
+    "clave": "ID",
+    "prefijo": "DES",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_INSCRIPCION_EQUIPO",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "INSCRIPCIONES_EQUIPOS"
+     },
+     {
+      "nombre": "IMPORTE",
+      "tipo": "importe",
+      "obligatoria": true
+     },
+     {
+      "nombre": "MOTIVO",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "descuentos_pkey": [
+      "ID"
+     ],
+     "descuentos_id_formato": [
+      "ID"
+     ],
+     "descuentos_id_inscripcion_equipo_fkey": [
+      "ID_INSCRIPCION_EQUIPO"
+     ]
+    }
+   },
+   "EQUIPOS": {
+    "db": "equipos",
+    "clave": "ID",
+    "prefijo": "E",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "NOMBRE",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "TIPO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Liga",
+       "Kopa di Mondo"
+      ]
+     },
+     {
+      "nombre": "FECHA_ALTA",
+      "tipo": "fecha",
+      "obligatoria": true
+     },
+     {
+      "nombre": "NOTAS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "equipos_pkey": [
+      "ID"
+     ],
+     "equipos_id_formato": [
+      "ID"
+     ],
+     "equipos_tipo_valores": [
+      "TIPO"
+     ]
+    }
+   },
+   "JUGADORAS": {
+    "db": "jugadoras",
+    "clave": "ID",
+    "prefijo": "J",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "NOMBRE",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "APELLIDO_1",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "APELLIDO_2",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "FECHA_NACIMIENTO",
+      "tipo": "fecha"
+     },
+     {
+      "nombre": "TIPO_DOCUMENTO",
+      "tipo": "lista",
+      "valores": [
+       "DNI",
+       "NIE",
+       "Pasaporte",
+       "Otro"
+      ]
+     },
+     {
+      "nombre": "NUM_DOCUMENTO",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "TELEFONO",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "EMAIL",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "INSTAGRAM",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "IDIOMA",
+      "tipo": "lista",
+      "valores": [
+       "Castellano",
+       "Català",
+       "English"
+      ]
+     },
+     {
+      "nombre": "FECHA_ALTA",
+      "tipo": "fecha",
+      "obligatoria": true
+     },
+     {
+      "nombre": "NOTAS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     },
+     {
+      "nombre": "PERSONA",
+      "tipo": "persona"
+     },
+     {
+      "nombre": "NOMBRE_PUBLICO",
+      "tipo": "booleano"
+     }
+    ],
+    "restricciones": {
+     "jugadoras_pkey": [
+      "ID"
+     ],
+     "jugadoras_id_formato": [
+      "ID"
+     ],
+     "jugadoras_tipo_documento_valores": [
+      "TIPO_DOCUMENTO"
+     ],
+     "jugadoras_idioma_valores": [
+      "IDIOMA"
+     ],
+     "jugadoras_persona_fkey": [
+      "PERSONA"
+     ],
+     "jugadoras_tipo_documento_num_documento_key": [
+      "TIPO_DOCUMENTO",
+      "NUM_DOCUMENTO"
+     ],
+     "jugadoras_telefono_key": [
+      "TELEFONO"
+     ],
+     "jugadoras_persona_key": [
+      "PERSONA"
+     ]
+    }
+   },
+   "INSCRIPCIONES_EQUIPOS": {
+    "db": "inscripciones_equipos",
+    "clave": "ID",
+    "prefijo": "IE",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_EQUIPO",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "EQUIPOS"
+     },
+     {
+      "nombre": "ID_COMPETICION",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "COMPETICIONES"
+     },
+     {
+      "nombre": "ID_LIGA",
+      "tipo": "ref",
+      "ref": "LIGAS"
+     },
+     {
+      "nombre": "NOMBRE_EQUIPO",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_CAPITANA",
+      "tipo": "ref",
+      "ref": "JUGADORAS"
+     },
+     {
+      "nombre": "NIVEL",
+      "tipo": "lista",
+      "valores": [
+       "1",
+       "2",
+       "3",
+       "4",
+       "5"
+      ]
+     },
+     {
+      "nombre": "EXPERIENCIA",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "DISPONIBILIDAD",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "PREFERENCIA_HORARIA",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "COMENTARIOS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "NUM_JUGADORAS",
+      "tipo": "numero"
+     },
+     {
+      "nombre": "BUSCA_JUGADORAS",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "CUANTAS_BUSCA",
+      "tipo": "numero"
+     },
+     {
+      "nombre": "FACTURA_NOMBRE",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "FACTURA_NIF",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "FACTURA_DIRECCION",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "FACTURA_EMAIL",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "ID_COLOR",
+      "tipo": "ref",
+      "ref": "COLORES"
+     },
+     {
+      "nombre": "ID_RESPONSABLE",
+      "tipo": "ref",
+      "ref": "STAFF"
+     },
+     {
+      "nombre": "ESTADO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Solicitada",
+       "Confirmada",
+       "Baja"
+      ]
+     },
+     {
+      "nombre": "FECHA_INSCRIPCION",
+      "tipo": "fecha",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ORIGEN",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Formulario",
+       "Clasificación",
+       "Histórico",
+       "Manual"
+      ]
+     },
+     {
+      "nombre": "ID_INSCRIPCION_ORIGEN",
+      "tipo": "ref",
+      "ref": "INSCRIPCIONES_EQUIPOS"
+     },
+     {
+      "nombre": "MENSAJE_INICIAL_ENVIADO",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "GRUPO_CREADO",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "EN_XPORTY",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "NOTAS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     },
+     {
+      "nombre": "AVISO_LIGA_ENVIADO",
+      "tipo": "booleano"
+     }
+    ],
+    "restricciones": {
+     "inscripciones_equipos_pkey": [
+      "ID"
+     ],
+     "inscripciones_equipos_id_formato": [
+      "ID"
+     ],
+     "inscripciones_equipos_id_equipo_fkey": [
+      "ID_EQUIPO"
+     ],
+     "inscripciones_equipos_id_competicion_fkey": [
+      "ID_COMPETICION"
+     ],
+     "inscripciones_equipos_id_liga_fkey": [
+      "ID_LIGA"
+     ],
+     "inscripciones_equipos_id_capitana_fkey": [
+      "ID_CAPITANA"
+     ],
+     "inscripciones_equipos_nivel_valores": [
+      "NIVEL"
+     ],
+     "inscripciones_equipos_id_color_fkey": [
+      "ID_COLOR"
+     ],
+     "inscripciones_equipos_id_responsable_fkey": [
+      "ID_RESPONSABLE"
+     ],
+     "inscripciones_equipos_estado_valores": [
+      "ESTADO"
+     ],
+     "inscripciones_equipos_origen_valores": [
+      "ORIGEN"
+     ],
+     "inscripciones_equipos_id_inscripcion_origen_fkey": [
+      "ID_INSCRIPCION_ORIGEN"
+     ],
+     "inscripciones_equipos_id_equipo_id_competicion_key": [
+      "ID_EQUIPO",
+      "ID_COMPETICION"
+     ]
+    }
+   },
+   "INSCRIPCIONES_JUGADORAS": {
+    "db": "inscripciones_jugadoras",
+    "clave": "ID",
+    "prefijo": "IJ",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_JUGADORA",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "JUGADORAS"
+     },
+     {
+      "nombre": "ID_INSCRIPCION_EQUIPO",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "INSCRIPCIONES_EQUIPOS"
+     },
+     {
+      "nombre": "DORSAL",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "ESTADO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Activa",
+       "Baja"
+      ]
+     },
+     {
+      "nombre": "FECHA_INSCRIPCION",
+      "tipo": "fecha",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ACEPTA_NORMAS",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "ACEPTA_DERECHOS_IMAGEN",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "ACEPTA_DATOS",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "ACEPTA_RESPONSABILIDAD",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "COMO_NOS_CONOCIO",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "INFO_SEGURO",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "TALLA",
+      "tipo": "lista",
+      "valores": [
+       "XS",
+       "S",
+       "M",
+       "L",
+       "XL",
+       "XXL"
+      ]
+     },
+     {
+      "nombre": "COMENTARIOS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "ORIGEN",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Formulario",
+       "Clasificación",
+       "Histórico",
+       "Manual"
+      ]
+     },
+     {
+      "nombre": "EN_XPORTY",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "EN_CONTACTOS_GOOGLE",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "inscripciones_jugadoras_pkey": [
+      "ID"
+     ],
+     "inscripciones_jugadoras_id_formato": [
+      "ID"
+     ],
+     "inscripciones_jugadoras_id_jugadora_fkey": [
+      "ID_JUGADORA"
+     ],
+     "inscripciones_jugadoras_id_inscripcion_equipo_fkey": [
+      "ID_INSCRIPCION_EQUIPO"
+     ],
+     "inscripciones_jugadoras_estado_valores": [
+      "ESTADO"
+     ],
+     "inscripciones_jugadoras_talla_valores": [
+      "TALLA"
+     ],
+     "inscripciones_jugadoras_origen_valores": [
+      "ORIGEN"
+     ],
+     "inscripciones_jugadoras_id_jugadora_id_inscripcion_equipo_key": [
+      "ID_JUGADORA",
+      "ID_INSCRIPCION_EQUIPO"
+     ],
+     "inscripciones_jugadoras_id_inscripcion_equipo_dorsal_key": [
+      "ID_INSCRIPCION_EQUIPO",
+      "DORSAL"
+     ]
+    }
+   },
+   "SIN_EQUIPO": {
+    "db": "sin_equipo",
+    "clave": "ID",
+    "prefijo": "SE",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_JUGADORA",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "JUGADORAS"
+     },
+     {
+      "nombre": "ID_COMPETICION",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "COMPETICIONES"
+     },
+     {
+      "nombre": "FECHA",
+      "tipo": "fecha",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ESTADO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Busca equipo",
+       "Colocada",
+       "Baja"
+      ]
+     },
+     {
+      "nombre": "NIVEL",
+      "tipo": "lista",
+      "valores": [
+       "1",
+       "2",
+       "3",
+       "4",
+       "5"
+      ]
+     },
+     {
+      "nombre": "DISPONIBILIDAD",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "PORTERA",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "EN_BANCO",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "BANCO_TELEFONO",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "EQUIPOS_INTERES",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "ID_INSCRIPCION_EQUIPO",
+      "tipo": "ref",
+      "ref": "INSCRIPCIONES_EQUIPOS"
+     },
+     {
+      "nombre": "ID_INSCRIPCION_JUGADORA",
+      "tipo": "ref",
+      "ref": "INSCRIPCIONES_JUGADORAS"
+     },
+     {
+      "nombre": "ACEPTA_DATOS",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "COMO_NOS_CONOCIO",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "COMENTARIOS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "NOTAS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "sin_equipo_pkey": [
+      "ID"
+     ],
+     "sin_equipo_id_formato": [
+      "ID"
+     ],
+     "sin_equipo_id_jugadora_fkey": [
+      "ID_JUGADORA"
+     ],
+     "sin_equipo_id_competicion_fkey": [
+      "ID_COMPETICION"
+     ],
+     "sin_equipo_estado_valores": [
+      "ESTADO"
+     ],
+     "sin_equipo_nivel_valores": [
+      "NIVEL"
+     ],
+     "sin_equipo_id_inscripcion_equipo_fkey": [
+      "ID_INSCRIPCION_EQUIPO"
+     ],
+     "sin_equipo_id_inscripcion_jugadora_fkey": [
+      "ID_INSCRIPCION_JUGADORA"
+     ],
+     "sin_equipo_id_jugadora_id_competicion_key": [
+      "ID_JUGADORA",
+      "ID_COMPETICION"
+     ]
+    }
+   },
+   "FOTOS": {
+    "db": "fotos",
+    "clave": "ID",
+    "prefijo": "FOT",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_JUGADORA",
+      "tipo": "ref",
+      "ref": "JUGADORAS"
+     },
+     {
+      "nombre": "ID_INSCRIPCION_EQUIPO",
+      "tipo": "ref",
+      "ref": "INSCRIPCIONES_EQUIPOS"
+     },
+     {
+      "nombre": "ID_TEMPORADA",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "TEMPORADAS"
+     },
+     {
+      "nombre": "ARCHIVO_URL",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "NOMBRE_ORIGINAL",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ESTADO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Vinculada",
+       "Sin vincular"
+      ]
+     },
+     {
+      "nombre": "PUBLICABLE",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "FECHA",
+      "tipo": "fecha",
+      "obligatoria": true
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "fotos_pkey": [
+      "ID"
+     ],
+     "fotos_id_formato": [
+      "ID"
+     ],
+     "fotos_id_jugadora_fkey": [
+      "ID_JUGADORA"
+     ],
+     "fotos_id_inscripcion_equipo_fkey": [
+      "ID_INSCRIPCION_EQUIPO"
+     ],
+     "fotos_id_temporada_fkey": [
+      "ID_TEMPORADA"
+     ],
+     "fotos_estado_valores": [
+      "ESTADO"
+     ],
+     "fotos_archivo_url_key": [
+      "ARCHIVO_URL"
+     ]
+    }
+   },
+   "REVISIONES": {
+    "db": "revisiones",
+    "clave": "ID",
+    "prefijo": "REV",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "TIPO",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_REGISTRO",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "CANDIDATOS",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "MOTIVO",
+      "tipo": "texto",
+      "obligatoria": true
+     },
+     {
+      "nombre": "RESUELTO",
+      "tipo": "booleano"
+     },
+     {
+      "nombre": "FECHA",
+      "tipo": "fecha",
+      "obligatoria": true
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "revisiones_pkey": [
+      "ID"
+     ],
+     "revisiones_id_formato": [
+      "ID"
+     ]
+    }
+   },
+   "INTERACCIONES": {
+    "db": "interacciones",
+    "clave": "ID",
+    "prefijo": "INT",
+    "columnas": [
+     {
+      "nombre": "ID",
+      "tipo": "id",
+      "obligatoria": true
+     },
+     {
+      "nombre": "ID_INSCRIPCION_EQUIPO",
+      "tipo": "ref",
+      "obligatoria": true,
+      "ref": "INSCRIPCIONES_EQUIPOS"
+     },
+     {
+      "nombre": "FECHA",
+      "tipo": "fecha_hora",
+      "obligatoria": true
+     },
+     {
+      "nombre": "TIPO",
+      "tipo": "lista",
+      "obligatoria": true,
+      "valores": [
+       "Pedir la señal",
+       "Mensaje",
+       "Llamada",
+       "Correo",
+       "Nota"
+      ]
+     },
+     {
+      "nombre": "CANAL",
+      "tipo": "lista",
+      "valores": [
+       "WhatsApp",
+       "Copiado",
+       "Teléfono",
+       "Correo",
+       "En persona",
+       "Otro"
+      ]
+     },
+     {
+      "nombre": "TEXTO",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "PERSONA",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "LOG",
+      "tipo": "log"
+     }
+    ],
+    "restricciones": {
+     "interacciones_pkey": [
+      "ID"
+     ],
+     "interacciones_id_formato": [
+      "ID"
+     ],
+     "interacciones_id_inscripcion_equipo_fkey": [
+      "ID_INSCRIPCION_EQUIPO"
+     ],
+     "interacciones_tipo_valores": [
+      "TIPO"
+     ],
+     "interacciones_canal_valores": [
+      "CANAL"
      ]
     }
    },
@@ -1414,142 +3986,6 @@ window.NUCLEO_MONTAJE = {
      {
       "nombre": "PUESTO",
       "tipo": "numero"
-     }
-    ],
-    "restricciones": {}
-   },
-   "PARTIDOS_DETALLE": {
-    "db": "partidos_detalle",
-    "clave": "ID",
-    "soloLeer": true,
-    "columnas": [
-     {
-      "nombre": "ID",
-      "tipo": "texto"
-     },
-     {
-      "nombre": "GESTIONA",
-      "tipo": "booleano"
-     },
-     {
-      "nombre": "PUEDE",
-      "tipo": "texto"
-     },
-     {
-      "nombre": "MOVER",
-      "tipo": "booleano"
-     },
-     {
-      "nombre": "POR_RECUPERAR",
-      "tipo": "booleano"
-     },
-     {
-      "nombre": "RECUPERAR",
-      "tipo": "booleano"
-     },
-     {
-      "nombre": "RECUPERACION",
-      "tipo": "texto"
-     },
-     {
-      "nombre": "RECUPERA_FECHA",
-      "tipo": "fecha"
-     },
-     {
-      "nombre": "RECUPERA_HORA",
-      "tipo": "hora"
-     },
-     {
-      "nombre": "RECUPERA_CAMPO",
-      "tipo": "texto"
-     },
-     {
-      "nombre": "DEBE_LOCAL",
-      "tipo": "importe"
-     },
-     {
-      "nombre": "DEBE_VISITANTE",
-      "tipo": "importe"
-     },
-     {
-      "nombre": "SIN_SANCION",
-      "tipo": "booleano"
-     }
-    ],
-    "restricciones": {}
-   },
-   "JORNADAS": {
-    "db": "jornadas",
-    "clave": "ID",
-    "soloLeer": true,
-    "columnas": [
-     {
-      "nombre": "ID",
-      "tipo": "texto"
-     },
-     {
-      "nombre": "ID_LIGA",
-      "tipo": "texto"
-     },
-     {
-      "nombre": "JORNADA",
-      "tipo": "numero"
-     },
-     {
-      "nombre": "MOVIBLE",
-      "tipo": "booleano"
-     },
-     {
-      "nombre": "MOTIVO",
-      "tipo": "texto"
-     },
-     {
-      "nombre": "FECHA",
-      "tipo": "fecha"
-     }
-    ],
-    "restricciones": {}
-   },
-   "LIGAS_GESTIONADAS": {
-    "db": "ligas_gestionadas",
-    "clave": "ID",
-    "soloLeer": true,
-    "columnas": [
-     {
-      "nombre": "ID",
-      "tipo": "texto"
-     }
-    ],
-    "restricciones": {}
-   },
-   "EQUIPOS_DETALLE": {
-    "db": "equipos_detalle",
-    "clave": "ID",
-    "soloLeer": true,
-    "columnas": [
-     {
-      "nombre": "ID",
-      "tipo": "texto"
-     },
-     {
-      "nombre": "ID_LIGA",
-      "tipo": "texto"
-     },
-     {
-      "nombre": "GESTIONA",
-      "tipo": "booleano"
-     },
-     {
-      "nombre": "DEBE",
-      "tipo": "importe"
-     },
-     {
-      "nombre": "CARTA_USADA",
-      "tipo": "texto"
-     },
-     {
-      "nombre": "CARTA_USADA_FECHA",
-      "tipo": "fecha"
      }
     ],
     "restricciones": {}
