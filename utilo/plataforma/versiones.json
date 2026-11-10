@@ -1,6 +1,13 @@
 {
-  "version": "5.16.1-1.12.1",
+  "version": "5.16.1-1.13",
   "versiones": [
+    {
+      "v": "5.16.1-1.13",
+      "fecha": "10/11/2026",
+      "novedades": [
+        "En el iPhone, la barra de abajo queda pegada al borde y la franja de la hora ya no se difumina (quita Utilo de la pantalla de inicio y vuelve a añadirlo)."
+      ]
+    },
     {
       "v": "5.16.1-1.12.1",
       "fecha": "10/11/2026",
