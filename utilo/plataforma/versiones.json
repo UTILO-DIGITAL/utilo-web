@@ -1,6 +1,15 @@
 {
-  "version": "5.16.2-1.13.1",
+  "version": "5.17-1.14",
   "versiones": [
+    {
+      "v": "5.17-1.14",
+      "fecha": "10/11/2026",
+      "novedades": [
+        "Las entregas pasan solas a En curso en cuanto se empieza una de sus tareas.",
+        "Una entrega con todas sus tareas hechas lo dice en verde y se marca entregada con un botón.",
+        "Las cifras de arriba de Entregas se pulsan para ver solo las listas para entregar, las vencidas, las que tienen atascos o las que esperan."
+      ]
+    },
     {
       "v": "5.16.2-1.13.1",
       "fecha": "10/11/2026",

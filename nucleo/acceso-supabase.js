@@ -160,11 +160,14 @@
 
   /* ---------- las tablas y las funciones ---------- */
 
-  var funciones = [];
-  (M.secciones || []).forEach(function (s) { (s.api || []).forEach(function (f) { if (funciones.indexOf(f) < 0) funciones.push(f); }); });
+  var funciones = [], servidor = [];
+  (M.secciones || []).forEach(function (s) {
+    (s.api || []).forEach(function (f) { if (funciones.indexOf(f) < 0) funciones.push(f); });
+    (s.servidor || []).forEach(function (f) { if (servidor.indexOf(f) < 0) servidor.push(f); }); // T0394: las Edge Functions de su api
+  });
   var sb = null;
   function capa() {
-    if (!sb) sb = window.US.crear({ url: URL_SB, clave: P.clave, token: token, esquema: M.esquema, funciones: funciones.concat(['mi_acceso']),
+    if (!sb) sb = window.US.crear({ url: URL_SB, clave: P.clave, token: token, esquema: M.esquema, funciones: funciones.concat(['mi_acceso']), servidor: servidor,
       fetch: function (u, x) { return fetch(u, x); } }); // el de la página (en las pruebas, el del navegador falso)
     return sb;
   }
