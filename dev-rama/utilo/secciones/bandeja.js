@@ -116,7 +116,8 @@
   /** ¿Sale con estos filtros? F: { ver: [], ini: [], busca } (ver vacío: todas). */
   function seVe(s, F) {
     var v = lista(F.ver), i = lista(F.ini);
-    if (v.length && v.indexOf(grupo(s)) < 0) return false;
+    // T0427: una Retirada con aviso sin ver sale en «Por atender» y también en «Retiradas».
+    if (v.length && v.indexOf(grupo(s)) < 0 && !(s.ESTADO === 'Retirada' && v.indexOf('Retiradas') >= 0)) return false;
     if (i.length && i.indexOf(String(s.INICIATIVA)) < 0) return false;
     var q = sinTildes(String(F.busca || '').trim());
     if (!q) return true;

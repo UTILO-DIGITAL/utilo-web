@@ -20,6 +20,7 @@
  * Cada tarea abre su ficha en Tareas. Lee la vista TABLERO, con la sesión de quien ha entrado (lo que ve lo dicen sus
  * roles) y se pone al día sola cuando alguien cambia una tarea (Realtime). Los cálculos (CALC) se prueban en node
  * (herramientas/probar-plataforma.js). Estilos: estilos/kanban.css (.pm-*), con los colores de base.css.
+ * T0427: kanban.css se pide con la versión de esta sección: cambia con ella (las etiquetas de la Bandeja que saltan de línea).
  */
 (function () {
   'use strict';
