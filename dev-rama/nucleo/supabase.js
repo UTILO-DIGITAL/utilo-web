@@ -34,6 +34,8 @@
  * - T0386 · Vistas (TABLERO, de supabase/vistas.json): se leen como una tabla y no se escriben (SECCION:); se cambia su tabla.
  * - T0386 · Funciones de la base (o.funciones: las de la «api» de la sección, como mover_tarea): llamar(fn, [{ args }]) va a
  *   rpc/<fn>; sb.rpc(fn, args) también (mi_acceso). Sus errores, con el prefijo y la frase de la base.
+ * - T0394 · Funciones del servidor (o.servidor: las Edge Functions de la «api» de la sección, como justificante): llamar(fn,
+ *   [{ args }]) va a functions/v1/<fn> con la sesión; contestan { code, message } como la base, con los mismos avisos.
  * Vale también en node (las pruebas y las herramientas): module.exports, con fetch de node 18+ o el que se pase.
  */
 (function (raiz) {
@@ -428,13 +430,15 @@
      * argumentos por nombre ({ tarea, estado, … }). Lo que la base dice que no llega con el prefijo de siempre y su frase,
      * que ya está en castellano (las funciones de la gestión la escriben pensando en quien la lee).
      */
-    function rpc(fn, args) {
+    function rpc(fn, args, servidor) {
       var sesion = '';
       return Promise.resolve(o.token ? o.token() : '').then(function (tok) {
         sesion = tok || '';
         var h = { apikey: o.clave, Accept: 'application/json', 'Content-Type': 'application/json' };
         if (tok) h.Authorization = 'Bearer ' + tok;
-        return traer(base + 'rpc/' + encodeURIComponent(fn), { method: 'POST', headers: h, body: JSON.stringify(args || {}) });
+        // T0394 · Una función del servidor (Edge Function) va a functions/v1/<fn>, con la misma sesión y los mismos avisos.
+        var dir = servidor ? String(o.url).replace(/\/+$/, '') + '/functions/v1/' + encodeURIComponent(fn) : base + 'rpc/' + encodeURIComponent(fn);
+        return traer(dir, { method: 'POST', headers: h, body: JSON.stringify(args || {}) });
       }).then(function (r) {
         return r.text().then(function (s) {
           var j = null;
@@ -448,8 +452,9 @@
       });
     }
 
-    var funciones = {};
+    var funciones = {}, servidor = {};
     [].concat(o.funciones || []).forEach(function (f) { funciones[String(f)] = 1; });
+    [].concat(o.servidor || []).forEach(function (f) { servidor[String(f)] = 1; });
 
     /** llamar(fn, args) para tablas.js: lo de las tablas de Supabase, aquí; lo demás (y las tablas de un Sheet), a otro. */
     function llamar(fn, args) {
@@ -462,6 +467,7 @@
         }
         // T0386: las funciones de la base que puede llamar la sección (su «api»), con sus argumentos en un objeto.
         if (hay(funciones, fn)) return rpc(fn, args[0] || {});
+        if (hay(servidor, fn)) return rpc(fn, args[0] || {}, true); // T0394: una función del servidor (justificante)
         if (o.otro) return o.otro(fn, args);
         if (hay(FN, fn)) tabla(args[0]);
         throw new Error('Función no permitida: ' + fn + ' (aquí solo están las tablas de Supabase).');
