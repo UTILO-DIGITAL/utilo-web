@@ -1927,9 +1927,7 @@ html .u .u-velo, html .u .gs5 .gs-velo, html .u #alta-velo, html .u .ver-velo, h
   html .u .gs5 .gs-pie { padding-bottom: calc(var(--e2) + env(safe-area-inset-bottom, 0px)); }
 }
 
-/* ---------- Barra de arriba del iPhone (T0421) ----------
- * La franja de la hora es del color del fondo de html (la plataforma de Utilo lo pone del de la marca en su index.html);
- * el body, con el fondo de la página, ocupa al menos toda la pantalla, así que ese color solo se ve arriba. La página ya no
- * llega por debajo de la hora (black-translucent): en iOS 26 dejaba un difuminado blanco arriba y subía la barra de
- * secciones, con un hueco debajo. */
+/* ---------- El body cubre toda la pantalla (T0421) ----------
+ * Sin la etiqueta black-translucent (T0430), la franja de la hora del iPhone instalado toma el color de fondo del body (la
+ * plataforma de Utilo lo pone verde en su index.html). */
 body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
