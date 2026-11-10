@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Barra 3</title>
+<!-- T0430 · Prueba de la barra de abajo en el iPhone (instalada en la pantalla de inicio). La cabecera y el CSS son los de
+     web/utilo/plataforma/index.html; el marco, el de nucleo.js (barra .sx.u-sx y #sx-panel). Versiones (?v=):
+     actual   · como producción: la barra fija y el body que se desplaza.
+     columna  · la pantalla es una columna fija: el contenido se desplaza por dentro y la barra es su último trozo (no flota).
+     dvh      · como actual, pero html y body con 100dvh en vez de 100%.
+     Sección: ?c=corto (casi vacía, como la Bandeja) o ?c=largo. Lo de abajo de la página dice qué mide cada cosa. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="../../utilo/icono-180.png?v=2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Barra 3">
+<meta name="theme-color" content="#0E8A7A">
+<link rel="stylesheet" href="../../utilo/marca.css">
+<link rel="stylesheet" href="../../estilos/base.css">
+<style>html, body { overscroll-behavior-x: none; }
+  html { background: #0E8A7A; }
+  html .u .u-velo, html .u .gs5 .gs-velo, html .u #alta-velo, html .u .ver-velo, html .u .sol-velo, html .u .fv-velo, html .u .kz {
+    top: calc(var(--tope, 0px) + env(safe-area-inset-top, 0px)); }</style>
+
+<style>
+  /* columna: la pantalla entera es una columna fija; se desplaza #sx-panel y la barra va debajo, sin position: fixed. */
+  @media (max-width: 899px) {
+    html.v-columna, html.v-columna > body.u.u-con-barra { height: 100%; overflow: hidden; }
+    html.v-columna > body.u.u-con-barra { position: fixed; inset: 0; display: flex; flex-direction: column; padding-bottom: 0 !important;
+      overflow: hidden; min-height: 0; }
+    html.v-columna #sx-panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
+    html.v-columna .sx.u-sx { position: static; order: 2; flex: none; }
+    html.v-dvh, html.v-dvh > body.u.u-con-barra { height: 100dvh; }
+  }
+  /* lvh: con la app instalada, iOS da una ventana más corta que la pantalla (100dvh < 100lvh, la franja de la hora). La barra
+     baja justo lo que falta (0 si no falta nada) y el cuerpo mide la pantalla entera. */
+  @media (max-width: 899px) and (display-mode: standalone) {
+    html.v-lvh, html.v-lvh > body.u.u-con-barra { height: 100lvh; }
+    html.v-lvh .sx.u-sx { bottom: calc(100dvh - 100lvh); }
+  }
+  /* flujo: nada fijo. La pantalla entera (100lvh) es una columna: arriba se desplaza #sx-panel y debajo va la barra, como un
+     trozo más de la página. Lo de fuera de la ventana corta de iOS se pinta si es contenido normal, no si es fijo. */
+  @media (max-width: 899px) {
+    html.v-flujo, html.v-flujo > body.u.u-con-barra { height: 100dvh; overflow: hidden; }
+    html.v-flujo > body.u.u-con-barra { display: flex; flex-direction: column; padding-bottom: 0 !important; min-height: 0; }
+    html.v-flujo #sx-panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
+    html.v-flujo .sx.u-sx { position: static; order: 2; flex: none; }
+  }
+  /* Instalada, la pantalla entera: iOS da una ventana más corta (100dvh) que la pantalla (100lvh). */
+  @media (max-width: 899px) and (display-mode: standalone) { html.v-flujo, html.v-flujo > body.u.u-con-barra { height: 100lvh; } }
+  /* f=verde: el fondo del cuerpo, verde (lo que hay detrás de la franja de la hora); el contenido sigue crema. */
+  html.f-verde, html.f-verde body.u { background: #0E8A7A; }
+  html.f-verde #sx-panel { background: var(--color-fondo); min-height: 100%; }
+  .bt-v { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  .bt-v a { padding: 8px 10px; border: 1px solid var(--color-linea); border-radius: 8px; text-decoration: none; }
+  .bt-v a.si { background: var(--color-principal-oscuro); color: #fff; }
+  #medida { font: 13px/1.4 monospace; white-space: pre-wrap; }
+</style>
+</head>
+<body class="u u-con-barra">
+<nav class="sx u-sx" aria-label="Secciones"><div class="sx-in">
+  <a href="#"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/></svg><span>Para mí</span></a>
+  <a href="#"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/></svg><span>Tareas</span></a>
+  <a href="#"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/></svg><span>Entregas</span></a>
+  <a href="#" aria-current="page"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/></svg><span>Bandeja</span></a>
+</div></nav>
+<div id="sx-panel"><header class="u-cab n-cab"><h1>Bandeja</h1></header>
+<main class="u-main n-main" id="n-sec">
+  <p><b>Prueba de la barra 3 (T0430, sin la etiqueta)</b></p>
+  <div class="bt-v" id="vs"></div>
+  <p id="medida"></p>
+  <div id="relleno"></div>
+</main></div>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search), v = q.get('v') || 'actual', c = q.get('c') || 'corto';
+  document.documentElement.className = 'v-' + v + (q.get('f') ? ' f-' + q.get('f') : '');
+  var b = [];
+  ['actual', 'flujo', 'lvh', 'columna', 'dvh'].forEach(function (x) { ['corto', 'largo'].forEach(function (y) {
+    b.push('<a class="' + (x === v && y === c ? 'si' : '') + '" href="?v=' + x + '&c=' + y + '">' + x + ' · ' + y + '</a>'); }); });
+  b.push('<a href="?v=actual&c=corto&f=verde">actual · corto · fondo verde</a>');
+  document.getElementById('vs').innerHTML = b.join('');
+  if (c === 'largo') document.getElementById('relleno').innerHTML = Array.apply(null, Array(40)).map(function (_, i) { return '<p>Fila de relleno ' + (i + 1) + '</p>'; }).join('');
+  // Reglas para medir lo que da iOS de cada forma.
+  var reglas = ['100vh', '100lvh', '100svh', '100dvh', '100%', 'env(safe-area-inset-top, 0px)', 'env(safe-area-inset-bottom, 0px)'].map(function (h) {
+    var d = document.createElement('div'); d.style.cssText = 'position:fixed;left:-9px;top:0;width:1px;visibility:hidden;height:' + h; d.setAttribute('data-h', h); document.body.appendChild(d); return d; });
+  function medir() {
+    var nav = document.querySelector('.sx').getBoundingClientRect();
+    var extra = '\npantalla ' + screen.width + '×' + screen.height + ' · visual ' + Math.round(visualViewport ? visualViewport.height : 0) + ' · clientH ' + document.documentElement.clientHeight +
+      '\n' + reglas.map(function (d) { return d.getAttribute('data-h').replace(', 0px)', ')') + '=' + Math.round(d.getBoundingClientRect().height); }).join(' · ');
+    document.getElementById('medida').textContent = 'versión ' + v + ' · ' + c + '\nventana ' + innerWidth + '×' + innerHeight +
+      '\nbarra: arriba ' + Math.round(nav.top) + ', abajo ' + Math.round(nav.bottom) + ' (hueco debajo: ' + Math.round(innerHeight - nav.bottom) + ')' +
+      '\ninstalada: ' + (navigator.standalone ? 'sí' : 'no') + extra;
+  }
+  addEventListener('load', medir); addEventListener('resize', medir); setTimeout(medir, 500);
+  // Instalada y abierta desde la pantalla de inicio (sin ?v=), o con ?ciclo=: pasa sola por las seis, 6 s cada una, y vuelve a empezar.
+  var orden = ['lvh|corto', 'lvh|largo', 'actual|corto'];
+  if (!q.has('v') && navigator.standalone && !q.has('ciclo')) { location.replace('?v=actual&c=corto'); return; }
+  if (q.has('ciclo')) {
+    var i = (Number(q.get('ciclo')) || 0) % orden.length, x = orden[i].split('|');
+    if (!q.has('v')) { location.replace('?v=' + x[0] + '&c=' + x[1] + '&ciclo=' + i); return; }
+    setTimeout(function () { var n = (i + 1) % orden.length, y = orden[n].split('|'); location.replace('?v=' + y[0] + '&c=' + y[1] + '&ciclo=' + n); }, 6000);
+  }
+})();
+</script>
+</body>
+</html>
