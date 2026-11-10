@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Barra</title>
-<!-- T0430 · Prueba de la barra de abajo en el iPhone (instalada en la pantalla de inicio). La cabecera y el CSS son los de
+<!-- T0430 · Prueba de la barra de abajo en el iPhone (instalada en la pantalla de inicio), CON black-translucent: reproduce
+     el fallo (iOS 26.1+ da una ventana más corta que la pantalla y un degradado sobre la hora). La solución es dev/barra3/. La cabecera y el CSS son los de
      web/utilo/plataforma/index.html; el marco, el de nucleo.js (barra .sx.u-sx y #sx-panel). Versiones (?v=):
      actual   · como producción: la barra fija y el body que se desplaza.
      columna  · la pantalla es una columna fija: el contenido se desplaza por dentro y la barra es su último trozo (no flota).

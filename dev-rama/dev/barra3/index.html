@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Barra 3</title>
-<!-- T0430 · Prueba de la barra de abajo en el iPhone (instalada en la pantalla de inicio). La cabecera y el CSS son los de
+<!-- T0430 · Prueba de la barra en el iPhone instalada, SIN la etiqueta black-translucent: la solución que va en la plataforma
+     (comprobada en el iPhone de Javi, iOS 27.2). Con «fondo verde», la franja de la hora toma el verde de la página. La cabecera y el CSS son los de
      web/utilo/plataforma/index.html; el marco, el de nucleo.js (barra .sx.u-sx y #sx-panel). Versiones (?v=):
      actual   · como producción: la barra fija y el body que se desplaza.
      columna  · la pantalla es una columna fija: el contenido se desplaza por dentro y la barra es su último trozo (no flota).
@@ -52,6 +53,12 @@
   /* f=verde: el fondo del cuerpo, verde (lo que hay detrás de la franja de la hora); el contenido sigue crema. */
   html.f-verde, html.f-verde body.u { background: #0E8A7A; }
   html.f-verde #sx-panel { background: var(--color-fondo); min-height: 100%; }
+  /* f=real y f=antes: el CSS de la plataforma después y antes de T0430b. Antes, el body crema con el verde pintado arriba (la
+     franja salía clara fundiéndose con el verde); ahora, el body verde con el crema pintado abajo. */
+  html.f-real, html.f-antes { background: #0E8A7A; }
+  html.f-real body.u.u-con-barra { background: linear-gradient(var(--color-fondo), var(--color-fondo)) bottom / 100% 50% no-repeat, #0E8A7A; }
+  html.f-antes body.u.u-con-barra { background: linear-gradient(#0E8A7A, #0E8A7A) top / 100% 50% no-repeat, var(--color-fondo); }
+  html.f-real #sx-panel, html.f-antes #sx-panel { min-height: 100%; box-sizing: border-box; background: var(--color-fondo); }
   .bt-v { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
   .bt-v a { padding: 8px 10px; border: 1px solid var(--color-linea); border-radius: 8px; text-decoration: none; }
   .bt-v a.si { background: var(--color-principal-oscuro); color: #fff; }
@@ -80,6 +87,8 @@
   ['actual', 'flujo', 'lvh', 'columna', 'dvh'].forEach(function (x) { ['corto', 'largo'].forEach(function (y) {
     b.push('<a class="' + (x === v && y === c ? 'si' : '') + '" href="?v=' + x + '&c=' + y + '">' + x + ' · ' + y + '</a>'); }); });
   b.push('<a href="?v=actual&c=corto&f=verde">actual · corto · fondo verde</a>');
+  [['real', 'el arreglo'], ['antes', 'como está']].forEach(function (f) { ['corto', 'largo'].forEach(function (y) {
+    b.push('<a class="' + (q.get('f') === f[0] && y === c ? 'si' : '') + '" href="?v=actual&c=' + y + '&f=' + f[0] + '">' + f[1] + ' · ' + y + '</a>'); }); });
   document.getElementById('vs').innerHTML = b.join('');
   if (c === 'largo') document.getElementById('relleno').innerHTML = Array.apply(null, Array(40)).map(function (_, i) { return '<p>Fila de relleno ' + (i + 1) + '</p>'; }).join('');
   // Reglas para medir lo que da iOS de cada forma.

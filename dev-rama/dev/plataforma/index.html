@@ -12,7 +12,7 @@
 <!-- T0430: SIN apple-mobile-web-app-status-bar-style. Desde iOS 26.1, con black-translucent iOS pinta su propio degradado
      sobre la franja de la hora (no se quita desde la página) y da a la app instalada una ventana más corta que la pantalla,
      y la barra de secciones quedaba por encima del borde con un hueco debajo. Sin la etiqueta, la página empieza debajo de la
-     hora, la ventana mide lo que se ve y la franja toma el color del fondo de la página (el verde de arriba del body).
+     hora, la ventana mide lo que se ve y la franja toma el color de fondo del body (verde).
      Probado en el iPhone de Javi (iOS 27.2) con dev/barra3/. iOS la lee al añadir la app: hay que quitarla y volver a añadirla. -->
 <meta name="theme-color" content="#0E8A7A">
 <link rel="stylesheet" href="../../utilo/marca.css?v=47">
@@ -20,10 +20,12 @@
 <!-- T0386: como una aplicación: deslizar el dedo de lado no lleva a la página de atrás (en el iPhone, eso solo instalada) -->
 <style>html, body { overscroll-behavior-x: none; }
   html { background: #0E8A7A; overscroll-behavior-y: none; }
-  /* La franja de la hora del iPhone (app instalada) toma el color del fondo de la página: el body, que es el que se desplaza en
-     el móvil, va verde en su mitad de arriba y crema en la de abajo; #sx-panel tapa con el crema lo de debajo. Solo con la app
-     abierta (u-con-barra, T0429): en la pantalla de entrar no hay nada que lo tape y saldría media pantalla verde. */
-  @media (max-width: 899px) { body.u.u-con-barra { background: linear-gradient(#0E8A7A, #0E8A7A) top / 100% 50% no-repeat, var(--color-fondo); } }
+  /* La franja de la hora del iPhone (app instalada) toma el COLOR de fondo del body (background-color), no sus degradados: el
+     body, que es el que se desplaza en el móvil, es verde y lleva el crema pintado en su mitad de abajo (que tapa el hueco
+     entre el contenido y la barra de abajo); #sx-panel tapa con el crema lo demás. Con el verde pintado arriba sobre un body
+     crema, la franja salía crema fundiéndose con el verde (T0430b). Solo con la app abierta (u-con-barra, T0429): en la
+     pantalla de entrar no hay nada que lo tape y saldría media pantalla verde. */
+  @media (max-width: 899px) { body.u.u-con-barra { background: linear-gradient(var(--color-fondo), var(--color-fondo)) bottom / 100% 50% no-repeat, #0E8A7A; } }
   #sx-panel { min-height: 100%; box-sizing: border-box; background: var(--color-fondo); }
 </style>
 <script>
