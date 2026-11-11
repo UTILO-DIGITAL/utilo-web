@@ -735,9 +735,9 @@
  },
  "bases": {
   "konamigas": {
-   "rama": "T0456-cerrar-dev",
-   "commit": "06d33cf",
-   "fecha": "2026-11-11T19:08:40.151Z",
+   "rama": "T0398-subdominios-konamigas",
+   "commit": "a1c3e58",
+   "fecha": "2026-11-11T21:11:23.156Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
@@ -753,7 +753,8 @@
     "20261111120000_ligas_publico.sql",
     "20261111120001_nombre_publico.sql",
     "20261111190000_personas_de_prueba.sql",
-    "20261111210000_dev_cerrado.sql"
+    "20261111210000_dev_cerrado.sql",
+    "20261111220000_correo_enviar.sql"
    ]
   },
   "utilo": {
