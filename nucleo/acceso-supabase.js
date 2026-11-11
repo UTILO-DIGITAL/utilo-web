@@ -253,6 +253,28 @@
     mios: function () { return capa().rpc('mis_avisos', {}); }
   };
 
+  /**
+   * T0437 · Al tocar un aviso, el service worker (sw.js) dice qué abrir: a la ventana que pone delante y, si la ha abierto
+   * nueva, cuando la página le pregunta al arrancar. El iPhone no siempre abre la dirección del aviso. Solo de esta web.
+   */
+  function irA(url) {
+    try {
+      var u = new URL(url, location.href);
+      if (u.origin === location.origin && u.href !== location.href) location.assign(u.href);
+    } catch (e) { /* una dirección rara: se queda donde está */ }
+  }
+  var swc = avisos && typeof navigator !== 'undefined' ? navigator.serviceWorker : null;
+  if (swc && typeof swc.addEventListener === 'function' && typeof swc.getRegistration === 'function') {
+    swc.addEventListener('message', function (e) {
+      var d = e.data || {};
+      if (d.tipo === 'utilo-abrir' && d.url) irA(d.url);
+    });
+    swc.getRegistration('./').then(function (r) {
+      var w = r && (r.active || r.waiting || r.installing);
+      if (w) w.postMessage({ tipo: 'utilo-pendiente' });
+    }, function () {});
+  }
+
   /* ---------- las tablas y las funciones ---------- */
 
   var funciones = [], servidor = [];

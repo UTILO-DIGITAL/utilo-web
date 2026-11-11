@@ -1,6 +1,13 @@
 {
-  "version": "5.18-1.16",
+  "version": "5.19-1.17",
   "versiones": [
+    {
+      "v": "5.19-1.17",
+      "fecha": "11/11/2026",
+      "novedades": [
+        "Las preguntas de tus tareas te llegan como aviso al móvil y, al tocarlo, se abre la tarea para responderla ahí mismo."
+      ]
+    },
     {
       "v": "5.18-1.16",
       "fecha": "11/11/2026",
