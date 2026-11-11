@@ -1,4 +1,76 @@
 {
- "ramas": {},
+ "ramas": {
+  "T0441-dev-ramas-movil": {
+   "tarea": "T0441",
+   "titulo": "La acción «DEV ramas» no hace nada hasta que main tenga dev-ramas.js, y no esconde errores",
+   "pr": null,
+   "commit": "18165da",
+   "ultimo": "T0441: La acción «DEV ramas» no hace nada hasta que main tenga dev-ramas.js, y no esconde errores",
+   "quien": "Javi Canela",
+   "fecha": "2026-11-11T11:11:07.551Z",
+   "toca": [
+    "konamigas",
+    "utilo"
+   ],
+   "comun": true,
+   "paginas": [
+    {
+     "ruta": "dev/area/",
+     "nombre": "Área Konamigas",
+     "iniciativa": "konamigas"
+    },
+    {
+     "ruta": "dev/konamigas/",
+     "nombre": "Konamigas",
+     "iniciativa": "konamigas"
+    },
+    {
+     "ruta": "dev/plataforma/",
+     "nombre": "Utilo",
+     "iniciativa": "utilo"
+    }
+   ],
+   "migraciones": {
+    "konamigas": [
+     "20261105150000_latido.sql",
+     "20261105170000_acceso.sql",
+     "20261106210905_esquema.sql",
+     "20261106211000_reglas.sql",
+     "20261107122414_personas.sql",
+     "20261107123000_roles.sql",
+     "20261107175900_correos.sql",
+     "20261107175950_codigo.sql",
+     "20261107180000_ligas.sql",
+     "20261110140000_ligas_resumen.sql",
+     "20261110170000_ligas_pantalla.sql"
+    ],
+    "utilo": [
+     "20261105150000_latido.sql",
+     "20261105170000_acceso.sql",
+     "20261105174008_gestion_tablas.sql",
+     "20261105174009_gestion.sql",
+     "20261105180000_gestion_espera.sql",
+     "20261106090000_gestion_herramientas.sql",
+     "20261106210628_tareas_orden.sql",
+     "20261106210700_gestion_orden.sql",
+     "20261107100000_gestion_chats.sql",
+     "20261107160000_tablero_para_mi.sql",
+     "20261107170000_gestion_responder.sql",
+     "20261107170001_bitacora_entregas.sql",
+     "20261107170100_gestion_entregas.sql",
+     "20261107175900_correos.sql",
+     "20261107190000_entregas_en_directo.sql",
+     "20261109200149_solicitudes_tabla.sql",
+     "20261109200150_solicitudes.sql",
+     "20261109230350_mensajes_tabla.sql",
+     "20261109230351_mensajes.sql",
+     "20261110120000_entregas_solas.sql",
+     "20261110180000_avisos.sql",
+     "20261110200000_tareas_sin_urgente.sql"
+    ]
+   },
+   "rama": "T0441-dev-ramas-movil"
+  }
+ },
  "bases": {}
 }

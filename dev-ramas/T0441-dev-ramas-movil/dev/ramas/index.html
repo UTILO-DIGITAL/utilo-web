@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Utilo DEV</title>
+<!-- T0441: la app DEV. En utilo-web/dev-ramas/ (lo pone ahí herramientas/dev-ramas.js selector, desde main): lista las ramas
+     subidas (ramas.json) y abre sus páginas de DEV, cada rama en su carpeta. Se añade a la pantalla de inicio como «Utilo DEV»,
+     con el icono amarillo; la app de producción es otra. Su manifest abarca dev-ramas/ entero: las páginas de las ramas se
+     abren dentro de la app. -->
+<link rel="icon" href="icono-192.png?v=1">
+<link rel="manifest" href="manifest.webmanifest?v=1">
+<link rel="apple-touch-icon" href="icono-180.png?v=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Utilo DEV">
+<meta name="theme-color" content="#FFE08A">
+<style>
+  :root { --fondo: #FFF8E1; --caja: #FFFFFF; --texto: #1C1C1C; --suave: #5F5A4A; --borde: #E8D9A8; --amarillo: #FFE08A;
+    --amarillo-fuerte: #B88A00; --boton: #1C1C1C; --boton-texto: #FFFFFF; --aviso: #8A4B00; --aviso-fondo: #FFF0D6; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --fondo: #1A1810; --caja: #262318; --texto: #F3EEDC; --suave: #BDB49A; --borde: #4A4330;
+      --amarillo: #5A4A10; --amarillo-fuerte: #E8C14A; --boton: #F3EEDC; --boton-texto: #1A1810; --aviso: #FFC27A; --aviso-fondo: #3A2A10; }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--fondo); color: var(--texto); font: 16px/1.4 system-ui, -apple-system, sans-serif;
+    border: 6px solid var(--amarillo-fuerte); border-top: 0; min-height: 100vh; min-height: 100dvh; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--amarillo); border-bottom: 2px solid var(--amarillo-fuerte);
+    padding: calc(env(safe-area-inset-top) + 12px) 16px 12px; display: flex; align-items: center; gap: 12px; }
+  header h1 { margin: 0; font-size: 20px; flex: 1; }
+  header p { margin: 2px 0 0; font-size: 14px; color: var(--suave); }
+  main { padding: 12px 10px calc(env(safe-area-inset-bottom) + 24px); max-width: 640px; margin: 0 auto; }
+  button, a.btn { font: inherit; border-radius: 10px; border: 1px solid var(--boton); padding: 9px 14px; cursor: pointer;
+    text-decoration: none; display: inline-block; min-height: 44px; }
+  .principal { background: var(--boton); color: var(--boton-texto); }
+  .secundario { background: transparent; color: var(--texto); border-color: var(--borde); }
+  .caja { background: var(--caja); border: 1px solid var(--borde); border-radius: 14px; padding: 14px; margin: 0 0 10px; }
+  .seguir { border: 2px solid var(--amarillo-fuerte); }
+  .caja h2 { margin: 0 0 4px; font-size: 17px; overflow-wrap: anywhere; }
+  .dato { margin: 0 0 10px; font-size: 14px; color: var(--suave); overflow-wrap: anywhere; }
+  .botones { display: flex; flex-wrap: wrap; gap: 8px; }
+  .aviso { margin: 0 0 10px; padding: 8px 10px; border-radius: 8px; background: var(--aviso-fondo); color: var(--aviso); font-size: 14px; }
+  .nota { margin: 0 0 10px; font-size: 14px; color: var(--suave); }
+  .vacio { text-align: center; color: var(--suave); padding: 32px 8px; }
+  h3 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--suave); margin: 18px 6px 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div style="flex:1">
+    <h1>Utilo DEV</h1>
+    <p>Elige qué rama probar</p>
+  </div>
+  <button class="secundario" id="actualizar" type="button">Actualizar</button>
+</header>
+<main id="lista"><p class="vacio">Cargando…</p></main>
+<script>
+(function () {
+  'use strict';
+  var ULTIMA = 'dev_ramas_ultima'; // la última página abierta en este dispositivo: { carpeta, ruta }
+  var lista = document.getElementById('lista');
+
+  function texto(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
+  function leerUltima() { try { return JSON.parse(localStorage.getItem(ULTIMA) || 'null'); } catch (e) { return null; } }
+  function guardarUltima(u) { try { localStorage.setItem(ULTIMA, JSON.stringify(u)); } catch (e) {} }
+
+  /** «hace 5 min», «hace 3 h», «ayer», «hace 4 días». */
+  function hace(iso) {
+    var s = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (!(s >= 0)) return '';
+    if (s < 90) return 'ahora mismo';
+    if (s < 3600) return 'hace ' + Math.round(s / 60) + ' min';
+    if (s < 86400) return 'hace ' + Math.round(s / 3600) + ' h';
+    var d = Math.round(s / 86400);
+    return d === 1 ? 'ayer' : 'hace ' + d + ' días';
+  }
+
+  /** Lo que la rama trae de la base frente a lo que tiene cargado el Supabase de DEV de esa iniciativa. */
+  function avisosBase(r, bases, iniciativas) {
+    var out = [];
+    iniciativas.forEach(function (ini) {
+      var suyas = (r.migraciones || {})[ini], b = bases[ini];
+      if (!suyas || !b || !b.migraciones) return;
+      var faltan = suyas.filter(function (m) { return b.migraciones.indexOf(m) < 0; });
+      var sobran = b.migraciones.filter(function (m) { return suyas.indexOf(m) < 0; });
+      var quien = b.rama === r.rama ? 'una versión anterior de esta rama' : 'la de ' + (b.rama || 'otra rama');
+      var nombre = ini.charAt(0).toUpperCase() + ini.slice(1);
+      if (faltan.length) {
+        out.push('<p class="aviso">La base de ' + texto(nombre) + ' en DEV no tiene los cambios de esta rama (ahora está ' + texto(quien) +
+          '). Hay que cargarla con la acción «Supabase» en DEV, rama ' + texto(r.rama) + '.</p>');
+      } else if (sobran.length && (r.toca || []).indexOf(ini) >= 0) { // solo si la rama toca esa iniciativa: si no, da igual
+        out.push('<p class="nota">La base de ' + texto(nombre) + ' en DEV lleva además cambios de ' + texto(b.rama || 'otra rama') + '.</p>');
+      }
+    });
+    return out.join('');
+  }
+
+  function tarjeta(carpeta, r, bases) {
+    var paginas = r.paginas || [];
+    var toca = r.toca || [];
+    // primero las páginas de las iniciativas que toca la rama
+    paginas = paginas.slice().sort(function (a, b) { return (toca.indexOf(b.iniciativa) >= 0) - (toca.indexOf(a.iniciativa) >= 0); });
+    var iniciativas = paginas.map(function (p) { return p.iniciativa; }).filter(function (x, i, a) { return x && a.indexOf(x) === i; });
+    var dato = [r.tarea || r.rama, hace(r.fecha), r.pr ? 'PR #' + r.pr : '', r.quien && r.quien !== 'Javi Canela' ? r.quien : '']
+      .filter(Boolean).join(' · ');
+    var botones = paginas.map(function (p) {
+      var marcada = toca.indexOf(p.iniciativa) >= 0 || (!toca.length && r.comun);
+      return '<a class="btn ' + (marcada ? 'principal' : 'secundario') + '" data-carpeta="' + texto(carpeta) + '" data-ruta="' + texto(p.ruta) + '" href="' +
+        encodeURIComponent(carpeta) + '/' + texto(p.ruta) + '">' + texto(p.nombre) + '</a>';
+    }).join('');
+    return '<div class="caja"><h2>' + texto(r.titulo || r.rama) + '</h2><p class="dato">' + texto(dato) + '</p>' +
+      avisosBase(r, bases, iniciativas) +
+      '<div class="botones">' + (botones || '<span class="nota">Esta rama no tiene páginas de DEV.</span>') + '</div></div>';
+  }
+
+  function pintar(j) {
+    var ramas = j.ramas || {}, bases = j.bases || {};
+    var claves = Object.keys(ramas).filter(function (c) { return c !== 'main'; })
+      .sort(function (a, b) { return String(ramas[b].fecha).localeCompare(String(ramas[a].fecha)); });
+    var html = '';
+    var u = leerUltima();
+    if (u && ramas[u.carpeta]) {
+      var p = (ramas[u.carpeta].paginas || []).filter(function (x) { return x.ruta === u.ruta; })[0];
+      if (p) {
+        html += '<div class="caja seguir"><p class="dato" style="margin-bottom:8px">Lo último que abriste</p>' +
+          '<a class="btn principal" data-carpeta="' + texto(u.carpeta) + '" data-ruta="' + texto(u.ruta) + '" href="' + encodeURIComponent(u.carpeta) + '/' + texto(u.ruta) + '">' +
+          'Seguir con ' + texto(ramas[u.carpeta].tarea || u.carpeta) + ' · ' + texto(p.nombre) + '</a></div>';
+      }
+    }
+    html += claves.length ? '<h3>Ramas</h3>' + claves.map(function (c) { return tarjeta(c, ramas[c], bases); }).join('')
+      : '<p class="vacio">No hay ninguna rama subida. Se suben solas al hacer push a una rama T0xxx.</p>';
+    if (ramas.main) html += '<h3>main</h3>' + tarjeta('main', ramas.main, bases);
+    lista.innerHTML = html;
+  }
+
+  function cargar() {
+    return fetch('ramas.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(pintar)
+      .catch(function () { lista.innerHTML = '<p class="vacio">No se puede leer la lista de ramas. Comprueba la conexión y toca «Actualizar».</p>'; });
+  }
+
+  lista.addEventListener('click', function (ev) {
+    var a = ev.target.closest('a[data-carpeta]');
+    if (a) guardarUltima({ carpeta: a.getAttribute('data-carpeta'), ruta: a.getAttribute('data-ruta') });
+  });
+  document.getElementById('actualizar').addEventListener('click', cargar);
+  // Al volver a la app (desde otra o con «Cambiar»), la lista al día.
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) cargar(); });
+  cargar();
+})();
+</script>
+</body>
+</html>
