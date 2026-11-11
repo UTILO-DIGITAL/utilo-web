@@ -75,6 +75,82 @@
     ]
    },
    "rama": "main"
+  },
+  "T0441-version-selector": {
+   "tarea": "T0441",
+   "titulo": "La app «Utilo DEV» se pone al día sola cuando cambia el selector",
+   "pr": 283,
+   "commit": "44d8f3a",
+   "ultimo": "T0441: ramas.json conserva la versión del selector al subir o quitar una rama",
+   "quien": "Javi Canela",
+   "fecha": "2026-11-11T12:13:33.627Z",
+   "toca": [],
+   "comun": false,
+   "paginas": [
+    {
+     "ruta": "dev/konamigas/",
+     "nombre": "Plataforma",
+     "iniciativa": "konamigas",
+     "proyecto": "konamigas/plataforma",
+     "cambia": false
+    },
+    {
+     "ruta": "dev/plataforma/",
+     "nombre": "Plataforma",
+     "iniciativa": "utilo",
+     "proyecto": "utilo/plataforma",
+     "cambia": false
+    },
+    {
+     "ruta": "dev/area/",
+     "nombre": "Área de jugadoras",
+     "iniciativa": "konamigas",
+     "proyecto": "konamigas/area",
+     "cambia": false
+    }
+   ],
+   "migraciones": {
+    "konamigas": [
+     "20261105150000_latido.sql",
+     "20261105170000_acceso.sql",
+     "20261106210905_esquema.sql",
+     "20261106211000_reglas.sql",
+     "20261107122414_personas.sql",
+     "20261107123000_roles.sql",
+     "20261107175900_correos.sql",
+     "20261107175950_codigo.sql",
+     "20261107180000_ligas.sql",
+     "20261110140000_ligas_resumen.sql",
+     "20261110170000_ligas_pantalla.sql"
+    ],
+    "utilo": [
+     "20261105150000_latido.sql",
+     "20261105170000_acceso.sql",
+     "20261105174008_gestion_tablas.sql",
+     "20261105174009_gestion.sql",
+     "20261105180000_gestion_espera.sql",
+     "20261106090000_gestion_herramientas.sql",
+     "20261106210628_tareas_orden.sql",
+     "20261106210700_gestion_orden.sql",
+     "20261107100000_gestion_chats.sql",
+     "20261107160000_tablero_para_mi.sql",
+     "20261107170000_gestion_responder.sql",
+     "20261107170001_bitacora_entregas.sql",
+     "20261107170100_gestion_entregas.sql",
+     "20261107175900_correos.sql",
+     "20261107190000_entregas_en_directo.sql",
+     "20261109200149_solicitudes_tabla.sql",
+     "20261109200150_solicitudes.sql",
+     "20261109230350_mensajes_tabla.sql",
+     "20261109230351_mensajes.sql",
+     "20261110120000_entregas_solas.sql",
+     "20261110180000_avisos.sql",
+     "20261110200000_tareas_sin_urgente.sql",
+     "20261111120000_avisos_preguntas.sql",
+     "20261111150000_lanzar_autonomo.sql"
+    ]
+   },
+   "rama": "T0441-version-selector"
   }
  },
  "bases": {}
