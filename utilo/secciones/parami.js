@@ -12,8 +12,14 @@
  * Si la respondida es AUTÓNOMA y vuelve a En cola, un recuadro (hasta cerrarlo) lleva a lanzar «Autónomo» en GitHub: con el
  * agente en la fase 1 nadie la coge sola. En Lo siguiente, las autónomas llevan su etiqueta.
  * - En curso: lo demás que tiene entre manos (sin las vencidas), con su fase y quién la lleva.
+ * - T0449 · Te espera también lleva sus tareas con cambios pedidos sin coger (En cola, con la marca CAMBIOS_PEDIDOS; la más
+ *   antigua arriba), para que una de sesión no se quede olvidada en la cola: con lo pedido a la vista y, si es autónoma, el
+ *   camino a «Que lo haga Claude»; si no, la orden para la sesión (/empezar). No salen también en Lo siguiente.
  * - T0412 · Te espera también lleva las solicitudes Nuevas de los clientes que puede atender (vista BANDEJA, si tiene la
  *   Bandeja en su menú): las urgentes delante y, entre ellas, la más antigua arriba. Cada una abre la Bandeja con ella a la vista.
+ * - T0433 · Incidencias, debajo de Te espera: lo que falla en Utilo (avisos.registro: el latido, las copias, el agente, el
+ *   vigilante de main), con cuántas veces ha pasado y un botón para cerrarla; las cerradas de esta semana, plegadas. Solo
+ *   quien administra Utilo (la base no se las da a nadie más). No van en directo: se leen al abrir y al volver a la pestaña.
  * Arriba, el saludo, un enlace al mapa de Entregas (T0415, si se ve) y tres cifras (te esperan, en curso, tu cola). Debajo, en una pantalla grande tres columnas (Te espera |
  * Lo siguiente | Avisos y En curso), en una mediana dos (Te espera | lo demás) y en el móvil una. Cada tarjeta dice de quién viene (quién la hace o
  * pregunta), su iniciativa si se ven varias y, en una revisión, su PR. Los nombres, de personas_gestion() (guardados).
@@ -46,10 +52,18 @@
     }).sort(function (a, b) { return (ms(a.ESTADO_DESDE) - ms(b.ESTADO_DESDE)) || String(a.ID).localeCompare(String(b.ID)); });
   }
 
-  /** Sus primeras n tareas En cola: prioridad (lo urgente es !!!!, T0319), deadline (sin él, detrás), cuántas desbloquea y por ID. */
+  /** T0449 · Sus tareas con cambios pedidos sin coger (En cola con la marca), las pedidas hace más arriba. */
+  function cambios(filas, yo) {
+    if (!yo) return [];
+    return (filas || []).filter(function (t) { return t.ESTADO === 'En cola' && t.ASIGNADO === yo && !!t.CAMBIOS_PEDIDOS; })
+      .sort(function (a, b) { return (ms(a.CAMBIOS_PEDIDOS) - ms(b.CAMBIOS_PEDIDOS)) || String(a.ID).localeCompare(String(b.ID)); });
+  }
+
+  /** Sus primeras n tareas En cola: prioridad (lo urgente es !!!!, T0319), deadline (sin él, detrás), cuántas desbloquea y por ID.
+   *  Sin las de cambios pedidos, que ya salen en Te espera (T0449). */
   function siguientes(filas, yo, n) {
     if (!yo) return [];
-    return (filas || []).filter(function (t) { return t.ESTADO === 'En cola' && t.ASIGNADO === yo; }).sort(function (a, b) {
+    return (filas || []).filter(function (t) { return t.ESTADO === 'En cola' && t.ASIGNADO === yo && !t.CAMBIOS_PEDIDOS; }).sort(function (a, b) {
       return ((P[b.P] || 0) - (P[a.P] || 0)) ||
         (dia(a.DEADLINE) || '9999').localeCompare(dia(b.DEADLINE) || '9999') ||
         ((Number(b.DESBLOQUEA) || 0) - (Number(a.DESBLOQUEA) || 0)) || String(a.ID).localeCompare(String(b.ID));
@@ -84,6 +98,29 @@
     return d === 1 ? 'desde ayer' : 'hace ' + d + ' días';
   }
 
+  /**
+   * T0433 · Las incidencias de Utilo (incidencias() de la base, solo para quien administra Utilo): las abiertas y las cerradas
+   * de esta semana, como llegan (lo último arriba). Sin lista (no las ve), null.
+   */
+  function incidencias(lista) {
+    if (!Array.isArray(lista)) return null;
+    return { abiertas: lista.filter(function (i) { return i && i.abierta; }), cerradas: lista.filter(function (i) { return i && !i.abierta; }) };
+  }
+
+  /** T0433 · Cuántas veces y desde cuándo, en palabras: «hace 40 minutos» o «5 veces desde hace 2 días; la última, hace 6 horas». */
+  function veces(i, ahora) {
+    var n = Number(i && i.veces) || 1;
+    if (n === 1) return hace(i.primera, ahora);
+    return n + ' veces desde ' + hace(i.primera, ahora).replace(/^desde /, '') + '; la última, ' + hace(i.ultima, ahora).replace(/^desde ayer$/, 'ayer');
+  }
+
+  /** T0433 · Qué es el enlace de una incidencia, para su botón. */
+  function enlaceDe(url) {
+    var u = String(url || '');
+    if (!/^https:\/\//.test(u)) return null;
+    return { url: u, texto: /\/pull\/\d+/.test(u) ? 'Ver la PR' : /\/actions\/runs\//.test(u) ? 'Ver la ejecución' : /\/commits\//.test(u) ? 'Ver los commits' : 'Abrir el enlace' };
+  }
+
   /** ¿Hay que lanzar «Autónomo» para que siga? Si es AUTÓNOMA y, al responderla, ha vuelto a En cola (no a Esperando). */
   function lanzar(t, estado) { return !!(t && t.AUTONOMA) && estado === 'En cola'; }
 
@@ -99,10 +136,11 @@
   function resumen(filas, yo, hoy, sols) {
     var es = esperan(filas, yo), mias = yo ? (filas || []).filter(function (t) { return t.ASIGNADO === yo; }) : [];
     var cola = mias.filter(function (t) { return t.ESTADO === 'En cola'; });
-    var ss = solicitudes(sols);
+    var ss = solicitudes(sols), cp = cambios(filas, yo);
     return {
-      esperan: es.length + ss.length,
+      esperan: es.length + ss.length + cp.length,
       solicitudes: ss.length,
+      cambios: cp.length,
       respuestas: es.filter(function (t) { return t.ESTADO === 'Necesita tu respuesta'; }).length,
       revisiones: es.filter(function (t) { return t.ESTADO === 'Para revisar'; }).length,
       enCurso: mias.filter(function (t) { return t.ESTADO === 'En curso'; }).length,
@@ -110,6 +148,17 @@
       enCola: cola.length,
       autonomas: cola.filter(function (t) { return t.AUTONOMA; }).length
     };
+  }
+
+  /** T0449 · Lo último que se ha pedido en una DESCRIPCION: el texto del último «Cambios pedidos (…): …» (con sus líneas, hasta
+   *  DECISIONES/ABIERTO u otro apartado), en una línea. '' si no hay. */
+  function pedidoDe(desc) {
+    var ls = String(desc || '').split('\n'), k = -1;
+    ls.forEach(function (l, i) { if (/^Cambios pedidos\s*(\([^)]*\))?\s*:/.test(l)) k = i; });
+    if (k < 0) return '';
+    var out = [ls[k].replace(/^Cambios pedidos\s*(\([^)]*\))?\s*:\s*/, '')];
+    for (var i = k + 1; i < ls.length && !/^(DECISIONES|ABIERTO|Añadido después|Cambios pedidos)\b/.test(ls[i]); i++) out.push(ls[i]);
+    return out.join(' ').replace(/\s+/g, ' ').trim();
   }
 
   /** La última PR de DOCUMENTOS_RELEVANTES («PR utilo-apps #235: https://…»): { numero, url } o null. */
@@ -122,7 +171,8 @@
     return r;
   }
 
-  var CALC = { solicitudes: solicitudes, lanzar: lanzar, esperan: esperan, siguientes: siguientes, avisos: avisos, enCurso: enCurso, resumen: resumen, prDe: prDe, hace: hace, diasEntre: diasEntre, hoyIso: hoyIso };
+  var CALC = { solicitudes: solicitudes, lanzar: lanzar, esperan: esperan, cambios: cambios, siguientes: siguientes, avisos: avisos, enCurso: enCurso, resumen: resumen, prDe: prDe, pedidoDe: pedidoDe, hace: hace, diasEntre: diasEntre, hoyIso: hoyIso,
+    incidencias: incidencias, veces: veces, enlaceDe: enlaceDe };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -181,6 +231,7 @@
       var leido = false;
       var lanzarId = '';                 // la autónoma recién respondida, para lanzar «Autónomo»
       var borrador = {}, enviando = {};   // lo escrito en cada respuesta (por tarea) y las que se están mandando
+      var INC = null, cerrando = {};      // T0433: las incidencias (null: no las ve o aún no han llegado) y las que se están cerrando
       el.innerHTML = '<section class="pm"><div id="pm-cont"></div></section>';
       var cont = el.querySelector('#pm-cont');
 
@@ -212,7 +263,7 @@
         if (!fs.length && !leido) { cont.innerHTML = '<p class="pm-vacio">Cargando lo tuyo…</p>'; return; }
         if (!yo) { cont.innerHTML = '<p class="pm-vacio">No sabemos quién eres en la base todavía. Vuelve a entrar.</p>'; return; }
         var sols = BANDEJA ? ctx.tablas.filas(TS) : [], ss = solicitudes(sols);
-        var es = esperan(fs, yo), si = siguientes(fs, yo), av = avisos(fs, yo, hoy), ec = enCurso(fs, yo, hoy), r = resumen(fs, yo, hoy, sols);
+        var es = esperan(fs, yo), cp = cambios(fs, yo), si = siguientes(fs, yo), av = avisos(fs, yo, hoy), ec = enCurso(fs, yo, hoy), r = resumen(fs, yo, hoy, sols);
         var varias = fs.reduce(function (o, t) { o[t.INICIATIVA] = 1; return o; }, {});
         varias = Object.keys(varias).length > 1;
 
@@ -223,6 +274,7 @@
         h += '<div class="pm-res">' +
           cifra('pm-espera', r.esperan, r.esperan === 1 ? 'te espera' : 'te esperan',
             [r.respuestas ? uno(r.respuestas, 'respuesta', 'respuestas') : '', r.revisiones ? uno(r.revisiones, 'revisión', 'revisiones') : '',
+              r.cambios ? uno(r.cambios, 'con cambios pedidos', 'con cambios pedidos') : '',
               r.solicitudes ? uno(r.solicitudes, 'solicitud', 'solicitudes') : ''].filter(String).join(' · '), r.esperan ? ' pm-cifra-pr' : '') +
           cifra(r.vencidas ? 'pm-avisos' : 'pm-sig', r.enCurso, 'en curso', r.vencidas ? '<span class="pm-mal">' + uno(r.vencidas, 'vencida', 'vencidas') + '</span>' : '', r.vencidas ? ' pm-cifra-bl' : '') +
           cifra('pm-sig', r.enCola, 'en tu cola', r.autonomas ? uno(r.autonomas, 'autónoma', 'autónomas') : '') + '</div>';
@@ -243,7 +295,19 @@
             '<span class="pm-meta"><span class="n-estado n-e-pr">' + (s.ESTADO === 'Nueva' ? 'Atender' : s.ESTADO === 'Retirada' ? 'La ha retirado' : 'Ha escrito') + '</span><span>' + texto(String(s.TIPO || '').toLowerCase() + ' · lo pide ' + s.PERSONA) + '</span>' +
               (cuanto ? '<span class="pm-hace' + (vieja ? ' vieja' : '') + '">' + texto(cuanto) + '</span>' : '') + '</span></a></li>';
         }).join('');
-        var izq = bloque('pm-espera', 'Te espera', es.length + ss.length, es.length + ss.length ? '<ul class="pm-l">' + htmlSols + es.map(function (t) {
+        // T0449 · Las suyas con cambios pedidos sin coger: lo pedido (lo último de la DESCRIPCION) y cómo sigue.
+        var htmlCambios = cp.map(function (t) {
+          var cuanto = hace(t.CAMBIOS_PEDIDOS, ahora), pedido = pedidoDe(t.DESCRIPCION);
+          var dentro = '<span class="pm-meta"><span class="n-estado n-e-pr">Cambios pedidos</span>' + (t.AUTONOMA ? ICO_AUTO : '') +
+            (cuanto ? '<span class="pm-hace">' + texto(cuanto) + '</span>' : '') + '</span>' +
+            (pedido ? '<span class="pm-q">' + texto(pedido.length > 160 ? pedido.slice(0, 159).replace(/\s+\S*$/, '') + '…' : pedido) + '</span>' : '');
+          var despues = '<div class="pm-acc">' + (t.AUTONOMA
+            ? '<a class="u-btn" href="' + ficha(t) + '" data-sx="TABLERO">Que lo rehaga Claude</a>'
+            : '<a class="u-btn" href="' + ficha(t) + '" data-sx="TABLERO">Abrir la ficha</a><span class="pm-orden">En una sesión: /empezar ' + texto(t.ID) + '</span>') + '</div>';
+          return tarjeta(t, 's-pr', dentro, despues, varias);
+        }).join('');
+        var nEs = es.length + ss.length + cp.length;
+        var izq = bloque('pm-espera', 'Te espera', nEs, nEs ? '<ul class="pm-l">' + htmlSols + htmlCambios + es.map(function (t) {
           var resp = t.ESTADO === 'Necesita tu respuesta', cuanto = hace(t.ESTADO_DESDE, ahora);
           var quien = t.EMPLEADO || t.ASIGNADO !== yo ? deQuien(t) : '';   // si la lleva quien mira, no se dice
           var vieja = diasEntre(hoyIso(new Date(Date.parse(t.ESTADO_DESDE) || ahora)), hoy) >= DIAS_ANTIGUA;
@@ -260,6 +324,26 @@
               '<a class="u-btn' + (pr ? ' u-btn-texto' : '') + '" href="' + ficha(t) + '" data-sx="TABLERO">Abrir la ficha para revisarla</a></div>';
           return tarjeta(t, 's-pr', dentro, despues, varias);
         }).join('') + '</ul>' : '<div class="pm-libre">' + ICO_BIEN + '<p><b>Nada te espera.</b> Ninguna pregunta' + (BANDEJA ? ', revisión ni solicitud pendiente.' : ' ni revisión pendiente.') + '</p></div>');
+
+        // T0433 · Las incidencias de Utilo, junto a Te espera: solo quien administra Utilo (la base no se las da a nadie más).
+        var inc = incidencias(INC);
+        if (inc) {
+          izq += bloque('pm-inc', 'Incidencias', inc.abiertas.length, (inc.abiertas.length ? '<ul class="pm-l">' + inc.abiertas.map(function (i) {
+            var en = enlaceDe(i.url), txt = String(i.texto || '').split('\n').filter(function (l) { return !/^Míralo: https:/.test(l); }).join('\n').trim();
+            return '<li class="pm-c s-bl"><div class="pm-t"><span class="pm-top"><span class="pm-id">' + texto(i.origen) + '</span></span>' +
+              '<span class="pm-tit">' + texto(String(i.titulo || '').replace(/^⚠️\s*/, '').replace(/:$/, '')) + '</span>' +
+              (txt ? '<span class="pm-q pm-inc-txt">' + texto(txt) + '</span>' : '') +
+              '<span class="pm-meta"><span class="pm-hace">' + texto(veces(i, ahora)) + '</span></span></div>' +
+              '<div class="pm-acc">' + (en ? '<a class="u-btn u-btn-texto" href="' + texto(en.url) + '" target="_blank" rel="noopener">' + ICO_FUERA + texto(en.texto) + '</a>' : '') +
+              '<button type="button" class="u-btn" data-cerrar="' + texto(i.id) + '"' + (cerrando[i.id] ? ' disabled' : '') + '>' + (cerrando[i.id] ? 'Cerrando…' : 'Cerrar') + '</button></div></li>';
+          }).join('') + '</ul>' : '<div class="pm-libre">' + ICO_BIEN + '<p><b>Nada falla.</b> Ninguna incidencia abierta.</p></div>') +
+          (inc.cerradas.length ? '<details class="pm-inc-cerradas"><summary>' + texto(uno(inc.cerradas.length, 'cerrada', 'cerradas')) + ' esta semana</summary><ul class="pm-l">' +
+            inc.cerradas.map(function (i) {
+              return '<li class="pm-c"><div class="pm-t"><span class="pm-top"><span class="pm-id">' + texto(i.origen) + '</span></span>' +
+                '<span class="pm-tit">' + texto(String(i.titulo || '').replace(/^⚠️\s*/, '').replace(/:$/, '')) + '</span>' +
+                '<span class="pm-meta"><span>' + texto('cerrada ' + hace(i.cerrada, ahora).replace(/^desde ayer$/, 'ayer') + (i.cierre ? ' · ' + String(i.cierre).charAt(0).toLowerCase() + String(i.cierre).slice(1) : '')) + '</span></span></div></li>';
+            }).join('') + '</ul></details>' : ''), ' pm-avisos');
+        }
 
         var cen = bloque('pm-sig', 'Lo siguiente', 0, si.length ? '<ol class="pm-l">' + si.map(function (t) {
           var dl = dia(t.DEADLINE), q = dl ? diasEntre(hoy, dl) : null;
@@ -296,6 +380,8 @@
 
       cont.addEventListener('click', function (e) {
         if (e.target.closest('[data-lanzar-no]')) { lanzarId = ''; pintar(); return; }
+        var cer = e.target.closest('[data-cerrar]');
+        if (cer) { cerrarIncidencia(cer.getAttribute('data-cerrar')); return; }
         var ir = e.target.closest('[data-ir]'), dst = ir && cont.querySelector('#' + ir.getAttribute('data-ir'));
         if (dst) dst.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
@@ -322,6 +408,26 @@
         }).then(function () { delete enviando[id]; if (ctx.abierta()) pintar(); }, function () { delete enviando[id]; if (ctx.abierta()) pintar(); });
       });
 
+      /** T0433 · Las incidencias de Utilo. A quien no administra Utilo la base le da null: no hay bloque. */
+      function leerIncidencias() {
+        return ctx.llamar('incidencias', [{}]).then(function (r) {
+          var nuevo = Array.isArray(r) ? r : null;
+          if (JSON.stringify(nuevo) !== JSON.stringify(INC)) { INC = nuevo; if (ctx.abierta()) pintar(); }
+        }, function () { /* sin la función (una base antigua) o sin red: sin bloque */ });
+      }
+      function cerrarIncidencia(id) {
+        if (!id || cerrando[id]) return;
+        cerrando[id] = true; pintar();
+        ctx.llamar('incidencia_cerrar', [{ id: id }]).then(function () {
+          if (ctx.abierta()) ctx.aviso('Incidencia cerrada.');
+        }, function (e) {
+          if (ctx.abierta()) ctx.aviso('No se ha cerrado: ' + String(e.message).replace(/^\w+:\s*/, ''));
+        }).then(function () { return leerIncidencias(); }).then(function () { delete cerrando[id]; if (ctx.abierta()) pintar(); });
+      }
+      // Al volver a la pestaña (o a la app del móvil), se vuelven a leer: no van en directo.
+      function alVolver() { if (document.visibilityState === 'visible' && ctx.abierta()) leerIncidencias(); }
+      document.addEventListener('visibilitychange', alVolver);
+
       /** Los nombres de las personas (personas_gestion), guardados en el dispositivo; si cambian, se vuelve a pintar. */
       function gente() {
         return ctx.llamar('personas_gestion', [{}]).then(function (r) {
@@ -338,6 +444,7 @@
         cont.innerHTML = '<p class="u-error">No se han podido leer tus tareas.</p><p class="u-nota">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Vuelve a abrir la sección.</p>';
       });
       gente().catch(function () {});
+      leerIncidencias();
 
       // En directo (como Tareas): si alguien cambia una tarea, sus dependencias o su bitácora, se vuelve a leer el tablero.
       var directo = null, tDirecto = null;
@@ -346,6 +453,7 @@
         tDirecto = setTimeout(function () { tDirecto = null; if (ctx.abierta()) ctx.tablas.refrescar(BANDEJA ? [T, TS] : [T], true).catch(function () {}); }, 800);
       });
       this._cerrar = function () {
+        document.removeEventListener('visibilitychange', alVolver);
         if (directo) { directo.cerrar(); directo = null; }
         if (tDirecto) { clearTimeout(tDirecto); tDirecto = null; }
       };

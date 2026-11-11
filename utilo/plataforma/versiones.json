@@ -1,6 +1,13 @@
 {
-  "version": "5.20-1.18",
+  "version": "5.21-1.19",
   "versiones": [
+    {
+      "v": "5.21-1.19",
+      "fecha": "11/11/2026",
+      "novedades": [
+        "Puedes pedir cambios en una tarea en revisión desde su ficha o desde la app DEV: vuelve a la cola con lo que escribas y su tarjeta lo dice."
+      ]
+    },
     {
       "v": "5.20-1.18",
       "fecha": "11/11/2026",

@@ -41,6 +41,13 @@
   var CLAVE = 'nucleo_' + (C.clave || 'negocio');
   // Raíz de utilo-web (…/utilo-web/): de aquí cuelgan nucleo/, kanban4/, estilos/ y la carpeta de cada negocio.
   var RAIZ = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/nucleo\/[^/]*$/, '') : '../'; })();
+  // T0446: en la app «Utilo DEV» (dev-ramas/<rama>/…), su marco (el borde amarillo y la línea DEV), de dev-ramas/marco.js.
+  var APP_DEV = (/^(.*\/dev-ramas\/)[^/]+\//.exec(location.pathname) || [])[1] || '';
+  if (APP_DEV) {
+    var mDev = document.createElement('script');
+    mDev.src = APP_DEV + 'marco.js?v=' + Math.floor(Date.now() / 600000); // GitHub Pages lo guarda 10 minutos
+    document.head.appendChild(mDev);
+  }
   var MENU_CLAVE = 'kanbanMenuPlegado'; // el mismo que kanban4/app.js (T0225): cada dispositivo recuerda cómo dejó el menú
 
   var ICONO_PERFIL = '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"/>';
@@ -248,8 +255,9 @@
   }
 
   /** En DEV, la banda «DEV · rama · commit · modo» (la misma que DEV.gs del motor: colores fijos, solo en DEV). */
+  // T0446: en la app «Utilo DEV» (dev-ramas/<rama>/), sin banda: la marca de DEV es el marco de la app (dev-ramas/marco.js).
   function bandaDev(t) {
-    return t ? '<div role="status" style="position:sticky;top:0;z-index:99999;padding:6px 12px;font:600 13px/1.35 system-ui,sans-serif;text-align:center;' +
+    return t && !APP_DEV ? '<div role="status" style="position:sticky;top:0;z-index:99999;padding:6px 12px;font:600 13px/1.35 system-ui,sans-serif;text-align:center;' +
       'color:#1C1C1C;background:#FFE08A;border-bottom:2px solid #B88A00;overflow-wrap:anywhere">' + texto(t) + '</div>' : '';
   }
 
@@ -373,7 +381,7 @@
 
   /* ---------- T0283 · versión y novedades ---------- */
 
-  // La última versión cuyas novedades se han visto aquí. DEV (dev-rama/) comparte dirección con producción: va aparte.
+  // La última versión cuyas novedades se han visto aquí. DEV (dev-rama/, dev-ramas/) comparte dirección con producción: va aparte.
   function vista() { return 'nucleo_version_vista_' + (cred && cred.dev ? 'dev_' : '') + (C.clave || 'negocio'); }
   function leerVista() { try { return localStorage.getItem(vista()); } catch (e) { return null; } }
   function marcarVista() { var v = cred && cred.versiones && cred.versiones[0]; if (v) try { localStorage.setItem(vista(), v.v); } catch (e) {} }
