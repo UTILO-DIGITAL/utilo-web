@@ -75,10 +75,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "da0d6e5",
-   "ultimo": "Registro de instalaciones y CHANGELOG · utilo-plataforma-v1.16.0 (acción Publicar)",
-   "quien": "Utilo (Publicar · javiercanela3)",
-   "fecha": "2026-11-11T11:11:10.852Z",
+   "commit": "f31b4e6",
+   "ultimo": "Merge pull request #279 from UTILO-DIGITAL/T0437-responder-desde-plataforma",
+   "quien": "",
+   "fecha": "2026-11-11T11:18:28.641Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -134,7 +134,8 @@
      "20261109230351_mensajes.sql",
      "20261110120000_entregas_solas.sql",
      "20261110180000_avisos.sql",
-     "20261110200000_tareas_sin_urgente.sql"
+     "20261110200000_tareas_sin_urgente.sql",
+     "20261111120000_avisos_preguntas.sql"
     ]
    },
    "rama": "main"
