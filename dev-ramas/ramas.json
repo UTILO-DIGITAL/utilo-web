@@ -4,10 +4,10 @@
    "tarea": "T0441",
    "titulo": "App «Utilo DEV» en el móvil con selector de ramas, una carpeta por rama",
    "pr": null,
-   "commit": "ccda508",
-   "ultimo": "T0441: El selector se recarga solo cuando hay uno más nuevo (el móvil guarda la página 10 minutos)",
+   "commit": "e49481b",
+   "ultimo": "T0441: En cada rama, solo las webs que cambia (Plataforma o Área de jugadoras), la plataforma primero",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T11:37:31.402Z",
+   "fecha": "2026-11-11T11:46:57.426Z",
    "toca": [
     "konamigas",
     "utilo"
@@ -15,19 +15,25 @@
    "comun": true,
    "paginas": [
     {
-     "ruta": "dev/area/",
-     "nombre": "Área de jugadoras",
-     "iniciativa": "konamigas"
-    },
-    {
      "ruta": "dev/konamigas/",
      "nombre": "Plataforma",
-     "iniciativa": "konamigas"
+     "iniciativa": "konamigas",
+     "proyecto": "konamigas/plataforma",
+     "cambia": true
     },
     {
      "ruta": "dev/plataforma/",
      "nombre": "Plataforma",
-     "iniciativa": "utilo"
+     "iniciativa": "utilo",
+     "proyecto": "utilo/plataforma",
+     "cambia": true
+    },
+    {
+     "ruta": "dev/area/",
+     "nombre": "Área de jugadoras",
+     "iniciativa": "konamigas",
+     "proyecto": "konamigas/area",
+     "cambia": true
     }
    ],
    "migraciones": {
@@ -141,6 +147,5 @@
    "rama": "main"
   }
  },
- "bases": {},
- "selector": "a5d3949ad2"
+ "bases": {}
 }
