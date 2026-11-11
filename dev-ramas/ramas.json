@@ -554,8 +554,8 @@
   },
   "utilo": {
    "rama": "T0450-revision-con-dev",
-   "commit": "ebdcb6e",
-   "fecha": "2026-11-11T19:19:04.064Z",
+   "commit": "ada89a6",
+   "fecha": "2026-11-11T19:57:37.099Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
