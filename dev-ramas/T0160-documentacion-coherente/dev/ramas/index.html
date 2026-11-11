@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Utilo DEV</title>
+<!-- T0441: la app DEV. En utilo-web/dev-ramas/ (lo pone ahí herramientas/dev-ramas.js selector, desde main): lista las ramas
+     subidas (ramas.json) y abre sus páginas de DEV, cada rama en su carpeta. Se añade a la pantalla de inicio como «Utilo DEV»,
+     con el icono amarillo; la app de producción es otra. Su manifest abarca dev-ramas/ entero: las páginas de las ramas se
+     abren dentro de la app. -->
+<link rel="icon" href="icono-192.png?v=1">
+<link rel="manifest" href="manifest.webmanifest?v=1">
+<link rel="apple-touch-icon" href="icono-180.png?v=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Utilo DEV">
+<meta name="theme-color" content="#FFE08A">
+<style>
+  :root { --fondo: #FFF8E1; --caja: #FFFFFF; --texto: #1C1C1C; --suave: #5F5A4A; --borde: #E8D9A8; --amarillo: #FFE08A;
+    --amarillo-fuerte: #B88A00; --boton: #1C1C1C; --boton-texto: #FFFFFF; --aviso: #8A4B00; --aviso-fondo: #FFF0D6; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --fondo: #1A1810; --caja: #262318; --texto: #F3EEDC; --suave: #BDB49A; --borde: #4A4330;
+      --amarillo-fuerte: #E8C14A; --boton: #F3EEDC; --boton-texto: #1A1810; --aviso: #FFC27A; --aviso-fondo: #3A2A10; }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--fondo); color: var(--texto); font: 16px/1.4 system-ui, -apple-system, sans-serif;
+    border: 6px solid var(--amarillo-fuerte); border-top: 0; min-height: 100vh; min-height: 100dvh; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--amarillo); border-bottom: 2px solid var(--amarillo-fuerte);
+    padding: calc(env(safe-area-inset-top) + 12px) 16px 12px; display: flex; align-items: center; gap: 12px; }
+  /* La cabecera es la marca de DEV: amarilla y con letra oscura también en modo oscuro. */
+  header { color: #1C1C1C; }
+  header h1 { margin: 0; font-size: 20px; flex: 1; }
+  header p { margin: 2px 0 0; font-size: 14px; color: #5F5A4A; }
+  header button.secundario { color: #1C1C1C; border-color: #B88A00; background: transparent; }
+  main { padding: 12px 10px calc(env(safe-area-inset-bottom) + 24px); max-width: 640px; margin: 0 auto; }
+  button, a.btn { font: inherit; border-radius: 10px; border: 1px solid var(--boton); padding: 9px 14px; cursor: pointer;
+    text-decoration: none; display: inline-block; min-height: 44px; }
+  .principal { background: var(--boton); color: var(--boton-texto); }
+  .secundario { background: transparent; color: var(--texto); border-color: var(--borde); }
+  .caja { background: var(--caja); border: 1px solid var(--borde); border-radius: 14px; padding: 14px; margin: 0 0 10px; }
+  .seguir { border: 2px solid var(--amarillo-fuerte); }
+  .caja h2 { margin: 0 0 4px; font-size: 17px; overflow-wrap: anywhere; }
+  .dato { margin: 0 0 10px; font-size: 14px; color: var(--suave); overflow-wrap: anywhere; }
+  .botones { display: flex; flex-wrap: wrap; gap: 8px; }
+  .aviso { margin: 0 0 10px; padding: 8px 10px; border-radius: 8px; background: var(--aviso-fondo); color: var(--aviso); font-size: 14px; }
+  .nota { margin: 0 0 10px; font-size: 14px; color: var(--suave); }
+  .vacio { text-align: center; color: var(--suave); padding: 32px 8px; }
+  .iniciativa { display: block; width: 100%; text-align: left; font-size: 19px; font-weight: 700; padding: 18px 16px; margin: 0 0 10px;
+    background: var(--caja); color: var(--texto); border: 1px solid var(--borde); border-radius: 14px; }
+  .iniciativa small { display: block; font-size: 14px; font-weight: 400; color: var(--suave); margin-top: 2px; }
+  .volver { background: transparent; border: 0; color: var(--texto); padding: 8px 6px; font-weight: 600; }
+  .mas { background: transparent; color: var(--suave); border: 1px dashed var(--borde); width: 100%; }
+  h3 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--suave); margin: 18px 6px 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div style="flex:1">
+    <h1 id="titulo">Utilo DEV</h1>
+    <p id="subtitulo">Elige la iniciativa</p>
+  </div>
+  <button class="secundario" id="actualizar" type="button">Actualizar</button>
+</header>
+<main id="lista"><p class="vacio">Cargando…</p></main>
+<script>
+(function () {
+  'use strict';
+  // T0441: primero la iniciativa (#utilo, #konamigas); dentro, main siempre y las ramas que la tocan, con sus páginas.
+  var ULTIMA = 'dev_ramas_ultima';           // la última página abierta en este dispositivo: { carpeta, ruta }
+  var ULTIMA_INI = 'dev_ramas_iniciativa';   // la última iniciativa elegida
+  var NOMBRES = { utilo: 'Utilo', konamigas: 'Konamigas' };
+  var VERSION = '__SELECTOR__';               // la pone dev-ramas.js selector; ramas.json dice la publicada
+  var lista = document.getElementById('lista');
+  var datos = null, verTodas = false;
+
+  function texto(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
+  function leer(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function guardar(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function leerUltima() { try { return JSON.parse(leer(ULTIMA) || 'null'); } catch (e) { return null; } }
+  function nombre(ini) { return NOMBRES[ini] || ini.charAt(0).toUpperCase() + ini.slice(1); }
+
+  /** «hace 5 min», «hace 3 h», «ayer», «hace 4 días». */
+  function hace(iso) {
+    var s = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (!(s >= 0)) return '';
+    if (s < 90) return 'ahora mismo';
+    if (s < 3600) return 'hace ' + Math.round(s / 60) + ' min';
+    if (s < 86400) return 'hace ' + Math.round(s / 3600) + ' h';
+    var d = Math.round(s / 86400);
+    return d === 1 ? 'ayer' : 'hace ' + d + ' días';
+  }
+
+  function paginasDe(r, ini) { return (r.paginas || []).filter(function (p) { return p.iniciativa === ini; }); }
+  /** Las páginas de esa iniciativa que cambia la rama (dev-ramas.js · cambia); en main, todas. */
+  function cambiadas(r, ini) { return paginasDe(r, ini).filter(function (p) { return p.cambia !== false; }); }
+  /** La rama cambia alguna página de esa iniciativa. */
+  function toca(r, ini) {
+    var ps = paginasDe(r, ini);
+    if (ps.length && ps[0].cambia !== undefined) return cambiadas(r, ini).length > 0;
+    return (r.toca || []).indexOf(ini) >= 0 || !!r.comun; // subidas antes de «cambia»
+  }
+
+  /** Lo que la rama trae de la base frente a lo que tiene cargado el Supabase de DEV de esa iniciativa. */
+  function avisoBase(r, ini) {
+    var suyas = (r.migraciones || {})[ini], b = (datos.bases || {})[ini];
+    if (!suyas || !b || !b.migraciones) return '';
+    var faltan = suyas.filter(function (m) { return b.migraciones.indexOf(m) < 0; });
+    var sobran = b.migraciones.filter(function (m) { return suyas.indexOf(m) < 0; });
+    var quien = b.rama === r.rama ? 'una versión anterior de esta rama' : 'la de ' + (b.rama || 'otra rama');
+    if (faltan.length) return '<p class="aviso">La base de ' + texto(nombre(ini)) + ' en DEV no tiene los cambios de esta rama (ahora está ' + texto(quien) +
+      '). Hay que cargarla con la acción «Supabase» en DEV, rama ' + texto(r.rama) + '.</p>';
+    if (sobran.length && (r.toca || []).indexOf(ini) >= 0) return '<p class="nota">La base de ' + texto(nombre(ini)) + ' en DEV lleva además cambios de ' + texto(b.rama || 'otra rama') + '.</p>';
+    return '';
+  }
+
+  function boton(carpeta, p, principal) {
+    return '<a class="btn ' + (principal ? 'principal' : 'secundario') + '" data-carpeta="' + texto(carpeta) + '" data-ruta="' + texto(p.ruta) + '" href="' +
+      encodeURIComponent(carpeta) + '/' + texto(p.ruta) + '">' + texto(p.nombre) + '</a>';
+  }
+
+  /** todas: también las páginas que la rama no cambia (main y «Ver N ramas más»). */
+  function tarjeta(carpeta, r, ini, todas) {
+    var dato = [r.tarea || r.rama, hace(r.fecha), r.pr ? 'PR #' + r.pr : '', r.quien && r.quien !== 'Javi Canela' ? r.quien : ''].filter(Boolean).join(' · ');
+    var ps = todas ? paginasDe(r, ini) : cambiadas(r, ini);
+    return '<div class="caja"><h2>' + texto(r.titulo || r.rama) + '</h2><p class="dato">' + texto(dato) + '</p>' + avisoBase(r, ini) +
+      '<div class="botones">' + (ps.map(function (p) { return boton(carpeta, p, carpeta !== 'main'); }).join('') ||
+        '<span class="nota">Esta rama no tiene páginas de ' + texto(nombre(ini)) + '.</span>') + '</div></div>';
+  }
+
+  /** Las iniciativas con páginas en alguna rama (en el orden de NOMBRES y después las demás). */
+  function iniciativas() {
+    var vistas = {};
+    Object.keys(datos.ramas || {}).forEach(function (c) { (datos.ramas[c].paginas || []).forEach(function (p) { if (p.iniciativa) vistas[p.iniciativa] = 1; }); });
+    return Object.keys(NOMBRES).filter(function (x) { return vistas[x]; }).concat(Object.keys(vistas).filter(function (x) { return !NOMBRES[x]; }).sort());
+  }
+
+  function ramasDe(ini) {
+    var ramas = datos.ramas || {};
+    var todas = Object.keys(ramas).filter(function (c) { return c !== 'main' && paginasDe(ramas[c], ini).length; })
+      .sort(function (a, b) { return String(ramas[b].fecha).localeCompare(String(ramas[a].fecha)); });
+    return { suyas: todas.filter(function (c) { return toca(ramas[c], ini); }), otras: todas.filter(function (c) { return !toca(ramas[c], ini); }) };
+  }
+
+  function pintarInicio() {
+    document.getElementById('subtitulo').textContent = 'Elige la iniciativa';
+    var inis = iniciativas();
+    if (!inis.length) { lista.innerHTML = '<p class="vacio">No hay ninguna rama subida. Se suben solas al hacer push a una rama T0xxx.</p>'; return; }
+    lista.innerHTML = inis.map(function (ini) {
+      var n = ramasDe(ini).suyas.length;
+      return '<button type="button" class="iniciativa" data-ini="' + texto(ini) + '">' + texto(nombre(ini)) +
+        '<small>' + (n ? n + (n === 1 ? ' rama abierta' : ' ramas abiertas') + ' y main' : 'Solo main') + '</small></button>';
+    }).join('');
+  }
+
+  function pintarIniciativa(ini) {
+    var ramas = datos.ramas || {};
+    document.getElementById('subtitulo').textContent = nombre(ini) + ' · elige qué probar';
+    var html = '<button type="button" class="volver" data-volver="1">← Iniciativas</button>';
+    var u = leerUltima();
+    var pu = u && ramas[u.carpeta] && paginasDe(ramas[u.carpeta], ini).filter(function (x) { return x.ruta === u.ruta; })[0];
+    if (pu) {
+      html += '<div class="caja seguir"><p class="dato" style="margin-bottom:8px">Lo último que abriste</p>' +
+        boton(u.carpeta, { ruta: u.ruta, nombre: 'Seguir con ' + (ramas[u.carpeta].tarea || u.carpeta) + ' · ' + pu.nombre }, true) + '</div>';
+    }
+    if (ramas.main && paginasDe(ramas.main, ini).length) html += '<h3>main</h3>' + tarjeta('main', ramas.main, ini, true);
+    var r = ramasDe(ini);
+    html += '<h3>Ramas abiertas</h3>' + (r.suyas.length ? r.suyas.map(function (c) { return tarjeta(c, ramas[c], ini); }).join('')
+      : '<p class="nota" style="margin:0 6px 10px">Ninguna rama abierta cambia ' + texto(nombre(ini)) + '.</p>');
+    if (r.otras.length) {
+      html += verTodas ? '<h3>Otras ramas (no cambian ' + texto(nombre(ini)) + ')</h3>' + r.otras.map(function (c) { return tarjeta(c, ramas[c], ini, true); }).join('')
+        : '<button type="button" class="mas" data-mas="1">Ver ' + r.otras.length + (r.otras.length === 1 ? ' rama más' : ' ramas más') + ' que no cambian ' + texto(nombre(ini)) + '</button>';
+    }
+    lista.innerHTML = html;
+  }
+
+  /** Lo que se ve sale de la dirección (#konamigas); sin ella, la última iniciativa elegida si sigue habiéndola. */
+  function pintar() {
+    if (!datos) return;
+    var ini = decodeURIComponent(location.hash.slice(1));
+    if (ini && iniciativas().indexOf(ini) >= 0) { guardar(ULTIMA_INI, ini); pintarIniciativa(ini); } else pintarInicio();
+  }
+
+  function cargar() {
+    return fetch('ramas.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (j) {
+        // El móvil guarda la página 10 minutos: si hay un selector más nuevo, se carga con otra dirección (no la guardada).
+        if (j.selector && j.selector !== VERSION && VERSION.indexOf('__') && location.search.indexOf('v=' + j.selector) < 0) {
+          location.replace(location.pathname + '?v=' + j.selector + location.hash);
+          return;
+        }
+        datos = { ramas: j.ramas || {}, bases: j.bases || {} }; pintar();
+      })
+      .catch(function () { lista.innerHTML = '<p class="vacio">No se puede leer la lista de ramas. Comprueba la conexión y toca «Actualizar».</p>'; });
+  }
+
+  lista.addEventListener('click', function (ev) {
+    var a = ev.target.closest('a[data-carpeta]');
+    if (a) return guardar(ULTIMA, JSON.stringify({ carpeta: a.getAttribute('data-carpeta'), ruta: a.getAttribute('data-ruta') }));
+    var b = ev.target.closest('button');
+    if (!b) return;
+    if (b.getAttribute('data-ini')) { verTodas = false; location.hash = encodeURIComponent(b.getAttribute('data-ini')); }
+    else if (b.getAttribute('data-volver')) { guardar(ULTIMA_INI, ''); history.replaceState(null, '', location.pathname); pintar(); }
+    else if (b.getAttribute('data-mas')) { verTodas = true; pintar(); }
+  });
+  window.addEventListener('hashchange', pintar);
+  document.getElementById('actualizar').addEventListener('click', cargar);
+  // Al volver a la app (desde otra o con «Cambiar»), la lista al día.
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) cargar(); });
+  // Al abrir la app sin #, la última iniciativa elegida.
+  if (!location.hash && leer(ULTIMA_INI)) history.replaceState(null, '', '#' + encodeURIComponent(leer(ULTIMA_INI)));
+  cargar();
+})();
+</script>
+</body>
+</html>
