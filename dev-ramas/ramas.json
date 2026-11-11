@@ -331,10 +331,10 @@
    "tarea": "T0450",
    "titulo": "Una tarea pasa a revisión solo si se puede ver en DEV, con qué mirar",
    "pr": 296,
-   "commit": "1c60468",
-   "ultimo": "T0450: «+ Se comprueba» en Añadir de una tarea de Claude Code",
+   "commit": "bcd354f",
+   "ultimo": "T0450: «Se comprueba» con tres botones y «Qué mirar» solo en revisión",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T19:21:30.541Z",
+   "fecha": "2026-11-11T19:43:12.374Z",
    "toca": [
     "konamigas",
     "utilo"

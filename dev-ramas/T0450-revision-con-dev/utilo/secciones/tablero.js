@@ -326,8 +326,10 @@
   /* ---------- T0450 · Dónde se comprueba y «Verlo en DEV» ---------- */
   var APP_DEV = 'https://utilo-digital.github.io/utilo-web/dev-ramas/';
   var COMPROBAR = { Nada: 'basta la PR en verde', DEV: 'en la app «Utilo DEV», antes de fusionar', 'Producción': 'después de publicar' };
-  /** Con qué estados sale «Verlo en DEV»: mientras la rama está abierta (al fusionar, sale de DEV). */
-  var VER_EN_DEV = ['En curso', 'Necesita tu respuesta', 'Para revisar'];
+  /** Con qué estados sale el bloque «Qué mirar» (T0450, Javi: en curso aún no hay nada que mirar): en revisión y, tras
+   *  aprobarla, para lo que se mira al publicar. «Verlo en DEV», solo Para revisar: al aprobar se fusiona y sale de DEV. */
+  var EN_REVISION = ['Para revisar', 'Aprobada'];
+  var VER_EN_DEV = ['Para revisar'];
   /** El enlace de «Verlo en DEV»: la app «Utilo DEV» ya en la rama de la tarea, su web y su persona (VER_EN_DEV,
    *  «dev/plataforma/ como gestora@ejemplo.com»). Igual que enlaceDev de herramientas/revision.js (probar-plataforma.js
    *  comprueba que dan lo mismo). */
@@ -338,7 +340,7 @@
   }
 
   var CALC = { frases: frases, numerada: numerada, partesTexto: partesTexto, htmlTexto: htmlTexto, conEnlaces: conEnlaces, motivoClaude: motivoClaude, ANTES_DE_EMPEZAR: ANTES_DE_EMPEZAR,
-    enlaceDev: enlaceDev, COMPROBAR: COMPROBAR, VER_EN_DEV: VER_EN_DEV };
+    enlaceDev: enlaceDev, COMPROBAR: COMPROBAR, EN_REVISION: EN_REVISION, VER_EN_DEV: VER_EN_DEV };
   // En las pruebas (node, sin navegador), solo las cuentas.
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
@@ -1258,6 +1260,9 @@
         if (e.target.closest('[data-fed-no]')) { cerrarCampo(); return; }
         var q = e.target.closest('[data-quitar-dep]');
         if (q) { var qx = q.getAttribute('data-quitar-dep'); cambiarDeps(abiertaId, esperaA(abiertaId).filter(function (y) { return y !== qx; })); return; }
+        // T0450: dónde se comprueba, de un toque (el elegido otra vez lo quita).
+        var cb = e.target.closest('[data-comprobar]');
+        if (cb) { var tc = tarea(abiertaId), vc = cb.getAttribute('data-comprobar'); guardarCampo('COMPROBAR', tc && tc.COMPROBAR === vc ? '' : vc); return; }
         var d = e.target.closest('[data-ed]');
         if (d && !e.target.closest('a')) { abrirCampo(d.getAttribute('data-ed')); return; }
         if (e.target.closest('[data-editar]')) { editando = true; cambiando = ''; pintarFicha(); return; }
@@ -1388,8 +1393,7 @@
         }).join('') + (ab('DEPENDE') ? '<div class="fed-abierto">' + control(t, 'DEPENDE') + '</div>' : pc && deps.length ? '<button type="button" class="fmas" data-ed="DEPENDE">+ Otra tarea</button>' : '');
         // Lo que no tiene valor no sale en la ficha: se añade desde aquí.
         var faltan = !pc ? [] : [['ASIGNADO', !t.ASIGNADO], ['REVISA', !t.REVISA], ['ENTREGA', !t.ENTREGA], ['EPICA', !t.EPICA], ['P', !t.P], ['T', !t.T],
-          ['AUTONOMA', !t.AUTONOMA], ['DISPONIBLE_DESDE', !t.DISPONIBLE_DESDE], ['DEPENDE', !deps.length], ['DOCUMENTOS_RELEVANTES', !docs.length], ['CONCLUSIONES', !lineas(t.CONCLUSIONES).length],
-          ['COMPROBAR', !t.COMPROBAR && !t.QUE_MIRAR && t.HERRAMIENTA === 'Claude Code']] // T0450: dónde se comprueba, en las de Claude Code
+          ['AUTONOMA', !t.AUTONOMA], ['DISPONIBLE_DESDE', !t.DISPONIBLE_DESDE], ['DEPENDE', !deps.length], ['DOCUMENTOS_RELEVANTES', !docs.length], ['CONCLUSIONES', !lineas(t.CONCLUSIONES).length]]
           .filter(function (x) { return x[1] && cambiando !== x[0]; });
         var anadir = faltan.length ? '<div class="fanadir"><span>Añadir</span>' + faltan.map(function (x) {
           return '<button type="button" class="fmas" data-ed="' + x[0] + '">+ ' + texto(ETIQUETA[x[0]]) + '</button>'; }).join('') + '</div>' : '';
@@ -1406,16 +1410,20 @@
           '<div class="pie"><button type="button" class="u-btn" data-pedir-cambios>Pedir cambios</button></div></div>');
         if (t.MOTIVO_BLOQUEO) motivo.push('<p><b>Bloqueada:</b> ' + texto(t.MOTIVO_BLOQUEO) + '</p>');
         // T0450: cómo se revisa: qué mirar, dónde se comprueba y «Verlo en DEV» (la app DEV ya en su rama, web y persona).
+        // Solo en revisión (EN_REVISION), en las de Claude Code o si ya lo tiene; COMPROBAR, con sus tres botones a la vista.
         var revision = '';
-        if (t.COMPROBAR || t.QUE_MIRAR || ab('COMPROBAR') || ab('QUE_MIRAR')) {
+        if (EN_REVISION.indexOf(t.ESTADO) >= 0 && (t.COMPROBAR || t.QUE_MIRAR || t.HERRAMIENTA === 'Claude Code')) {
           var qm = ab('QUE_MIRAR') ? '<div class="fed-abierto"><div class="edit">' + control(t, 'QUE_MIRAR') + '</div></div>'
             : t.QUE_MIRAR ? '<div class="fx"' + pulsa(t, 'QUE_MIRAR') + '>' + htmlTexto(t.QUE_MIRAR) + '</div>'
             : pc ? '<button type="button" class="fmas" data-ed="QUE_MIRAR">+ Qué mirar</button>' : '';
-          var cmp = ab('COMPROBAR') ? '<p class="fed-abierto"><b>Se comprueba:</b> ' + control(t, 'COMPROBAR') + '</p>'
-            : '<p class="fcomprobar"' + pulsa(t, 'COMPROBAR', 'Se comprueba') + '><b>Se comprueba:</b> ' + (t.COMPROBAR ? texto(t.COMPROBAR) + ' · ' + texto(COMPROBAR[t.COMPROBAR] || '') : 'sin decir') + '</p>';
+          var cmp = '<div class="fcomprobar"><span class="lab" id="tb-cmp-lab">Se comprueba</span>' + (pc
+            ? '<div class="fniveles" role="group" aria-labelledby="tb-cmp-lab">' + Object.keys(COMPROBAR).map(function (x) {
+                return '<button type="button" data-comprobar="' + texto(x) + '" aria-pressed="' + (t.COMPROBAR === x) + '">' + texto(x) + '</button>'; }).join('') + '</div>'
+            : '<strong>' + texto(t.COMPROBAR || 'Sin decir') + '</strong>') +
+            '<span class="fpista">' + texto(t.COMPROBAR ? COMPROBAR[t.COMPROBAR] : 'Elige dónde se comprueba antes de darla por buena.') + '</span></div>';
           var ver = t.COMPROBAR === 'DEV' && VER_EN_DEV.indexOf(t.ESTADO) >= 0
             ? '<div class="pie"><a class="u-btn fver-dev" href="' + texto(enlaceDev(id, t.VER_EN_DEV)) + '" target="_blank" rel="noopener">Verlo en DEV</a></div>' : '';
-          revision = '<div class="bloque frevision"><h3>Qué mirar</h3>' + qm + cmp + ver + '</div>';
+          revision = '<div class="bloque frevision"><h3>Qué mirar</h3>' + cmp + qm + ver + '</div>';
         }
         if (t.MOTIVO) motivo.push('<p><b>Motivo:</b> ' + texto(t.MOTIVO) + '</p>');
         caja.innerHTML =
