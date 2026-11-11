@@ -331,10 +331,10 @@
    "tarea": "T0450",
    "titulo": "Una tarea pasa a revisión solo si se puede ver en DEV, con qué mirar",
    "pr": 296,
-   "commit": "0e08163",
-   "ultimo": "T0450: «Dónde lo miras» se lee, no se elige",
+   "commit": "b14bcb3",
+   "ultimo": "T0450: Sin «Verlo en DEV» cuando la ficha ya está en la app DEV",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T20:05:07.179Z",
+   "fecha": "2026-11-11T20:15:23.048Z",
    "toca": [
     "konamigas",
     "utilo"

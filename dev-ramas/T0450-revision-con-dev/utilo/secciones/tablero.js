@@ -1413,7 +1413,8 @@
             : t.QUE_MIRAR ? '<div class="fx"' + pulsa(t, 'QUE_MIRAR') + '>' + htmlTexto(t.QUE_MIRAR) + '</div>'
             : pc ? '<button type="button" class="fmas" data-ed="QUE_MIRAR">+ Qué mirar</button>' : '';
           var cmp = t.COMPROBAR ? '<p class="fcomprobar"><b>Dónde lo miras:</b> ' + texto(COMPROBAR[t.COMPROBAR] || t.COMPROBAR) + '</p>' : '';
-          var ver = t.COMPROBAR === 'DEV' && VER_EN_DEV.indexOf(t.ESTADO) >= 0
+          // Ya dentro de la app DEV (una rama en dev-ramas/), el botón volvería a abrirla: no sale (Javi).
+          var ver = t.COMPROBAR === 'DEV' && VER_EN_DEV.indexOf(t.ESTADO) >= 0 && !/\/dev-ramas\//.test(location.pathname)
             ? '<div class="pie"><a class="u-btn fver-dev" href="' + texto(enlaceDev(id, t.VER_EN_DEV)) + '" target="_blank" rel="noopener">Verlo en DEV</a></div>' : '';
           revision = '<div class="bloque frevision"><h3>Qué mirar</h3>' + cmp + qm + ver + '</div>';
         }
