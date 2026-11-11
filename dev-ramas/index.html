@@ -32,6 +32,8 @@
   /* El borde amarillo, como en las páginas de las ramas (marco.js): la hoja va dentro, con las esquinas redondeadas. */
   body { margin: 0; min-height: 100vh; min-height: 100dvh; background: var(--amarillo); color: var(--texto);
     font: 16px/1.4 system-ui, -apple-system, sans-serif; padding: 3px 6px calc(env(safe-area-inset-bottom, 0px) + 6px); display: flex; }
+  /* Fija arriba, como la del marco (marco.js): con algo fijo arriba, iOS 26 no difumina lo que queda bajo la franja de la hora. */
+  .raya { position: fixed; top: 0; left: 0; right: 0; height: 3px; background: var(--amarillo); z-index: 5; }
   .hoja { flex: 1; min-width: 0; background: var(--fondo); border-radius: 0 0 16px 16px; display: flex; flex-direction: column; }
   @media (display-mode: standalone) { .hoja { border-radius: 16px; } }
   /* Sin cabecera pegada arriba: desde iOS 26, la franja de la hora toma el color de lo que va fijo o pegado arriba (salía
@@ -91,6 +93,7 @@
 </style>
 </head>
 <body>
+<div class="raya" aria-hidden="true"></div>
 <div class="hoja">
   <header id="cab"></header>
   <main id="hoja"><p class="vacio">Cargando…</p></main>
@@ -101,7 +104,7 @@
   'use strict';
   var CLAVE = 'dev_app';                 // lo que recuerda la app en este dispositivo (lo comparte con marco.js)
   var NOMBRES = { utilo: 'Utilo', konamigas: 'Konamigas' };
-  var VERSION = '31a69fc6df';          // la pone dev-ramas.js selector; ramas.json dice la publicada
+  var VERSION = '30e8b31b40';          // la pone dev-ramas.js selector; ramas.json dice la publicada
   var ACCION = 'https://github.com/UTILO-DIGITAL/utilo-apps/actions/workflows/supabase.yml';
   var PROBAR = /[?&]probar\b/.test(location.search); // se ha venido a elegir (la línea DEV): no se vuelve sola a la última
   var hoja = document.getElementById('hoja'), cab = document.getElementById('cab'), pie = document.getElementById('pie');
@@ -232,9 +235,29 @@
   function rolAlto(p, ini) {
     var orden = perfilesDe(ini), pos = function (r) { var i = orden.indexOf(r.rol); return i < 0 ? 98 : i; };
     var r = (p.roles || []).slice().sort(function (a, b) { return pos(a) - pos(b); })[0];
-    return r ? rolTexto(r) : 'Sin roles';
+    return r ? rolesTexto({ roles: p.roles.filter(function (x) { return x.rol === r.rol; }) }) : 'Sin roles';
   }
-  function rolesTexto(p) { return p.roles && p.roles.length ? p.roles.map(rolTexto).join(', ') : 'Sin roles'; }
+  /** Sus roles, agrupados: «Árbitro · 4 partidos», «Gestor · 2 ligas y 1 partido», «Capitana · IE00001», «Admin». */
+  var AMBITOS = { partido: ['partido', 'partidos'], liga: ['liga', 'ligas'], equipo: ['equipo', 'equipos'], inscripcion_equipo: ['equipo', 'equipos'],
+    jugadora: ['ficha', 'fichas'], iniciativa: ['iniciativa', 'iniciativas'] };
+  function rolesTexto(p) {
+    if (!p.roles || !p.roles.length) return 'Sin roles';
+    var por = {}, orden = [];
+    p.roles.forEach(function (r) {
+      var n = r.nombre || r.rol;
+      if (!por[n]) { por[n] = []; orden.push(n); }
+      if (r.ambito && r.ambito !== 'todo' && r.ambito_id) por[n].push(r);
+    });
+    return orden.map(function (n) {
+      var rs = por[n];
+      if (!rs.length) return n;
+      if (rs.length === 1) return n + ' · ' + rs[0].ambito_id;
+      var cuenta = {}, tipos = [];
+      rs.forEach(function (r) { if (!cuenta[r.ambito]) { cuenta[r.ambito] = 0; tipos.push(r.ambito); } cuenta[r.ambito]++; });
+      var partes = tipos.map(function (t) { var w = AMBITOS[t] || ['ámbito', 'ámbitos']; return cuenta[t] + ' ' + w[cuenta[t] === 1 ? 0 : 1]; });
+      return n + ' · ' + (partes.length > 1 ? partes.slice(0, -1).join(', ') + ' y ' + partes[partes.length - 1] : partes[0]);
+    }).join(', ');
+  }
   function cargarPersonas(ini) {
     if (personas[ini]) return; // una vez; si falló, se vuelve a pedir al volver a entrar en «Entrar como» (ir)
     var sb = supabaseDe(ini);
