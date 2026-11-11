@@ -324,10 +324,10 @@
    "tarea": "T0160",
    "titulo": "El método de Utilo, al día con la base nueva (cuentas, clientes, plantillas e índice)",
    "pr": 288,
-   "commit": "2a2c2f5",
-   "ultimo": "T0160: 00_BASES como está de verdad en Drive, y el Sheet GESTION UTILO separado de la gestión en Supabase",
+   "commit": "81768bb",
+   "ultimo": "T0160: Un criterio para saber dónde va cada cosa (plataforma, repositorio, Drive o gestor) y 00_BASES ordenado con él",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T14:48:33.898Z",
+   "fecha": "2026-11-11T14:59:16.062Z",
    "toca": [],
    "comun": false,
    "paginas": [
