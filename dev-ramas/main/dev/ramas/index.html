@@ -13,6 +13,9 @@
      T0449 · Con una rama elegida, su tarea en el DAILY de verdad (ramas.json · daily: el Supabase de Utilo de producción,
      con la sesión de la plataforma de Utilo en este sitio, o entrando con Google una vez) y «Pedir cambios» si está Para
      revisar o Aprobada: pedir_cambios() de la base, el mismo camino que la ficha.
+     T0440 · Y «Aprobar» si está Para revisar: la función del servidor aprobar del DAILY (functions/v1/aprobar), la misma que la
+     ficha: mira su PR («Pruebas» ✅ y sin conflictos), la fusiona y la deja «Por publicar» (Aprobada). Al fusionarla, la
+     acción «DEV ramas» quita la rama de DEV sola.
      T0450 · «Verlo en DEV» de la ficha de una tarea: ?probar&tarea=T0xxx[&web=dev/plataforma/[&como=x@ejemplo.com]] elige
      la rama de esa tarea, esa web y esa persona (sin «como», tú con Google) y entra ya. Con la tarea, su «Qué mirar».
      T0456 · DEV cerrado: las personas de prueba y el buzón de pruebas solo se leen con la «llave», tu sesión de Google en
@@ -100,6 +103,10 @@
   .tarea .boton { align-self: flex-start; padding: 10px 16px; min-height: 44px; border-radius: 12px; border: 0; background: var(--boton); color: var(--boton-texto);
     font: 600 15px system-ui, -apple-system, sans-serif; cursor: pointer; }
   .tarea .boton:disabled { opacity: .55; cursor: default; }
+  .tarea .botones { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tarea .boton.sec { background: transparent; color: var(--texto); border: 1px solid var(--linea); }
+  .tarea .prs { margin: 0; padding-left: 1.2em; font-size: 14px; }
+  .tarea .prs a { color: inherit; }
   .tarea .hecho { margin: 0; font-size: 14px; }
   .tarea .hecho a { color: inherit; font-weight: 600; }
   .tarea .aviso { padding: 10px 12px; }
@@ -586,6 +593,60 @@
       function (e) { tareas[id] = { entrar: !!e.entrar, error: e.entrar ? '' : e.message, borrador: tareas[id].borrador }; })
       .then(function () { if (vista === 'probar') pintar(); });
   }
+  /** Una función del servidor del DAILY (functions/v1/<nombre>) con la misma sesión. */
+  function alFuncion(nombre, cuerpo) {
+    var d = daily();
+    return sesionDaily().then(function (s) {
+      if (!s) { var e = new Error('Entra en el DAILY.'); e.entrar = true; throw e; }
+      return fetch(d.url + '/functions/v1/' + nombre, { method: 'POST', headers: { apikey: d.clave, Authorization: 'Bearer ' + s.access_token, 'Content-Type': 'application/json' },
+        body: JSON.stringify(cuerpo || {}) });
+    }).then(function (r) {
+      return r.json().catch(function () { return null; }).then(function (j) {
+        if (r.status === 401) { var e = new Error('Tu sesión del DAILY ya no vale: vuelve a entrar.'); e.entrar = true; throw e; }
+        if (!r.ok) throw new Error((j && (j.message || j.msg)) || 'El DAILY no responde (' + r.status + ').');
+        return j;
+      });
+    });
+  }
+  /** T0440 · Cómo está una PR, en una línea. */
+  function lineaPr(p) {
+    var como = p.estado === 'fusionada' ? 'ya fusionada' : p.estado === 'cerrada' ? 'cerrada sin fusionar' :
+      (p.pruebas === 'bien' ? '«Pruebas» ✅' : p.pruebas === 'mal' ? '«Pruebas» ❌' : p.pruebas === 'en marcha' ? '«Pruebas» sin acabar' : 'sin «Pruebas»') +
+      ' · ' + (p.conflictos === false ? 'sin conflictos' : p.conflictos ? 'con conflictos' : 'conflictos sin mirar');
+    return '<li><a href="' + texto(p.url) + '" target="_blank" rel="noopener">PR ' + texto(p.repo + ' #' + p.numero) + '</a> · ' + texto(como) + '</li>';
+  }
+  function htmlAprobar(t, st) {
+    var a = st.ap || {}, r = a.r || {}, prs = r.prs || [], id = texto(t.id);
+    var abiertas = prs.filter(function (p) { return p.estado === 'abierta'; }).length;
+    var lista = prs.length ? '<ul class="prs">' + prs.map(lineaPr).join('') + '</ul>' : '';
+    if (a.paso === 'no') return '<p class="aviso">' + ICONOS.aviso + '<span>Aún no se puede aprobar: ' + texto((r.motivos || []).join('; ')) + '.</span></p>' + lista +
+      '<button type="button" class="boton sec" data-aprobar="' + id + '">Volver a mirar</button>';
+    if (a.paso === 'confirmar' || a.paso === 'aprobando') {
+      var entrega = r.publicar === false;
+      return lista + '<p class="hecho">' + (abiertas ? (abiertas === 1 ? 'Se fusiona la PR' : 'Se fusionan las ' + abiertas + ' PR') + ' y ' : prs.length ? '' : 'No tiene PR: ') + texto(t.id) +
+        (entrega ? ' pasa a Entregada: no lleva nada que publicar.' : ' pasa a Por publicar.') + '</p><div class="botones">' +
+        '<button type="button" class="boton" data-aprobar-si="' + id + '"' + (a.paso === 'aprobando' ? ' disabled' : '') + '>' +
+        (a.paso === 'aprobando' ? (abiertas ? 'Fusionando…' : 'Aprobando…') : abiertas ? 'Aprobar y fusionar' : 'Aprobar') + '</button>' +
+        (a.paso === 'aprobando' ? '' : '<button type="button" class="boton sec" data-aprobar-no="' + id + '">Ahora no</button>') + '</div>';
+    }
+    return '<button type="button" class="boton" data-aprobar="' + id + '"' + (a.paso === 'mirando' ? ' disabled' : '') + '>' + (a.paso === 'mirando' ? 'Mirando la PR…' : 'Aprobar') + '</button>';
+  }
+  function aprobar(id, probar) {
+    var st = tareas[id] || {}, a = st.ap = { paso: probar ? 'mirando' : 'aprobando', r: (st.ap || {}).r };
+    st.fallo = ''; pintar();
+    return alFuncion('aprobar', { tarea: id, probar: !!probar }).then(function (r) {
+      if (st.ap !== a) return;
+      r = r || {};
+      if (probar) { st.ap = { paso: r.puede ? 'confirmar' : 'no', r: r }; return; }
+      return leerTarea(id).then(function (t) { tareas[id] = { t: t, aprobada: r, borrador: '' }; });
+    }, function (e) {
+      if (st.ap !== a) return;
+      var m = String(e.message || e), por = /^No se puede aprobar T\d+: (.*?)\.?$/.exec(m);
+      if (e.entrar) { tareas[id] = { entrar: true, borrador: st.borrador }; return; }
+      if (por) { st.ap = { paso: 'no', r: { prs: (a.r || {}).prs || [], motivos: por[1].split('; ') } }; return; }
+      st.ap = null; st.fallo = (probar ? 'No se ha podido mirar la PR: ' : 'No se ha aprobado: ') + m;
+    }).then(function () { if (vista === 'probar') pintar(); });
+  }
   function htmlTarea(id) {
     if (!tareas[id]) cargarTarea(id);
     var st = tareas[id], t = st.t, d = daily(), h = '';
@@ -596,14 +657,17 @@
     else if (!t) h = '<span class="tt">' + texto(id) + '</span><span class="nota" style="padding:0">No está en el DAILY.</span>';
     else {
       var puede = t.estado === 'Para revisar' || t.estado === 'Aprobada';
-      h = '<span class="tt">' + texto(t.id + ' · ' + t.titulo) + '</span><span class="etiqueta">' + texto(t.estado) + (t.cambios_pedidos ? ' · con cambios pedidos sin coger' : '') + '</span>';
+      h = '<span class="tt">' + texto(t.id + ' · ' + t.titulo) + '</span><span class="etiqueta">' + texto(t.estado === 'Aprobada' ? 'Por publicar' : t.estado) + (t.cambios_pedidos ? ' · con cambios pedidos sin coger' : '') + '</span>';
       if (t.que_mirar) h += '<span class="etiqueta">Qué mirar</span><span class="mirar">' + texto(t.que_mirar) + '</span>';
+      if (st.aprobada) h += '<p class="hecho">' + texto(t.id) + ' aprobada' + (st.aprobada.fusionadas ? ' y ' + (st.aprobada.fusionadas === 1 ? 'su PR, fusionada' : 'sus PR, fusionadas') : '') +
+        (t.estado === 'Entregada' ? ': no lleva nada que publicar, queda Entregada.' : ': queda Por publicar.') + (st.aprobada.fusionadas ? ' La rama sale de DEV en un par de minutos.' : '') + '</p>';
+      if (t.estado === 'Para revisar') h += htmlAprobar(t, st);
       if (st.hecho) h += '<p class="hecho">Cambios pedidos: ' + texto(t.id) + ' vuelve a ' + texto(t.estado === 'Esperando' ? 'esperar' : 'la cola') + '. ' +
         (t.autonoma ? 'Es autónoma: <a href="' + texto(d.ficha + encodeURIComponent(t.id)) + '">«Que lo haga Claude»</a> en su ficha para que la rehaga.' : 'Quien la coja verá lo pedido lo primero.') + '</p>';
       if (puede) h += '<label class="etiqueta" for="cambios-texto">¿Hay que cambiar algo?</label>' +
         '<textarea id="cambios-texto" rows="3" placeholder="Qué hay que cambiar, tal cual…"' + (st.enviando ? ' disabled' : '') + '>' + texto(st.borrador || '') + '</textarea>' +
         '<button type="button" class="boton" data-pedir-cambios="' + texto(t.id) + '"' + (st.enviando ? ' disabled' : '') + '>' + (st.enviando ? 'Enviando…' : 'Pedir cambios') + '</button>';
-      else if (!st.hecho) h += '<span class="nota" style="padding:0">Los cambios se piden cuando está Para revisar o Aprobada.</span>';
+      else if (!st.hecho && !st.aprobada) h += '<span class="nota" style="padding:0">Los cambios se piden cuando está Para revisar o Por publicar.</span>';
       if (st.fallo) h += '<p class="aviso">' + ICONOS.aviso + '<span>' + texto(st.fallo) + '</span></p>';
     }
     return '<div><p class="titulo">La tarea de esta rama</p><div class="grupo tarea"><div class="bloque">' + h + '</div></div></div>';
@@ -751,6 +815,9 @@
     if (b.hasAttribute('data-daily-entrar')) { var d = daily(); if (d) aGoogle(d, d.sesion, location.href.replace(/[?#].*$/, '') + '?probar'); return; }
     if (b.hasAttribute('data-llave-entrar')) { aLaLlave(eleccion().ini); return; }
     if (b.hasAttribute('data-pedir-cambios')) { pedirCambios(b.getAttribute('data-pedir-cambios')); return; }
+    if (b.hasAttribute('data-aprobar')) { aprobar(b.getAttribute('data-aprobar'), true); return; }
+    if (b.hasAttribute('data-aprobar-si')) { aprobar(b.getAttribute('data-aprobar-si'), false); return; }
+    if (b.hasAttribute('data-aprobar-no')) { var sa = tareas[b.getAttribute('data-aprobar-no')]; if (sa) sa.ap = null; pintar(); return; }
     if (b.hasAttribute('data-yo')) { elegir({ como: { tipo: 'yo' } }); return atras(); }
     if (b.hasAttribute('data-persona')) {
       var p = hoja._personas[+b.getAttribute('data-persona')];

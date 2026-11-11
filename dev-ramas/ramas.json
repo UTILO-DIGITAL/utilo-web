@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "cadf7c8",
-   "ultimo": "Merge pull request #296 from UTILO-DIGITAL/T0450-revision-con-dev",
+   "commit": "4c8b05c",
+   "ultimo": "Merge pull request #298 from UTILO-DIGITAL/T0440-aprobar-y-fusionar",
    "quien": "",
-   "fecha": "2026-11-11T21:02:26.628Z",
+   "fecha": "2026-11-11T21:42:30.494Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -193,7 +193,8 @@
      "20261111200000_avisos_registro.sql",
      "20261111200001_revision_dev_tablas.sql",
      "20261111200002_revision_dev.sql",
-     "20261111210000_dev_cerrado.sql"
+     "20261111210000_dev_cerrado.sql",
+     "20261111230000_aprobar.sql"
     ]
    },
    "rama": "main"
