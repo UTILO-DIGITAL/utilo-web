@@ -4,10 +4,10 @@
    "tarea": "T0441",
    "titulo": "App «Utilo DEV» en el móvil para probar cada rama antes de fusionar",
    "pr": 281,
-   "commit": "e49481b",
-   "ultimo": "T0441: En cada rama, solo las webs que cambia (Plataforma o Área de jugadoras), la plataforma primero",
+   "commit": "abbaef7",
+   "ultimo": "T0441: Trae main (T0437, T0439); acceso-supabase.js a la v=11",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T11:51:06.643Z",
+   "fecha": "2026-11-11T12:03:35.908Z",
    "toca": [
     "konamigas",
     "utilo"
@@ -72,7 +72,9 @@
      "20261109230351_mensajes.sql",
      "20261110120000_entregas_solas.sql",
      "20261110180000_avisos.sql",
-     "20261110200000_tareas_sin_urgente.sql"
+     "20261110200000_tareas_sin_urgente.sql",
+     "20261111120000_avisos_preguntas.sql",
+     "20261111150000_lanzar_autonomo.sql"
     ]
    },
    "rama": "T0441-dev-ramas-movil"
