@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "4752153",
-   "ultimo": "Merge pull request #283 from UTILO-DIGITAL/T0441-version-selector",
+   "commit": "35910b0",
+   "ultimo": "Merge pull request #285 from UTILO-DIGITAL/T0395-consulta-publica-ligas",
    "quien": "",
-   "fecha": "2026-11-11T12:20:11.982Z",
+   "fecha": "2026-11-11T12:37:14.843Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -31,6 +31,13 @@
      "iniciativa": "konamigas",
      "proyecto": "konamigas/area",
      "cambia": true
+    },
+    {
+     "ruta": "dev/konamigas/competiciones/",
+     "nombre": "Consulta pública",
+     "iniciativa": "konamigas",
+     "proyecto": "konamigas/competiciones",
+     "cambia": true
     }
    ],
    "migraciones": {
@@ -45,7 +52,9 @@
      "20261107175950_codigo.sql",
      "20261107180000_ligas.sql",
      "20261110140000_ligas_resumen.sql",
-     "20261110170000_ligas_pantalla.sql"
+     "20261110170000_ligas_pantalla.sql",
+     "20261111120000_ligas_publico.sql",
+     "20261111120001_nombre_publico.sql"
     ],
     "utilo": [
      "20261105150000_latido.sql",
