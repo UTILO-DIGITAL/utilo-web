@@ -18,7 +18,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Tu ficha",
    "icono": "<rect x=\"4\" y=\"3\" width=\"16\" height=\"18\" rx=\"2\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/><path d=\"M7.5 17c1-2 2.6-3 4.5-3s3.5 1 4.5 3\"/>",
    "web": "konamigas/secciones/mificha.js",
-   "version": "f86ed0c3f8",
+   "version": "898eba60d0",
    "perfiles": [
     "capitana",
     "jugadora"

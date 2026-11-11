@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "f31bc55",
-   "ultimo": "Merge pull request #292 from UTILO-DIGITAL/T0445-ciclo-revision",
+   "commit": "5ea287b",
+   "ultimo": "Merge pull request #293 from UTILO-DIGITAL/T0433-avisos-incidencias",
    "quien": "",
-   "fecha": "2026-11-11T16:57:39.190Z",
+   "fecha": "2026-11-11T17:51:49.174Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -186,7 +186,8 @@
      "20261110200000_tareas_sin_urgente.sql",
      "20261111120000_avisos_preguntas.sql",
      "20261111150000_lanzar_autonomo.sql",
-     "20261111190000_personas_de_prueba.sql"
+     "20261111190000_personas_de_prueba.sql",
+     "20261111200000_avisos_registro.sql"
     ]
    },
    "rama": "main"
