@@ -7,7 +7,7 @@
    "commit": "d66db83",
    "ultimo": "Merge pull request #286 from UTILO-DIGITAL/T0441-paginas-que-carga",
    "quien": "",
-   "fecha": "2026-11-11T14:27:50.904Z",
+   "fecha": "2026-11-11T14:58:28.659Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -25,6 +25,24 @@
       "web/nucleo/acceso-supabase.js",
       "web/nucleo/nucleo.js",
       "web/nucleo/supabase.js"
+     ],
+     "clave": "dev-konamigas-plataforma",
+     "supabase": {
+      "url": "https://bizkhbuahaqmxmlrdios.supabase.co",
+      "clave": "sb_publishable_-7pWx7lxVtCygyO-hYLhOA_IfA_xCLF",
+      "nombre": "konamigas-dev"
+     },
+     "perfiles": [
+      "admin",
+      "socio",
+      "gestor",
+      "arbitro",
+      "capitana",
+      "jugadora"
+     ],
+     "entrar": [
+      "google",
+      "codigo"
      ],
      "cambia": true
     },
@@ -48,6 +66,21 @@
       "web/utilo/secciones/parami.js",
       "web/utilo/secciones/tablero.js"
      ],
+     "clave": "dev-plataforma",
+     "supabase": {
+      "url": "https://wpjcdszlkzxbmqkqyjsn.supabase.co",
+      "clave": "sb_publishable_bKp5qCd6Gk5NaToFOz0Wig_dKxkLaKV",
+      "nombre": "utilo-dev"
+     },
+     "perfiles": [
+      "admin",
+      "responsable",
+      "colaborador",
+      "lector"
+     ],
+     "entrar": [
+      "google"
+     ],
      "cambia": true
     },
     {
@@ -64,6 +97,24 @@
       "web/nucleo/acceso-supabase.js",
       "web/nucleo/nucleo.js",
       "web/nucleo/supabase.js"
+     ],
+     "clave": "dev-area",
+     "supabase": {
+      "url": "https://bizkhbuahaqmxmlrdios.supabase.co",
+      "clave": "sb_publishable_-7pWx7lxVtCygyO-hYLhOA_IfA_xCLF",
+      "nombre": "konamigas-dev"
+     },
+     "perfiles": [
+      "admin",
+      "socio",
+      "gestor",
+      "arbitro",
+      "capitana",
+      "jugadora"
+     ],
+     "entrar": [
+      "codigo",
+      "google"
      ],
      "cambia": true
     },
@@ -83,6 +134,13 @@
       "web/nucleo/publica-supabase.js",
       "web/nucleo/supabase.js"
      ],
+     "clave": "dev-konamigas-competiciones",
+     "supabase": {
+      "url": "https://bizkhbuahaqmxmlrdios.supabase.co",
+      "clave": "sb_publishable_-7pWx7lxVtCygyO-hYLhOA_IfA_xCLF",
+      "nombre": "konamigas-dev"
+     },
+     "publica": true,
      "cambia": true
     }
    ],
