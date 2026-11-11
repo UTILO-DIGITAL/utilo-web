@@ -68,8 +68,9 @@
     'html.dev-app .u .sx,html.dev-app .sx.u-sx{bottom:var(--dev-abajo);padding-bottom:0}' +
     'html.dev-app .u .u-aviso,html.dev-app .u .rp-toast,html.dev-app .u .eco-fab,html.dev-app #alta-btn,html.dev-app #alta-aviso,html.dev-app #estado-aviso{translate:0 calc(-1 * var(--dev-linea))}' +
     '#dev-marco{position:fixed;inset:0;z-index:2147483000;pointer-events:none}' +
-    '#dev-marco .dev-hueco{position:absolute;top:0;left:6px;right:6px;bottom:var(--dev-abajo);border-radius:0 0 14px 14px;box-shadow:0 0 0 240px ' + AMARILLO + '}' +
-    '@media (display-mode: standalone){#dev-marco .dev-hueco{border-radius:14px}}' +
+    // Una raya amarilla de 3px arriba, fija: desde iOS 26 la franja de la hora toma el color de lo que va fijo arriba (si
+    // no, el de la cabecera de la app, que va pegada arriba).
+    '#dev-marco .dev-hueco{position:absolute;top:3px;left:6px;right:6px;bottom:var(--dev-abajo);border-radius:14px;box-shadow:0 0 0 240px ' + AMARILLO + '}' +
     '#dev-marco a{position:absolute;left:0;right:0;bottom:env(safe-area-inset-bottom, 0px);height:var(--dev-linea);pointer-events:auto;display:flex;align-items:center;justify-content:center;gap:6px;' +
     'padding:0 16px;color:#1C1C1C;text-decoration:none;font:600 12px/1 system-ui,-apple-system,sans-serif}' +
     '#dev-marco a span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
