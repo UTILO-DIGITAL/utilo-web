@@ -31,23 +31,19 @@
   html { -webkit-text-size-adjust: 100%; background: var(--amarillo); }
   /* El borde amarillo, como en las páginas de las ramas (marco.js): la hoja va dentro, con las esquinas redondeadas. */
   body { margin: 0; min-height: 100vh; min-height: 100dvh; background: var(--amarillo); color: var(--texto);
-    font: 16px/1.4 system-ui, -apple-system, sans-serif; padding: 3px 6px calc(env(safe-area-inset-bottom, 0px) + 6px); display: flex; }
-  /* Fija arriba, como la del marco (marco.js): con algo fijo arriba, iOS 26 no difumina lo que queda bajo la franja de la hora. */
-  .raya { position: fixed; top: 0; left: 0; right: 0; height: 3px; background: var(--amarillo); z-index: 5; }
-  .hoja { flex: 1; min-width: 0; background: var(--fondo); border-radius: 0 0 16px 16px; display: flex; flex-direction: column; }
-  @media (display-mode: standalone) { .hoja { border-radius: 16px; } }
-  /* Sin cabecera pegada arriba: desde iOS 26, la franja de la hora toma el color de lo que va fijo o pegado arriba (salía
-     oscura). Así toma el amarillo del body y de la raya de 3px de arriba, como en las páginas de las ramas (marco.js). */
-  header { background: var(--fondo); border-radius: inherit; padding: calc(env(safe-area-inset-top, 0px) + 8px) 8px 6px;
-    display: flex; align-items: center; gap: 4px; min-height: 58px; }
+    font: 16px/1.4 system-ui, -apple-system, sans-serif; padding: 0 6px calc(env(safe-area-inset-bottom, 0px) + 6px); display: flex; flex-direction: column; }
+  .hoja { flex: 1; min-width: 0; background: var(--fondo); border-radius: 16px; display: flex; flex-direction: column; }
+  /* La cabecera, sobre el amarillo (fuera de la hoja) y sin ir pegada arriba: desde iOS 26 la franja de la hora toma el color
+     de lo que va fijo o pegado arriba, y difumina lo que queda debajo; así toma el amarillo y difumina amarillo sobre amarillo. */
+  header { color: #1C1C1C; padding: calc(env(safe-area-inset-top, 0px) + 6px) 4px 6px; display: flex; align-items: center; gap: 4px; min-height: 56px; }
   header h1 { margin: 0; font-size: 17px; flex: 1; display: flex; flex-direction: column; }
-  header h1 small { font-size: 13px; font-weight: 400; color: var(--suave); }
+  header h1 small { font-size: 13px; font-weight: 400; color: #5F4B00; }
   header.centro h1 { text-align: center; }
   .icono { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: transparent; border: 0;
-    color: var(--texto); padding: 0; border-radius: 12px; cursor: pointer; flex: none; }
+    color: inherit; padding: 0; border-radius: 12px; cursor: pointer; flex: none; }
   .icono svg { stroke: currentColor; fill: none; stroke-linecap: round; stroke-linejoin: round; }
   .hueco { width: 44px; flex: none; }
-  main { flex: 1; padding: 6px 12px 16px; width: 100%; max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+  main { flex: 1; padding: 12px 12px 16px; width: 100%; max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
   .grupo { background: var(--caja); border: 1px solid var(--linea); border-radius: 14px; overflow: hidden; }
   .fila { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; min-height: 56px; background: transparent; border: 0;
     border-top: 1px solid var(--separa); color: var(--texto); font: inherit; text-align: left; cursor: pointer; text-decoration: none; }
@@ -90,12 +86,12 @@
   .estado:empty { display: none; }
   .estado.error { color: var(--aviso); }
   button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid var(--texto); outline-offset: 2px; }
+  header button:focus-visible { outline-color: #1C1C1C; }
 </style>
 </head>
 <body>
-<div class="raya" aria-hidden="true"></div>
+<header id="cab"></header>
 <div class="hoja">
-  <header id="cab"></header>
   <main id="hoja"><p class="vacio">Cargando…</p></main>
   <footer id="pie" hidden><div><p class="estado" id="estado" role="status"></p><button type="button" class="abrir" id="abrir">Abrir</button></div></footer>
 </div>
@@ -104,7 +100,7 @@
   'use strict';
   var CLAVE = 'dev_app';                 // lo que recuerda la app en este dispositivo (lo comparte con marco.js)
   var NOMBRES = { utilo: 'Utilo', konamigas: 'Konamigas' };
-  var VERSION = '30e8b31b40';          // la pone dev-ramas.js selector; ramas.json dice la publicada
+  var VERSION = '6f73837997';          // la pone dev-ramas.js selector; ramas.json dice la publicada
   var ACCION = 'https://github.com/UTILO-DIGITAL/utilo-apps/actions/workflows/supabase.yml';
   var PROBAR = /[?&]probar\b/.test(location.search); // se ha venido a elegir (la línea DEV): no se vuelve sola a la última
   var hoja = document.getElementById('hoja'), cab = document.getElementById('cab'), pie = document.getElementById('pie');
