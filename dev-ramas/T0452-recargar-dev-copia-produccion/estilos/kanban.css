@@ -430,6 +430,12 @@ body.ver-entregas .filtros, body.ver-entregas #tablero, body.ver-entregas .bj { 
 .u .pm-libre { display: flex; align-items: center; gap: var(--e3); padding: var(--e4); background: var(--color-superficie); border: 1px dashed var(--color-borde-campo); border-radius: var(--radio); }
 .u .pm-libre svg { flex: none; width: 32px; height: 32px; stroke: var(--color-bien); fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .u .pm-libre p { margin: 0; }
+/* T0433 · Incidencias: el texto con sus saltos de línea; las cerradas, plegadas debajo. */
+.u .pm-inc-txt { white-space: pre-line; border-left-color: var(--estado-bl); font-size: 13px; }
+.u .pm-inc-cerradas { margin-top: var(--e3); }
+.u .pm-inc-cerradas summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 700; color: var(--color-suave); }
+.u .pm-inc-cerradas .pm-l { margin-top: var(--e2); }
+.u .pm-inc-cerradas .pm-c { opacity: .8; }
 @media (max-width: 640px) {
   .u .pm-hola { font-size: 22px; }
   .u .pm-res { gap: var(--e2); margin-bottom: var(--e4); }

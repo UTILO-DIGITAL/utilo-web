@@ -521,12 +521,12 @@
   },
   "T0452-recargar-dev-copia-produccion": {
    "tarea": "T0452",
-   "titulo": "El Supabase de DEV se recarga cada noche con main y las ramas abiertas (copia de producción preparada, apagada)",
-   "pr": null,
-   "commit": "b335eb8",
-   "ultimo": "T0452: El Supabase de DEV se recarga cada noche con main y las ramas abiertas (copia de producción preparada, apagada)",
+   "titulo": "El Supabase de DEV se rehace cada noche con main y las ramas abiertas",
+   "pr": 294,
+   "commit": "3540c78",
+   "ultimo": "Merge remote-tracking branch 'origin/main' into T0452-recargar-dev-copia-produccion",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T17:54:18.591Z",
+   "fecha": "2026-11-11T18:00:55.964Z",
    "toca": [
     "konamigas",
     "utilo"
@@ -708,7 +708,8 @@
      "20261110200000_tareas_sin_urgente.sql",
      "20261111120000_avisos_preguntas.sql",
      "20261111150000_lanzar_autonomo.sql",
-     "20261111190000_personas_de_prueba.sql"
+     "20261111190000_personas_de_prueba.sql",
+     "20261111200000_avisos_registro.sql"
     ]
    },
    "rama": "T0452-recargar-dev-copia-produccion"
