@@ -35,6 +35,9 @@
   var ICO_VOLVER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>';
   var ICO_FILTROS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>';
   var ICO_CERRAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  /** T0319 · Una tarea autónoma, en la tarjeta: un robot junto al ID, sin texto (decidido por Javi: etiquetas, las justas). */
+  var ICO_AUTO = '<svg class="tb-auto" viewBox="0 0 24 24" role="img" aria-label="Autónoma"><title>La puede hacer el agente autónomo</title>' +
+    '<rect x="5" y="8" width="14" height="11" rx="2"/><path d="M12 4v4M9 13h.01M15 13h.01M9.5 16.5h5M3 12v3M21 12v3"/></svg>';
 
   /** Los estados, en el orden del flujo, con su color de estilos/base.css y quién mueve ficha. */
   var ESTADOS = ['Esperando', 'En cola', 'En curso', 'Necesita tu respuesta', 'Bloqueada', 'Para revisar', 'Aprobada', 'Entregada', 'Aplazada', 'Descartada'];
@@ -87,7 +90,8 @@
   var ETIQUETA = { ASIGNADO: 'Asignada a', PIDE: 'La pide', REVISA: 'La revisa', EPICA: 'Épica', P: 'Prioridad', T: 'Tamaño', INICIATIVA: 'Iniciativa',
     ENTREGA: 'Entrega', DEADLINE: 'Fecha límite', DISPONIBLE_DESDE: 'No empezar antes del', FECHA_CIERRE: 'Cerrada el', REVISAR_EL: 'Se vuelve a mirar el',
     DESCRIPCION: 'Qué hay que hacer', DOCUMENTOS_RELEVANTES: 'Documentos', CONCLUSIONES: 'Conclusiones', PREGUNTA: 'Pregunta', MOTIVO: 'Motivo',
-    MOTIVO_BLOQUEO: 'Motivo del bloqueo', HERRAMIENTA: 'Herramienta', EMPLEADO: 'Empleado IA', TITULO: 'Título', DEPENDE: 'Espera a' };
+    MOTIVO_BLOQUEO: 'Motivo del bloqueo', HERRAMIENTA: 'Herramienta', EMPLEADO: 'Empleado IA', TITULO: 'Título', DEPENDE: 'Espera a',
+    AUTONOMA: 'Autónoma' };
   var OBLIGA = { TITULO: 'Título', DESCRIPCION: 'Qué hay que hacer', INICIATIVA: 'Iniciativa', ASIGNADO: 'Asignada a', P: 'Prioridad', T: 'Tamaño' };
   /** T0074: la épica que se sugiere a una tarea nueva de la entrega e: la que más llevan sus tareas (sin las descartadas); a
    *  igualdad, la de la tarea más reciente. '' sin entrega o si ninguna de sus tareas tiene épica. */
@@ -105,6 +109,7 @@
    *  cambia nada. entregasDe(ini) da los id de las entregas de una iniciativa: al cambiar de iniciativa, la entrega que no es suya se quita. */
   function cambioDe(t, k, v, entregasDe) {
     v = typeof v === 'boolean' ? v : String(v == null ? '' : v).trim();
+    if (k === 'AUTONOMA' && typeof v !== 'boolean') v = v === 'si'; // T0319: de la lista llega «si» o «no»
     if (k === 'TITULO') v = v.replace(/\.+$/, '');
     if (OBLIGA[k] && !v) return { mal: OBLIGA[k] + ': falta.' };
     if (k === 'TITULO' && v.length > 60) return { mal: 'Título: pasa de 60 caracteres.' };
@@ -378,7 +383,9 @@
           var vs = []; tareas().forEach(function (t) { if (t.EPICA && vs.indexOf(t.EPICA) < 0) vs.push(t.EPICA); });
           return vs.sort().map(function (v) { return [v, v]; });
         } },
-        { k: 'P', t: 'Prioridad', vs: function () { return ['!!!!', '!!!', '!!', '!'].map(function (v) { return [v, v]; }); } }
+        { k: 'P', t: 'Prioridad', vs: function () { return ['!!!!', '!!!', '!!', '!'].map(function (v) { return [v, v]; }); } },
+        // T0319: las que puede hacer el agente autónomo (en la tarjeta, el robot junto al ID).
+        { k: 'AUTONOMA', t: 'Agente autónomo', vs: function () { return [['si', 'Autónomas'], ['no', 'No autónomas']]; } }
       ];
       FILTROS.forEach(function (f) { F[f.k] = lista(F[f.k]); }); // lo guardado antes de T0423, un texto
       /** T0422 · Los filtros, en una hoja que sube desde abajo (como en Entregas): las columnas, cada filtro y las cerradas, en
@@ -436,7 +443,7 @@
           return F.busca.split(/\s+/).every(function (p) { return hay.indexOf(p) >= 0; });
         }
         var en = function (k, v) { return !F[k].length || F[k].indexOf(String(v)) >= 0; }; // T0423: cualquiera de las elegidas
-        if (!en('INICIATIVA', t.INICIATIVA) || !en('ENTREGA', t.ENTREGA || '-') || !en('EPICA', t.EPICA) || !en('P', t.P)) return false;
+        if (!en('INICIATIVA', t.INICIATIVA) || !en('ENTREGA', t.ENTREGA || '-') || !en('EPICA', t.EPICA) || !en('P', t.P) || !en('AUTONOMA', t.AUTONOMA ? 'si' : 'no')) return false;
         if (F.PERSONA.length && ![t.EN_MANOS_TIPO === 'persona' ? t.EN_MANOS_DE : '', t.ASIGNADO, t.PIDE, t.REVISA].some(function (p) { return p && F.PERSONA.indexOf(String(p)) >= 0; })) return false;
         if (CERRADOS.indexOf(t.ESTADO) >= 0) { var d = dias(t.FECHA_CIERRE); return d === null || -d <= F.dias; }
         return true;
@@ -444,11 +451,12 @@
 
       /* ---------- tablero ---------- */
 
-      /** Primero lo urgente y lo que vence en 7 días, después la prioridad, la fecha límite y la más antigua (como la 4.x). */
+      /** Primero lo urgente (!!!!) y lo que vence en 7 días, después la prioridad, la fecha límite y la más antigua (como la 4.x).
+       *  T0319 (decidido por Javi): lo urgente es la prioridad !!!!; la casilla Urgente ya no existe. */
       function ordenar(ts, cerradas) {
         if (cerradas) return ts.sort(function (a, b) { return String(b.FECHA_CIERRE || '').localeCompare(String(a.FECHA_CIERRE || '')) || String(b.ID).localeCompare(String(a.ID)); });
         var dl = function (t) { var d = dias(t.DEADLINE); return d === null ? 1e9 : d; };
-        var ur = function (t) { return t.URGENTE || dl(t) <= 7 ? 1 : 0; };
+        var ur = function (t) { return t.P === '!!!!' || dl(t) <= 7 ? 1 : 0; };
         var pn = function (t) { return String(t.P || '').length; };
         // T0386: las ordenadas a mano (ORDEN), antes y en su orden; las demás, debajo, con el de siempre.
         var om = function (t) { var o = ordenDe(t); return o === null ? Infinity : o; };
@@ -483,8 +491,8 @@
           [t.ESTADO].concat(pasos).map(function (e) { return '<option' + (e === t.ESTADO ? ' selected' : '') + '>' + texto(e) + '</option>'; }).join('') + '</select></div>' : '';
         return '<div class="card ' + cls(t.ESTADO) + '-b' + (t._pendiente ? ' guardando' : '') + '"' + (puede && !TACTIL ? ' draggable="true"' : '') + ' data-id="' + texto(id) + '">' +
           '<a class="card-link" href="?s=' + texto(ctx.id.toLowerCase()) + '&amp;t=' + encodeURIComponent(id) + '" data-abrir="' + texto(id) + '">' +
-          '<div class="top"><span class="id">' + (id ? texto(id) : 'Creando…') + '</span>' + (t.ENTREGA_CORTA ? '<span class="u-chip" title="Entrega">' + texto(t.ENTREGA_CORTA) + '</span>' : '') +
-          (t.URGENTE ? '<span class="u-chip">Urgente</span>' : '') + (t._pendiente ? '<span class="u-chip">Guardando</span>' : '') + '</div>' +
+          '<div class="top"><span class="id">' + (id ? texto(id) : 'Creando…') + (t.AUTONOMA && CERRADOS.indexOf(t.ESTADO) < 0 ? ICO_AUTO : '') + '</span>' +
+          (t.ENTREGA_CORTA ? '<span class="u-chip" title="Entrega">' + texto(t.ENTREGA_CORTA) + '</span>' : '') + (t._pendiente ? '<span class="u-chip">Guardando</span>' : '') + '</div>' +
           '<div class="t">' + texto(t.TITULO) + '</div>' +
           (m.length ? '<div class="m">' + texto(m.join(' · ')) + '</div>' : '') + x.join('') + '</a>' + mover + '</div>';
       }
@@ -801,9 +809,10 @@
             '<select id="tb-f-DEPENDE" data-anadir-dep><option value="">Añadir una tarea…</option>' + cand.map(function (x) { return '<option value="' + texto(x.ID) + '">' + texto(x.ID + ' · ' + x.TITULO) + '</option>'; }).join('') + '</select>', true,
             'Mientras alguna no esté entregada o descartada, esta espera.') +
           campo('HERRAMIENTA', 'Herramienta', '<select id="tb-f-HERRAMIENTA">' + opciones(HERRAMIENTAS.map(function (x) { return [x, x]; }), val('HERRAMIENTA'), 'Sin decidir') + '</select>', true) +
+          '<div class="campo"><label><input type="checkbox" id="tb-f-AUTONOMA"' + (t.AUTONOMA ? ' checked' : '') + '> La puede hacer sola el agente autónomo</label>' +
+          '<div class="ayuda">La coge la acción «Autónomo» cuando está En cola.</div></div>' +
           campo('DOCUMENTOS_RELEVANTES', 'Documentos', '<textarea id="tb-f-DOCUMENTOS_RELEVANTES" rows="3">' + texto(val('DOCUMENTOS_RELEVANTES')) + '</textarea>', true, 'Uno por línea: «Nombre: enlace».') +
           (nueva ? '' : campo('CONCLUSIONES', 'Conclusiones', '<textarea id="tb-f-CONCLUSIONES" rows="3">' + texto(val('CONCLUSIONES')) + '</textarea>', true)) +
-          '<div class="campo"><label><input type="checkbox" id="tb-f-URGENTE"' + (t.URGENTE ? ' checked' : '') + '> Urgente</label></div>' +
           '<div class="campo"><label><input type="checkbox" id="tb-f-PUBLICAR"' + (t.PUBLICAR ? ' checked' : '') + '> Al aprobarla, hay que publicarla o enviarla</label>' +
           '<div class="ayuda">Si no, al aprobarla pasa sola a Entregada.</div></div>';
       }
@@ -849,8 +858,8 @@
         var o = {}, mal = [];
         COLS.forEach(function (n) { var x = f.querySelector('#tb-f-' + n); if (x) o[n] = n === 'TITULO' ? x.value.trim().replace(/\.+$/, '') : x.value.trim(); });
         if (o.EPICA === OTRA) { var en = f.querySelector('#tb-f-EPICA-nueva'); o.EPICA = en ? en.value.trim().toUpperCase() : ''; }
-        o.URGENTE = f.querySelector('#tb-f-URGENTE').checked;
         o.PUBLICAR = f.querySelector('#tb-f-PUBLICAR').checked;
+        o.AUTONOMA = f.querySelector('#tb-f-AUTONOMA').checked;
         var d = f.querySelector('[data-deps]'), deps = d && d.getAttribute('data-deps') ? d.getAttribute('data-deps').split(',').filter(String) : [];
         if (!o.TITULO) mal.push('Título: falta.');
         else if (o.TITULO.length > 60) mal.push('Título: pasa de 60 caracteres.');
@@ -951,7 +960,7 @@
         return '<select id="fed"' + lab + '>' + opciones(o.vs, o.v, o.vacio) + '</select>';
       }
       /** Los datos que se eligen de una lista (en el ordenador, un desplegable; en el móvil, la ventanita de elegir). */
-      var DE_LISTA = { INICIATIVA: 1, ENTREGA: 1, EPICA: 1, ASIGNADO: 1, REVISA: 1, P: 1, T: 1, DEPENDE: 1 };
+      var DE_LISTA = { INICIATIVA: 1, ENTREGA: 1, EPICA: 1, ASIGNADO: 1, REVISA: 1, P: 1, T: 1, DEPENDE: 1, AUTONOMA: 1 };
       /** Las opciones de un dato de lista: { vs: [[valor, texto]], v: el de ahora, vacio: el texto de la opción vacía o false }. */
       function opcionesDe(t, k) {
         var v = t[k] == null ? '' : String(t[k]), vs = [], vacio = false;
@@ -969,6 +978,8 @@
         else if (k === 'REVISA') { vs = gentes(); vacio = 'Nadie'; }
         else if (k === 'P') vs = ['!!!!', '!!!', '!!', '!'].map(function (x) { return [x, x]; });
         else if (k === 'T') vs = ['XS', 'S', 'M', 'L', 'XL'].map(function (x) { return [x, x]; });
+        // T0319: autónoma, sí o no (en la base es verdadero o falso).
+        else if (k === 'AUTONOMA') { vs = [['si', 'Sí, la puede hacer sola'], ['no', 'No']]; v = t.AUTONOMA ? 'si' : 'no'; }
         if (!vacio && !v) vacio = 'Elige…';
         return { vs: vs, v: v, vacio: vacio };
       }
@@ -1220,6 +1231,8 @@
         if (t.EPICA || ab('EPICA')) tags.push(tag('EPICA', texto(t.EPICA)));
         if (t.P || ab('P')) tags.push(tag('P', 'Prioridad ' + texto(t.P), ' p' + String(t.P || '').length));
         if (t.T || ab('T')) tags.push(tag('T', 'Tamaño ' + texto(t.T)));
+        // T0319: si la puede hacer el agente autónomo (el modelo no sale: manda la regla; decidido por Javi).
+        if (t.AUTONOMA || ab('AUTONOMA')) tags.push(tag('AUTONOMA', 'Autónoma'));
         var manos = enManos(t);
         var pasos = PASOS[t.ESTADO] || [], mueve = !SOLO_LEE && pasos.length && !t._nueva;
         var estado = '<div class="est ' + cls(t.ESTADO) + '">' + (mueve ? '<label for="kb-f-est">Estado</label><select id="kb-f-est"' + (t._pendiente ? ' disabled' : '') + '>' +
@@ -1237,7 +1250,7 @@
         }).join('') + (ab('DEPENDE') ? '<div class="fed-abierto">' + control(t, 'DEPENDE') + '</div>' : pc && deps.length ? '<button type="button" class="fmas" data-ed="DEPENDE">+ Otra tarea</button>' : '');
         // Lo que no tiene valor no sale en la ficha: se añade desde aquí.
         var faltan = !pc ? [] : [['ASIGNADO', !t.ASIGNADO], ['REVISA', !t.REVISA], ['ENTREGA', !t.ENTREGA], ['EPICA', !t.EPICA], ['P', !t.P], ['T', !t.T],
-          ['DISPONIBLE_DESDE', !t.DISPONIBLE_DESDE], ['DEPENDE', !deps.length], ['DOCUMENTOS_RELEVANTES', !docs.length], ['CONCLUSIONES', !lineas(t.CONCLUSIONES).length]]
+          ['AUTONOMA', !t.AUTONOMA], ['DISPONIBLE_DESDE', !t.DISPONIBLE_DESDE], ['DEPENDE', !deps.length], ['DOCUMENTOS_RELEVANTES', !docs.length], ['CONCLUSIONES', !lineas(t.CONCLUSIONES).length]]
           .filter(function (x) { return x[1] && cambiando !== x[0]; });
         var anadir = faltan.length ? '<div class="fanadir"><span>Añadir</span>' + faltan.map(function (x) {
           return '<button type="button" class="fmas" data-ed="' + x[0] + '">+ ' + texto(ETIQUETA[x[0]]) + '</button>'; }).join('') + '</div>' : '';

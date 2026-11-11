@@ -1,6 +1,15 @@
 {
-  "version": "5.17-1.14",
+  "version": "5.18-1.15",
   "versiones": [
+    {
+      "v": "5.18-1.15",
+      "fecha": "11/11/2026",
+      "novedades": [
+        "Las tareas autónomas llevan un robot junto a su número y se filtran desde Filtros; se marcan al crearlas o desde la ficha.",
+        "Ya no hay casilla Urgente: lo urgente es la prioridad !!!!, que va delante de todo.",
+        "Desde tu perfil puedes recibir avisos en el móvil aunque no tengas Utilo abierta, y ver cuándo te han llegado."
+      ]
+    },
     {
       "v": "5.17-1.14",
       "fecha": "10/11/2026",

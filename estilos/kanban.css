@@ -78,6 +78,10 @@
 .u .card.cli { border-left-width: 6px; }
 .u .card .top { display: flex; align-items: center; justify-content: space-between; gap: var(--e2); }
 .u .card .id { font: 600 13px/1.4 var(--fuente-titulos); color: var(--color-principal-oscuro); font-variant-numeric: tabular-nums; }
+/* T0319 · Una tarea autónoma: el robot junto al ID, sin etiqueta de texto. */
+.u .tb-auto { width: 15px; height: 15px; flex: none; vertical-align: -2px; fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; color: var(--color-principal-oscuro); }
+.u .card .id .tb-auto { margin-left: 5px; }
 .u .card .chip { display: inline-block; max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   padding: 0 var(--e2); border-radius: var(--radio-peq); color: var(--color-superficie); font: 700 12px/1.6 var(--fuente-texto); }
 .u .card .t { font-weight: 700; margin: 2px 0 var(--e1); line-height: 1.35; }
@@ -702,6 +706,10 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
  * en la ventana de T0172, sin marco: se pinta dentro y baja con su propio desplazamiento. */
 .u .n-main.kb { padding: 0; max-width: none; } /* T0386: el tablero usa todo el ancho (el marco limita a 1600px las demás secciones) */
 .u .n-main.kb .kb-vacio { padding: var(--e4); }
+/* T0394 · Ligas de Konamigas (konamigas/secciones/competicion.js): lo de debajo de la barra, con su margen, como la barra. */
+.u .n-main.kb .lg-cuerpo { padding: var(--e3) var(--e4) var(--e5); }
+.u .lg-viendo { margin: 0 0 var(--e2); color: var(--color-suave); }
+@media (min-width: 900px) { .u .n-main.kb .lg-cuerpo { padding-left: var(--e5); padding-right: var(--e5); } }
 .u .fv-caja.kb-ficha { display: block; overflow-y: auto; overscroll-behavior: contain; }
 .u .kb-ficha .barra { padding: var(--e3) var(--e4); }
 .u .kb-ficha .cab h1 { font-size: 24px; }
