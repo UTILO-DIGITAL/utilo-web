@@ -453,12 +453,12 @@
   },
   "T0446-app-dev-borde": {
    "tarea": "T0446",
-   "titulo": "La app DEV con borde amarillo y «Probar en DEV», que entra ya como «Yo» o como una persona de prueba",
-   "pr": null,
+   "titulo": "La app DEV con borde amarillo y «Probar en DEV», que entra ya como tú o como una persona de prueba",
+   "pr": 289,
    "commit": "9a7294d",
    "ultimo": "T0446: La app DEV con borde amarillo y «Probar en DEV», que entra ya como «Yo» o como una persona de prueba",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T14:58:25.309Z",
+   "fecha": "2026-11-11T15:05:25.603Z",
    "toca": [
     "konamigas",
     "utilo"
