@@ -14,7 +14,10 @@
      con la sesión de la plataforma de Utilo en este sitio, o entrando con Google una vez) y «Pedir cambios» si está Para
      revisar o Aprobada: pedir_cambios() de la base, el mismo camino que la ficha.
      T0450 · «Verlo en DEV» de la ficha de una tarea: ?probar&tarea=T0xxx[&web=dev/plataforma/[&como=x@ejemplo.com]] elige
-     la rama de esa tarea, esa web y esa persona (sin «como», tú con Google) y entra ya. Con la tarea, su «Qué mirar». -->
+     la rama de esa tarea, esa web y esa persona (sin «como», tú con Google) y entra ya. Con la tarea, su «Qué mirar».
+     T0456 · DEV cerrado: las personas de prueba y el buzón de pruebas solo se leen con la «llave», tu sesión de Google en
+     el Supabase de DEV de esa iniciativa (una persona de verdad con rol). Se pide una vez por dispositivo en «Entrar como»
+     y se guarda aparte («dev_llaves», por Supabase), también para el botón del buzón de pruebas de las páginas. -->
 <link rel="icon" href="icono-192.png?v=1">
 <link rel="manifest" href="manifest.webmanifest?v=2">
 <link rel="apple-touch-icon" href="icono-180.png?v=1">
@@ -282,9 +285,9 @@
     var sb = supabaseDe(ini);
     if (!sb) { personas[ini] = { error: 'Esta iniciativa no tiene Supabase de DEV.' }; return; }
     personas[ini] = { cargando: true };
-    fetch(sb.url + '/rest/v1/rpc/personas_de_prueba', { method: 'POST', headers: { apikey: sb.clave, 'Content-Type': 'application/json' }, body: '{}' })
-      .then(function (r) { return r.json().catch(function () { return null; }).then(function (j) { return { ok: r.ok, j: j }; }); })
+    conLlave(sb, 'personas_de_prueba', {})
       .then(function (r) {
+        if (r.entrar) { personas[ini] = { entrar: true, motivo: r.motivo || '' }; if (vista === 'como') pintar(); return; }
         if (!r.ok || !Array.isArray(r.j)) {
           var sinFuncion = r.j && (r.j.code === 'PGRST202' || /personas_de_prueba/.test(r.j.message || ''));
           personas[ini] = { error: sinFuncion ? 'La base de ' + nombre(ini) + ' en DEV aún no sabe dar sus personas de prueba: cárgala con la acción «Supabase» en DEV.'
@@ -319,14 +322,43 @@
       .then(function (r) { return r.ok && r.j.access_token ? sesionDe(r.j, s) : null; }, function () { return null; });
   }
 
-  /** Una persona de prueba: se pide su código, se lee del buzón de pruebas y se cambia por su sesión. */
+  /* ---------- T0456 · la llave: tu Google en el Supabase de DEV de cada iniciativa ---------- */
+
+  var LLAVES = 'dev_llaves';             // url del Supabase → sesión (la comparte con el buzón de pruebas de las páginas)
+  function llaves() { try { return JSON.parse(leerLS(LLAVES) || 'null') || {}; } catch (e) { return {}; } }
+  function ponerLlave(sb, s) { var L = llaves(); if (s) L[sb.url] = s; else delete L[sb.url]; ponerLS(LLAVES, JSON.stringify(L)); }
+  /** La llave de ese Supabase, renovada si hace falta, o null. */
+  function llave(sb) {
+    var s = llaves()[sb.url] || null;
+    return vigente(sb, s).then(function (n) { if (n !== s) ponerLlave(sb, n); return n; });
+  }
+  /** Una función de la base con la llave: { ok, j } o { entrar, motivo } si no hay llave o la base no la acepta (no es
+   *  una persona de verdad con rol en ese DEV, o ha caducado): entonces se quita, para volver a entrar con Google. */
+  function conLlave(sb, fn, cuerpo) {
+    return llave(sb).then(function (s) {
+      if (!s) return { entrar: true };
+      return fetch(sb.url + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: sb.clave, Authorization: 'Bearer ' + s.access_token, 'Content-Type': 'application/json' },
+        body: JSON.stringify(cuerpo || {}) })
+        .then(function (r) { return r.json().catch(function () { return null; }).then(function (j) { return { ok: r.ok, status: r.status, j: j }; }); })
+        .then(function (r) {
+          if (r.status === 401 || (!r.ok && /Entra primero con tu Google/.test((r.j && r.j.message) || ''))) {
+            ponerLlave(sb, null);
+            return { entrar: true, motivo: r.status === 401 ? 'Tu sesión de Google en DEV ha caducado: vuelve a entrar.'
+              : (s.correo || 'Tu Google') + ' no es una persona con rol en DEV: entra con otra cuenta o pide un rol.' };
+          }
+          return r;
+        });
+    });
+  }
+
+  /** Una persona de prueba: se pide su código, se lee del buzón de pruebas (con la llave) y se cambia por su sesión. */
   function entrarDePrueba(sb, correo, ini) {
     var desde = Date.now() - 60000; // con margen: el reloj del móvil y el de la base no van igual
     var vueltas = 0;
     function leerBuzon() {
-      return fetch(sb.url + '/rest/v1/rpc/buzon_de_pruebas', { method: 'POST', headers: { apikey: sb.clave, 'Content-Type': 'application/json' }, body: JSON.stringify({ correo: correo }) })
-        .then(function (b) { return b.json().catch(function () { return null; }).then(function (j) { return { ok: b.ok, j: j }; }); })
+      return conLlave(sb, 'buzon_de_pruebas', { correo: correo })
         .then(function (b) {
+          if (b.entrar) throw new Error((b.motivo ? b.motivo + ' ' : '') + 'Para entrar como una persona de prueba, entra antes con tu Google en «Entrar como».');
           if (!b.ok || !Array.isArray(b.j)) throw new Error('La base de ' + nombre(ini) + ' en DEV no tiene buzón de pruebas.');
           var c = b.j.filter(function (m) { return new Date(m.creado).getTime() >= desde; })
             .map(function (m) { return (/(\d{6,10})/.exec(String(m.asunto || '') + ' ' + String(m.texto || '')) || [])[1]; }).filter(Boolean)[0];
@@ -335,7 +367,10 @@
           return esperar(600).then(leerBuzon);
         });
     }
-    return auth(sb, 'otp', { email: correo, create_user: true }).then(function (r) {
+    return llave(sb).then(function (s) {
+      if (!s) throw new Error('Para entrar como una persona de prueba, entra antes con tu Google en «Entrar como» (una vez en este dispositivo).');
+      return auth(sb, 'otp', { email: correo, create_user: true });
+    }).then(function (r) {
       if (!r.ok) {
         if (r.status === 429 || /rate|seconds/i.test(JSON.stringify(r.j || {}))) throw new Error('Supabase no deja pedir otro código tan seguido para ' + correo + ': espera un minuto y vuelve a abrir.');
         throw new Error('Supabase no da el código de ' + correo + ' (' + ((r.j && (r.j.msg || r.j.message)) || r.status) + ').');
@@ -587,7 +622,9 @@
   }
   /** Entrar en el DAILY con Google: de vuelta aquí (?probar), cambiar el código por la sesión (como acceso-supabase.js). */
   var CODIGO = (/[?&]code=([^&#]+)/.exec(location.search) || [])[1] || '';
+  var LLAVE = (/[?&]llave=([^&#]+)/.exec(location.search) || [])[1] || '';   // T0456: la vuelta de Google es la llave de esa iniciativa
   function canjearCodigo() {
+    if (LLAVE) return canjearLlave();
     var d = daily(), v = null;
     if (!CODIGO || !d) return Promise.resolve();
     try { v = sessionStorage.getItem(d.sesion + '_verificador'); sessionStorage.removeItem(d.sesion + '_verificador'); } catch (e) {}
@@ -599,6 +636,26 @@
       if (r.ok && r.j.access_token) { ponerLS(d.sesion, JSON.stringify(sesionDe(r.j))); tareas = {}; }
       else aviso('No se ha podido entrar en el DAILY (' + ((r.j && (r.j.msg || r.j.error_description || r.j.message)) || r.status) + ').', true);
     }, function () { aviso('No se ha podido entrar en el DAILY: sin conexión.', true); });
+  }
+
+  /** T0456 · Entrar con Google en el Supabase de DEV de una iniciativa (la llave): de vuelta aquí, a «Entrar como». */
+  function aLaLlave(ini) {
+    var sb = supabaseDe(ini);
+    if (sb) aGoogle(sb, 'dev_llave', location.href.replace(/[?#].*$/, '') + '?probar&llave=' + encodeURIComponent(ini));
+  }
+  function canjearLlave() {
+    var ini = decodeURIComponent(LLAVE), sb = supabaseDe(ini), v = null, codigo = decodeURIComponent(CODIGO);
+    LLAVE = ''; CODIGO = '';
+    try { v = sessionStorage.getItem('dev_llave_verificador'); sessionStorage.removeItem('dev_llave_verificador'); } catch (e) {}
+    history.replaceState(null, '', location.pathname + '?probar');
+    if (!sb || !codigo || !v) return Promise.resolve();
+    return auth(sb, 'token?grant_type=pkce', { auth_code: codigo, code_verifier: v }).then(function (r) {
+      if (!r.ok || !r.j.access_token) { aviso('No se ha podido entrar con Google en DEV de ' + nombre(ini) + ' (' + ((r.j && (r.j.msg || r.j.error_description || r.j.message)) || r.status) + ').', true); return; }
+      ponerLlave(sb, sesionDe(r.j));
+      delete personas[ini];
+      if (eleccion().ini !== ini) elegir({ ini: ini });
+      ir('como');
+    }, function () { aviso('No se ha podido entrar con Google: sin conexión.', true); });
   }
 
   function pintarIniciativa() {
@@ -649,6 +706,9 @@
     h += '<div><p class="titulo">Personas de prueba · ' + texto(nombre(x.ini)) + '</p>';
     hoja._personas = [];
     if (P.cargando) h += '<p class="nota">Cargando…</p>';
+    else if (P.entrar) h += '<div class="grupo tarea"><div class="bloque">' + (P.motivo ? '<p class="aviso">' + ICONOS.aviso + '<span>' + texto(P.motivo) + '</span></p>' : '') +
+      '<span class="nota" style="padding:0">DEV está cerrado: para ver las personas de prueba y entrar como ellas, entra antes con tu Google (una vez en este dispositivo).</span>' +
+      '<button type="button" class="boton" data-llave-entrar="1">Entrar con Google</button></div></div>';
     else if (P.error) h += '<p class="aviso">' + ICONOS.aviso + '<span>' + texto(P.error) + '</span></p>';
     else {
       var l = (P.lista || []).filter(function (p) { return coincide(p.nombre, p.correo, rolesTexto(p)); });
@@ -659,7 +719,7 @@
       }).join('') + '</div>' : '<p class="nota">' + (filtro ? 'Nadie con eso.' : 'Esta iniciativa no tiene personas de prueba.') + '</p>';
       hoja._personas = l;
     }
-    h += '</div><p class="nota">Las personas y sus roles salen de los datos de prueba de cada iniciativa (solo correos @ejemplo.com). Se entra sin escribir el código: la app lo lee del buzón de pruebas de DEV.</p>';
+    h += '</div><p class="nota">Las personas y sus roles salen de los datos de prueba de cada iniciativa (solo correos @ejemplo.com). Se entra sin escribir el código: la app lo lee del buzón de pruebas de DEV, con tu Google.</p>';
     hoja.innerHTML = h;
   }
 
@@ -671,7 +731,7 @@
   }
   /** A una lista (iniciativa, rama, como): con su paso en el historial, para que «atrás» del móvil vuelva a la hoja. */
   function ir(v) {
-    if (v === 'como') { var ini = eleccion().ini; if (personas[ini] && personas[ini].error) delete personas[ini]; }
+    if (v === 'como') { var ini = eleccion().ini; if (personas[ini] && (personas[ini].error || personas[ini].entrar)) delete personas[ini]; }
     vista = v; filtro = ''; verTodas = false; aviso(''); history.pushState({ v: v }, '', location.pathname + location.search + '#' + v); window.scrollTo(0, 0); pintar(); }
   function atras() { if (vista !== 'probar') history.back(); }
 
@@ -689,6 +749,7 @@
     if (b.hasAttribute('data-rama')) { elegir({ carpeta: b.getAttribute('data-rama') }); return atras(); }
     if (b.hasAttribute('data-mas')) { verTodas = true; pintar(); return; }
     if (b.hasAttribute('data-daily-entrar')) { var d = daily(); if (d) aGoogle(d, d.sesion, location.href.replace(/[?#].*$/, '') + '?probar'); return; }
+    if (b.hasAttribute('data-llave-entrar')) { aLaLlave(eleccion().ini); return; }
     if (b.hasAttribute('data-pedir-cambios')) { pedirCambios(b.getAttribute('data-pedir-cambios')); return; }
     if (b.hasAttribute('data-yo')) { elegir({ como: { tipo: 'yo' } }); return atras(); }
     if (b.hasAttribute('data-persona')) {
