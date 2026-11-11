@@ -240,6 +240,27 @@
    "rama": "T0395-consulta-publica-ligas"
   }
  },
- "bases": {},
+ "bases": {
+  "konamigas": {
+   "rama": "T0395-consulta-publica-ligas",
+   "commit": "0663b17",
+   "fecha": "2026-11-11T12:26:00.779Z",
+   "migraciones": [
+    "20261105150000_latido.sql",
+    "20261105170000_acceso.sql",
+    "20261106210905_esquema.sql",
+    "20261106211000_reglas.sql",
+    "20261107122414_personas.sql",
+    "20261107123000_roles.sql",
+    "20261107175900_correos.sql",
+    "20261107175950_codigo.sql",
+    "20261107180000_ligas.sql",
+    "20261110140000_ligas_resumen.sql",
+    "20261110170000_ligas_pantalla.sql",
+    "20261111120000_ligas_publico.sql",
+    "20261111120001_nombre_publico.sql"
+   ]
+  }
+ },
  "selector": "a5d3949ad2"
 }
