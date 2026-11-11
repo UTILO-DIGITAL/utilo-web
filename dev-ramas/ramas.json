@@ -2,12 +2,12 @@
  "ramas": {
   "T0441-dev-ramas-movil": {
    "tarea": "T0441",
-   "titulo": "App «Utilo DEV» en el móvil con selector de ramas, una carpeta por rama",
-   "pr": null,
+   "titulo": "App «Utilo DEV» en el móvil para probar cada rama antes de fusionar",
+   "pr": 281,
    "commit": "e49481b",
    "ultimo": "T0441: En cada rama, solo las webs que cambia (Plataforma o Área de jugadoras), la plataforma primero",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T11:46:57.426Z",
+   "fecha": "2026-11-11T11:51:06.643Z",
    "toca": [
     "konamigas",
     "utilo"
