@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "d66db83",
-   "ultimo": "Merge pull request #286 from UTILO-DIGITAL/T0441-paginas-que-carga",
+   "commit": "0d1769f",
+   "ultimo": "Merge pull request #289 from UTILO-DIGITAL/T0446-app-dev-borde",
    "quien": "",
-   "fecha": "2026-11-11T14:58:28.659Z",
+   "fecha": "2026-11-11T15:25:04.698Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -158,7 +158,8 @@
      "20261110140000_ligas_resumen.sql",
      "20261110170000_ligas_pantalla.sql",
      "20261111120000_ligas_publico.sql",
-     "20261111120001_nombre_publico.sql"
+     "20261111120001_nombre_publico.sql",
+     "20261111190000_personas_de_prueba.sql"
     ],
     "utilo": [
      "20261105150000_latido.sql",
@@ -184,7 +185,8 @@
      "20261110180000_avisos.sql",
      "20261110200000_tareas_sin_urgente.sql",
      "20261111120000_avisos_preguntas.sql",
-     "20261111150000_lanzar_autonomo.sql"
+     "20261111150000_lanzar_autonomo.sql",
+     "20261111190000_personas_de_prueba.sql"
     ]
    },
    "rama": "main"

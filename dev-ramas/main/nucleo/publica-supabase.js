@@ -22,6 +22,13 @@
   var M = window.NUCLEO_MONTAJE || {};
   var ENTORNO = C.supabaseLocal ? 'local' : /\/dev-ramas?\//.test(location.pathname) ? 'dev' : 'prod';
   var RAMA = (/\/dev-ramas\/([^/]+)\//.exec(location.pathname) || [])[1] || '';     // T0441: la rama de dev-ramas/<rama>/
+  // T0446: en la app «Utilo DEV», su marco (dev-ramas/marco.js) en lugar de la banda.
+  var APP_DEV = (/^(.*\/dev-ramas\/)[^/]+\//.exec(location.pathname) || [])[1] || '';
+  if (APP_DEV) {
+    var mDev = document.createElement('script');
+    mDev.src = APP_DEV + 'marco.js?v=' + Math.floor(Date.now() / 600000); // GitHub Pages lo guarda 10 minutos
+    document.head.appendChild(mDev);
+  }
   var P = C.supabaseLocal || (M.supabase || {})[ENTORNO] || {};
   var RAIZ = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/nucleo\/[^/]*$/, '') : '../../'; })();
   var CADA = 2 * 60 * 1000; // cada cuánto se pone al día mientras se mira
@@ -65,7 +72,7 @@
     T.en('cambio', function (tabla, info) { oyentes.forEach(function (f) { try { f(tabla, info); } catch (e) { if (window.console) console.error(e); } }); });
     var titulo = S.titulo || C.nombreApp || M.nombreApp || '';
     var dev = ENTORNO === 'prod' ? '' : (ENTORNO === 'dev' ? 'DEV' : 'Local') + (RAMA ? ' · ' + decodeURIComponent(RAMA) : '') + ' · Supabase ' + (P.nombre || 'de pruebas') + ' · sin entrar';
-    document.body.innerHTML = (dev ? '<div role="status" class="pub-dev">' + texto(dev) + '</div>' : '') +
+    document.body.innerHTML = (dev && !APP_DEV ? '<div role="status" class="pub-dev">' + texto(dev) + '</div>' : '') +
       '<header class="u-cab n-cab pub-cab"><h1 id="pub-titulo">' + texto(titulo) + '</h1>' +
       (C.nombreApp || M.nombreApp ? '<span class="pub-marca">' + texto(C.nombreApp || M.nombreApp) + '</span>' : '') + '</header>' +
       '<main class="u-main n-main" id="pub"></main><div class="u-aviso" id="pub-aviso" role="status" hidden></div>';
