@@ -331,12 +331,12 @@
   },
   "T0440-aprobar-y-fusionar": {
    "tarea": "T0440",
-   "titulo": "Aprobar desde la ficha y desde DEV, que fusiona la PR, y la columna «Por publicar»",
-   "pr": null,
-   "commit": "fdd1333",
-   "ultimo": "T0440: Aprobar desde la ficha y desde DEV, que fusiona la PR, y la columna «Por publicar»",
+   "titulo": "Aprobar una tarea fusiona su PR, y «Por publicar» en su columna",
+   "pr": 298,
+   "commit": "28b4dda",
+   "ultimo": "T0440: Trae main (T0450); Aprobar, debajo de «Qué mirar» en la ficha y en DEV",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T20:12:27.329Z",
+   "fecha": "2026-11-11T21:10:12.718Z",
    "toca": [
     "konamigas",
     "utilo"
@@ -491,7 +491,8 @@
      "20261110170000_ligas_pantalla.sql",
      "20261111120000_ligas_publico.sql",
      "20261111120001_nombre_publico.sql",
-     "20261111190000_personas_de_prueba.sql"
+     "20261111190000_personas_de_prueba.sql",
+     "20261111210000_dev_cerrado.sql"
     ],
     "utilo": [
      "20261105150000_latido.sql",
@@ -522,7 +523,10 @@
      "20261111190001_pedir_cambios_tablas.sql",
      "20261111190002_pedir_cambios.sql",
      "20261111200000_avisos_registro.sql",
-     "20261111210000_aprobar.sql"
+     "20261111200001_revision_dev_tablas.sql",
+     "20261111200002_revision_dev.sql",
+     "20261111210000_dev_cerrado.sql",
+     "20261111220000_aprobar.sql"
     ]
    },
    "rama": "T0440-aprobar-y-fusionar"

@@ -15,7 +15,12 @@
      revisar o Aprobada: pedir_cambios() de la base, el mismo camino que la ficha.
      T0440 · Y «Aprobar» si está Para revisar: la función del servidor aprobar del DAILY (functions/v1/aprobar), la misma que la
      ficha: mira su PR («Pruebas» ✅ y sin conflictos), la fusiona y la deja «Por publicar» (Aprobada). Al fusionarla, la
-     acción «DEV ramas» quita la rama de DEV sola. -->
+     acción «DEV ramas» quita la rama de DEV sola.
+     T0450 · «Verlo en DEV» de la ficha de una tarea: ?probar&tarea=T0xxx[&web=dev/plataforma/[&como=x@ejemplo.com]] elige
+     la rama de esa tarea, esa web y esa persona (sin «como», tú con Google) y entra ya. Con la tarea, su «Qué mirar».
+     T0456 · DEV cerrado: las personas de prueba y el buzón de pruebas solo se leen con la «llave», tu sesión de Google en
+     el Supabase de DEV de esa iniciativa (una persona de verdad con rol). Se pide una vez por dispositivo en «Entrar como»
+     y se guarda aparte («dev_llaves», por Supabase), también para el botón del buzón de pruebas de las páginas. -->
 <link rel="icon" href="icono-192.png?v=1">
 <link rel="manifest" href="manifest.webmanifest?v=2">
 <link rel="apple-touch-icon" href="icono-180.png?v=1">
@@ -105,6 +110,7 @@
   .tarea .hecho { margin: 0; font-size: 14px; }
   .tarea .hecho a { color: inherit; font-weight: 600; }
   .tarea .aviso { padding: 10px 12px; }
+  .tarea .mirar { font-size: 15px; white-space: pre-line; overflow-wrap: anywhere; }
   button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid var(--texto); outline-offset: 2px; }
   header button:focus-visible { outline-color: #1C1C1C; }
 </style>
@@ -123,6 +129,13 @@
   var VERSION = '__SELECTOR__';          // la pone dev-ramas.js selector; ramas.json dice la publicada
   var ACCION = 'https://github.com/UTILO-DIGITAL/utilo-apps/actions/workflows/supabase.yml';
   var PROBAR = /[?&]probar\b/.test(location.search); // se ha venido a elegir (la línea DEV): no se vuelve sola a la última
+  /** T0450 · Lo que pide el enlace «Verlo en DEV»: { tarea, web, como } o null. */
+  function pedido(q) {
+    var p = new URLSearchParams(q || '');
+    var tarea = (/^T\d{4}$/.exec(p.get('tarea') || '') || [])[0];
+    return tarea ? { tarea: tarea, web: p.get('web') || '', como: String(p.get('como') || '').toLowerCase() } : null;
+  }
+  var PEDIDO = pedido(location.search);
   var hoja = document.getElementById('hoja'), cab = document.getElementById('cab'), pie = document.getElementById('pie');
   var estado = document.getElementById('estado'), btnAbrir = document.getElementById('abrir');
   var datos = null, vista = 'probar', filtro = '', verTodas = false, ocupado = false, primera = true;
@@ -279,9 +292,9 @@
     var sb = supabaseDe(ini);
     if (!sb) { personas[ini] = { error: 'Esta iniciativa no tiene Supabase de DEV.' }; return; }
     personas[ini] = { cargando: true };
-    fetch(sb.url + '/rest/v1/rpc/personas_de_prueba', { method: 'POST', headers: { apikey: sb.clave, 'Content-Type': 'application/json' }, body: '{}' })
-      .then(function (r) { return r.json().catch(function () { return null; }).then(function (j) { return { ok: r.ok, j: j }; }); })
+    conLlave(sb, 'personas_de_prueba', {})
       .then(function (r) {
+        if (r.entrar) { personas[ini] = { entrar: true, motivo: r.motivo || '' }; if (vista === 'como') pintar(); return; }
         if (!r.ok || !Array.isArray(r.j)) {
           var sinFuncion = r.j && (r.j.code === 'PGRST202' || /personas_de_prueba/.test(r.j.message || ''));
           personas[ini] = { error: sinFuncion ? 'La base de ' + nombre(ini) + ' en DEV aún no sabe dar sus personas de prueba: cárgala con la acción «Supabase» en DEV.'
@@ -316,14 +329,43 @@
       .then(function (r) { return r.ok && r.j.access_token ? sesionDe(r.j, s) : null; }, function () { return null; });
   }
 
-  /** Una persona de prueba: se pide su código, se lee del buzón de pruebas y se cambia por su sesión. */
+  /* ---------- T0456 · la llave: tu Google en el Supabase de DEV de cada iniciativa ---------- */
+
+  var LLAVES = 'dev_llaves';             // url del Supabase → sesión (la comparte con el buzón de pruebas de las páginas)
+  function llaves() { try { return JSON.parse(leerLS(LLAVES) || 'null') || {}; } catch (e) { return {}; } }
+  function ponerLlave(sb, s) { var L = llaves(); if (s) L[sb.url] = s; else delete L[sb.url]; ponerLS(LLAVES, JSON.stringify(L)); }
+  /** La llave de ese Supabase, renovada si hace falta, o null. */
+  function llave(sb) {
+    var s = llaves()[sb.url] || null;
+    return vigente(sb, s).then(function (n) { if (n !== s) ponerLlave(sb, n); return n; });
+  }
+  /** Una función de la base con la llave: { ok, j } o { entrar, motivo } si no hay llave o la base no la acepta (no es
+   *  una persona de verdad con rol en ese DEV, o ha caducado): entonces se quita, para volver a entrar con Google. */
+  function conLlave(sb, fn, cuerpo) {
+    return llave(sb).then(function (s) {
+      if (!s) return { entrar: true };
+      return fetch(sb.url + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: sb.clave, Authorization: 'Bearer ' + s.access_token, 'Content-Type': 'application/json' },
+        body: JSON.stringify(cuerpo || {}) })
+        .then(function (r) { return r.json().catch(function () { return null; }).then(function (j) { return { ok: r.ok, status: r.status, j: j }; }); })
+        .then(function (r) {
+          if (r.status === 401 || (!r.ok && /Entra primero con tu Google/.test((r.j && r.j.message) || ''))) {
+            ponerLlave(sb, null);
+            return { entrar: true, motivo: r.status === 401 ? 'Tu sesión de Google en DEV ha caducado: vuelve a entrar.'
+              : (s.correo || 'Tu Google') + ' no es una persona con rol en DEV: entra con otra cuenta o pide un rol.' };
+          }
+          return r;
+        });
+    });
+  }
+
+  /** Una persona de prueba: se pide su código, se lee del buzón de pruebas (con la llave) y se cambia por su sesión. */
   function entrarDePrueba(sb, correo, ini) {
     var desde = Date.now() - 60000; // con margen: el reloj del móvil y el de la base no van igual
     var vueltas = 0;
     function leerBuzon() {
-      return fetch(sb.url + '/rest/v1/rpc/buzon_de_pruebas', { method: 'POST', headers: { apikey: sb.clave, 'Content-Type': 'application/json' }, body: JSON.stringify({ correo: correo }) })
-        .then(function (b) { return b.json().catch(function () { return null; }).then(function (j) { return { ok: b.ok, j: j }; }); })
+      return conLlave(sb, 'buzon_de_pruebas', { correo: correo })
         .then(function (b) {
+          if (b.entrar) throw new Error((b.motivo ? b.motivo + ' ' : '') + 'Para entrar como una persona de prueba, entra antes con tu Google en «Entrar como».');
           if (!b.ok || !Array.isArray(b.j)) throw new Error('La base de ' + nombre(ini) + ' en DEV no tiene buzón de pruebas.');
           var c = b.j.filter(function (m) { return new Date(m.creado).getTime() >= desde; })
             .map(function (m) { return (/(\d{6,10})/.exec(String(m.asunto || '') + ' ' + String(m.texto || '')) || [])[1]; }).filter(Boolean)[0];
@@ -332,7 +374,10 @@
           return esperar(600).then(leerBuzon);
         });
     }
-    return auth(sb, 'otp', { email: correo, create_user: true }).then(function (r) {
+    return llave(sb).then(function (s) {
+      if (!s) throw new Error('Para entrar como una persona de prueba, entra antes con tu Google en «Entrar como» (una vez en este dispositivo).');
+      return auth(sb, 'otp', { email: correo, create_user: true });
+    }).then(function (r) {
       if (!r.ok) {
         if (r.status === 429 || /rate|seconds/i.test(JSON.stringify(r.j || {}))) throw new Error('Supabase no deja pedir otro código tan seguido para ' + correo + ': espera un minuto y vuelve a abrir.');
         throw new Error('Supabase no da el código de ' + correo + ' (' + ((r.j && (r.j.msg || r.j.message)) || r.status) + ').');
@@ -470,6 +515,44 @@
     hoja._recientes = rec;
   }
 
+  /* ---------- T0450 · «Verlo en DEV»: la rama de una tarea, su web y su persona, y entrar ya ---------- */
+
+  /** La rama subida de esa tarea (la más reciente, si hay varias), o ''. */
+  function ramaDeTarea(id) {
+    var rs = datos.ramas || {};
+    return Object.keys(rs).filter(function (c) { return c !== 'main' && rs[c].tarea === id; })
+      .sort(function (a, b) { return String(rs[b].fecha).localeCompare(String(rs[a].fecha)); })[0] || '';
+  }
+  /** La elección que pide el enlace, o { error }. */
+  function eleccionPedida(P) {
+    var c = ramaDeTarea(P.tarea), r = c && rama(c);
+    if (!r) return { error: P.tarea + ' ya no tiene su rama en DEV: o aún no se ha subido (un minuto tras el push) o ya se ha fusionado.' };
+    var ps = r.paginas || [];
+    var p = P.web ? ps.filter(function (x) { return x.ruta === P.web; })[0] : ps.filter(function (x) { return x.cambia !== false; })[0] || ps[0];
+    if (!p) return { error: 'La rama de ' + P.tarea + ' no tiene ' + (P.web ? 'la web ' + P.web : 'ninguna web') + ' en DEV.' };
+    var x = { ini: p.iniciativa, carpeta: c, ruta: p.ruta };
+    if (P.como) x.como = { tipo: 'prueba', ini: p.iniciativa, correo: P.como, nombre: '', rol: '' };
+    else if (P.web) x.como = { tipo: 'yo' };
+    return { x: x, publica: !!p.publica };
+  }
+  /** Si se ha venido con un enlace «Verlo en DEV», elige lo pedido y entra; true si se ocupa él de la pantalla. */
+  function verPedido() {
+    var P = PEDIDO;
+    if (!P) return false;
+    PEDIDO = null;
+    history.replaceState(null, '', location.pathname + '?probar');
+    var e = eleccionPedida(P);
+    if (e.error) { pintar(); aviso(e.error, true); return true; }
+    elegir({ ini: e.x.ini }); // cambiar de iniciativa deja la rama y la persona como estaban: primero ella, después lo demás
+    elegir({ carpeta: e.x.carpeta, ruta: e.x.ruta, como: e.x.como });
+    var x = eleccion();
+    pintar();
+    // Si la base de DEV no tiene lo de esta rama, se queda en la hoja con el aviso (cargarla) en vez de entrar.
+    if (base(x.carpeta, x.ini)) { aviso('La base de DEV no tiene aún lo de esta rama: cárgala antes de mirarla.', true); return true; }
+    abrir(x);
+    return true;
+  }
+
   /* ---------- T0449 · la tarea de la rama en el DAILY de verdad: verla y pedir cambios ---------- */
 
   var tareas = {};   // id → { cargando } | { t } | { entrar } | { error }, con borrador, enviando, hecho y fallo (lo de pedir cambios)
@@ -500,7 +583,8 @@
     });
   }
   function leerTarea(id) {
-    return alDaily('GET', 'tareas?id=eq.' + encodeURIComponent(id) + '&select=id,titulo,estado,autonoma,cambios_pedidos').then(function (l) { return (l || [])[0] || null; });
+    // T0450: todo (también que_mirar, que el DAILY de producción tiene desde que se aplica su migración).
+    return alDaily('GET', 'tareas?id=eq.' + encodeURIComponent(id) + '&select=*').then(function (l) { return (l || [])[0] || null; });
   }
   function cargarTarea(id) {
     var antes = tareas[id] || {};
@@ -574,6 +658,7 @@
     else {
       var puede = t.estado === 'Para revisar' || t.estado === 'Aprobada';
       h = '<span class="tt">' + texto(t.id + ' · ' + t.titulo) + '</span><span class="etiqueta">' + texto(t.estado === 'Aprobada' ? 'Por publicar' : t.estado) + (t.cambios_pedidos ? ' · con cambios pedidos sin coger' : '') + '</span>';
+      if (t.que_mirar) h += '<span class="etiqueta">Qué mirar</span><span class="mirar">' + texto(t.que_mirar) + '</span>';
       if (st.aprobada) h += '<p class="hecho">' + texto(t.id) + ' aprobada' + (st.aprobada.fusionadas ? ' y ' + (st.aprobada.fusionadas === 1 ? 'su PR, fusionada' : 'sus PR, fusionadas') : '') +
         (t.estado === 'Entregada' ? ': no lleva nada que publicar, queda Entregada.' : ': queda Por publicar.') + (st.aprobada.fusionadas ? ' La rama sale de DEV en un par de minutos.' : '') + '</p>';
       if (t.estado === 'Para revisar') h += htmlAprobar(t, st);
@@ -601,7 +686,9 @@
   }
   /** Entrar en el DAILY con Google: de vuelta aquí (?probar), cambiar el código por la sesión (como acceso-supabase.js). */
   var CODIGO = (/[?&]code=([^&#]+)/.exec(location.search) || [])[1] || '';
+  var LLAVE = (/[?&]llave=([^&#]+)/.exec(location.search) || [])[1] || '';   // T0456: la vuelta de Google es la llave de esa iniciativa
   function canjearCodigo() {
+    if (LLAVE) return canjearLlave();
     var d = daily(), v = null;
     if (!CODIGO || !d) return Promise.resolve();
     try { v = sessionStorage.getItem(d.sesion + '_verificador'); sessionStorage.removeItem(d.sesion + '_verificador'); } catch (e) {}
@@ -613,6 +700,26 @@
       if (r.ok && r.j.access_token) { ponerLS(d.sesion, JSON.stringify(sesionDe(r.j))); tareas = {}; }
       else aviso('No se ha podido entrar en el DAILY (' + ((r.j && (r.j.msg || r.j.error_description || r.j.message)) || r.status) + ').', true);
     }, function () { aviso('No se ha podido entrar en el DAILY: sin conexión.', true); });
+  }
+
+  /** T0456 · Entrar con Google en el Supabase de DEV de una iniciativa (la llave): de vuelta aquí, a «Entrar como». */
+  function aLaLlave(ini) {
+    var sb = supabaseDe(ini);
+    if (sb) aGoogle(sb, 'dev_llave', location.href.replace(/[?#].*$/, '') + '?probar&llave=' + encodeURIComponent(ini));
+  }
+  function canjearLlave() {
+    var ini = decodeURIComponent(LLAVE), sb = supabaseDe(ini), v = null, codigo = decodeURIComponent(CODIGO);
+    LLAVE = ''; CODIGO = '';
+    try { v = sessionStorage.getItem('dev_llave_verificador'); sessionStorage.removeItem('dev_llave_verificador'); } catch (e) {}
+    history.replaceState(null, '', location.pathname + '?probar');
+    if (!sb || !codigo || !v) return Promise.resolve();
+    return auth(sb, 'token?grant_type=pkce', { auth_code: codigo, code_verifier: v }).then(function (r) {
+      if (!r.ok || !r.j.access_token) { aviso('No se ha podido entrar con Google en DEV de ' + nombre(ini) + ' (' + ((r.j && (r.j.msg || r.j.error_description || r.j.message)) || r.status) + ').', true); return; }
+      ponerLlave(sb, sesionDe(r.j));
+      delete personas[ini];
+      if (eleccion().ini !== ini) elegir({ ini: ini });
+      ir('como');
+    }, function () { aviso('No se ha podido entrar con Google: sin conexión.', true); });
   }
 
   function pintarIniciativa() {
@@ -663,6 +770,9 @@
     h += '<div><p class="titulo">Personas de prueba · ' + texto(nombre(x.ini)) + '</p>';
     hoja._personas = [];
     if (P.cargando) h += '<p class="nota">Cargando…</p>';
+    else if (P.entrar) h += '<div class="grupo tarea"><div class="bloque">' + (P.motivo ? '<p class="aviso">' + ICONOS.aviso + '<span>' + texto(P.motivo) + '</span></p>' : '') +
+      '<span class="nota" style="padding:0">DEV está cerrado: para ver las personas de prueba y entrar como ellas, entra antes con tu Google (una vez en este dispositivo).</span>' +
+      '<button type="button" class="boton" data-llave-entrar="1">Entrar con Google</button></div></div>';
     else if (P.error) h += '<p class="aviso">' + ICONOS.aviso + '<span>' + texto(P.error) + '</span></p>';
     else {
       var l = (P.lista || []).filter(function (p) { return coincide(p.nombre, p.correo, rolesTexto(p)); });
@@ -673,7 +783,7 @@
       }).join('') + '</div>' : '<p class="nota">' + (filtro ? 'Nadie con eso.' : 'Esta iniciativa no tiene personas de prueba.') + '</p>';
       hoja._personas = l;
     }
-    h += '</div><p class="nota">Las personas y sus roles salen de los datos de prueba de cada iniciativa (solo correos @ejemplo.com). Se entra sin escribir el código: la app lo lee del buzón de pruebas de DEV.</p>';
+    h += '</div><p class="nota">Las personas y sus roles salen de los datos de prueba de cada iniciativa (solo correos @ejemplo.com). Se entra sin escribir el código: la app lo lee del buzón de pruebas de DEV, con tu Google.</p>';
     hoja.innerHTML = h;
   }
 
@@ -685,7 +795,7 @@
   }
   /** A una lista (iniciativa, rama, como): con su paso en el historial, para que «atrás» del móvil vuelva a la hoja. */
   function ir(v) {
-    if (v === 'como') { var ini = eleccion().ini; if (personas[ini] && personas[ini].error) delete personas[ini]; }
+    if (v === 'como') { var ini = eleccion().ini; if (personas[ini] && (personas[ini].error || personas[ini].entrar)) delete personas[ini]; }
     vista = v; filtro = ''; verTodas = false; aviso(''); history.pushState({ v: v }, '', location.pathname + location.search + '#' + v); window.scrollTo(0, 0); pintar(); }
   function atras() { if (vista !== 'probar') history.back(); }
 
@@ -703,6 +813,7 @@
     if (b.hasAttribute('data-rama')) { elegir({ carpeta: b.getAttribute('data-rama') }); return atras(); }
     if (b.hasAttribute('data-mas')) { verTodas = true; pintar(); return; }
     if (b.hasAttribute('data-daily-entrar')) { var d = daily(); if (d) aGoogle(d, d.sesion, location.href.replace(/[?#].*$/, '') + '?probar'); return; }
+    if (b.hasAttribute('data-llave-entrar')) { aLaLlave(eleccion().ini); return; }
     if (b.hasAttribute('data-pedir-cambios')) { pedirCambios(b.getAttribute('data-pedir-cambios')); return; }
     if (b.hasAttribute('data-aprobar')) { aprobar(b.getAttribute('data-aprobar'), true); return; }
     if (b.hasAttribute('data-aprobar-si')) { aprobar(b.getAttribute('data-aprobar-si'), false); return; }
@@ -728,7 +839,8 @@
       .then(function (j) {
         // El móvil guarda la página 10 minutos: si hay una app más nueva, se carga con otra dirección (no la guardada).
         if (j.selector && j.selector !== VERSION && VERSION.indexOf('__') && location.search.indexOf('v=' + j.selector) < 0) {
-          location.replace(location.pathname + '?' + (PROBAR ? 'probar&' : '') + 'v=' + j.selector);
+          var q = location.search.replace(/([?&])v=[^&]*&?/, '$1').replace(/[?&]$/, ''); // con lo que pedía el enlace (T0450)
+          location.replace(location.pathname + (q ? q + '&' : '?') + 'v=' + j.selector);
           return;
         }
         datos = { ramas: j.ramas || {}, bases: j.bases || {}, daily: j.daily || null };
@@ -736,7 +848,7 @@
         var u = leer().ultima, c = u && (/\/dev-ramas\/([^/]+)\//.exec(u) || [])[1];
         if (primera && !PROBAR && c && u.indexOf(location.pathname) === 0 && rama(decodeURIComponent(c))) { location.replace(u); return; }
         primera = false;
-        return canjearCodigo().then(pintar);
+        return canjearCodigo().then(function () { if (!verPedido()) pintar(); });
       })
       .catch(function () { cabecera('Probar en DEV'); hoja.innerHTML = '<p class="vacio">No se puede leer la lista de ramas. Comprueba la conexión y vuelve a abrir la app.</p>'; });
   }
