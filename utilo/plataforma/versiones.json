@@ -1,6 +1,13 @@
 {
-  "version": "5.21-1.19",
+  "version": "5.22-1.20",
   "versiones": [
+    {
+      "v": "5.22-1.20",
+      "fecha": "11/11/2026",
+      "novedades": [
+        "La ficha de una tarea en revisión dice dónde mirarla y qué mirar, y «Verlo en DEV» la abre en la app DEV ya en su rama y con quién entrar."
+      ]
+    },
     {
       "v": "5.21-1.19",
       "fecha": "11/11/2026",

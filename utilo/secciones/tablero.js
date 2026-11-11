@@ -97,7 +97,7 @@
     ENTREGA: 'Entrega', DEADLINE: 'Fecha límite', DISPONIBLE_DESDE: 'No empezar antes del', FECHA_CIERRE: 'Cerrada el', REVISAR_EL: 'Se vuelve a mirar el',
     DESCRIPCION: 'Qué hay que hacer', DOCUMENTOS_RELEVANTES: 'Documentos', CONCLUSIONES: 'Conclusiones', PREGUNTA: 'Pregunta', MOTIVO: 'Motivo',
     MOTIVO_BLOQUEO: 'Motivo del bloqueo', HERRAMIENTA: 'Herramienta', EMPLEADO: 'Empleado IA', TITULO: 'Título', DEPENDE: 'Espera a',
-    AUTONOMA: 'Autónoma' };
+    AUTONOMA: 'Autónoma', QUE_MIRAR: 'Qué mirar' };
   var OBLIGA = { TITULO: 'Título', DESCRIPCION: 'Qué hay que hacer', INICIATIVA: 'Iniciativa', ASIGNADO: 'Asignada a', P: 'Prioridad', T: 'Tamaño' };
   /** T0074: la épica que se sugiere a una tarea nueva de la entrega e: la que más llevan sus tareas (sin las descartadas); a
    *  igualdad, la de la tarea más reciente. '' sin entrega o si ninguna de sus tareas tiene épica. */
@@ -323,7 +323,25 @@
   /** Con qué estados sale «Que lo haga Claude» en la ficha: los de antes de empezar (en los demás ya la lleva alguien o está hecha). */
   var ANTES_DE_EMPEZAR = ['Esperando', 'En cola', 'Necesita tu respuesta', 'Bloqueada', 'Aplazada'];
 
-  var CALC = { frases: frases, numerada: numerada, partesTexto: partesTexto, htmlTexto: htmlTexto, conEnlaces: conEnlaces, motivoClaude: motivoClaude, ANTES_DE_EMPEZAR: ANTES_DE_EMPEZAR };
+  /* ---------- T0450 · Dónde se comprueba y «Verlo en DEV» ---------- */
+  var APP_DEV = 'https://utilo-digital.github.io/utilo-web/dev-ramas/';
+  /** Dónde lo miras, dicho para quien revisa (T0450, Javi: se lee, no se elige; lo decide Claude con las reglas). */
+  var COMPROBAR = { Nada: 'no hace falta: basta la PR en verde', DEV: 'en DEV, antes de aprobar', 'Producción': 'tras publicar' };
+  /** Con qué estados sale el bloque «Qué mirar» (T0450, Javi: en curso aún no hay nada que mirar): en revisión y, tras
+   *  aprobarla, para lo que se mira al publicar. «Verlo en DEV», solo Para revisar: al aprobar se fusiona y sale de DEV. */
+  var EN_REVISION = ['Para revisar', 'Aprobada'];
+  var VER_EN_DEV = ['Para revisar'];
+  /** El enlace de «Verlo en DEV»: la app «Utilo DEV» ya en la rama de la tarea, su web y su persona (VER_EN_DEV,
+   *  «dev/plataforma/ como gestora@ejemplo.com»). Igual que enlaceDev de herramientas/revision.js (probar-plataforma.js
+   *  comprueba que dan lo mismo). */
+  function enlaceDev(id, verEnDev) {
+    var s = String(verEnDev || ''), m = /^\s*(\S+?)\/?(?:\s+como\s+(\S+))?\s*$/i.exec(s);
+    var v = m && s.trim() ? { ruta: m[1].replace(/^\/+/, '') + '/', como: (m[2] || '').toLowerCase() } : null;
+    return APP_DEV + '?probar&tarea=' + encodeURIComponent(id) + (v ? '&web=' + encodeURIComponent(v.ruta) + (v.como ? '&como=' + encodeURIComponent(v.como) : '') : '');
+  }
+
+  var CALC = { frases: frases, numerada: numerada, partesTexto: partesTexto, htmlTexto: htmlTexto, conEnlaces: conEnlaces, motivoClaude: motivoClaude, ANTES_DE_EMPEZAR: ANTES_DE_EMPEZAR,
+    enlaceDev: enlaceDev, COMPROBAR: COMPROBAR, EN_REVISION: EN_REVISION, VER_EN_DEV: VER_EN_DEV };
   // En las pruebas (node, sin navegador), solo las cuentas.
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
@@ -978,7 +996,7 @@
 
       /* ---------- cambiar un dato pulsándolo en la ficha (T0386) ---------- */
 
-      var LARGO = { DESCRIPCION: 6, DOCUMENTOS_RELEVANTES: 4, CONCLUSIONES: 4 }; // textos de varias líneas: se guardan con «Guardar»
+      var LARGO = { DESCRIPCION: 6, DOCUMENTOS_RELEVANTES: 4, CONCLUSIONES: 4, QUE_MIRAR: 3 }; // textos de varias líneas: se guardan con «Guardar»
       var epicaNueva = false; // T0420: en la ficha, se está escribiendo una épica que aún no existe
       function ocupado() { return editando || !!cambiando; }
       function puedeCambiar(t) { return !SOLO_LEE && !t._nueva && CERRADOS.indexOf(t.ESTADO) < 0; }
@@ -1387,13 +1405,26 @@
           '<textarea id="tb-cambios" rows="3" placeholder="Qué hay que cambiar, tal cual…">' + texto(cambiosTxt[id] || '') + '</textarea>' +
           '<div class="pie"><button type="button" class="u-btn" data-pedir-cambios>Pedir cambios</button></div></div>');
         if (t.MOTIVO_BLOQUEO) motivo.push('<p><b>Bloqueada:</b> ' + texto(t.MOTIVO_BLOQUEO) + '</p>');
+        // T0450: cómo se revisa: qué mirar, dónde se comprueba y «Verlo en DEV» (la app DEV ya en su rama, web y persona).
+        // Solo en revisión (EN_REVISION) y si lo tiene: dónde lo miras (se lee) y qué mirar.
+        var revision = '';
+        if (EN_REVISION.indexOf(t.ESTADO) >= 0 && (t.COMPROBAR || t.QUE_MIRAR)) {
+          var qm = ab('QUE_MIRAR') ? '<div class="fed-abierto"><div class="edit">' + control(t, 'QUE_MIRAR') + '</div></div>'
+            : t.QUE_MIRAR ? '<div class="fx"' + pulsa(t, 'QUE_MIRAR') + '>' + htmlTexto(t.QUE_MIRAR) + '</div>'
+            : pc ? '<button type="button" class="fmas" data-ed="QUE_MIRAR">+ Qué mirar</button>' : '';
+          var cmp = t.COMPROBAR ? '<p class="fcomprobar"><b>Dónde lo miras:</b> ' + texto(COMPROBAR[t.COMPROBAR] || t.COMPROBAR) + '</p>' : '';
+          // Ya dentro de la app DEV (una rama en dev-ramas/), el botón volvería a abrirla: no sale (Javi).
+          var ver = t.COMPROBAR === 'DEV' && VER_EN_DEV.indexOf(t.ESTADO) >= 0 && !/\/dev-ramas\//.test(location.pathname)
+            ? '<div class="pie"><a class="u-btn fver-dev" href="' + texto(enlaceDev(id, t.VER_EN_DEV)) + '" target="_blank" rel="noopener">Verlo en DEV</a></div>' : '';
+          revision = '<div class="bloque frevision"><h3>Qué mirar</h3>' + cmp + qm + ver + '</div>';
+        }
         if (t.MOTIVO) motivo.push('<p><b>Motivo:</b> ' + texto(t.MOTIVO) + '</p>');
         caja.innerHTML =
           '<div class="barra"><button type="button" class="volver" data-cerrar>' + ICO_VOLVER + texto(vieneDe ? 'Volver a ' + vieneDe.titulo : 'Volver al tablero') + '</button></div>' +
           '<div class="cab"><div class="id"><span class="n">' + texto(id) + '</span></div>' +
             (ab('TITULO') ? '<h1 id="kb-f-tit" class="fed-abierto">' + control(t, 'TITULO') + '</h1>' : '<h1 id="kb-f-tit"' + pulsa(t, 'TITULO') + '>' + texto(t.TITULO) + '</h1>') + '</div>' +
           '<div class="fmeta">' + tags.join('') + '</div>' + estado +
-          (motivo.length ? '<div class="bloque">' + motivo.join('') + '</div>' : '') +
+          (motivo.length ? '<div class="bloque">' + motivo.join('') + '</div>' : '') + revision +
           (puedeClaude(t) ? htmlClaude(t) : '') +
           '<div class="datos"><div class="fila"><b>Fechas</b><div class="ffechas">' + fs.join('') + '</div></div></div>' +
           largoFx('DESCRIPCION') +
