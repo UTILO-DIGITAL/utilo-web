@@ -325,12 +325,12 @@
   },
   "T0449-pedir-cambios": {
    "tarea": "T0449",
-   "titulo": "Pedir cambios desde la ficha, desde DEV y desde una sesión",
-   "pr": null,
-   "commit": "ddb4eff",
-   "ultimo": "T0449: Pedir cambios desde la ficha, desde DEV y desde una sesión",
+   "titulo": "Pedir cambios en una tarea desde su ficha, desde DEV o desde una sesión",
+   "pr": 295,
+   "commit": "0fa508b",
+   "ultimo": "T0449: Trae main (T0433) y rehace los montajes",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T17:51:47.204Z",
+   "fecha": "2026-11-11T18:08:55.900Z",
    "toca": [
     "konamigas",
     "utilo"
@@ -514,7 +514,8 @@
      "20261111150000_lanzar_autonomo.sql",
      "20261111190000_personas_de_prueba.sql",
      "20261111190001_pedir_cambios_tablas.sql",
-     "20261111190002_pedir_cambios.sql"
+     "20261111190002_pedir_cambios.sql",
+     "20261111200000_avisos_registro.sql"
     ]
    },
    "rama": "T0449-pedir-cambios"
