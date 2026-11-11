@@ -97,7 +97,7 @@
     ENTREGA: 'Entrega', DEADLINE: 'Fecha límite', DISPONIBLE_DESDE: 'No empezar antes del', FECHA_CIERRE: 'Cerrada el', REVISAR_EL: 'Se vuelve a mirar el',
     DESCRIPCION: 'Qué hay que hacer', DOCUMENTOS_RELEVANTES: 'Documentos', CONCLUSIONES: 'Conclusiones', PREGUNTA: 'Pregunta', MOTIVO: 'Motivo',
     MOTIVO_BLOQUEO: 'Motivo del bloqueo', HERRAMIENTA: 'Herramienta', EMPLEADO: 'Empleado IA', TITULO: 'Título', DEPENDE: 'Espera a',
-    AUTONOMA: 'Autónoma', COMPROBAR: 'Se comprueba', QUE_MIRAR: 'Qué mirar' };
+    AUTONOMA: 'Autónoma', QUE_MIRAR: 'Qué mirar' };
   var OBLIGA = { TITULO: 'Título', DESCRIPCION: 'Qué hay que hacer', INICIATIVA: 'Iniciativa', ASIGNADO: 'Asignada a', P: 'Prioridad', T: 'Tamaño' };
   /** T0074: la épica que se sugiere a una tarea nueva de la entrega e: la que más llevan sus tareas (sin las descartadas); a
    *  igualdad, la de la tarea más reciente. '' sin entrega o si ninguna de sus tareas tiene épica. */
@@ -325,7 +325,8 @@
 
   /* ---------- T0450 · Dónde se comprueba y «Verlo en DEV» ---------- */
   var APP_DEV = 'https://utilo-digital.github.io/utilo-web/dev-ramas/';
-  var COMPROBAR = { Nada: 'basta la PR en verde', DEV: 'en la app «Utilo DEV», antes de fusionar', 'Producción': 'después de publicar' };
+  /** Dónde lo miras, dicho para quien revisa (T0450, Javi: se lee, no se elige; lo decide Claude con las reglas). */
+  var COMPROBAR = { Nada: 'no hace falta: basta la PR en verde', DEV: 'en DEV, antes de aprobar', 'Producción': 'tras publicar' };
   /** Con qué estados sale el bloque «Qué mirar» (T0450, Javi: en curso aún no hay nada que mirar): en revisión y, tras
    *  aprobarla, para lo que se mira al publicar. «Verlo en DEV», solo Para revisar: al aprobar se fusiona y sale de DEV. */
   var EN_REVISION = ['Para revisar', 'Aprobada'];
@@ -1015,7 +1016,7 @@
         return '<select id="fed"' + lab + '>' + opciones(o.vs, o.v, o.vacio) + '</select>';
       }
       /** Los datos que se eligen de una lista (en el ordenador, un desplegable; en el móvil, la ventanita de elegir). */
-      var DE_LISTA = { INICIATIVA: 1, ENTREGA: 1, EPICA: 1, ASIGNADO: 1, REVISA: 1, P: 1, T: 1, DEPENDE: 1, AUTONOMA: 1, COMPROBAR: 1 };
+      var DE_LISTA = { INICIATIVA: 1, ENTREGA: 1, EPICA: 1, ASIGNADO: 1, REVISA: 1, P: 1, T: 1, DEPENDE: 1, AUTONOMA: 1 };
       /** Las opciones de un dato de lista: { vs: [[valor, texto]], v: el de ahora, vacio: el texto de la opción vacía o false }. */
       function opcionesDe(t, k) {
         var v = t[k] == null ? '' : String(t[k]), vs = [], vacio = false;
@@ -1035,8 +1036,6 @@
         else if (k === 'T') vs = ['XS', 'S', 'M', 'L', 'XL'].map(function (x) { return [x, x]; });
         // T0319: autónoma, sí o no (en la base es verdadero o falso).
         else if (k === 'AUTONOMA') { vs = [['si', 'Sí, la puede hacer sola'], ['no', 'No']]; v = t.AUTONOMA ? 'si' : 'no'; }
-        // T0450: dónde se comprueba (lo propone Claude; quien revisa lo corrige).
-        else if (k === 'COMPROBAR') { vs = Object.keys(COMPROBAR).map(function (x) { return [x, x + ': ' + COMPROBAR[x]]; }); vacio = 'Sin decir'; }
         if (!vacio && !v) vacio = 'Elige…';
         return { vs: vs, v: v, vacio: vacio };
       }
@@ -1260,9 +1259,6 @@
         if (e.target.closest('[data-fed-no]')) { cerrarCampo(); return; }
         var q = e.target.closest('[data-quitar-dep]');
         if (q) { var qx = q.getAttribute('data-quitar-dep'); cambiarDeps(abiertaId, esperaA(abiertaId).filter(function (y) { return y !== qx; })); return; }
-        // T0450: dónde se comprueba, de un toque (el elegido otra vez lo quita).
-        var cb = e.target.closest('[data-comprobar]');
-        if (cb) { var tc = tarea(abiertaId), vc = cb.getAttribute('data-comprobar'); guardarCampo('COMPROBAR', tc && tc.COMPROBAR === vc ? '' : vc); return; }
         var d = e.target.closest('[data-ed]');
         if (d && !e.target.closest('a')) { abrirCampo(d.getAttribute('data-ed')); return; }
         if (e.target.closest('[data-editar]')) { editando = true; cambiando = ''; pintarFicha(); return; }
@@ -1410,17 +1406,13 @@
           '<div class="pie"><button type="button" class="u-btn" data-pedir-cambios>Pedir cambios</button></div></div>');
         if (t.MOTIVO_BLOQUEO) motivo.push('<p><b>Bloqueada:</b> ' + texto(t.MOTIVO_BLOQUEO) + '</p>');
         // T0450: cómo se revisa: qué mirar, dónde se comprueba y «Verlo en DEV» (la app DEV ya en su rama, web y persona).
-        // Solo en revisión (EN_REVISION), en las de Claude Code o si ya lo tiene; COMPROBAR, con sus tres botones a la vista.
+        // Solo en revisión (EN_REVISION) y si lo tiene: dónde lo miras (se lee) y qué mirar.
         var revision = '';
-        if (EN_REVISION.indexOf(t.ESTADO) >= 0 && (t.COMPROBAR || t.QUE_MIRAR || t.HERRAMIENTA === 'Claude Code')) {
+        if (EN_REVISION.indexOf(t.ESTADO) >= 0 && (t.COMPROBAR || t.QUE_MIRAR)) {
           var qm = ab('QUE_MIRAR') ? '<div class="fed-abierto"><div class="edit">' + control(t, 'QUE_MIRAR') + '</div></div>'
             : t.QUE_MIRAR ? '<div class="fx"' + pulsa(t, 'QUE_MIRAR') + '>' + htmlTexto(t.QUE_MIRAR) + '</div>'
             : pc ? '<button type="button" class="fmas" data-ed="QUE_MIRAR">+ Qué mirar</button>' : '';
-          var cmp = '<div class="fcomprobar"><span class="lab" id="tb-cmp-lab">Se comprueba</span>' + (pc
-            ? '<div class="fniveles" role="group" aria-labelledby="tb-cmp-lab">' + Object.keys(COMPROBAR).map(function (x) {
-                return '<button type="button" data-comprobar="' + texto(x) + '" aria-pressed="' + (t.COMPROBAR === x) + '">' + texto(x) + '</button>'; }).join('') + '</div>'
-            : '<strong>' + texto(t.COMPROBAR || 'Sin decir') + '</strong>') +
-            '<span class="fpista">' + texto(t.COMPROBAR ? COMPROBAR[t.COMPROBAR] : 'Elige dónde se comprueba antes de darla por buena.') + '</span></div>';
+          var cmp = t.COMPROBAR ? '<p class="fcomprobar"><b>Dónde lo miras:</b> ' + texto(COMPROBAR[t.COMPROBAR] || t.COMPROBAR) + '</p>' : '';
           var ver = t.COMPROBAR === 'DEV' && VER_EN_DEV.indexOf(t.ESTADO) >= 0
             ? '<div class="pie"><a class="u-btn fver-dev" href="' + texto(enlaceDev(id, t.VER_EN_DEV)) + '" target="_blank" rel="noopener">Verlo en DEV</a></div>' : '';
           revision = '<div class="bloque frevision"><h3>Qué mirar</h3>' + cmp + qm + ver + '</div>';

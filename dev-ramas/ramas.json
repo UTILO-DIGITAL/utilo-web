@@ -331,10 +331,10 @@
    "tarea": "T0450",
    "titulo": "Una tarea pasa a revisión solo si se puede ver en DEV, con qué mirar",
    "pr": 296,
-   "commit": "ada89a6",
-   "ultimo": "T0450: Trae main (T0456)",
+   "commit": "0e08163",
+   "ultimo": "T0450: «Dónde lo miras» se lee, no se elige",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T19:54:34.168Z",
+   "fecha": "2026-11-11T20:05:07.179Z",
    "toca": [
     "konamigas",
     "utilo"
