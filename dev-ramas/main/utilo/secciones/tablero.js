@@ -18,7 +18,11 @@
  * - Se pinta al momento con lo guardado en el dispositivo y se refresca por detrás.
  * - Mover (arrastrando en el ordenador, con el desplegable en el móvil o desde la ficha): solo a los estados a los que se
  *   puede pasar, y pide lo que exige cada uno (Bloqueada, el motivo; Necesita tu respuesta, la pregunta; Aplazada, la fecha;
- *   Descartada y rechazar, el motivo). La tarjeta cambia al momento y lo escribe mover_tarea(); si la base dice que no, vuelve.
+ *   Descartada, el motivo). La tarjeta cambia al momento y lo escribe mover_tarea(); si la base dice que no, vuelve.
+ * - T0449 · Pedir cambios (sustituye a «rechazar»): en la ficha de una tarea Para revisar o Aprobada, o llevándola a En cola,
+ *   quien la revisa (o lleva la iniciativa) escribe qué hay que cambiar y pedir_cambios() la devuelve a la cola con la marca
+ *   (la tarjeta lo dice), el bloque «Cambios pedidos» en Qué hay que hacer y su línea en la bitácora. Si es autónoma, el aviso
+ *   lleva a «Que lo haga Claude».
  * - En el móvil, mantener pulsada una tarjeta la coge para llevarla con el dedo a otra columna o a otro sitio de la suya.
  * - Ficha: cada dato (título, etiquetas, fechas, personas, «espera a», textos) se cambia pulsándolo; lo que no tiene valor, con
  *   «Añadir». «Editar tarea» sigue para cambiar varios a la vez.
@@ -51,8 +55,8 @@
     'En curso': ['Para revisar', 'Necesita tu respuesta', 'Bloqueada', 'En cola', 'Aplazada', 'Descartada'],
     'Necesita tu respuesta': ['En cola', 'Aplazada', 'Descartada'],
     'Bloqueada': ['En cola', 'Aplazada', 'Descartada'],
-    'Para revisar': ['Aprobada', 'En curso', 'Descartada'],
-    'Aprobada': ['Entregada'],
+    'Para revisar': ['Aprobada', 'En cola', 'Descartada'],   // T0449: a En cola, pidiendo cambios (rechazar a En curso, ya no)
+    'Aprobada': ['Entregada', 'En cola'],
     'Aplazada': ['En cola', 'Esperando', 'Descartada']
   };
   /** Qué abarca cada estado: sale al pasar el ratón por la cabecera de su columna. */
@@ -73,6 +77,8 @@
     return c.estados.length === 1 ? QUE_ES[c.estados[0]] || '' : c.estados.map(function (e) { return e + ': ' + (QUE_ES[e] || ''); }).join('\n');
   }
   var MOTIVOS_BLOQUEO = ['Falta material del cliente', 'Falta un acceso', 'Problema técnico', 'Un tercero'];
+  /** T0449 · Lo que pasa al pedir cambios (la ventanita del tablero). */
+  var AYUDA_CAMBIOS = 'Vuelve a la cola con lo que escribas, tal cual: queda en Qué hay que hacer y en la bitácora, y quien la coja lo ve lo primero.';
   var HERRAMIENTAS = ['Chat', 'Cowork', 'Claude Code'];
   /** Las columnas de cada vista: [{ id, titulo, estados }]. */
   var VISTAS = {
@@ -228,6 +234,7 @@
    * [{ tit, fecha?, anadido?, cosas: [{ p } | { hecho } | { li, quien } | { intro, pasos }] }]
    * - «SOLICITUD:», «DECISIONES:», «ABIERTO:»… (APARTADOS), solos o al empezar la línea: un apartado con su título.
    * - «Añadido después (fecha, quién): …»: un apartado aparte, con lo de los paréntesis como fecha.
+   * - T0449 · «Cambios pedidos (fecha, quién): …»: lo mismo, marcado como cambios pedidos (cambios: true).
    * - Un párrafo, una frase por línea; «Está bien hecho cuando …», aparte; «1) … 2) …», numerada.
    * - «- …»: lista; «(Javi)» al final, a quién le toca.
    */
@@ -253,6 +260,7 @@
         return;
       }
       if ((m = /^Añadido después\s*(?:\(([^)]*)\))?\s*:\s*(.*)$/i.exec(l))) { nuevo('Añadido después', { anadido: true, fecha: m[1] || '' }); if (m[2]) parrafo(m[2]); return; }
+      if ((m = /^Cambios pedidos\s*(?:\(([^)]*)\))?\s*:\s*(.*)$/i.exec(l))) { nuevo('Cambios pedidos', { anadido: true, cambios: true, fecha: m[1] || '' }); if (m[2]) parrafo(m[2]); return; }
       if ((m = /^([A-ZÁÉÍÓÚÑ_]+):\s*(.*)$/.exec(l)) && m[1] in APARTADOS) { nuevo(APARTADOS[m[1]]); if (m[2]) parrafo(m[2]); return; }
       parrafo(l);
     });
@@ -286,7 +294,7 @@
       });
       if (lista) h += '</ul>';
       var tit = x.tit ? '<h4>' + texto(x.tit) + (x.fecha ? ' <span>' + texto(x.fecha) + '</span>' : '') + '</h4>' : '';
-      return '<div class="fx-parte' + (x.anadido ? ' fx-anadido' : '') + '">' + tit + h + '</div>';
+      return '<div class="fx-parte' + (x.anadido ? ' fx-anadido' : '') + (x.cambios ? ' fx-cambios' : '') + '">' + tit + h + '</div>';
     }).join('');
   }
   /**
@@ -506,6 +514,8 @@
         if (col.estados.length > 1) x.push('<div class="x"><b>' + texto(t.ESTADO) + '</b></div>');
         if (t.ESTADO === 'Necesita tu respuesta' && t.PREGUNTA) x.push('<div class="x">Pregunta: ' + texto(t.PREGUNTA) + '</div>');
         if (t.ESTADO === 'Aplazada' && t.REVISAR_EL) x.push('<div class="x">Se vuelve a mirar el ' + fechaEs(t.REVISAR_EL) + '</div>');
+        // T0449: con cambios pedidos que nadie ha cogido todavía.
+        if (t.CAMBIOS_PEDIDOS && (t.ESTADO === 'En cola' || t.ESTADO === 'Esperando')) x.push('<div class="x tb-cambios">Cambios pedidos</div>');
         if (CERRADOS.indexOf(t.ESTADO) >= 0) { if (t.FECHA_CIERRE) x.push('<div class="x">Cerrada el ' + fechaEs(t.FECHA_CIERRE) + '</div>'); }
         else {
           var d = dias(t.DEADLINE);
@@ -716,7 +726,7 @@
       /** Lo que pide la base para pasar a ese estado: '' si nada. */
       function pide(de, a) {
         return a === 'Bloqueada' ? 'bloqueo' : a === 'Necesita tu respuesta' ? 'pregunta' : a === 'Aplazada' ? 'aplazar' : a === 'Descartada' ? 'descartar' :
-          de === 'Para revisar' && a === 'En curso' ? 'rechazar' : '';
+          (de === 'Para revisar' || de === 'Aprobada') && a === 'En cola' ? 'cambios' : '';
       }
       function mover(id, nuevo) {
         var t = tarea(id);
@@ -748,19 +758,20 @@
       /** La ventanita con lo que pide el estado: motivo del bloqueo, pregunta, fecha, motivo. */
       function pedirDatos(t, nuevo, q) {
         var id = String(t.ID), h = '';
-        var tit = { bloqueo: 'Bloquear ' + id, pregunta: 'Preguntar a quien la pidió', aplazar: 'Aplazar ' + id, descartar: 'Descartar ' + id, rechazar: 'Rechazar ' + id }[q];
+        var tit = { bloqueo: 'Bloquear ' + id, pregunta: 'Preguntar a quien la pidió', aplazar: 'Aplazar ' + id, descartar: 'Descartar ' + id, cambios: 'Pedir cambios en ' + id }[q];
         var ayuda = { bloqueo: 'Pasa a Bloqueada: la mueve alguien de fuera o algo técnico.', pregunta: 'Pasa a Necesita tu respuesta, en manos de ' + (nombre(t.PIDE) || 'quien la pidió') + '.',
           aplazar: 'Nadie la mueve hasta esa fecha; entonces se decide.', descartar: 'Se cierra y no se reabre. Las que la esperan dejan de esperarla.',
-          rechazar: 'Vuelve a En curso con lo que hay que cambiar.' }[q];
+          cambios: AYUDA_CAMBIOS }[q];
         if (q === 'bloqueo') h = '<div class="campo"><label class="lab" for="tb-d-mb">Por qué</label><select id="tb-d-mb" required><option value="">Elige…</option>' +
           MOTIVOS_BLOQUEO.map(function (m) { return '<option>' + texto(m) + '</option>'; }).join('') + '</select></div>' +
           '<div class="campo"><label class="lab" for="tb-d-mo">Qué pasa <span class="opc">(opcional)</span></label><textarea id="tb-d-mo" rows="2"></textarea></div>';
         if (q === 'pregunta') h = '<div class="campo"><label class="lab" for="tb-d-pr">La pregunta, concreta</label><textarea id="tb-d-pr" rows="3" required></textarea></div>';
         if (q === 'aplazar') h = '<div class="campo"><label class="lab" for="tb-d-re">Se vuelve a mirar el</label><input type="date" id="tb-d-re" min="' + hoyISO() + '" required></div>' +
           '<div class="campo"><label class="lab" for="tb-d-mo">Por qué <span class="opc">(opcional)</span></label><textarea id="tb-d-mo" rows="2"></textarea></div>';
-        if (q === 'descartar' || q === 'rechazar') h = '<div class="campo"><label class="lab" for="tb-d-mo">' + (q === 'rechazar' ? 'Qué hay que cambiar' : 'Por qué se descarta') + '</label><textarea id="tb-d-mo" rows="3" required></textarea></div>';
+        if (q === 'descartar') h = '<div class="campo"><label class="lab" for="tb-d-mo">Por qué se descarta</label><textarea id="tb-d-mo" rows="3" required></textarea></div>';
+        if (q === 'cambios') h = '<div class="campo"><label class="lab" for="tb-d-ca">Qué hay que cambiar</label><textarea id="tb-d-ca" rows="4" required></textarea></div>';
         altaForm.innerHTML = '<h2>' + texto(tit) + '</h2><p class="u-nota">' + texto(ayuda) + '</p><div class="edit">' + h + '</div><div id="alta-error" role="alert"></div>' +
-          '<div class="botones"><button type="button" class="sec" data-cancelar-alta>Cancelar</button><button type="submit" class="pri">' + texto(q === 'rechazar' ? 'Rechazar' : 'Pasar a ' + nuevo) + '</button></div>';
+          '<div class="botones"><button type="button" class="sec" data-cancelar-alta>Cancelar</button><button type="submit" class="pri">' + texto(q === 'cambios' ? 'Pedir cambios' : 'Pasar a ' + nuevo) + '</button></div>';
         abrirVelo();
         altaForm.onsubmit = function (e) {
           e.preventDefault();
@@ -768,10 +779,11 @@
           var x = { motivo_bloqueo: v('tb-d-mb'), pregunta: v('tb-d-pr'), revisar_el: v('tb-d-re'), motivo: v('tb-d-mo') };
           var mal = q === 'bloqueo' && !x.motivo_bloqueo ? 'Elige por qué está bloqueada.' : q === 'pregunta' && !x.pregunta ? 'Escribe la pregunta.' :
             q === 'aplazar' && !x.revisar_el ? 'Pon la fecha en que se vuelve a mirar.' : q === 'aplazar' && x.revisar_el < hoyISO() ? 'La fecha ya ha pasado.' :
-            (q === 'descartar' || q === 'rechazar') && !x.motivo ? (q === 'rechazar' ? 'Di qué hay que cambiar.' : 'Di por qué se descarta.') : '';
+            q === 'descartar' && !x.motivo ? 'Di por qué se descarta.' : q === 'cambios' && !v('tb-d-ca') ? 'Di qué hay que cambiar.' : '';
           if (mal) { var er = altaForm.querySelector('#alta-error'); er.textContent = mal; er.style.display = 'block'; return; }
           cerrarVelo();
-          enviar(t, nuevo, x);
+          if (q === 'cambios') pedirCambios(String(t.ID), v('tb-d-ca'));
+          else enviar(t, nuevo, x);
         };
       }
       function abrirVelo() {
@@ -1090,6 +1102,30 @@
       }
 
       /**
+       * T0449 · Pedir cambios en una tarea Para revisar o Aprobada: pedir_cambios() de la base, el mismo camino que DEV, daily.js
+       * y los chats. Lo pide quien la revisa o quien lleva la iniciativa; el texto va tal cual. La tarjeta pasa a En cola al
+       * momento y, si la base dice que no, vuelve.
+       */
+      var cambiosTxt = {};   // lo escrito en «Pedir cambios» de cada tarea, para que repintar la ficha no lo borre
+      function puedePedirCambios(t) {
+        return (t.ESTADO === 'Para revisar' || t.ESTADO === 'Aprobada') && !SOLO_LEE && !t._nueva && !t._pendiente &&
+          (ctx.admin || (ctx.personaId && t.REVISA === ctx.personaId) || /^responsable/.test(ctx.perfil || ''));
+      }
+      function pedirCambios(id, txt, b) {
+        var t = tarea(id), auto = !!(t || {}).AUTONOMA;
+        if (b) { b.disabled = true; b.textContent = 'Enviando…'; }
+        return ctx.tablas.actualizar(T, id, { ESTADO: 'En cola', CAMBIOS_PEDIDOS: new Date().toISOString() }, { fn: 'pedir_cambios', args: [{ tarea: id, texto: txt }] }).then(function (estado) {
+          delete cambiosTxt[id];
+          if (ctx.abierta()) ctx.aviso('Cambios pedidos: ' + id + ' vuelve a ' + (typeof estado === 'string' && estado ? estado : 'la cola') + '.' +
+            (auto ? ' Es autónoma: pulsa «Que lo haga Claude» para que la rehaga.' : ' Quien la coja verá lo pedido lo primero.'));
+          return alDia(id);
+        }, function () {
+          // El aviso de lo que dice la base ya lo da la capa de tablas; lo escrito se queda para volver a enviarlo.
+          if (b) { b.disabled = false; b.textContent = 'Pedir cambios'; }
+        }).then(function () { if (ctx.abierta() && abiertaId === id && !ocupado()) pintarFicha(); });
+      }
+
+      /**
        * T0439 · «Que lo haga Claude»: la marca autónoma y lanza «Autónomo» con ella (la función del servidor lanzar_autonomo,
        * con la llave de GitHub). Lo lanza quien administra Utilo. En dos pasos: el primero pregunta a la base si el agente la
        * puede coger (fase, tope y todo lo demás: probar) y el segundo, tras «Lanzar», la lanza. Si no puede, dice por qué.
@@ -1212,12 +1248,17 @@
         if (e.target.closest('[data-claude]')) { pedirClaude(abiertaId, true); return; }
         if (e.target.closest('[data-claude-si]')) { pedirClaude(abiertaId, false); return; }
         if (e.target.closest('[data-claude-no]')) { delete claude[abiertaId]; pintarFicha(); return; }
+        var pc0 = e.target.closest('[data-pedir-cambios]');
+        if (pc0) { var pa = caja.querySelector('#tb-cambios'), pt = pa ? pa.value.trim() : ''; if (pt) pedirCambios(abiertaId, pt, pc0); else if (pa) { pa.focus(); ctx.aviso('Di qué hay que cambiar.'); } return; }
         var rb = e.target.closest('[data-responder]');
         if (rb) { var ra = caja.querySelector('#tb-resp'), rt = ra ? ra.value.trim() : ''; if (rt) responder(abiertaId, rt, rb); else if (ra) { ra.focus(); ctx.aviso('Escribe la respuesta antes de enviarla.'); } return; }
         var b = e.target.closest('[data-anotar]');
         if (b) { var a = caja.querySelector('#tb-nota'), txt = a ? a.value.trim() : ''; if (txt) anotar(abiertaId, txt, b); else if (a) a.focus(); }
       });
-      fv.addEventListener('input', function (e) { if (e.target.id === 'tb-resp' && abiertaId) respuestas[abiertaId] = e.target.value; });
+      fv.addEventListener('input', function (e) {
+        if (e.target.id === 'tb-resp' && abiertaId) respuestas[abiertaId] = e.target.value;
+        if (e.target.id === 'tb-cambios' && abiertaId) cambiosTxt[abiertaId] = e.target.value;
+      });
       fv.addEventListener('change', function (e) {
         if (e.target.id === 'kb-f-est') { mover(abiertaId, e.target.value); return; }
         if (e.target.id === 'fed' && cambiando && (e.target.tagName === 'SELECT' || (TACTIL && e.target.type === 'date'))) guardarCampo(cambiando, e.target.value);
@@ -1339,6 +1380,12 @@
         if (puedeResponder(t)) motivo.push('<div class="fresp"><label class="u-oculto" for="tb-resp">Tu respuesta</label>' +
           '<textarea id="tb-resp" rows="3" placeholder="Tu respuesta…">' + texto(respuestas[id] || '') + '</textarea>' +
           '<div class="pie"><button type="button" class="u-btn" data-responder>Responder</button></div></div>');
+        // T0449: los cambios pedidos que nadie ha cogido (lo pedido, en Qué hay que hacer) y pedirlos.
+        if (t.CAMBIOS_PEDIDOS && (t.ESTADO === 'En cola' || t.ESTADO === 'Esperando'))
+          motivo.push('<p class="fcambios"><b>Cambios pedidos</b> el ' + texto(fechaEs(String(t.CAMBIOS_PEDIDOS).slice(0, 10))) + ': están en Qué hay que hacer y esperan a que alguien la coja.</p>');
+        if (puedePedirCambios(t)) motivo.push('<div class="fresp fpedir"><label class="lab" for="tb-cambios">¿Hay que cambiar algo?</label>' +
+          '<textarea id="tb-cambios" rows="3" placeholder="Qué hay que cambiar, tal cual…">' + texto(cambiosTxt[id] || '') + '</textarea>' +
+          '<div class="pie"><button type="button" class="u-btn" data-pedir-cambios>Pedir cambios</button></div></div>');
         if (t.MOTIVO_BLOQUEO) motivo.push('<p><b>Bloqueada:</b> ' + texto(t.MOTIVO_BLOQUEO) + '</p>');
         if (t.MOTIVO) motivo.push('<p><b>Motivo:</b> ' + texto(t.MOTIVO) + '</p>');
         caja.innerHTML =

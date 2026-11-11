@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "9fb62b2",
-   "ultimo": "Merge pull request #294 from UTILO-DIGITAL/T0452-recargar-dev-copia-produccion",
+   "commit": "774ef77",
+   "ultimo": "Merge pull request #295 from UTILO-DIGITAL/T0449-pedir-cambios",
    "quien": "",
-   "fecha": "2026-11-11T18:13:43.754Z",
+   "fecha": "2026-11-11T18:16:28.540Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -187,6 +187,8 @@
      "20261111120000_avisos_preguntas.sql",
      "20261111150000_lanzar_autonomo.sql",
      "20261111190000_personas_de_prueba.sql",
+     "20261111190001_pedir_cambios_tablas.sql",
+     "20261111190002_pedir_cambios.sql",
      "20261111200000_avisos_registro.sql"
     ]
    },

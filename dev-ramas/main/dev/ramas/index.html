@@ -9,7 +9,10 @@
      de cada página, dev-ramas/marco.js): Iniciativa → Rama → Web → Entrar como; «Abrir» entra ya, sin pantalla de entrar:
      como «Yo» (Google) o como una persona de prueba de la iniciativa (personas_de_prueba de su Supabase de DEV y su código
      del buzón de pruebas, solo @ejemplo.com). Su manifest abarca dev-ramas/ entero: las páginas de las ramas se abren
-     dentro de la app. -->
+     dentro de la app.
+     T0449 · Con una rama elegida, su tarea en el DAILY de verdad (ramas.json · daily: el Supabase de Utilo de producción,
+     con la sesión de la plataforma de Utilo en este sitio, o entrando con Google una vez) y «Pedir cambios» si está Para
+     revisar o Aprobada: pedir_cambios() de la base, el mismo camino que la ficha. -->
 <link rel="icon" href="icono-192.png?v=1">
 <link rel="manifest" href="manifest.webmanifest?v=2">
 <link rel="apple-touch-icon" href="icono-180.png?v=1">
@@ -85,7 +88,17 @@
   .estado { margin: 0; font-size: 14px; color: var(--suave); text-align: center; }
   .estado:empty { display: none; }
   .estado.error { color: var(--aviso); }
-  button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid var(--texto); outline-offset: 2px; }
+  /* T0449 · La tarea de la rama y pedir cambios */
+  .tarea .tt { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+  .tarea textarea { width: 100%; min-height: 84px; padding: 10px 12px; border: 1px solid var(--linea); border-radius: 10px; background: var(--fondo);
+    color: var(--texto); font: 16px/1.4 system-ui, -apple-system, sans-serif; resize: vertical; }
+  .tarea .boton { align-self: flex-start; padding: 10px 16px; min-height: 44px; border-radius: 12px; border: 0; background: var(--boton); color: var(--boton-texto);
+    font: 600 15px system-ui, -apple-system, sans-serif; cursor: pointer; }
+  .tarea .boton:disabled { opacity: .55; cursor: default; }
+  .tarea .hecho { margin: 0; font-size: 14px; }
+  .tarea .hecho a { color: inherit; font-weight: 600; }
+  .tarea .aviso { padding: 10px 12px; }
+  button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid var(--texto); outline-offset: 2px; }
   header button:focus-visible { outline-color: #1C1C1C; }
 </style>
 </head>
@@ -443,10 +456,99 @@
     var b = r && base(x.carpeta, x.ini);
     if (b) h += '<p class="aviso">' + ICONOS.aviso + '<span>Esta rama cambia la base de ' + texto(nombre(x.ini)) + ' y DEV tiene ' + texto(b.cargada) + '. ' +
       '<a href="' + ACCION + '" target="_blank" rel="noopener">Cargar la de esta rama</a> con la acción «Supabase» en DEV, rama ' + texto(x.carpeta) + '.</span></p>';
+    if (r && x.carpeta !== 'main' && r.tarea && daily()) h += htmlTarea(r.tarea);
     var rec = (leer().recientes || []).filter(function (y) { return rama(y.carpeta) && pagina(y); });
     if (rec.length) h += '<div><p class="titulo">Recientes</p>' + rec.map(function (y, i) { return '<button type="button" class="reciente" data-reciente="' + i + '">' + texto(recienteTexto(y)) + '</button>'; }).join('') + '</div>';
     hoja.innerHTML = h;
     hoja._recientes = rec;
+  }
+
+  /* ---------- T0449 · la tarea de la rama en el DAILY de verdad: verla y pedir cambios ---------- */
+
+  var tareas = {};   // id → { cargando } | { t } | { entrar } | { error }, con borrador, enviando, hecho y fallo (lo de pedir cambios)
+  /** Dónde está el DAILY (ramas.json · daily, lo pone el selector): { url, clave, sesion, ficha } o null. */
+  function daily() { var d = datos && datos.daily; return d && d.url && d.clave && d.sesion ? d : null; }
+  /** La sesión del DAILY (la de la plataforma de Utilo en este sitio), renovada si hace falta; null si no hay. */
+  function sesionDaily() {
+    var d = daily(), s = null;
+    try { s = JSON.parse(leerLS(d.sesion) || 'null'); } catch (e) {}
+    return vigente(d, s).then(function (n) {
+      if (n && n !== s) ponerLS(d.sesion, JSON.stringify(n));
+      if (!n && s) ponerLS(d.sesion, null);
+      return n;
+    });
+  }
+  function alDaily(metodo, ruta, cuerpo) {
+    var d = daily();
+    return sesionDaily().then(function (s) {
+      if (!s) { var e = new Error('Entra en el DAILY.'); e.entrar = true; throw e; }
+      return fetch(d.url + '/rest/v1/' + ruta, { method: metodo, headers: { apikey: d.clave, Authorization: 'Bearer ' + s.access_token, 'Content-Type': 'application/json' },
+        body: cuerpo ? JSON.stringify(cuerpo) : undefined });
+    }).then(function (r) {
+      return r.json().catch(function () { return null; }).then(function (j) {
+        if (r.status === 401) { var e = new Error('Tu sesión del DAILY ya no vale: vuelve a entrar.'); e.entrar = true; throw e; }
+        if (!r.ok) throw new Error((j && (j.message || j.msg)) || 'El DAILY no responde (' + r.status + ').');
+        return j;
+      });
+    });
+  }
+  function leerTarea(id) {
+    return alDaily('GET', 'tareas?id=eq.' + encodeURIComponent(id) + '&select=id,titulo,estado,autonoma,cambios_pedidos').then(function (l) { return (l || [])[0] || null; });
+  }
+  function cargarTarea(id) {
+    var antes = tareas[id] || {};
+    tareas[id] = { cargando: true, borrador: antes.borrador || '' };
+    leerTarea(id).then(function (t) { tareas[id] = { t: t, borrador: tareas[id].borrador }; },
+      function (e) { tareas[id] = { entrar: !!e.entrar, error: e.entrar ? '' : e.message, borrador: tareas[id].borrador }; })
+      .then(function () { if (vista === 'probar') pintar(); });
+  }
+  function htmlTarea(id) {
+    if (!tareas[id]) cargarTarea(id);
+    var st = tareas[id], t = st.t, d = daily(), h = '';
+    if (st.cargando) h = '<span class="tt">' + texto(id) + '</span><span class="nota" style="padding:0">Leyendo el DAILY…</span>';
+    else if (st.entrar) h = '<span class="tt">' + texto(id) + '</span><span class="nota" style="padding:0">Para ver cómo está y pedir cambios, entra en el DAILY con tu Google (una vez en este dispositivo).</span>' +
+      '<button type="button" class="boton" data-daily-entrar="1">Entrar en el DAILY</button>';
+    else if (st.error) h = '<span class="tt">' + texto(id) + '</span><p class="aviso">' + ICONOS.aviso + '<span>' + texto(st.error) + '</span></p>';
+    else if (!t) h = '<span class="tt">' + texto(id) + '</span><span class="nota" style="padding:0">No está en el DAILY.</span>';
+    else {
+      var puede = t.estado === 'Para revisar' || t.estado === 'Aprobada';
+      h = '<span class="tt">' + texto(t.id + ' · ' + t.titulo) + '</span><span class="etiqueta">' + texto(t.estado) + (t.cambios_pedidos ? ' · con cambios pedidos sin coger' : '') + '</span>';
+      if (st.hecho) h += '<p class="hecho">Cambios pedidos: ' + texto(t.id) + ' vuelve a ' + texto(t.estado === 'Esperando' ? 'esperar' : 'la cola') + '. ' +
+        (t.autonoma ? 'Es autónoma: <a href="' + texto(d.ficha + encodeURIComponent(t.id)) + '">«Que lo haga Claude»</a> en su ficha para que la rehaga.' : 'Quien la coja verá lo pedido lo primero.') + '</p>';
+      if (puede) h += '<label class="etiqueta" for="cambios-texto">¿Hay que cambiar algo?</label>' +
+        '<textarea id="cambios-texto" rows="3" placeholder="Qué hay que cambiar, tal cual…"' + (st.enviando ? ' disabled' : '') + '>' + texto(st.borrador || '') + '</textarea>' +
+        '<button type="button" class="boton" data-pedir-cambios="' + texto(t.id) + '"' + (st.enviando ? ' disabled' : '') + '>' + (st.enviando ? 'Enviando…' : 'Pedir cambios') + '</button>';
+      else if (!st.hecho) h += '<span class="nota" style="padding:0">Los cambios se piden cuando está Para revisar o Aprobada.</span>';
+      if (st.fallo) h += '<p class="aviso">' + ICONOS.aviso + '<span>' + texto(st.fallo) + '</span></p>';
+    }
+    return '<div><p class="titulo">La tarea de esta rama</p><div class="grupo tarea"><div class="bloque">' + h + '</div></div></div>';
+  }
+  function pedirCambios(id) {
+    var st = tareas[id] || {}, txt = String(st.borrador || '').trim();
+    if (!txt) { st.fallo = 'Di qué hay que cambiar.'; pintar(); return Promise.resolve(); }
+    st.enviando = true; st.fallo = ''; pintar();
+    return alDaily('POST', 'rpc/pedir_cambios', { tarea: id, texto: txt }).then(function () {
+      return leerTarea(id).then(function (t) { tareas[id] = { t: t, hecho: true, borrador: '' }; });
+    }, function (e) {
+      st.enviando = false;
+      if (e.entrar) tareas[id] = { entrar: true, borrador: st.borrador };
+      else st.fallo = e.message;
+    }).then(function () { if (vista === 'probar') pintar(); });
+  }
+  /** Entrar en el DAILY con Google: de vuelta aquí (?probar), cambiar el código por la sesión (como acceso-supabase.js). */
+  var CODIGO = (/[?&]code=([^&#]+)/.exec(location.search) || [])[1] || '';
+  function canjearCodigo() {
+    var d = daily(), v = null;
+    if (!CODIGO || !d) return Promise.resolve();
+    try { v = sessionStorage.getItem(d.sesion + '_verificador'); sessionStorage.removeItem(d.sesion + '_verificador'); } catch (e) {}
+    var codigo = decodeURIComponent(CODIGO);
+    CODIGO = '';
+    history.replaceState(null, '', location.pathname + '?probar');
+    if (!v) return Promise.resolve();
+    return auth(d, 'token?grant_type=pkce', { auth_code: codigo, code_verifier: v }).then(function (r) {
+      if (r.ok && r.j.access_token) { ponerLS(d.sesion, JSON.stringify(sesionDe(r.j))); tareas = {}; }
+      else aviso('No se ha podido entrar en el DAILY (' + ((r.j && (r.j.msg || r.j.error_description || r.j.message)) || r.status) + ').', true);
+    }, function () { aviso('No se ha podido entrar en el DAILY: sin conexión.', true); });
   }
 
   function pintarIniciativa() {
@@ -536,17 +638,22 @@
     if (b.hasAttribute('data-ini')) { elegir({ ini: b.getAttribute('data-ini') }); return atras(); }
     if (b.hasAttribute('data-rama')) { elegir({ carpeta: b.getAttribute('data-rama') }); return atras(); }
     if (b.hasAttribute('data-mas')) { verTodas = true; pintar(); return; }
+    if (b.hasAttribute('data-daily-entrar')) { var d = daily(); if (d) aGoogle(d, d.sesion, location.href.replace(/[?#].*$/, '') + '?probar'); return; }
+    if (b.hasAttribute('data-pedir-cambios')) { pedirCambios(b.getAttribute('data-pedir-cambios')); return; }
     if (b.hasAttribute('data-yo')) { elegir({ como: { tipo: 'yo' } }); return atras(); }
     if (b.hasAttribute('data-persona')) {
       var p = hoja._personas[+b.getAttribute('data-persona')];
       if (p) { elegir({ como: { tipo: 'prueba', ini: eleccion().ini, correo: p.correo, nombre: p.nombre, rol: rolAlto(p, eleccion().ini) } }); atras(); }
     }
   });
-  document.addEventListener('input', function (ev) { if (ev.target.id === 'buscar') { filtro = ev.target.value; pintar(); } });
+  document.addEventListener('input', function (ev) {
+    if (ev.target.id === 'buscar') { filtro = ev.target.value; pintar(); }
+    if (ev.target.id === 'cambios-texto') { var r = rama(eleccion().carpeta); if (r && tareas[r.tarea]) tareas[r.tarea].borrador = ev.target.value; }
+  });
   btnAbrir.addEventListener('click', function () { abrir(eleccion()); });
   window.addEventListener('popstate', function () { vista = location.hash.slice(1) || 'probar'; filtro = ''; verTodas = false; pintar(); });
   // Al volver a la app (desde otra, o atrás desde una rama), la lista al día y lo que se haya renovado dentro.
-  window.addEventListener('pageshow', function (e) { if (e.persisted) { ocupado = false; recogerSesion(); cargar(); } });
+  window.addEventListener('pageshow', function (e) { if (e.persisted) { ocupado = false; tareas = {}; recogerSesion(); cargar(); } });
 
   function cargar() {
     return fetch('ramas.json?t=' + Date.now(), { cache: 'no-store' })
@@ -557,12 +664,12 @@
           location.replace(location.pathname + '?' + (PROBAR ? 'probar&' : '') + 'v=' + j.selector);
           return;
         }
-        datos = { ramas: j.ramas || {}, bases: j.bases || {} };
+        datos = { ramas: j.ramas || {}, bases: j.bases || {}, daily: j.daily || null };
         // Al abrir la app: vuelve donde se dejó (la página de una rama que sigue subida), salvo si se ha venido a elegir.
         var u = leer().ultima, c = u && (/\/dev-ramas\/([^/]+)\//.exec(u) || [])[1];
         if (primera && !PROBAR && c && u.indexOf(location.pathname) === 0 && rama(decodeURIComponent(c))) { location.replace(u); return; }
         primera = false;
-        pintar();
+        return canjearCodigo().then(pintar);
       })
       .catch(function () { cabecera('Probar en DEV'); hoja.innerHTML = '<p class="vacio">No se puede leer la lista de ramas. Comprueba la conexión y vuelve a abrir la app.</p>'; });
   }
