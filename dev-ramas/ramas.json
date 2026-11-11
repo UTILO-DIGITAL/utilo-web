@@ -326,10 +326,10 @@
    "tarea": "T0446",
    "titulo": "«Entrar como» con los roles agrupados y «Probar en DEV» sin el difuminado de arriba",
    "pr": null,
-   "commit": "fcead99",
-   "ultimo": "T0446: «Entrar como» con los roles agrupados y «Probar en DEV» sin el difuminado de arriba",
+   "commit": "f298ac3",
+   "ultimo": "T0446: «Probar en DEV» con la cabecera sobre el amarillo: iOS ya no difumina la hoja bajo la franja de la hora",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T16:18:53.751Z",
+   "fecha": "2026-11-11T16:22:17.940Z",
    "toca": [],
    "comun": true,
    "paginas": [
