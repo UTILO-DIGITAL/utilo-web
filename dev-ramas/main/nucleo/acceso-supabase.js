@@ -142,12 +142,37 @@
     }, function () { throw new Error('No hay conexión: revisa internet y vuelve a probar.'); });
   }
 
-  /** Local y DEV: los últimos correos del buzón de pruebas a ese correo (sin entrar), o null si aquí no hay buzón. */
+  /** T0456 · La llave de DEV: la sesión de Google de una persona de verdad en este Supabase, que guarda la app «Utilo DEV»
+   *  (dev/ramas/index.html, «dev_llaves»), renovada si hace falta; o null. */
+  function llaveDev() {
+    var L = null;
+    try { L = JSON.parse(localStorage.getItem('dev_llaves') || 'null') || {}; } catch (e) { L = {}; }
+    var s = L[URL_SB];
+    if (!s || !s.refresh_token) return Promise.resolve(null);
+    if (s.access_token && s.expires_at - 60 > ahora()) return Promise.resolve(s);
+    return auth('token?grant_type=refresh_token', { refresh_token: s.refresh_token }).then(function (r) {
+      var n = r.ok && r.j.access_token ? sesionDe(r.j, s) : null;
+      try { var M2 = JSON.parse(localStorage.getItem('dev_llaves') || 'null') || {}; if (n) M2[URL_SB] = n; else delete M2[URL_SB]; localStorage.setItem('dev_llaves', JSON.stringify(M2)); } catch (e) {}
+      return n;
+    }, function () { return null; });
+  }
+
+  /** Local y DEV: los últimos correos del buzón de pruebas a ese correo, o null si aquí no hay buzón o no se puede leer.
+   *  T0456: DEV está cerrado, así que va con la llave de la app «Utilo DEV» (sin ella, null); en local lo lee local.js con
+   *  la clave secreta. */
   function buzon(correo) {
     if (ENTORNO === 'prod' || !URL_SB) return Promise.resolve(null);
-    return fetch(URL_SB + '/rest/v1/rpc/buzon_de_pruebas', { method: 'POST', headers: { apikey: P.clave, 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ correo: bajo(correo) }) })
-      .then(function (r) { return r.ok ? r.json() : null; }, function () { return null; });
+    var c = JSON.stringify({ correo: bajo(correo) });
+    var leerlo = function (r) { return r.ok ? r.json() : null; };
+    if (ENTORNO === 'local') {
+      return fetch('/_local/supabase/buzon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: c })
+        .then(leerlo, function () { return null; });
+    }
+    return llaveDev().then(function (s) {
+      if (!s) return null;
+      return fetch(URL_SB + '/rest/v1/rpc/buzon_de_pruebas', { method: 'POST', headers: { apikey: P.clave, Authorization: 'Bearer ' + s.access_token,
+        'Content-Type': 'application/json', Accept: 'application/json' }, body: c }).then(leerlo);
+    }).then(null, function () { return null; });
   }
 
   /** Los correos de quien ha entrado (Perfil): leer, añadir con su código, confirmar y quitar. */
