@@ -535,10 +535,10 @@
    "tarea": "T0398",
    "titulo": "Los códigos para entrar salen de avisos.konamigas.com por Scaleway",
    "pr": null,
-   "commit": "a1c3e58",
-   "ultimo": "T0398: Trae main (T0456); la migración del correo pasa a 20261111220000 para no chocar con la de DEV cerrado",
+   "commit": "76bb8a6",
+   "ultimo": "T0398: DOMINIO.md con los registros de Scaleway, la cuenta y la caducidad de la clave",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T21:07:08.996Z",
+   "fecha": "2026-11-11T21:19:19.886Z",
    "toca": [
     "konamigas",
     "utilo"
