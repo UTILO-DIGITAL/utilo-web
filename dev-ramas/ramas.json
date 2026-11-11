@@ -400,7 +400,7 @@
    "commit": "9a7294d",
    "ultimo": "T0446: La app DEV con borde amarillo y «Probar en DEV», que entra ya como «Yo» o como una persona de prueba",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T14:53:00.766Z",
+   "fecha": "2026-11-11T14:58:25.309Z",
    "toca": [
     "konamigas",
     "utilo"
@@ -421,6 +421,24 @@
       "web/nucleo/acceso-supabase.js",
       "web/nucleo/nucleo.js",
       "web/nucleo/supabase.js"
+     ],
+     "clave": "dev-konamigas-plataforma",
+     "supabase": {
+      "url": "https://bizkhbuahaqmxmlrdios.supabase.co",
+      "clave": "sb_publishable_-7pWx7lxVtCygyO-hYLhOA_IfA_xCLF",
+      "nombre": "konamigas-dev"
+     },
+     "perfiles": [
+      "admin",
+      "socio",
+      "gestor",
+      "arbitro",
+      "capitana",
+      "jugadora"
+     ],
+     "entrar": [
+      "google",
+      "codigo"
      ],
      "cambia": true
     },
@@ -444,6 +462,21 @@
       "web/utilo/secciones/parami.js",
       "web/utilo/secciones/tablero.js"
      ],
+     "clave": "dev-plataforma",
+     "supabase": {
+      "url": "https://wpjcdszlkzxbmqkqyjsn.supabase.co",
+      "clave": "sb_publishable_bKp5qCd6Gk5NaToFOz0Wig_dKxkLaKV",
+      "nombre": "utilo-dev"
+     },
+     "perfiles": [
+      "admin",
+      "responsable",
+      "colaborador",
+      "lector"
+     ],
+     "entrar": [
+      "google"
+     ],
      "cambia": true
     },
     {
@@ -460,6 +493,24 @@
       "web/nucleo/acceso-supabase.js",
       "web/nucleo/nucleo.js",
       "web/nucleo/supabase.js"
+     ],
+     "clave": "dev-area",
+     "supabase": {
+      "url": "https://bizkhbuahaqmxmlrdios.supabase.co",
+      "clave": "sb_publishable_-7pWx7lxVtCygyO-hYLhOA_IfA_xCLF",
+      "nombre": "konamigas-dev"
+     },
+     "perfiles": [
+      "admin",
+      "socio",
+      "gestor",
+      "arbitro",
+      "capitana",
+      "jugadora"
+     ],
+     "entrar": [
+      "codigo",
+      "google"
      ],
      "cambia": true
     },
@@ -479,6 +530,13 @@
       "web/nucleo/publica-supabase.js",
       "web/nucleo/supabase.js"
      ],
+     "clave": "dev-konamigas-competiciones",
+     "supabase": {
+      "url": "https://bizkhbuahaqmxmlrdios.supabase.co",
+      "clave": "sb_publishable_-7pWx7lxVtCygyO-hYLhOA_IfA_xCLF",
+      "nombre": "konamigas-dev"
+     },
+     "publica": true,
      "cambia": true
     }
    ],
