@@ -737,9 +737,9 @@
    ]
   },
   "utilo": {
-   "rama": "T0446-app-dev-borde",
-   "commit": "9a7294d",
-   "fecha": "2026-11-11T14:54:55.422Z",
+   "rama": "T0449-pedir-cambios",
+   "commit": "ddb4eff",
+   "fecha": "2026-11-11T17:55:07.995Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
@@ -765,7 +765,9 @@
     "20261110200000_tareas_sin_urgente.sql",
     "20261111120000_avisos_preguntas.sql",
     "20261111150000_lanzar_autonomo.sql",
-    "20261111190000_personas_de_prueba.sql"
+    "20261111190000_personas_de_prueba.sql",
+    "20261111190001_pedir_cambios_tablas.sql",
+    "20261111190002_pedir_cambios.sql"
    ]
   }
  },
