@@ -551,6 +551,38 @@
     "20261111120001_nombre_publico.sql",
     "20261111190000_personas_de_prueba.sql"
    ]
+  },
+  "utilo": {
+   "rama": "T0446-app-dev-borde",
+   "commit": "9a7294d",
+   "fecha": "2026-11-11T14:54:55.422Z",
+   "migraciones": [
+    "20261105150000_latido.sql",
+    "20261105170000_acceso.sql",
+    "20261105174008_gestion_tablas.sql",
+    "20261105174009_gestion.sql",
+    "20261105180000_gestion_espera.sql",
+    "20261106090000_gestion_herramientas.sql",
+    "20261106210628_tareas_orden.sql",
+    "20261106210700_gestion_orden.sql",
+    "20261107100000_gestion_chats.sql",
+    "20261107160000_tablero_para_mi.sql",
+    "20261107170000_gestion_responder.sql",
+    "20261107170001_bitacora_entregas.sql",
+    "20261107170100_gestion_entregas.sql",
+    "20261107175900_correos.sql",
+    "20261107190000_entregas_en_directo.sql",
+    "20261109200149_solicitudes_tabla.sql",
+    "20261109200150_solicitudes.sql",
+    "20261109230350_mensajes_tabla.sql",
+    "20261109230351_mensajes.sql",
+    "20261110120000_entregas_solas.sql",
+    "20261110180000_avisos.sql",
+    "20261110200000_tareas_sin_urgente.sql",
+    "20261111120000_avisos_preguntas.sql",
+    "20261111150000_lanzar_autonomo.sql",
+    "20261111190000_personas_de_prueba.sql"
+   ]
   }
  },
  "selector": "a5d3949ad2"
