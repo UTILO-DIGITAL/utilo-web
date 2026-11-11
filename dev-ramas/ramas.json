@@ -748,9 +748,9 @@
    ]
   },
   "utilo": {
-   "rama": "T0456-cerrar-dev",
-   "commit": "06d33cf",
-   "fecha": "2026-11-11T19:07:36.524Z",
+   "rama": "T0450-revision-con-dev",
+   "commit": "ebdcb6e",
+   "fecha": "2026-11-11T19:19:04.064Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
@@ -780,6 +780,8 @@
     "20261111190001_pedir_cambios_tablas.sql",
     "20261111190002_pedir_cambios.sql",
     "20261111200000_avisos_registro.sql",
+    "20261111200001_revision_dev_tablas.sql",
+    "20261111200002_revision_dev.sql",
     "20261111210000_dev_cerrado.sql"
    ]
   }
