@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "c9bb85a",
-   "ultimo": "Merge pull request #301 from UTILO-DIGITAL/T0451-entregada-al-publicar",
+   "commit": "9a17615",
+   "ultimo": "Merge pull request #300 from UTILO-DIGITAL/T0462-que-mirar-chat",
    "quien": "",
-   "fecha": "2026-11-11T22:37:11.659Z",
+   "fecha": "2026-11-11T22:46:48.247Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -196,7 +196,9 @@
      "20261111200002_revision_dev.sql",
      "20261111210000_dev_cerrado.sql",
      "20261111220000_correo_enviar.sql",
-     "20261111230000_aprobar.sql"
+     "20261111230000_aprobar.sql",
+     "20261111233000_que_mirar_chat.sql",
+     "20261111233001_que_mirar_chat_tablas.sql"
     ]
    },
    "rama": "main"
