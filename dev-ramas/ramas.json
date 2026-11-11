@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "4c8b05c",
-   "ultimo": "Merge pull request #298 from UTILO-DIGITAL/T0440-aprobar-y-fusionar",
+   "commit": "37945a2",
+   "ultimo": "Merge pull request #299 from UTILO-DIGITAL/T0398-subdominios-konamigas",
    "quien": "",
-   "fecha": "2026-11-11T21:42:30.494Z",
+   "fecha": "2026-11-11T21:46:20.862Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -160,7 +160,8 @@
      "20261111120000_ligas_publico.sql",
      "20261111120001_nombre_publico.sql",
      "20261111190000_personas_de_prueba.sql",
-     "20261111210000_dev_cerrado.sql"
+     "20261111210000_dev_cerrado.sql",
+     "20261111220000_correo_enviar.sql"
     ],
     "utilo": [
      "20261105150000_latido.sql",
@@ -194,6 +195,7 @@
      "20261111200001_revision_dev_tablas.sql",
      "20261111200002_revision_dev.sql",
      "20261111210000_dev_cerrado.sql",
+     "20261111220000_correo_enviar.sql",
      "20261111230000_aprobar.sql"
     ]
    },
