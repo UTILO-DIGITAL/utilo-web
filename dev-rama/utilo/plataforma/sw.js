@@ -7,7 +7,11 @@
  * probar-avisos.js comprueba que no se separan. No guarda nada ni toca las peticiones de la página: solo avisos.
  * - push: enseña el aviso (en iOS, un aviso que llega sin enseñarse acaba quitando el permiso) y apunta en la base que ha
  *   llegado (aviso_recibido, sin sesión: el id del envío no se adivina). Así se ve el retraso sin apuntarlo a mano.
- * - Al tocarlo: apunta que se ha abierto y abre la plataforma (o la pone delante si ya estaba abierta).
+ * - Al tocarlo: apunta que se ha abierto y abre la plataforma donde dice el aviso (o la pone delante si ya estaba abierta).
+ * - T0437 · El iPhone no siempre lleva la app adonde dice el aviso (abierta, no la mueve; cerrada, puede abrirla en su
+ *   inicio). Por eso no se fía de navigate ni de openWindow: a la ventana que pone delante le dice qué abrir (mensaje
+ *   «utilo-abrir», que atiende acceso-supabase.js) y, si abre una nueva, se lo guarda un minuto para cuando la página
+ *   pregunte al arrancar («utilo-pendiente»).
  */
 'use strict';
 
@@ -45,20 +49,36 @@ self.addEventListener('push', function (e) {
   ]));
 });
 
+var PENDIENTE = null; // T0437 · { url, hasta }: lo que ha pedido el último aviso tocado, para la página que se abra
+
 self.addEventListener('notificationclick', function (e) {
   var d = (e.notification && e.notification.data) || {};
   e.notification.close();
+  var url = d.url || self.registration.scope;
+  PENDIENTE = null;
   e.waitUntil(Promise.all([
     apuntar(d.id, true),
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (vs) {
-      var url = d.url || self.registration.scope;
       for (var i = 0; i < vs.length; i++) {
         if (vs[i].url.indexOf(self.registration.scope) === 0 && 'focus' in vs[i]) {
           var v = vs[i];
-          return v.focus().then(function () { return url !== self.registration.scope && v.navigate ? v.navigate(url) : v; });
+          return v.focus().catch(function () { return v; }).then(function (w) {
+            if (url !== self.registration.scope) (w || v).postMessage({ tipo: 'utilo-abrir', url: url });
+            return w || v;
+          });
         }
       }
+      if (url !== self.registration.scope) PENDIENTE = { url: url, hasta: Date.now() + 60000 };
       return self.clients.openWindow(url);
     })
   ]));
+});
+
+/** T0437 · La página, al arrancar, pregunta si viene de tocar un aviso: se le dice adónde ir (una vez, y solo un minuto). */
+self.addEventListener('message', function (e) {
+  var d = e.data || {};
+  if (d.tipo !== 'utilo-pendiente' || !PENDIENTE || !e.source) return;
+  var p = PENDIENTE;
+  PENDIENTE = null;
+  if (p.hasta > Date.now()) e.source.postMessage({ tipo: 'utilo-abrir', url: p.url });
 });

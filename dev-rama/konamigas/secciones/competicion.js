@@ -444,8 +444,6 @@
       F.busca = '';
       var S = { tab: PESTANAS[leerLocal(CLAVE + '_tab', '')] ? leerLocal(CLAVE + '_tab', '') : 'PARTIDOS', fecha: '', golAmbito: leerLocal(CLAVE + '_gol', 'liga'), leido: false };
       // Lo interno (admin, socio) cambia el importe de una multa; lo demás que puede cada uno lo dice la base (PARTIDOS_DETALLE…).
-      // T0395 · La consulta pública (nucleo/publica-supabase.js): sin entrar no se enseña el staff (árbitro, gestor).
-      var publica = !!ctx.publica;
       var interno = (ctx.roles || []).some(function (r) { return (r.rol === 'admin' || r.rol === 'socio') && r.ambito === 'todo'; });
       // Desde otra sección (?partido=PAR…) se abre la ficha de ese partido.
       var url = new URL(location.href), pedido = url.searchParams.get('partido') || '';
@@ -589,7 +587,7 @@
         };
         var arb = p.ID_ARBITRO_REAL || p.ID_ARBITRO;
         var info = '<span class="lg-pi"><b class="u-cifra">' + texto(p.HORA || '--:--') + '</b><small>' + texto(campo(p.ID_CAMPO)) + '</small>' +
-          (libre || publica ? '' : '<small class="lg-parb" title="Árbitro">' + texto(arb ? persona(arb) : 'Sin árbitro') + '</small>') + '</span>';
+          (libre ? '' : '<small class="lg-parb" title="Árbitro">' + texto(arb ? persona(arb) : 'Sin árbitro') + '</small>') + '</span>';
         var debajo = [conLiga ? '<span class="lg-pliga">' + texto(ligaCompleta(p.ID_LIGA) + ' · J' + p.JORNADA) + '</span>' : '',
           p._pendiente ? '<span class="u-chip">Guardando</span>' : '',
           roto ? '<span class="lg-pav lg-av-no">Le falta el ' + (p.ID_INSCRIPCION_LOCAL ? 'visitante' : 'local') + ': no cuenta en la clasificación</span>' : '',
@@ -615,7 +613,7 @@
       /** Día, nivel y gestor de la liga (con su WhatsApp, si se ve su teléfono). */
       function cabLiga(l) {
         var g = M.ix.staff[l.ID_GESTOR], tel = g && wa(g.TELEFONO);
-        var datos = [l.DIA_SEMANA ? 'Los ' + l.DIA_SEMANA.toLowerCase().replace(/s$/, '') + 's' : '', l.NIVEL ? 'Nivel ' + l.NIVEL : '', l.ID_GESTOR && !publica ? 'Gestor: ' + persona(l.ID_GESTOR) : ''].filter(String);
+        var datos = [l.DIA_SEMANA ? 'Los ' + l.DIA_SEMANA.toLowerCase().replace(/s$/, '') + 's' : '', l.NIVEL ? 'Nivel ' + l.NIVEL : '', l.ID_GESTOR ? 'Gestor: ' + persona(l.ID_GESTOR) : ''].filter(String);
         return '<div class="lg-cab"><p>' + texto(datos.join(' · ')) + (tel ? ' <a href="' + texto(tel) + '" target="_blank" rel="noopener">WhatsApp</a>' : '') + '</p></div>';
       }
       /** Lo pendiente de la liga, arriba: aplazados por recuperar y anulados sin su sanción (lo que dice la base). */
@@ -813,8 +811,8 @@
           (p.ESTADO === 'Jugado' && !gs.length ? '<p class="u-nota">El acta no dice quién marcó.</p>' : '') +
           '<dl class="lg-datos">' + fila('Cuándo', texto(p.FECHA ? fechaDia(p.FECHA) + ' · ' + fecha(p.FECHA) + (p.HORA ? ' a las ' + p.HORA : '') : 'Sin fecha')) +
           fila('Campo', texto(campoLargo(p.ID_CAMPO)) + (ins && ins.UBICACION_URL ? ' <a href="' + texto(ins.UBICACION_URL) + '" target="_blank" rel="noopener">Cómo llegar</a>' : '')) +
-          (publica ? '' : fila('Árbitro', texto(p.ID_ARBITRO ? persona(p.ID_ARBITRO) : 'Sin asignar') + (p.ID_ARBITRO_REAL ? ' · arbitró ' + texto(persona(p.ID_ARBITRO_REAL)) : ''))) +
-          (publica ? '' : fila('Gestor', p.ID_GESTOR ? texto(persona(p.ID_GESTOR)) + (tel ? ' <a href="' + texto(tel) + '" target="_blank" rel="noopener">WhatsApp</a>' : '') : '')) +
+          fila('Árbitro', texto(p.ID_ARBITRO ? persona(p.ID_ARBITRO) : 'Sin asignar') + (p.ID_ARBITRO_REAL ? ' · arbitró ' + texto(persona(p.ID_ARBITRO_REAL)) : '')) +
+          fila('Gestor', p.ID_GESTOR ? texto(persona(p.ID_GESTOR)) + (tel ? ' <a href="' + texto(tel) + '" target="_blank" rel="noopener">WhatsApp</a>' : '') : '') +
           fila('Motivo', texto(p.MOTIVO)) + fila('Pidió aplazarlo', texto(p.APLAZADO_POR ? equipo(p.APLAZADO_POR) + (p.AVISO_APLAZAMIENTO ? ', avisó el ' + fecha(p.AVISO_APLAZAMIENTO) : '') : '')) +
           fila('Notas', texto(p.NOTAS)) + '</dl>';
         var sp = sancionesDe(M.san, { partido: p.ID });
