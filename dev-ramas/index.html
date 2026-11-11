@@ -70,7 +70,7 @@
   var ULTIMA = 'dev_ramas_ultima';           // la última página abierta en este dispositivo: { carpeta, ruta }
   var ULTIMA_INI = 'dev_ramas_iniciativa';   // la última iniciativa elegida
   var NOMBRES = { utilo: 'Utilo', konamigas: 'Konamigas' };
-  var VERSION = '129443cb81';               // la pone dev-ramas.js selector; ramas.json dice la publicada
+  var VERSION = 'a5d3949ad2';               // la pone dev-ramas.js selector; ramas.json dice la publicada
   var lista = document.getElementById('lista');
   var datos = null, verTodas = false;
 
@@ -92,8 +92,14 @@
   }
 
   function paginasDe(r, ini) { return (r.paginas || []).filter(function (p) { return p.iniciativa === ini; }); }
-  /** La rama cambia algo de esa iniciativa: lo suyo (clientes/<ini>/, web/<ini>/) o lo común (motor/, núcleo, estilos). */
-  function toca(r, ini) { return (r.toca || []).indexOf(ini) >= 0 || !!r.comun; }
+  /** Las páginas de esa iniciativa que cambia la rama (dev-ramas.js · cambia); en main, todas. */
+  function cambiadas(r, ini) { return paginasDe(r, ini).filter(function (p) { return p.cambia !== false; }); }
+  /** La rama cambia alguna página de esa iniciativa. */
+  function toca(r, ini) {
+    var ps = paginasDe(r, ini);
+    if (ps.length && ps[0].cambia !== undefined) return cambiadas(r, ini).length > 0;
+    return (r.toca || []).indexOf(ini) >= 0 || !!r.comun; // subidas antes de «cambia»
+  }
 
   /** Lo que la rama trae de la base frente a lo que tiene cargado el Supabase de DEV de esa iniciativa. */
   function avisoBase(r, ini) {
@@ -113,9 +119,10 @@
       encodeURIComponent(carpeta) + '/' + texto(p.ruta) + '">' + texto(p.nombre) + '</a>';
   }
 
-  function tarjeta(carpeta, r, ini) {
+  /** todas: también las páginas que la rama no cambia (main y «Ver N ramas más»). */
+  function tarjeta(carpeta, r, ini, todas) {
     var dato = [r.tarea || r.rama, hace(r.fecha), r.pr ? 'PR #' + r.pr : '', r.quien && r.quien !== 'Javi Canela' ? r.quien : ''].filter(Boolean).join(' · ');
-    var ps = paginasDe(r, ini);
+    var ps = todas ? paginasDe(r, ini) : cambiadas(r, ini);
     return '<div class="caja"><h2>' + texto(r.titulo || r.rama) + '</h2><p class="dato">' + texto(dato) + '</p>' + avisoBase(r, ini) +
       '<div class="botones">' + (ps.map(function (p) { return boton(carpeta, p, carpeta !== 'main'); }).join('') ||
         '<span class="nota">Esta rama no tiene páginas de ' + texto(nombre(ini)) + '.</span>') + '</div></div>';
@@ -156,12 +163,12 @@
       html += '<div class="caja seguir"><p class="dato" style="margin-bottom:8px">Lo último que abriste</p>' +
         boton(u.carpeta, { ruta: u.ruta, nombre: 'Seguir con ' + (ramas[u.carpeta].tarea || u.carpeta) + ' · ' + pu.nombre }, true) + '</div>';
     }
-    if (ramas.main && paginasDe(ramas.main, ini).length) html += '<h3>main</h3>' + tarjeta('main', ramas.main, ini);
+    if (ramas.main && paginasDe(ramas.main, ini).length) html += '<h3>main</h3>' + tarjeta('main', ramas.main, ini, true);
     var r = ramasDe(ini);
     html += '<h3>Ramas abiertas</h3>' + (r.suyas.length ? r.suyas.map(function (c) { return tarjeta(c, ramas[c], ini); }).join('')
       : '<p class="nota" style="margin:0 6px 10px">Ninguna rama abierta cambia ' + texto(nombre(ini)) + '.</p>');
     if (r.otras.length) {
-      html += verTodas ? '<h3>Otras ramas (no cambian ' + texto(nombre(ini)) + ')</h3>' + r.otras.map(function (c) { return tarjeta(c, ramas[c], ini); }).join('')
+      html += verTodas ? '<h3>Otras ramas (no cambian ' + texto(nombre(ini)) + ')</h3>' + r.otras.map(function (c) { return tarjeta(c, ramas[c], ini, true); }).join('')
         : '<button type="button" class="mas" data-mas="1">Ver ' + r.otras.length + (r.otras.length === 1 ? ' rama más' : ' ramas más') + ' que no cambian ' + texto(nombre(ini)) + '</button>';
     }
     lista.innerHTML = html;
