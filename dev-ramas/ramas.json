@@ -526,12 +526,12 @@
   },
   "T0450-revision-con-dev": {
    "tarea": "T0450",
-   "titulo": "Pasar a revisión solo con la rama en DEV y qué mirar",
-   "pr": null,
-   "commit": "ebdcb6e",
-   "ultimo": "T0450: Pasar a revisión solo con la rama en DEV y qué mirar",
+   "titulo": "Una tarea pasa a revisión solo si se puede ver en DEV, con qué mirar",
+   "pr": 296,
+   "commit": "1c60468",
+   "ultimo": "T0450: «+ Se comprueba» en Añadir de una tarea de Claude Code",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T19:15:53.158Z",
+   "fecha": "2026-11-11T19:21:30.541Z",
    "toca": [
     "konamigas",
     "utilo"
