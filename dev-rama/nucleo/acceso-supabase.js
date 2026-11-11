@@ -14,6 +14,8 @@
  * - T0391 · Entrar con un código al correo (montaje.entrar con 'codigo'): pedirCodigo(correo) pide a Auth que lo envíe y
  *   entrarConCodigo(correo, codigo) lo cambia por la sesión. En local y DEV el correo no sale: buzon(correo) lo lee del
  *   buzón de pruebas. correos.* son los de quien ha entrado (Perfil: añadir otro, confirmado con su código).
+ * - T0432 · avisos.* (solo si montaje.avisos trae la clave pública de este entorno): los avisos al móvil (Web Push) de este
+ *   dispositivo, con el service worker sw.js de la carpeta de la página. Perfil: activar, probar, quitar y los últimos.
  *
  * window.KANBAN = { clave, marca, nombreApp, supabase: true } y window.NUCLEO_MONTAJE (montaje.js) van antes; después,
  * kanban4/tablas.js, nucleo/supabase.js, este archivo y nucleo/nucleo.js. En el modo local, local-navegador.js cambia
@@ -158,6 +160,99 @@
     quitar: function (c) { return capa().rpc('quitar_correo', { correo: bajo(c) }); }
   };
 
+  /* ---------- T0432 · avisos al móvil (Web Push) ---------- */
+
+  // La clave pública VAPID de este entorno (montaje.avisos, de config.json · supabase.avisos). Sin ella, sin avisos.
+  var VAPID = (M.avisos || {})[ENTORNO] || '';
+  var SW = 'sw.js'; // en la carpeta de la página: solo así atiende la plataforma (su «scope»)
+
+  function deB64url(t) {
+    t = String(t || '').replace(/-/g, '+').replace(/_/g, '/');
+    var bin = atob(t + '==='.slice((t.length + 3) % 4)), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function instalada() {
+    if (typeof navigator === 'undefined') return false;
+    return !!((window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone);
+  }
+  /** Un nombre para este dispositivo, para la lista del Perfil: «iPhone · app», «Mac · Chrome»… */
+  function dispositivo() {
+    var ua = navigator.userAgent || '', que = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? 'iPad' :
+      /Android/.test(ua) ? 'Android' : /Macintosh/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'Ordenador';
+    var nav = instalada() ? 'app' : /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'navegador';
+    return que + ' · ' + nav;
+  }
+  function soportado() { return typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+  function registro() {
+    var ic = document.querySelector('link[rel="apple-touch-icon"]') || document.querySelector('link[rel="icon"]');
+    var icono = ic && /^https?:/.test(ic.href) ? ic.href : '';
+    return navigator.serviceWorker.register(SW + '?sb=' + encodeURIComponent(URL_SB) + '&k=' + encodeURIComponent(P.clave || '') + '&i=' + encodeURIComponent(icono), { scope: './' })
+      .then(function () { return navigator.serviceWorker.ready; });
+  }
+  /** La suscripción de este dispositivo, si la hay (sin pedir nada). */
+  function suscripcion() {
+    if (!soportado()) return Promise.resolve(null);
+    return navigator.serviceWorker.getRegistration('./').then(function (r) { return r ? r.pushManager.getSubscription() : null; }, function () { return null; });
+  }
+  function guardarSus(sus) {
+    var j = sus.toJSON(), k = j.keys || {};
+    return capa().rpc('avisos_guardar', { endpoint: j.endpoint, p256dh: k.p256dh, auth: k.auth, dispositivo: dispositivo() }).then(function () { return sus; });
+  }
+  /** ¿Es de esta clave? Una suscripción hecha con otra clave (otro entorno, claves nuevas) no recibe nada: se rehace. */
+  function deEstaClave(sus) {
+    var k = sus && sus.options && sus.options.applicationServerKey;
+    if (!k) return true;
+    var a = new Uint8Array(k), b = deB64url(VAPID);
+    if (a.length !== b.length) return false;
+    for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  }
+
+  var avisos = !VAPID ? null : {
+    /** Cómo está este dispositivo: { soportado, instalada, ios, permiso, activo }. */
+    estado: function () {
+      var ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '', o = { soportado: soportado(), instalada: instalada(), ios: /iPhone|iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1),
+        permiso: 'Notification' in window ? Notification.permission : 'default', activo: false };
+      if (!o.soportado) return Promise.resolve(o);
+      return suscripcion().then(function (s) { o.activo = !!s && o.permiso === 'granted' && deEstaClave(s); return o; });
+    },
+    /** Pide permiso (tiene que ser desde un clic), suscribe este dispositivo y lo guarda en la base. */
+    activar: function () {
+      if (!soportado()) return Promise.reject(new Error('Este navegador no puede recibir avisos.'));
+      return Promise.resolve(Notification.requestPermission()).then(function (p) {
+        if (p !== 'granted') throw new Error(p === 'denied' ? 'Has dicho que no a los avisos: se cambia en los ajustes del móvil (Notificaciones › Utilo).' : 'Sin permiso no llegan los avisos.');
+        return registro();
+      }).then(function (reg) {
+        return reg.pushManager.getSubscription().then(function (s) {
+          if (s && deEstaClave(s)) return s;
+          return (s ? s.unsubscribe() : Promise.resolve()).then(function () {
+            return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: deB64url(VAPID) });
+          });
+        });
+      }).then(guardarSus);
+    },
+    /** Este dispositivo deja de recibir avisos. */
+    desactivar: function () {
+      return suscripcion().then(function (s) {
+        if (!s) return false;
+        var e = s.endpoint;
+        return s.unsubscribe().then(function () { return capa().rpc('avisos_quitar', { endpoint: e }); });
+      });
+    },
+    /** Al entrar: si este dispositivo ya los recibe, la base lo sabe al día (y si el móvil ha cambiado la suscripción, la nueva). */
+    refrescar: function () {
+      if (!soportado() || Notification.permission !== 'granted') return Promise.resolve(false);
+      return suscripcion().then(function (s) { return s && deEstaClave(s) ? guardarSus(s).then(function () { return true; }) : false; }).catch(function () { return false; });
+    },
+    /** Un aviso de prueba a mis dispositivos (la función del servidor «avisar», con mi sesión). */
+    prueba: function () {
+      return capa().rpc('avisar', { titulo: 'Aviso de prueba', texto: 'Toca para abrir la plataforma.', origen: 'Prueba' }, true);
+    },
+    /** Mis dispositivos y mis últimos avisos (mis_avisos de la base). */
+    mios: function () { return capa().rpc('mis_avisos', {}); }
+  };
+
   /* ---------- las tablas y las funciones ---------- */
 
   var funciones = [], servidor = [];
@@ -200,6 +295,7 @@
         if (s.cifra) o.cifra = s.cifra; // T0412: el número del menú (nucleo.js · cifras)
         return o;
       }).filter(function (s) { return s.menu !== false; });
+      if (avisos) avisos.refrescar(); // T0432: sin esperar
       return {
         persona: yo.nombre, correo: bajo(yo.correo || correo), perfil: alto.nombre + (alto.ambito !== 'todo' && alto.ambito_id ? ' en ' + alto.ambito_id : ''),
         admin: admin, negocio: M.negocio || '', dev: ENTORNO === 'prod' ? '' : (ENTORNO === 'dev' ? 'DEV' : 'Local') + ' · Supabase ' + (P.nombre || 'de pruebas') + (M.commit ? ' · ' + M.commit : ''),
@@ -253,6 +349,7 @@
     entrarConCodigo: entrarConCodigo,
     buzon: buzon,
     correos: correos,
+    avisos: avisos,
     llamar: llamar,
     seccion: function (api, cuerpo, clave) {
       return llamar(api, cuerpo).catch(function (e) {

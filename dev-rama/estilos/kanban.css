@@ -702,10 +702,6 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
  * en la ventana de T0172, sin marco: se pinta dentro y baja con su propio desplazamiento. */
 .u .n-main.kb { padding: 0; max-width: none; } /* T0386: el tablero usa todo el ancho (el marco limita a 1600px las demás secciones) */
 .u .n-main.kb .kb-vacio { padding: var(--e4); }
-/* T0394 · Ligas de Konamigas (konamigas/secciones/competicion.js): lo de debajo de la barra, con su margen, como la barra. */
-.u .n-main.kb .lg-cuerpo { padding: var(--e3) var(--e4) var(--e5); }
-.u .lg-viendo { margin: 0 0 var(--e2); color: var(--color-suave); }
-@media (min-width: 900px) { .u .n-main.kb .lg-cuerpo { padding-left: var(--e5); padding-right: var(--e5); } }
 .u .fv-caja.kb-ficha { display: block; overflow-y: auto; overscroll-behavior: contain; }
 .u .kb-ficha .barra { padding: var(--e3) var(--e4); }
 .u .kb-ficha .cab h1 { font-size: 24px; }
