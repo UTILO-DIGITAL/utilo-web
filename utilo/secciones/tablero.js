@@ -7,7 +7,7 @@
  * - Lee la vista TABLERO (public.tablero: cada tarea con su entrega corta y en manos de quién está) con la capa de tablas,
  *   que va a Supabase con la sesión de quien ha entrado: lo que se ve lo dicen sus roles (reglas por fila).
  * - Vista (arriba): «8 columnas» (todas menos Aplazada y Descartada), «Todas» (los diez estados) o «Agrupadas» (Necesita tu
- *   respuesta con Bloqueada y Para revisar con Aprobada; el estado exacto, en la tarjeta). La primera vez, la de
+ *   respuesta con Bloqueada; el estado exacto, en la tarjeta). T0440: Aprobada se llama «Por publicar», en su columna. La primera vez, la de
  *   config.VISTA; después, la última de este dispositivo. Entregadas y Descartadas, solo las de los últimos días (Filtros).
  * - En directo: con Supabase, lo que cambie otra persona (o el agente) sale solo en un segundo (Realtime); sin ↻ (T0422).
  * - Ordenar a mano: arrastrada dentro de su columna, la tarjeta se queda donde se suelta (el mismo orden para todos; las que no
@@ -19,6 +19,9 @@
  * - Mover (arrastrando en el ordenador, con el desplegable en el móvil o desde la ficha): solo a los estados a los que se
  *   puede pasar, y pide lo que exige cada uno (Bloqueada, el motivo; Necesita tu respuesta, la pregunta; Aplazada, la fecha;
  *   Descartada, el motivo). La tarjeta cambia al momento y lo escribe mover_tarea(); si la base dice que no, vuelve.
+ * - T0440 · Aprobar: en la ficha de una tarea Para revisar (o llevándola a Por publicar), quien la revisa (o lleva la
+ *   iniciativa) la aprueba: la función del servidor aprobar mira su PR en GitHub («Pruebas» ✅ y sin conflictos), la fusiona
+ *   y la deja en Aprobada, que aquí se llama «Por publicar» y tiene su columna (Entregada si no lleva nada que publicar).
  * - T0449 · Pedir cambios (sustituye a «rechazar»): en la ficha de una tarea Para revisar o Aprobada, o llevándola a En cola,
  *   quien la revisa (o lleva la iniciativa) escribe qué hay que cambiar y pedir_cambios() la devuelve a la cola con la marca
  *   (la tarjeta lo dice), el bloque «Cambios pedidos» en Qué hay que hacer y su línea en la bitácora. Si es autónoma, el aviso
@@ -48,6 +51,9 @@
   var COLOR = { 'Esperando': 'x', 'En cola': 'ni', 'En curso': 'ec', 'Necesita tu respuesta': 'pr', 'Bloqueada': 'bl', 'Para revisar': 'pr', 'Aprobada': 'co',
     'Entregada': 'co', 'Aplazada': 'x', 'Descartada': 'x' };
   var CERRADOS = ['Entregada', 'Descartada'];
+  /** T0440 · Cómo se llama cada estado en la pantalla: Aprobada es «Por publicar» (fusionada, falta llevarla a producción). */
+  var NOMBRE = { 'Aprobada': 'Por publicar' };
+  function nom(e) { return NOMBRE[e] || e; }
   /** A qué estados se puede pasar desde cada uno (los de gestion.pasos() de la base, que es la que manda). */
   var PASOS = {
     'Esperando': ['En cola', 'Aplazada', 'Descartada'],
@@ -66,15 +72,15 @@
     'En curso': 'Alguien está trabajando en ella ahora.',
     'Necesita tu respuesta': 'Parada hasta que quien la pidió conteste una pregunta concreta.',
     'Bloqueada': 'Parada por algo de fuera: material del cliente, un acceso, un problema técnico o un tercero.',
-    'Para revisar': 'Hecha: falta que quien la revisa la mire.',
-    'Aprobada': 'Revisada y bien: falta publicarla o entregarla.',
+    'Para revisar': 'Hecha: falta que quien la revisa la mire y la apruebe (Aprobar fusiona su PR) o pida cambios.',
+    'Aprobada': 'Aprobada y fusionada: falta publicarla o enviarla. Si no lleva nada que publicar, pasa sola a Entregada.',
     'Entregada': 'Hecha y funcionando. Se cierra con su fecha.',
     'Aplazada': 'Se deja para más adelante: se vuelve a mirar en la fecha que diga.',
     'Descartada': 'No se va a hacer.'
   };
   /** El texto de la cabecera de una columna: el de su estado o, si junta varios, el de cada uno. */
   function queEs(c) {
-    return c.estados.length === 1 ? QUE_ES[c.estados[0]] || '' : c.estados.map(function (e) { return e + ': ' + (QUE_ES[e] || ''); }).join('\n');
+    return c.estados.length === 1 ? QUE_ES[c.estados[0]] || '' : c.estados.map(function (e) { return nom(e) + ': ' + (QUE_ES[e] || ''); }).join('\n');
   }
   var MOTIVOS_BLOQUEO = ['Falta material del cliente', 'Falta un acceso', 'Problema técnico', 'Un tercero'];
   /** T0449 · Lo que pasa al pedir cambios (la ventanita del tablero). */
@@ -82,14 +88,15 @@
   var HERRAMIENTAS = ['Chat', 'Cowork', 'Claude Code'];
   /** Las columnas de cada vista: [{ id, titulo, estados }]. */
   var VISTAS = {
-    ocho: { titulo: '8 columnas', cols: ESTADOS.filter(function (e) { return e !== 'Aplazada' && e !== 'Descartada'; }).map(function (e) { return { id: e, titulo: e, estados: [e] }; }) },
-    todas: { titulo: 'Todas', cols: ESTADOS.map(function (e) { return { id: e, titulo: e, estados: [e] }; }) },
+    ocho: { titulo: '8 columnas', cols: ESTADOS.filter(function (e) { return e !== 'Aplazada' && e !== 'Descartada'; }).map(function (e) { return { id: e, titulo: nom(e), estados: [e] }; }) },
+    todas: { titulo: 'Todas', cols: ESTADOS.map(function (e) { return { id: e, titulo: nom(e), estados: [e] }; }) },
     agrupadas: { titulo: 'Agrupadas', cols: [
       { id: 'Esperando', titulo: 'Esperando', estados: ['Esperando'] },
       { id: 'En cola', titulo: 'En cola', estados: ['En cola'] },
       { id: 'En curso', titulo: 'En curso', estados: ['En curso'] },
       { id: 'Atascadas', titulo: 'Atascadas', estados: ['Necesita tu respuesta', 'Bloqueada'], color: 'bl' },
-      { id: 'En revisión', titulo: 'En revisión', estados: ['Para revisar', 'Aprobada'], color: 'pr' },
+      { id: 'Para revisar', titulo: 'Para revisar', estados: ['Para revisar'] },
+      { id: 'Aprobada', titulo: 'Por publicar', estados: ['Aprobada'] },   // T0440: en su propia columna
       { id: 'Entregada', titulo: 'Entregada', estados: ['Entregada'] }
     ] }
   };
@@ -529,7 +536,7 @@
         if (t.EPICA) m.push(t.EPICA);
         if (t.P) m.push(t.P);
         if (varias) m.push(iniciativa(t.INICIATIVA));
-        if (col.estados.length > 1) x.push('<div class="x"><b>' + texto(t.ESTADO) + '</b></div>');
+        if (col.estados.length > 1) x.push('<div class="x"><b>' + texto(nom(t.ESTADO)) + '</b></div>');
         if (t.ESTADO === 'Necesita tu respuesta' && t.PREGUNTA) x.push('<div class="x">Pregunta: ' + texto(t.PREGUNTA) + '</div>');
         if (t.ESTADO === 'Aplazada' && t.REVISAR_EL) x.push('<div class="x">Se vuelve a mirar el ' + fechaEs(t.REVISAR_EL) + '</div>');
         // T0449: con cambios pedidos que nadie ha cogido todavía.
@@ -542,7 +549,7 @@
         if (t._nueva) id = '';
         var pasos = PASOS[t.ESTADO] || [], puede = id && !SOLO_LEE && !t._pendiente && pasos.length;
         var mover = TACTIL && puede ? '<div class="mover"><span>Estado</span><select data-mover="' + texto(id) + '" aria-label="Estado de ' + texto(id) + '">' +
-          [t.ESTADO].concat(pasos).map(function (e) { return '<option' + (e === t.ESTADO ? ' selected' : '') + '>' + texto(e) + '</option>'; }).join('') + '</select></div>' : '';
+          [t.ESTADO].concat(pasos).map(function (e) { return '<option value="' + texto(e) + '"' + (e === t.ESTADO ? ' selected' : '') + '>' + texto(nom(e)) + '</option>'; }).join('') + '</select></div>' : '';
         return '<div class="card ' + cls(t.ESTADO) + '-b' + (t._pendiente ? ' guardando' : '') + '"' + (puede && !TACTIL ? ' draggable="true"' : '') + ' data-id="' + texto(id) + '">' +
           '<a class="card-link" href="?s=' + texto(ctx.id.toLowerCase()) + '&amp;t=' + encodeURIComponent(id) + '" data-abrir="' + texto(id) + '">' +
           '<div class="top"><span class="id">' + (id ? texto(id) : 'Creando…') + (t.AUTONOMA ? ICO_AUTO : '') /* también en las cerradas: si no, con el filtro de autónomas no se ve en ninguna (Javi) */ + '</span>' +
@@ -751,8 +758,15 @@
         if (!t || t.ESTADO === nuevo) return;
         if ((PASOS[t.ESTADO] || []).indexOf(nuevo) < 0) {
           ctx.aviso(CERRADOS.indexOf(t.ESTADO) >= 0 ? id + ' está ' + t.ESTADO.toLowerCase() + ': no se reabre. Si hace falta más, crea otra que espere a esta.' :
-            'De ' + t.ESTADO + ' no se pasa a ' + nuevo + (PASOS[t.ESTADO] ? ': puede ir a ' + PASOS[t.ESTADO].join(', ') + '.' : '.'));
+            'De ' + nom(t.ESTADO) + ' no se pasa a ' + nom(nuevo) + (PASOS[t.ESTADO] ? ': puede ir a ' + PASOS[t.ESTADO].map(nom).join(', ') + '.' : '.'));
           pintarTablero(); if (abiertaId) pintarFicha(); return;
+        }
+        // T0440: a Por publicar se llega con Aprobar (mira y fusiona su PR): se abre la ficha y se mira la PR.
+        if (t.ESTADO === 'Para revisar' && nuevo === 'Aprobada') {
+          pintarTablero();
+          if (abiertaId !== id) abrirFicha(id); else pintarFicha();
+          pedirAprobar(id, true);
+          return;
         }
         var q = pide(t.ESTADO, nuevo);
         if (q) { pedirDatos(t, nuevo, q); pintarTablero(); if (abiertaId) pintarFicha(); return; }
@@ -1144,6 +1158,67 @@
       }
 
       /**
+       * T0440 · Aprobar una tarea Para revisar: la función del servidor aprobar (la misma que la línea de DEV) mira sus PR en
+       * GitHub («Pruebas» ✅ y sin conflictos con main), las fusiona y la pasa a Aprobada, «Por publicar» (Entregada, si no
+       * lleva nada que publicar). En dos pasos, como «Que lo haga Claude»: primero mira (probar) y enseña cada PR; después,
+       * «Aprobar y fusionar». Si no se puede, dice por qué. Lo mismo al llevar la tarjeta a Por publicar. Quien la revisa o
+       * quien lleva la iniciativa (la base lo vuelve a mirar).
+       */
+      var aprob = {};   // por tarea: { paso: 'mirando' | 'confirmar' | 'aprobando' | 'no', r: lo que ha dicho la función }
+      function puedeAprobar(t) {
+        return t.ESTADO === 'Para revisar' && !SOLO_LEE && !t._nueva && !t._pendiente &&
+          (ctx.admin || (ctx.personaId && t.REVISA === ctx.personaId) || /^responsable/.test(ctx.perfil || ''));
+      }
+      function lineaPr(p) {
+        var como = p.estado === 'fusionada' ? 'ya fusionada' : p.estado === 'cerrada' ? 'cerrada sin fusionar' :
+          (p.pruebas === 'bien' ? '«Pruebas» ✅' : p.pruebas === 'mal' ? '«Pruebas» ❌' : p.pruebas === 'en marcha' ? '«Pruebas» sin acabar' : 'sin «Pruebas»') +
+          ' · ' + (p.conflictos === false ? 'sin conflictos' : p.conflictos ? 'con conflictos' : 'conflictos sin mirar');
+        return '<li><a href="' + texto(p.url) + '" target="_blank" rel="noopener">PR ' + texto(p.repo + ' #' + p.numero) + '</a> · ' + texto(como) + '</li>';
+      }
+      function htmlAprobar(t) {
+        var id = String(t.ID), a = aprob[id] || {}, r = a.r || {}, prs = r.prs || [];
+        var bot = function (txt, attr, c) { return '<button type="button" class="u-btn ' + (c || '') + '" ' + attr + '>' + texto(txt) + '</button>'; };
+        var abiertas = prs.filter(function (p) { return p.estado === 'abierta'; }).length;
+        var lista = prs.length ? '<ul class="fap-prs">' + prs.map(lineaPr).join('') + '</ul>' : '';
+        var h;
+        if (a.paso === 'no') {
+          h = '<p class="fcl-no"><b>Aún no se puede aprobar:</b> ' + texto((r.motivos || []).join('; ')) + '.</p>' + lista +
+            '<div class="fcl-b">' + bot('Volver a mirar', 'data-aprobar') + '</div>';
+        } else if (a.paso === 'confirmar' || a.paso === 'aprobando') {
+          var entrega = r.publicar === false || (r.publicar == null && !t.PUBLICAR);
+          h = lista + '<p>' + (abiertas ? (abiertas === 1 ? 'Se fusiona la PR' : 'Se fusionan las ' + abiertas + ' PR') + ' y ' + id : (prs.length ? '' : 'No tiene PR: ') + id) +
+            (entrega ? ' pasa a Entregada: no lleva nada que publicar.' : ' pasa a Por publicar.') + '</p>' +
+            '<div class="fcl-b">' + bot(a.paso === 'aprobando' ? (abiertas ? 'Fusionando…' : 'Aprobando…') : (abiertas ? 'Aprobar y fusionar' : 'Aprobar'),
+              'data-aprobar-si' + (a.paso === 'aprobando' ? ' disabled' : ''), 'u-btn-accion') +
+            (a.paso === 'aprobando' ? '' : bot('Ahora no', 'data-aprobar-no', 'u-btn-texto')) + '</div>';
+        } else {
+          h = '<div class="fcl-b">' + bot(a.paso === 'mirando' ? 'Mirando la PR…' : 'Aprobar', 'data-aprobar' + (a.paso === 'mirando' ? ' disabled' : ''), 'u-btn-accion') + '</div>';
+        }
+        return '<div class="bloque fcl fap' + (a.paso === 'no' ? ' fcl-off' : '') + '">' + h + '</div>';
+      }
+      function pedirAprobar(id, probar) {
+        var a = aprob[id] = { paso: probar ? 'mirando' : 'aprobando', r: (aprob[id] || {}).r };
+        if (abiertaId === id) pintarFicha();
+        return ctx.llamar('aprobar', [{ tarea: id, probar: !!probar }]).then(function (r) {
+          if (aprob[id] !== a) return;
+          r = r || {};
+          if (probar) { aprob[id] = { paso: r.puede ? 'confirmar' : 'no', r: r }; return; }
+          delete aprob[id];
+          var n = r.fusionadas || 0;
+          if (ctx.abierta()) ctx.aviso(id + ' aprobada' + (n ? ' y ' + (n === 1 ? 'su PR, fusionada' : 'sus ' + n + ' PR, fusionadas') : '') +
+            (r.estado === 'Entregada' ? ': no lleva nada que publicar, queda Entregada.' : ': queda Por publicar.') + (r.simulada ? ' (En local no sale nada hacia GitHub.)' : ''));
+          return alDia(id);
+        }, function (e) {
+          if (aprob[id] !== a) return;
+          var m = sinPrefijo(e), por = /^No se puede aprobar T\d+: (.*?)\.?$/.exec(m);
+          if (por) { aprob[id] = { paso: 'no', r: { prs: (a.r || {}).prs || [], motivos: por[1].split('; ') } }; return; }
+          delete aprob[id];
+          if (ctx.abierta()) ctx.aviso((probar ? 'No se ha podido mirar la PR: ' : 'No se ha aprobado: ') + m);
+          if (!probar) return alDia(id);
+        }).then(function () { if (ctx.abierta() && abiertaId === id && !ocupado()) pintarFicha(); });
+      }
+
+      /**
        * T0439 · «Que lo haga Claude»: la marca autónoma y lanza «Autónomo» con ella (la función del servidor lanzar_autonomo,
        * con la llave de GitHub). Lo lanza quien administra Utilo. En dos pasos: el primero pregunta a la base si el agente la
        * puede coger (fase, tope y todo lo demás: probar) y el segundo, tras «Lanzar», la lanza. Si no puede, dice por qué.
@@ -1210,6 +1285,7 @@
         if (!tarea(id)) return;
         abiertaId = id; editando = false; cambiando = '';
         if (claude[id] && claude[id].paso !== 'lanzando') delete claude[id]; // T0439: al volver a abrirla, se comprueba otra vez
+        if (aprob[id] && aprob[id].paso !== 'aprobando' && aprob[id].paso !== 'mirando') delete aprob[id]; // T0440: igual
         pintarFicha();
         fv.classList.add('abierto');
         document.documentElement.classList.add('fv-abierta');
@@ -1266,6 +1342,9 @@
         if (e.target.closest('[data-claude]')) { pedirClaude(abiertaId, true); return; }
         if (e.target.closest('[data-claude-si]')) { pedirClaude(abiertaId, false); return; }
         if (e.target.closest('[data-claude-no]')) { delete claude[abiertaId]; pintarFicha(); return; }
+        if (e.target.closest('[data-aprobar]')) { pedirAprobar(abiertaId, true); return; }
+        if (e.target.closest('[data-aprobar-si]')) { pedirAprobar(abiertaId, false); return; }
+        if (e.target.closest('[data-aprobar-no]')) { delete aprob[abiertaId]; pintarFicha(); return; }
         var pc0 = e.target.closest('[data-pedir-cambios]');
         if (pc0) { var pa = caja.querySelector('#tb-cambios'), pt = pa ? pa.value.trim() : ''; if (pt) pedirCambios(abiertaId, pt, pc0); else if (pa) { pa.focus(); ctx.aviso('Di qué hay que cambiar.'); } return; }
         var rb = e.target.closest('[data-responder]');
@@ -1314,7 +1393,7 @@
       function rel(id) {
         var x = tarea(id), st = x ? x.ESTADO : 'No la ves';
         return '<a class="frel" href="?s=' + texto(ctx.id.toLowerCase()) + '&amp;t=' + encodeURIComponent(id) + '" data-rel="' + texto(id) + '">' +
-          '<span class="fpill ' + cls(st) + '">' + texto(st) + '</span><span class="frid">' + texto(id) + '</span><span class="frtit">' + texto(x ? x.TITULO : '') + '</span></a>';
+          '<span class="fpill ' + cls(st) + '">' + texto(nom(st)) + '</span><span class="frid">' + texto(id) + '</span><span class="frtit">' + texto(x ? x.TITULO : '') + '</span></a>';
       }
       function fechaCaja(lab, val, pista, c, attrs) {
         return '<div class="ffecha ' + (c || '') + '"' + (attrs || '') + '><small>' + texto(lab) + '</small><strong>' + texto(val || '—') + '</strong>' + (pista ? '<span class="fpista">' + texto(pista) + '</span>' : '') + '</div>';
@@ -1375,8 +1454,8 @@
         var manos = enManos(t);
         var pasos = PASOS[t.ESTADO] || [], mueve = !SOLO_LEE && pasos.length && !t._nueva;
         var estado = '<div class="est ' + cls(t.ESTADO) + '">' + (mueve ? '<label for="kb-f-est">Estado</label><select id="kb-f-est"' + (t._pendiente ? ' disabled' : '') + '>' +
-            [t.ESTADO].concat(pasos).map(function (e) { return '<option' + (e === t.ESTADO ? ' selected' : '') + '>' + texto(e) + '</option>'; }).join('') + '</select>'
-            : '<span class="fpill">' + texto(t.ESTADO) + '</span>') +
+            [t.ESTADO].concat(pasos).map(function (e) { return '<option value="' + texto(e) + '"' + (e === t.ESTADO ? ' selected' : '') + '>' + texto(nom(e)) + '</option>'; }).join('') + '</select>'
+            : '<span class="fpill">' + texto(nom(t.ESTADO)) + '</span>') +
           (t._pendiente ? '<span class="msg">Guardando…</span>' : manos ? '<span class="msg">' + texto(t.EN_MANOS_TIPO === 'espera' ? manos : t.EN_MANOS_TIPO === 'fuera' ? 'Depende de fuera: ' + manos : 'En manos de ' + manos) + '</span>' : '') + '</div>';
         var personas = ['ASIGNADO', 'PIDE', 'REVISA'].map(function (k) {
           if (ab(k)) return '<p class="fed-abierto"><b>' + texto(ETIQUETA[k]) + ':</b> ' + control(t, k) + '</p>';
@@ -1425,6 +1504,7 @@
             (ab('TITULO') ? '<h1 id="kb-f-tit" class="fed-abierto">' + control(t, 'TITULO') + '</h1>' : '<h1 id="kb-f-tit"' + pulsa(t, 'TITULO') + '>' + texto(t.TITULO) + '</h1>') + '</div>' +
           '<div class="fmeta">' + tags.join('') + '</div>' + estado +
           (motivo.length ? '<div class="bloque">' + motivo.join('') + '</div>' : '') + revision +
+          (puedeAprobar(t) || aprob[id] ? htmlAprobar(t) : '') +
           (puedeClaude(t) ? htmlClaude(t) : '') +
           '<div class="datos"><div class="fila"><b>Fechas</b><div class="ffechas">' + fs.join('') + '</div></div></div>' +
           largoFx('DESCRIPCION') +
