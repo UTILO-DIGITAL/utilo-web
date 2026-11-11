@@ -1086,3 +1086,7 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
 .u .bjp-dos { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e3); }
 .u #bjp-t-verbo.mal { color: var(--estado-bl); font-weight: 700; }
 @media (max-width: 480px) { .u .bjp-dos { grid-template-columns: 1fr; } }
+/* T0450 · Qué mirar al revisar, dónde se comprueba y «Verlo en DEV» (amarillo, el color de la app DEV) */
+.u .bloque.frevision { border-left: 4px solid var(--estado-pr); }
+.u .bloque .fcomprobar { margin: 0 0 var(--e2); }
+.u .bloque .fver-dev { background: #F5C518; border-color: #1C1C1C; color: #1C1C1C; }

@@ -13,6 +13,8 @@
      T0449 · Con una rama elegida, su tarea en el DAILY de verdad (ramas.json · daily: el Supabase de Utilo de producción,
      con la sesión de la plataforma de Utilo en este sitio, o entrando con Google una vez) y «Pedir cambios» si está Para
      revisar o Aprobada: pedir_cambios() de la base, el mismo camino que la ficha.
+     T0450 · «Verlo en DEV» de la ficha de una tarea: ?probar&tarea=T0xxx[&web=dev/plataforma/[&como=x@ejemplo.com]] elige
+     la rama de esa tarea, esa web y esa persona (sin «como», tú con Google) y entra ya. Con la tarea, su «Qué mirar».
      T0456 · DEV cerrado: las personas de prueba y el buzón de pruebas solo se leen con la «llave», tu sesión de Google en
      el Supabase de DEV de esa iniciativa (una persona de verdad con rol). Se pide una vez por dispositivo en «Entrar como»
      y se guarda aparte («dev_llaves», por Supabase), también para el botón del buzón de pruebas de las páginas. -->
@@ -101,6 +103,7 @@
   .tarea .hecho { margin: 0; font-size: 14px; }
   .tarea .hecho a { color: inherit; font-weight: 600; }
   .tarea .aviso { padding: 10px 12px; }
+  .tarea .mirar { font-size: 15px; white-space: pre-line; overflow-wrap: anywhere; }
   button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid var(--texto); outline-offset: 2px; }
   header button:focus-visible { outline-color: #1C1C1C; }
 </style>
@@ -119,6 +122,13 @@
   var VERSION = '__SELECTOR__';          // la pone dev-ramas.js selector; ramas.json dice la publicada
   var ACCION = 'https://github.com/UTILO-DIGITAL/utilo-apps/actions/workflows/supabase.yml';
   var PROBAR = /[?&]probar\b/.test(location.search); // se ha venido a elegir (la línea DEV): no se vuelve sola a la última
+  /** T0450 · Lo que pide el enlace «Verlo en DEV»: { tarea, web, como } o null. */
+  function pedido(q) {
+    var p = new URLSearchParams(q || '');
+    var tarea = (/^T\d{4}$/.exec(p.get('tarea') || '') || [])[0];
+    return tarea ? { tarea: tarea, web: p.get('web') || '', como: String(p.get('como') || '').toLowerCase() } : null;
+  }
+  var PEDIDO = pedido(location.search);
   var hoja = document.getElementById('hoja'), cab = document.getElementById('cab'), pie = document.getElementById('pie');
   var estado = document.getElementById('estado'), btnAbrir = document.getElementById('abrir');
   var datos = null, vista = 'probar', filtro = '', verTodas = false, ocupado = false, primera = true;
@@ -498,6 +508,44 @@
     hoja._recientes = rec;
   }
 
+  /* ---------- T0450 · «Verlo en DEV»: la rama de una tarea, su web y su persona, y entrar ya ---------- */
+
+  /** La rama subida de esa tarea (la más reciente, si hay varias), o ''. */
+  function ramaDeTarea(id) {
+    var rs = datos.ramas || {};
+    return Object.keys(rs).filter(function (c) { return c !== 'main' && rs[c].tarea === id; })
+      .sort(function (a, b) { return String(rs[b].fecha).localeCompare(String(rs[a].fecha)); })[0] || '';
+  }
+  /** La elección que pide el enlace, o { error }. */
+  function eleccionPedida(P) {
+    var c = ramaDeTarea(P.tarea), r = c && rama(c);
+    if (!r) return { error: P.tarea + ' ya no tiene su rama en DEV: o aún no se ha subido (un minuto tras el push) o ya se ha fusionado.' };
+    var ps = r.paginas || [];
+    var p = P.web ? ps.filter(function (x) { return x.ruta === P.web; })[0] : ps.filter(function (x) { return x.cambia !== false; })[0] || ps[0];
+    if (!p) return { error: 'La rama de ' + P.tarea + ' no tiene ' + (P.web ? 'la web ' + P.web : 'ninguna web') + ' en DEV.' };
+    var x = { ini: p.iniciativa, carpeta: c, ruta: p.ruta };
+    if (P.como) x.como = { tipo: 'prueba', ini: p.iniciativa, correo: P.como, nombre: '', rol: '' };
+    else if (P.web) x.como = { tipo: 'yo' };
+    return { x: x, publica: !!p.publica };
+  }
+  /** Si se ha venido con un enlace «Verlo en DEV», elige lo pedido y entra; true si se ocupa él de la pantalla. */
+  function verPedido() {
+    var P = PEDIDO;
+    if (!P) return false;
+    PEDIDO = null;
+    history.replaceState(null, '', location.pathname + '?probar');
+    var e = eleccionPedida(P);
+    if (e.error) { pintar(); aviso(e.error, true); return true; }
+    elegir({ ini: e.x.ini }); // cambiar de iniciativa deja la rama y la persona como estaban: primero ella, después lo demás
+    elegir({ carpeta: e.x.carpeta, ruta: e.x.ruta, como: e.x.como });
+    var x = eleccion();
+    pintar();
+    // Si la base de DEV no tiene lo de esta rama, se queda en la hoja con el aviso (cargarla) en vez de entrar.
+    if (base(x.carpeta, x.ini)) { aviso('La base de DEV no tiene aún lo de esta rama: cárgala antes de mirarla.', true); return true; }
+    abrir(x);
+    return true;
+  }
+
   /* ---------- T0449 · la tarea de la rama en el DAILY de verdad: verla y pedir cambios ---------- */
 
   var tareas = {};   // id → { cargando } | { t } | { entrar } | { error }, con borrador, enviando, hecho y fallo (lo de pedir cambios)
@@ -528,7 +576,8 @@
     });
   }
   function leerTarea(id) {
-    return alDaily('GET', 'tareas?id=eq.' + encodeURIComponent(id) + '&select=id,titulo,estado,autonoma,cambios_pedidos').then(function (l) { return (l || [])[0] || null; });
+    // T0450: todo (también que_mirar, que el DAILY de producción tiene desde que se aplica su migración).
+    return alDaily('GET', 'tareas?id=eq.' + encodeURIComponent(id) + '&select=*').then(function (l) { return (l || [])[0] || null; });
   }
   function cargarTarea(id) {
     var antes = tareas[id] || {};
@@ -548,6 +597,7 @@
     else {
       var puede = t.estado === 'Para revisar' || t.estado === 'Aprobada';
       h = '<span class="tt">' + texto(t.id + ' · ' + t.titulo) + '</span><span class="etiqueta">' + texto(t.estado) + (t.cambios_pedidos ? ' · con cambios pedidos sin coger' : '') + '</span>';
+      if (t.que_mirar) h += '<span class="etiqueta">Qué mirar</span><span class="mirar">' + texto(t.que_mirar) + '</span>';
       if (st.hecho) h += '<p class="hecho">Cambios pedidos: ' + texto(t.id) + ' vuelve a ' + texto(t.estado === 'Esperando' ? 'esperar' : 'la cola') + '. ' +
         (t.autonoma ? 'Es autónoma: <a href="' + texto(d.ficha + encodeURIComponent(t.id)) + '">«Que lo haga Claude»</a> en su ficha para que la rehaga.' : 'Quien la coja verá lo pedido lo primero.') + '</p>';
       if (puede) h += '<label class="etiqueta" for="cambios-texto">¿Hay que cambiar algo?</label>' +
@@ -722,7 +772,8 @@
       .then(function (j) {
         // El móvil guarda la página 10 minutos: si hay una app más nueva, se carga con otra dirección (no la guardada).
         if (j.selector && j.selector !== VERSION && VERSION.indexOf('__') && location.search.indexOf('v=' + j.selector) < 0) {
-          location.replace(location.pathname + '?' + (PROBAR ? 'probar&' : '') + 'v=' + j.selector);
+          var q = location.search.replace(/([?&])v=[^&]*&?/, '$1').replace(/[?&]$/, ''); // con lo que pedía el enlace (T0450)
+          location.replace(location.pathname + (q ? q + '&' : '?') + 'v=' + j.selector);
           return;
         }
         datos = { ramas: j.ramas || {}, bases: j.bases || {}, daily: j.daily || null };
@@ -730,7 +781,7 @@
         var u = leer().ultima, c = u && (/\/dev-ramas\/([^/]+)\//.exec(u) || [])[1];
         if (primera && !PROBAR && c && u.indexOf(location.pathname) === 0 && rama(decodeURIComponent(c))) { location.replace(u); return; }
         primera = false;
-        return canjearCodigo().then(pintar);
+        return canjearCodigo().then(function () { if (!verPedido()) pintar(); });
       })
       .catch(function () { cabecera('Probar en DEV'); hoja.innerHTML = '<p class="vacio">No se puede leer la lista de ramas. Comprueba la conexión y vuelve a abrir la app.</p>'; });
   }
