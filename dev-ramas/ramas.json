@@ -2,12 +2,12 @@
  "ramas": {
   "T0441-dev-ramas-movil": {
    "tarea": "T0441",
-   "titulo": "La acción «DEV ramas» no hace nada hasta que main tenga dev-ramas.js, y no esconde errores",
+   "titulo": "App «Utilo DEV» en el móvil con selector de ramas, una carpeta por rama",
    "pr": null,
-   "commit": "18165da",
-   "ultimo": "T0441: La acción «DEV ramas» no hace nada hasta que main tenga dev-ramas.js, y no esconde errores",
+   "commit": "6f0a540",
+   "ultimo": "T0441: En el selector, el título del primer commit de la rama, main sin autor y la cabecera siempre amarilla",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T11:11:07.551Z",
+   "fecha": "2026-11-11T11:18:25.833Z",
    "toca": [
     "konamigas",
     "utilo"

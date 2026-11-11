@@ -20,7 +20,7 @@
     --amarillo-fuerte: #B88A00; --boton: #1C1C1C; --boton-texto: #FFFFFF; --aviso: #8A4B00; --aviso-fondo: #FFF0D6; }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) { --fondo: #1A1810; --caja: #262318; --texto: #F3EEDC; --suave: #BDB49A; --borde: #4A4330;
-      --amarillo: #5A4A10; --amarillo-fuerte: #E8C14A; --boton: #F3EEDC; --boton-texto: #1A1810; --aviso: #FFC27A; --aviso-fondo: #3A2A10; }
+      --amarillo-fuerte: #E8C14A; --boton: #F3EEDC; --boton-texto: #1A1810; --aviso: #FFC27A; --aviso-fondo: #3A2A10; }
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
@@ -28,8 +28,11 @@
     border: 6px solid var(--amarillo-fuerte); border-top: 0; min-height: 100vh; min-height: 100dvh; }
   header { position: sticky; top: 0; z-index: 2; background: var(--amarillo); border-bottom: 2px solid var(--amarillo-fuerte);
     padding: calc(env(safe-area-inset-top) + 12px) 16px 12px; display: flex; align-items: center; gap: 12px; }
+  /* La cabecera es la marca de DEV: amarilla y con letra oscura también en modo oscuro. */
+  header { color: #1C1C1C; }
   header h1 { margin: 0; font-size: 20px; flex: 1; }
-  header p { margin: 2px 0 0; font-size: 14px; color: var(--suave); }
+  header p { margin: 2px 0 0; font-size: 14px; color: #5F5A4A; }
+  header button { color: #1C1C1C; border-color: #B88A00; background: transparent; }
   main { padding: 12px 10px calc(env(safe-area-inset-bottom) + 24px); max-width: 640px; margin: 0 auto; }
   button, a.btn { font: inherit; border-radius: 10px; border: 1px solid var(--boton); padding: 9px 14px; cursor: pointer;
     text-decoration: none; display: inline-block; min-height: 44px; }
