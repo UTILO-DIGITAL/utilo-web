@@ -771,9 +771,14 @@
           pedirAprobar(id, true);
           return;
         }
-        var q = pide(t.ESTADO, nuevo);
+        // T0462: una de Chat o Cowork sin qué mirar lo pide al pasar a Para revisar (la base no la deja pasar sin él).
+        var q = faltaQueMirar(t, nuevo) ? 'quemirar' : pide(t.ESTADO, nuevo);
         if (q) { pedirDatos(t, nuevo, q); pintarTablero(); if (abiertaId) pintarFicha(); return; }
         enviar(t, nuevo, {});
+      }
+      /** T0462 · Las de Chat y Cowork no pasan a Para revisar sin QUE_MIRAR: se pide en la ventanita, como el motivo. */
+      function faltaQueMirar(t, nuevo) {
+        return nuevo === 'Para revisar' && SIN_CODIGO.indexOf(t.HERRAMIENTA) >= 0 && !String(t.QUE_MIRAR || '').trim();
       }
       function enviar(t, nuevo, x) {
         var id = String(t.ID), args = { tarea: id, estado: nuevo }, local = { ESTADO: nuevo };
@@ -793,10 +798,10 @@
       /** La ventanita con lo que pide el estado: motivo del bloqueo, pregunta, fecha, motivo. */
       function pedirDatos(t, nuevo, q) {
         var id = String(t.ID), h = '';
-        var tit = { bloqueo: 'Bloquear ' + id, pregunta: 'Preguntar a quien la pidió', aplazar: 'Aplazar ' + id, descartar: 'Descartar ' + id, cambios: 'Pedir cambios en ' + id }[q];
+        var tit = { bloqueo: 'Bloquear ' + id, pregunta: 'Preguntar a quien la pidió', aplazar: 'Aplazar ' + id, descartar: 'Descartar ' + id, cambios: 'Pedir cambios en ' + id, quemirar: 'Qué mirar en ' + id }[q];
         var ayuda = { bloqueo: 'Pasa a Bloqueada: la mueve alguien de fuera o algo técnico.', pregunta: 'Pasa a Necesita tu respuesta, en manos de ' + (nombre(t.PIDE) || 'quien la pidió') + '.',
           aplazar: 'Nadie la mueve hasta esa fecha; entonces se decide.', descartar: 'Se cierra y no se reabre. Las que la esperan dejan de esperarla.',
-          cambios: AYUDA_CAMBIOS }[q];
+          cambios: AYUDA_CAMBIOS, quemirar: 'Pasa a Para revisar. Di qué tiene que mirar quien la revisa: qué partes son nuevas, qué decisión espera.' }[q];
         if (q === 'bloqueo') h = '<div class="campo"><label class="lab" for="tb-d-mb">Por qué</label><select id="tb-d-mb" required><option value="">Elige…</option>' +
           MOTIVOS_BLOQUEO.map(function (m) { return '<option>' + texto(m) + '</option>'; }).join('') + '</select></div>' +
           '<div class="campo"><label class="lab" for="tb-d-mo">Qué pasa <span class="opc">(opcional)</span></label><textarea id="tb-d-mo" rows="2"></textarea></div>';
@@ -804,6 +809,8 @@
         if (q === 'aplazar') h = '<div class="campo"><label class="lab" for="tb-d-re">Se vuelve a mirar el</label><input type="date" id="tb-d-re" min="' + hoyISO() + '" required></div>' +
           '<div class="campo"><label class="lab" for="tb-d-mo">Por qué <span class="opc">(opcional)</span></label><textarea id="tb-d-mo" rows="2"></textarea></div>';
         if (q === 'descartar') h = '<div class="campo"><label class="lab" for="tb-d-mo">Por qué se descarta</label><textarea id="tb-d-mo" rows="3" required></textarea></div>';
+        if (q === 'quemirar') h = '<div class="campo"><label class="lab" for="tb-d-qm">Qué mirar</label><textarea id="tb-d-qm" rows="4" required ' +
+          'placeholder="1) El apartado 3 es nuevo.&#10;2) Decide si va el precio."></textarea></div>';
         if (q === 'cambios') h = '<div class="campo"><label class="lab" for="tb-d-ca">Qué hay que cambiar</label><textarea id="tb-d-ca" rows="4" required></textarea></div>';
         altaForm.innerHTML = '<h2>' + texto(tit) + '</h2><p class="u-nota">' + texto(ayuda) + '</p><div class="edit">' + h + '</div><div id="alta-error" role="alert"></div>' +
           '<div class="botones"><button type="button" class="sec" data-cancelar-alta>Cancelar</button><button type="submit" class="pri">' + texto(q === 'cambios' ? 'Pedir cambios' : 'Pasar a ' + nuevo) + '</button></div>';
@@ -814,12 +821,20 @@
           var x = { motivo_bloqueo: v('tb-d-mb'), pregunta: v('tb-d-pr'), revisar_el: v('tb-d-re'), motivo: v('tb-d-mo') };
           var mal = q === 'bloqueo' && !x.motivo_bloqueo ? 'Elige por qué está bloqueada.' : q === 'pregunta' && !x.pregunta ? 'Escribe la pregunta.' :
             q === 'aplazar' && !x.revisar_el ? 'Pon la fecha en que se vuelve a mirar.' : q === 'aplazar' && x.revisar_el < hoyISO() ? 'La fecha ya ha pasado.' :
-            q === 'descartar' && !x.motivo ? 'Di por qué se descarta.' : q === 'cambios' && !v('tb-d-ca') ? 'Di qué hay que cambiar.' : '';
+            q === 'descartar' && !x.motivo ? 'Di por qué se descarta.' : q === 'cambios' && !v('tb-d-ca') ? 'Di qué hay que cambiar.' : q === 'quemirar' && !v('tb-d-qm') ? 'Di qué tiene que mirar quien la revisa.' : '';
           if (mal) { var er = altaForm.querySelector('#alta-error'); er.textContent = mal; er.style.display = 'block'; return; }
           cerrarVelo();
           if (q === 'cambios') pedirCambios(String(t.ID), v('tb-d-ca'));
+          else if (q === 'quemirar') guardarYEnviar(t, nuevo, { QUE_MIRAR: v('tb-d-qm') });
           else enviar(t, nuevo, x);
         };
+      }
+      /** T0462 · Primero el qué mirar y, guardado, el estado (si no se guarda, no se mueve). */
+      function guardarYEnviar(t, nuevo, cambios) {
+        var id = String(t.ID), antes = {};
+        Object.keys(cambios).forEach(function (k) { antes[k] = t[k] == null ? '' : t[k]; });
+        ctx.tablas.actualizar(T, id, cambios, { fn: 'tablasActualizar', args: ['TAREAS', id, cambios, { antes: antes }] })
+          .then(function () { enviar(tarea(id) || t, nuevo, {}); }, function () {});
       }
       function abrirVelo() {
         altaVelo.classList.add('abierto');

@@ -336,10 +336,10 @@
    "tarea": "T0462",
    "titulo": "Las tareas de Chat y Cowork piden qué mirar antes de pasar a revisión",
    "pr": 300,
-   "commit": "78be15e",
-   "ultimo": "T0462: Trae main (T0440 Aprobar, correo); las migraciones de qué mirar, detrás de las suyas",
+   "commit": "7357680",
+   "ultimo": "T0462: Al llevar al tablero una de Chat o Cowork a Para revisar sin qué mirar, se pide en una ventanita",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T22:09:14.225Z",
+   "fecha": "2026-11-11T22:29:21.429Z",
    "toca": [
     "utilo"
    ],
