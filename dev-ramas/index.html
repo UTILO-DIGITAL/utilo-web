@@ -32,7 +32,7 @@
   header { color: #1C1C1C; }
   header h1 { margin: 0; font-size: 20px; flex: 1; }
   header p { margin: 2px 0 0; font-size: 14px; color: #5F5A4A; }
-  header button { color: #1C1C1C; border-color: #B88A00; background: transparent; }
+  header button.secundario { color: #1C1C1C; border-color: #B88A00; background: transparent; }
   main { padding: 12px 10px calc(env(safe-area-inset-bottom) + 24px); max-width: 640px; margin: 0 auto; }
   button, a.btn { font: inherit; border-radius: 10px; border: 1px solid var(--boton); padding: 9px 14px; cursor: pointer;
     text-decoration: none; display: inline-block; min-height: 44px; }
@@ -46,14 +46,19 @@
   .aviso { margin: 0 0 10px; padding: 8px 10px; border-radius: 8px; background: var(--aviso-fondo); color: var(--aviso); font-size: 14px; }
   .nota { margin: 0 0 10px; font-size: 14px; color: var(--suave); }
   .vacio { text-align: center; color: var(--suave); padding: 32px 8px; }
+  .iniciativa { display: block; width: 100%; text-align: left; font-size: 19px; font-weight: 700; padding: 18px 16px; margin: 0 0 10px;
+    background: var(--caja); color: var(--texto); border: 1px solid var(--borde); border-radius: 14px; }
+  .iniciativa small { display: block; font-size: 14px; font-weight: 400; color: var(--suave); margin-top: 2px; }
+  .volver { background: transparent; border: 0; color: var(--texto); padding: 8px 6px; font-weight: 600; }
+  .mas { background: transparent; color: var(--suave); border: 1px dashed var(--borde); width: 100%; }
   h3 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--suave); margin: 18px 6px 8px; }
 </style>
 </head>
 <body>
 <header>
   <div style="flex:1">
-    <h1>Utilo DEV</h1>
-    <p>Elige qué rama probar</p>
+    <h1 id="titulo">Utilo DEV</h1>
+    <p id="subtitulo">Elige la iniciativa</p>
   </div>
   <button class="secundario" id="actualizar" type="button">Actualizar</button>
 </header>
@@ -61,12 +66,18 @@
 <script>
 (function () {
   'use strict';
-  var ULTIMA = 'dev_ramas_ultima'; // la última página abierta en este dispositivo: { carpeta, ruta }
+  // T0441: primero la iniciativa (#utilo, #konamigas); dentro, main siempre y las ramas que la tocan, con sus páginas.
+  var ULTIMA = 'dev_ramas_ultima';           // la última página abierta en este dispositivo: { carpeta, ruta }
+  var ULTIMA_INI = 'dev_ramas_iniciativa';   // la última iniciativa elegida
+  var NOMBRES = { utilo: 'Utilo', konamigas: 'Konamigas' };
   var lista = document.getElementById('lista');
+  var datos = null, verTodas = false;
 
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
-  function leerUltima() { try { return JSON.parse(localStorage.getItem(ULTIMA) || 'null'); } catch (e) { return null; } }
-  function guardarUltima(u) { try { localStorage.setItem(ULTIMA, JSON.stringify(u)); } catch (e) {} }
+  function leer(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function guardar(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function leerUltima() { try { return JSON.parse(leer(ULTIMA) || 'null'); } catch (e) { return null; } }
+  function nombre(ini) { return NOMBRES[ini] || ini.charAt(0).toUpperCase() + ini.slice(1); }
 
   /** «hace 5 min», «hace 3 h», «ayer», «hace 4 días». */
   function hace(iso) {
@@ -79,78 +90,111 @@
     return d === 1 ? 'ayer' : 'hace ' + d + ' días';
   }
 
+  function paginasDe(r, ini) { return (r.paginas || []).filter(function (p) { return p.iniciativa === ini; }); }
+  /** La rama cambia algo de esa iniciativa: lo suyo (clientes/<ini>/, web/<ini>/) o lo común (motor/, núcleo, estilos). */
+  function toca(r, ini) { return (r.toca || []).indexOf(ini) >= 0 || !!r.comun; }
+
   /** Lo que la rama trae de la base frente a lo que tiene cargado el Supabase de DEV de esa iniciativa. */
-  function avisosBase(r, bases, iniciativas) {
-    var out = [];
-    iniciativas.forEach(function (ini) {
-      var suyas = (r.migraciones || {})[ini], b = bases[ini];
-      if (!suyas || !b || !b.migraciones) return;
-      var faltan = suyas.filter(function (m) { return b.migraciones.indexOf(m) < 0; });
-      var sobran = b.migraciones.filter(function (m) { return suyas.indexOf(m) < 0; });
-      var quien = b.rama === r.rama ? 'una versión anterior de esta rama' : 'la de ' + (b.rama || 'otra rama');
-      var nombre = ini.charAt(0).toUpperCase() + ini.slice(1);
-      if (faltan.length) {
-        out.push('<p class="aviso">La base de ' + texto(nombre) + ' en DEV no tiene los cambios de esta rama (ahora está ' + texto(quien) +
-          '). Hay que cargarla con la acción «Supabase» en DEV, rama ' + texto(r.rama) + '.</p>');
-      } else if (sobran.length && (r.toca || []).indexOf(ini) >= 0) { // solo si la rama toca esa iniciativa: si no, da igual
-        out.push('<p class="nota">La base de ' + texto(nombre) + ' en DEV lleva además cambios de ' + texto(b.rama || 'otra rama') + '.</p>');
-      }
-    });
-    return out.join('');
+  function avisoBase(r, ini) {
+    var suyas = (r.migraciones || {})[ini], b = (datos.bases || {})[ini];
+    if (!suyas || !b || !b.migraciones) return '';
+    var faltan = suyas.filter(function (m) { return b.migraciones.indexOf(m) < 0; });
+    var sobran = b.migraciones.filter(function (m) { return suyas.indexOf(m) < 0; });
+    var quien = b.rama === r.rama ? 'una versión anterior de esta rama' : 'la de ' + (b.rama || 'otra rama');
+    if (faltan.length) return '<p class="aviso">La base de ' + texto(nombre(ini)) + ' en DEV no tiene los cambios de esta rama (ahora está ' + texto(quien) +
+      '). Hay que cargarla con la acción «Supabase» en DEV, rama ' + texto(r.rama) + '.</p>';
+    if (sobran.length && (r.toca || []).indexOf(ini) >= 0) return '<p class="nota">La base de ' + texto(nombre(ini)) + ' en DEV lleva además cambios de ' + texto(b.rama || 'otra rama') + '.</p>';
+    return '';
   }
 
-  function tarjeta(carpeta, r, bases) {
-    var paginas = r.paginas || [];
-    var toca = r.toca || [];
-    // primero las páginas de las iniciativas que toca la rama
-    paginas = paginas.slice().sort(function (a, b) { return (toca.indexOf(b.iniciativa) >= 0) - (toca.indexOf(a.iniciativa) >= 0); });
-    var iniciativas = paginas.map(function (p) { return p.iniciativa; }).filter(function (x, i, a) { return x && a.indexOf(x) === i; });
-    var dato = [r.tarea || r.rama, hace(r.fecha), r.pr ? 'PR #' + r.pr : '', r.quien && r.quien !== 'Javi Canela' ? r.quien : '']
-      .filter(Boolean).join(' · ');
-    var botones = paginas.map(function (p) {
-      var marcada = toca.indexOf(p.iniciativa) >= 0 || (!toca.length && r.comun);
-      return '<a class="btn ' + (marcada ? 'principal' : 'secundario') + '" data-carpeta="' + texto(carpeta) + '" data-ruta="' + texto(p.ruta) + '" href="' +
-        encodeURIComponent(carpeta) + '/' + texto(p.ruta) + '">' + texto(p.nombre) + '</a>';
-    }).join('');
-    return '<div class="caja"><h2>' + texto(r.titulo || r.rama) + '</h2><p class="dato">' + texto(dato) + '</p>' +
-      avisosBase(r, bases, iniciativas) +
-      '<div class="botones">' + (botones || '<span class="nota">Esta rama no tiene páginas de DEV.</span>') + '</div></div>';
+  function boton(carpeta, p, principal) {
+    return '<a class="btn ' + (principal ? 'principal' : 'secundario') + '" data-carpeta="' + texto(carpeta) + '" data-ruta="' + texto(p.ruta) + '" href="' +
+      encodeURIComponent(carpeta) + '/' + texto(p.ruta) + '">' + texto(p.nombre) + '</a>';
   }
 
-  function pintar(j) {
-    var ramas = j.ramas || {}, bases = j.bases || {};
-    var claves = Object.keys(ramas).filter(function (c) { return c !== 'main'; })
+  function tarjeta(carpeta, r, ini) {
+    var dato = [r.tarea || r.rama, hace(r.fecha), r.pr ? 'PR #' + r.pr : '', r.quien && r.quien !== 'Javi Canela' ? r.quien : ''].filter(Boolean).join(' · ');
+    var ps = paginasDe(r, ini);
+    return '<div class="caja"><h2>' + texto(r.titulo || r.rama) + '</h2><p class="dato">' + texto(dato) + '</p>' + avisoBase(r, ini) +
+      '<div class="botones">' + (ps.map(function (p) { return boton(carpeta, p, carpeta !== 'main'); }).join('') ||
+        '<span class="nota">Esta rama no tiene páginas de ' + texto(nombre(ini)) + '.</span>') + '</div></div>';
+  }
+
+  /** Las iniciativas con páginas en alguna rama (en el orden de NOMBRES y después las demás). */
+  function iniciativas() {
+    var vistas = {};
+    Object.keys(datos.ramas || {}).forEach(function (c) { (datos.ramas[c].paginas || []).forEach(function (p) { if (p.iniciativa) vistas[p.iniciativa] = 1; }); });
+    return Object.keys(NOMBRES).filter(function (x) { return vistas[x]; }).concat(Object.keys(vistas).filter(function (x) { return !NOMBRES[x]; }).sort());
+  }
+
+  function ramasDe(ini) {
+    var ramas = datos.ramas || {};
+    var todas = Object.keys(ramas).filter(function (c) { return c !== 'main' && paginasDe(ramas[c], ini).length; })
       .sort(function (a, b) { return String(ramas[b].fecha).localeCompare(String(ramas[a].fecha)); });
-    var html = '';
+    return { suyas: todas.filter(function (c) { return toca(ramas[c], ini); }), otras: todas.filter(function (c) { return !toca(ramas[c], ini); }) };
+  }
+
+  function pintarInicio() {
+    document.getElementById('subtitulo').textContent = 'Elige la iniciativa';
+    var inis = iniciativas();
+    if (!inis.length) { lista.innerHTML = '<p class="vacio">No hay ninguna rama subida. Se suben solas al hacer push a una rama T0xxx.</p>'; return; }
+    lista.innerHTML = inis.map(function (ini) {
+      var n = ramasDe(ini).suyas.length;
+      return '<button type="button" class="iniciativa" data-ini="' + texto(ini) + '">' + texto(nombre(ini)) +
+        '<small>' + (n ? n + (n === 1 ? ' rama abierta' : ' ramas abiertas') + ' y main' : 'Solo main') + '</small></button>';
+    }).join('');
+  }
+
+  function pintarIniciativa(ini) {
+    var ramas = datos.ramas || {};
+    document.getElementById('subtitulo').textContent = nombre(ini) + ' · elige qué probar';
+    var html = '<button type="button" class="volver" data-volver="1">← Iniciativas</button>';
     var u = leerUltima();
-    if (u && ramas[u.carpeta]) {
-      var p = (ramas[u.carpeta].paginas || []).filter(function (x) { return x.ruta === u.ruta; })[0];
-      if (p) {
-        html += '<div class="caja seguir"><p class="dato" style="margin-bottom:8px">Lo último que abriste</p>' +
-          '<a class="btn principal" data-carpeta="' + texto(u.carpeta) + '" data-ruta="' + texto(u.ruta) + '" href="' + encodeURIComponent(u.carpeta) + '/' + texto(u.ruta) + '">' +
-          'Seguir con ' + texto(ramas[u.carpeta].tarea || u.carpeta) + ' · ' + texto(p.nombre) + '</a></div>';
-      }
+    var pu = u && ramas[u.carpeta] && paginasDe(ramas[u.carpeta], ini).filter(function (x) { return x.ruta === u.ruta; })[0];
+    if (pu) {
+      html += '<div class="caja seguir"><p class="dato" style="margin-bottom:8px">Lo último que abriste</p>' +
+        boton(u.carpeta, { ruta: u.ruta, nombre: 'Seguir con ' + (ramas[u.carpeta].tarea || u.carpeta) + ' · ' + pu.nombre }, true) + '</div>';
     }
-    html += claves.length ? '<h3>Ramas</h3>' + claves.map(function (c) { return tarjeta(c, ramas[c], bases); }).join('')
-      : '<p class="vacio">No hay ninguna rama subida. Se suben solas al hacer push a una rama T0xxx.</p>';
-    if (ramas.main) html += '<h3>main</h3>' + tarjeta('main', ramas.main, bases);
+    if (ramas.main && paginasDe(ramas.main, ini).length) html += '<h3>main</h3>' + tarjeta('main', ramas.main, ini);
+    var r = ramasDe(ini);
+    html += '<h3>Ramas abiertas</h3>' + (r.suyas.length ? r.suyas.map(function (c) { return tarjeta(c, ramas[c], ini); }).join('')
+      : '<p class="nota" style="margin:0 6px 10px">Ninguna rama abierta cambia ' + texto(nombre(ini)) + '.</p>');
+    if (r.otras.length) {
+      html += verTodas ? '<h3>Otras ramas (no cambian ' + texto(nombre(ini)) + ')</h3>' + r.otras.map(function (c) { return tarjeta(c, ramas[c], ini); }).join('')
+        : '<button type="button" class="mas" data-mas="1">Ver ' + r.otras.length + (r.otras.length === 1 ? ' rama más' : ' ramas más') + ' que no cambian ' + texto(nombre(ini)) + '</button>';
+    }
     lista.innerHTML = html;
+  }
+
+  /** Lo que se ve sale de la dirección (#konamigas); sin ella, la última iniciativa elegida si sigue habiéndola. */
+  function pintar() {
+    if (!datos) return;
+    var ini = decodeURIComponent(location.hash.slice(1));
+    if (ini && iniciativas().indexOf(ini) >= 0) { guardar(ULTIMA_INI, ini); pintarIniciativa(ini); } else pintarInicio();
   }
 
   function cargar() {
     return fetch('ramas.json?t=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(pintar)
+      .then(function (j) { datos = { ramas: j.ramas || {}, bases: j.bases || {} }; pintar(); })
       .catch(function () { lista.innerHTML = '<p class="vacio">No se puede leer la lista de ramas. Comprueba la conexión y toca «Actualizar».</p>'; });
   }
 
   lista.addEventListener('click', function (ev) {
     var a = ev.target.closest('a[data-carpeta]');
-    if (a) guardarUltima({ carpeta: a.getAttribute('data-carpeta'), ruta: a.getAttribute('data-ruta') });
+    if (a) return guardar(ULTIMA, JSON.stringify({ carpeta: a.getAttribute('data-carpeta'), ruta: a.getAttribute('data-ruta') }));
+    var b = ev.target.closest('button');
+    if (!b) return;
+    if (b.getAttribute('data-ini')) { verTodas = false; location.hash = encodeURIComponent(b.getAttribute('data-ini')); }
+    else if (b.getAttribute('data-volver')) { guardar(ULTIMA_INI, ''); history.replaceState(null, '', location.pathname); pintar(); }
+    else if (b.getAttribute('data-mas')) { verTodas = true; pintar(); }
   });
+  window.addEventListener('hashchange', pintar);
   document.getElementById('actualizar').addEventListener('click', cargar);
   // Al volver a la app (desde otra o con «Cambiar»), la lista al día.
   document.addEventListener('visibilitychange', function () { if (!document.hidden) cargar(); });
+  // Al abrir la app sin #, la última iniciativa elegida.
+  if (!location.hash && leer(ULTIMA_INI)) history.replaceState(null, '', '#' + encodeURIComponent(leer(ULTIMA_INI)));
   cargar();
 })();
 </script>
