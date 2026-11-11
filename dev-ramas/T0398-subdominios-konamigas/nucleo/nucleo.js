@@ -219,7 +219,8 @@
           var v = $('n-buzon-ver');
           window.UG.buzon(correo).then(function (ms) {
             v.hidden = false;
-            v.innerHTML = !ms ? '<p class="u-nota">Aquí no hay buzón de pruebas para ' + texto(correo) + ' (solo los correos de prueba, como los de @ejemplo.com).</p>' :
+            v.innerHTML = !ms ? '<p class="u-nota">Aquí no hay buzón de pruebas para ' + texto(correo) + ' (solo los correos de prueba, como los de @ejemplo.com).' +
+                (window.UG.entorno === 'dev' ? ' En DEV, además, solo se lee después de entrar con tu Google en «Entrar como» de la app Utilo DEV.' : '') + '</p>' :
               !ms.length ? '<p class="u-nota">No ha llegado nada a ' + texto(correo) + '. Si el correo no está dado de alta, no se envía ningún código.</p>' :
               '<p class="u-nota">Buzón de pruebas: los correos no salen de verdad.</p><p><strong>' + texto(ms[0].asunto) + '</strong></p><p>' + texto(ms[0].texto).replace(/\n/g, '<br>') + '</p>';
           });
@@ -769,7 +770,7 @@
       Array.prototype.forEach.call(caja.querySelectorAll('[data-n-buzon]'), function (b) {
         b.onclick = function () {
           window.UG.buzon(b.getAttribute('data-n-buzon')).then(function (ms) {
-            aviso2 = !ms ? 'Aquí no hay buzón de pruebas para ese correo.' : !ms.length ? 'No ha llegado nada a ese correo.' : 'Buzón de pruebas: ' + ms[0].asunto;
+            aviso2 = !ms ? 'Aquí no hay buzón de pruebas para ese correo' + (window.UG.entorno === 'dev' ? ' (en DEV, solo después de entrar con tu Google en la app Utilo DEV).' : '.') : !ms.length ? 'No ha llegado nada a ese correo.' : 'Buzón de pruebas: ' + ms[0].asunto;
             pintar(lista);
           });
         };

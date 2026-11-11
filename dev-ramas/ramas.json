@@ -531,10 +531,10 @@
    "tarea": "T0398",
    "titulo": "Los códigos para entrar salen de avisos.konamigas.com por Scaleway",
    "pr": null,
-   "commit": "b2ac223",
-   "ultimo": "T0398: Los códigos para entrar salen de avisos.konamigas.com por Scaleway",
+   "commit": "a1c3e58",
+   "ultimo": "T0398: Trae main (T0456); la migración del correo pasa a 20261111220000 para no chocar con la de DEV cerrado",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T20:14:00.581Z",
+   "fecha": "2026-11-11T21:07:08.996Z",
    "toca": [
     "konamigas",
     "utilo"
@@ -690,7 +690,8 @@
      "20261111120000_ligas_publico.sql",
      "20261111120001_nombre_publico.sql",
      "20261111190000_personas_de_prueba.sql",
-     "20261111210000_correo_enviar.sql"
+     "20261111210000_dev_cerrado.sql",
+     "20261111220000_correo_enviar.sql"
     ],
     "utilo": [
      "20261105150000_latido.sql",
@@ -721,7 +722,8 @@
      "20261111190001_pedir_cambios_tablas.sql",
      "20261111190002_pedir_cambios.sql",
      "20261111200000_avisos_registro.sql",
-     "20261111210000_correo_enviar.sql"
+     "20261111210000_dev_cerrado.sql",
+     "20261111220000_correo_enviar.sql"
     ]
    },
    "rama": "T0398-subdominios-konamigas"
