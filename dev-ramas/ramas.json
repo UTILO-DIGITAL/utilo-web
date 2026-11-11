@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "ae91057",
-   "ultimo": "Merge pull request #287 from UTILO-DIGITAL/T0444-nombrar-todas-funciones-servidor",
+   "commit": "d66db83",
+   "ultimo": "Merge pull request #286 from UTILO-DIGITAL/T0441-paginas-que-carga",
    "quien": "",
-   "fecha": "2026-11-11T13:05:50.869Z",
+   "fecha": "2026-11-11T14:27:50.904Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -16,6 +16,16 @@
      "nombre": "Plataforma",
      "iniciativa": "konamigas",
      "proyecto": "konamigas/plataforma",
+     "carga": [
+      "web/estilos/base.css",
+      "web/kanban4/tablas.js",
+      "web/konamigas/marca.css",
+      "web/konamigas/plataforma/montaje.js",
+      "web/konamigas/secciones/competicion.js",
+      "web/nucleo/acceso-supabase.js",
+      "web/nucleo/nucleo.js",
+      "web/nucleo/supabase.js"
+     ],
      "cambia": true
     },
     {
@@ -23,6 +33,21 @@
      "nombre": "Plataforma",
      "iniciativa": "utilo",
      "proyecto": "utilo/plataforma",
+     "carga": [
+      "web/dev/plataforma/manifest.webmanifest",
+      "web/estilos/base.css",
+      "web/kanban4/tablas.js",
+      "web/nucleo/acceso-supabase.js",
+      "web/nucleo/nucleo.js",
+      "web/nucleo/supabase.js",
+      "web/utilo/icono-180.png",
+      "web/utilo/marca.css",
+      "web/utilo/plataforma/montaje.js",
+      "web/utilo/secciones/bandeja.js",
+      "web/utilo/secciones/entregas.js",
+      "web/utilo/secciones/parami.js",
+      "web/utilo/secciones/tablero.js"
+     ],
      "cambia": true
     },
     {
@@ -30,6 +55,16 @@
      "nombre": "Área de jugadoras",
      "iniciativa": "konamigas",
      "proyecto": "konamigas/area",
+     "carga": [
+      "web/estilos/base.css",
+      "web/kanban4/tablas.js",
+      "web/konamigas/area/montaje.js",
+      "web/konamigas/marca.css",
+      "web/konamigas/secciones/mificha.js",
+      "web/nucleo/acceso-supabase.js",
+      "web/nucleo/nucleo.js",
+      "web/nucleo/supabase.js"
+     ],
      "cambia": true
     },
     {
@@ -37,6 +72,17 @@
      "nombre": "Consulta pública",
      "iniciativa": "konamigas",
      "proyecto": "konamigas/competiciones",
+     "carga": [
+      "web/estilos/base.css",
+      "web/kanban4/tablas.js",
+      "web/konamigas/competiciones/montaje.js",
+      "web/konamigas/icono-180.png",
+      "web/konamigas/icono-192.png",
+      "web/konamigas/marca.css",
+      "web/konamigas/secciones/competicion.js",
+      "web/nucleo/publica-supabase.js",
+      "web/nucleo/supabase.js"
+     ],
      "cambia": true
     }
    ],
