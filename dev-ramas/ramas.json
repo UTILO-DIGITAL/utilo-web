@@ -326,10 +326,10 @@
    "tarea": "T0446",
    "titulo": "La franja de la hora del iPhone, amarilla también en «Probar en DEV»",
    "pr": 290,
-   "commit": "f63f008",
-   "ultimo": "T0446: La franja de la hora del iPhone, amarilla también en «Probar en DEV» y dentro de la app",
+   "commit": "7406987",
+   "ultimo": "T0446: La prueba de «Abrir» espera a que la app acabe (en GitHub, el cifrado de «Yo» tardaba más)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T15:56:38.544Z",
+   "fecha": "2026-11-11T16:01:47.648Z",
    "toca": [],
    "comun": true,
    "paginas": [
