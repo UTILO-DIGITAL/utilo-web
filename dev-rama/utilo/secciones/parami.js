@@ -46,11 +46,11 @@
     }).sort(function (a, b) { return (ms(a.ESTADO_DESDE) - ms(b.ESTADO_DESDE)) || String(a.ID).localeCompare(String(b.ID)); });
   }
 
-  /** Sus primeras n tareas En cola: urgentes delante, prioridad, deadline (sin él, detrás), cuántas desbloquea y por ID. */
+  /** Sus primeras n tareas En cola: prioridad (lo urgente es !!!!, T0319), deadline (sin él, detrás), cuántas desbloquea y por ID. */
   function siguientes(filas, yo, n) {
     if (!yo) return [];
     return (filas || []).filter(function (t) { return t.ESTADO === 'En cola' && t.ASIGNADO === yo; }).sort(function (a, b) {
-      return ((b.URGENTE ? 1 : 0) - (a.URGENTE ? 1 : 0)) || ((P[b.P] || 0) - (P[a.P] || 0)) ||
+      return ((P[b.P] || 0) - (P[a.P] || 0)) ||
         (dia(a.DEADLINE) || '9999').localeCompare(dia(b.DEADLINE) || '9999') ||
         ((Number(b.DESBLOQUEA) || 0) - (Number(a.DESBLOQUEA) || 0)) || String(a.ID).localeCompare(String(b.ID));
     }).slice(0, n == null ? SIGUIENTES : n);
@@ -130,7 +130,10 @@
   var RAIZ = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/utilo\/secciones\/[^/]*$/, '') : '../../'; })();
   var VERSION = (function () { var s = document.currentScript && document.currentScript.src; var m = s && /[?&]v=([^&]+)/.exec(s); return m ? m[1] : '1'; })();
   var ICO_MAPA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14"/><path d="M15 6v14"/></svg>';
-  var ICO_BIEN = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>';
+  // T0319 · Una autónoma: el mismo robot que en la tarjeta del tablero (tablero.js, ICO_AUTO).
+  var ICO_AUTO = '<svg class="tb-auto" viewBox="0 0 24 24" role="img" aria-label="Autónoma"><title>La puede hacer el agente autónomo</title>' +
+    '<rect x="5" y="8" width="14" height="11" rx="2"/><path d="M12 4v4M9 13h.01M15 13h.01M9.5 16.5h5M3 12v3M21 12v3"/></svg>';
+  var ICO_BIEN ='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>';
   var ICO_FUERA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';
   var TI = 'INICIATIVAS';
   var TS = 'BANDEJA'; // T0412: las solicitudes de los clientes
@@ -263,7 +266,7 @@
         var cen = bloque('pm-sig', 'Lo siguiente', 0, si.length ? '<ol class="pm-l">' + si.map(function (t) {
           var dl = dia(t.DEADLINE), q = dl ? diasEntre(hoy, dl) : null;
           return tarjeta(t, 's-ni', '<span class="pm-meta">' +
-            (t.URGENTE ? '<span class="u-chip">Urgente</span>' : '') + (t.AUTONOMA ? '<span class="u-chip" title="La puede hacer el agente autónomo">Autónoma</span>' : '') +
+            (t.AUTONOMA ? ICO_AUTO : '') + // T0319: el robot de la tarjeta del tablero, no una etiqueta más
             '<span class="u-chip" title="Prioridad">' + texto(t.P) + '</span>' + (t.T ? '<span class="u-chip" title="Tamaño">' + texto(t.T) + '</span>' : '') +
             (t.HERRAMIENTA ? '<span class="u-chip pm-herr">' + texto(t.HERRAMIENTA) + '</span>' : '<span class="u-chip pm-sin">Sin herramienta</span>') +
             (dl ? '<span class="pm-dl' + (q < 0 ? ' vencida' : q <= 7 ? ' pronto' : '') + '">para el ' + fechaEs(dl) + '</span>' : '') +

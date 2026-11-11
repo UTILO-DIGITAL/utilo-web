@@ -453,9 +453,9 @@
       el.innerHTML = '<div class="filtros tb-fil">' +
           '<label class="busca"><span class="u-oculto">Buscar un equipo o una jugadora</span><input type="search" id="lg-busca" placeholder="Buscar un equipo o una jugadora" autocomplete="off"></label>' +
           '<button id="lg-fil" class="sec en-filtros" type="button" aria-haspopup="dialog">' + ICO_FILTROS + '<span>Filtros</span><span id="lg-fil-n" class="k-fil-n" hidden></span></button>' +
-        '</div><p class="lg-que" id="lg-que"></p>' +
+        '</div><div class="lg-cuerpo"><p class="lg-viendo" id="lg-viendo"></p>' +
         '<div class="u-pestanas" role="tablist">' + Object.keys(PESTANAS).map(function (p) { return '<button type="button" role="tab" data-tab="' + p + '">' + PESTANAS[p] + '</button>'; }).join('') + '</div>' +
-        '<div id="lg-cont" class="lg-cont"><div class="kz-centro" role="status"><div class="u-carga"></div>' + (pedido ? '<p>Abriendo el partido…</p>' : '') + '</div></div>' +
+        '<div id="lg-cont" class="lg-cont"><div class="kz-centro" role="status"><div class="u-carga"></div>' + (pedido ? '<p>Abriendo el partido…</p>' : '') + '</div></div></div>' +
         '<div id="alta-velo"><form id="alta-form" novalidate></form></div>' +
         '<div class="u-velo" id="lg-velo"><div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="lg-vt"><div class="n-ventana" id="lg-vent"></div></div></div>';
       var $ = function (id) { return el.querySelector('#' + id); };
@@ -545,7 +545,7 @@
         [].forEach.call(el.querySelectorAll('[data-tab]'), function (b) { b.setAttribute('aria-selected', b.getAttribute('data-tab') === S.tab ? 'true' : 'false'); });
         var n = (F.temp && M.tempo && F.temp !== (temporadaActual(M.temp, hoy()) || {}).ID ? 1 : 0) + (F.liga ? 1 : 0) + (F.mios ? 1 : 0), fn = $('lg-fil-n');
         fn.textContent = n ? String(n) : ''; fn.hidden = !n;
-        $('lg-que').textContent = !M.tempo ? '' : (M.todas ? 'Todas las ligas' : M.actual ? ligaCompleta(M.actual.liga.ID) : 'Sin ligas') + ' · ' + M.tempo.NOMBRE + (F.mios && staff.yo && S.tab === 'PARTIDOS' ? ' · solo mis partidos' : '');
+        $('lg-viendo').textContent = !M.tempo ? '' : (M.todas ? 'Todas las ligas' : M.actual ? ligaCompleta(M.actual.liga.ID) : 'Sin ligas') + ' · ' + M.tempo.NOMBRE + (F.mios && staff.yo && S.tab === 'PARTIDOS' ? ' · solo mis partidos' : '');
         if (!M.tempo) { cont.innerHTML = '<p class="u-vacio">Todavía no hay temporadas.</p>'; return; }
         if (!M.actual) { cont.innerHTML = '<p class="u-vacio">Esta temporada todavía no tiene ligas.</p>'; return; }
         cont.innerHTML = ({ PARTIDOS: htmlPartidos, CLASIFICACION: htmlClasificacion, GOLEADORAS: htmlGoleadoras })[S.tab]();

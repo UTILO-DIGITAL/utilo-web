@@ -421,11 +421,11 @@
           '<div class="campo"><label class="lab" for="bjp-t-tit">Título</label><input type="text" id="bjp-t-tit" autocomplete="off" required value="' + texto(tit) + '">' +
             '<div class="ayuda"><span class="contador" data-cuenta>' + tit.length + ' / ' + TITULO_MAX + '</span> · <span id="bjp-t-verbo">Qué se entrega, empezando por un verbo: «Arreglar…», «Añadir…».</span></div></div>' +
           '<div class="campo"><label class="lab" for="bjp-t-epi">Épica</label><input type="text" id="bjp-t-epi" autocomplete="off" value="CLIENTES"></div>' +
-          '<div class="bjp-dos"><div class="campo"><label class="lab" for="bjp-t-p">Prioridad</label><select id="bjp-t-p">' + opciones(['!', '!!', '!!!', '!!!!'], s.URGENTE ? '!!!' : '!!') + '</select></div>' +
+          '<div class="bjp-dos"><div class="campo"><label class="lab" for="bjp-t-p">Prioridad</label><select id="bjp-t-p">' + opciones(['!', '!!', '!!!', '!!!!'], s.URGENTE ? '!!!!' : '!!') + '</select></div>' +
           '<div class="campo"><label class="lab" for="bjp-t-t">Tamaño</label><select id="bjp-t-t">' + opciones(['XS', 'S', 'M', 'L', 'XL'], 'S') + '</select></div></div>' +
           '<div class="bjp-dos"><div class="campo"><label class="lab" for="bjp-t-a">La lleva</label><select id="bjp-t-a">' + opciones(gente, yo) + '</select></div>' +
           '<div class="campo"><label class="lab" for="bjp-t-h">Herramienta <span class="opc">(opcional)</span></label><select id="bjp-t-h"><option value="">Sin decir</option>' + opciones(HERRAMIENTAS, '') + '</select></div></div>' +
-          '<p class="ayuda">En ' + texto(cliente(s.INICIATIVA)) + '. Lo que pide el cliente va tal cual en «Qué hay que hacer»' + (s.ENLACE ? ', con su captura' : '') + (s.URGENTE ? '; urgente, como lo pidió' : '') + '.</p>' +
+          '<p class="ayuda">En ' + texto(cliente(s.INICIATIVA)) + '. Lo que pide el cliente va tal cual en «Qué hay que hacer»' + (s.ENLACE ? ', con su captura' : '') + (s.URGENTE ? '; la pidió urgente: va con !!!!, delante de todo' : '') + '.</p>' +
           '</div><div id="alta-error" role="alert"></div>' +
           '<div class="botones"><button type="button" class="sec" data-cancelar-alta>Cancelar</button><button type="submit" class="pri">Crear la tarea</button></div>';
         abrirVelo();
