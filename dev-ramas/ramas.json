@@ -349,9 +349,9 @@
    ]
   },
   "utilo": {
-   "rama": "main y las ramas abiertas",
-   "commit": "9fb62b2",
-   "fecha": "2026-11-11T18:15:08.810Z",
+   "rama": "main",
+   "commit": "774ef77",
+   "fecha": "2026-11-11T18:28:10.751Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
