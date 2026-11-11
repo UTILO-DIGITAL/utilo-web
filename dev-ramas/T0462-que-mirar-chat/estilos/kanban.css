@@ -543,6 +543,11 @@ body.ver-entregas .filtros, body.ver-entregas #tablero, body.ver-entregas .bj { 
 .u .fcl-no { color: var(--color-suave); }
 .u .fcl-b { display: flex; flex-wrap: wrap; gap: var(--e2); }
 .u .fcl-b .tb-auto { width: 18px; height: 18px; }
+/* T0440 · Aprobar, en la ficha de una tarea Para revisar: su PR (cómo está) y el botón. */
+.u .fap { border-left-color: var(--estado-co); }
+.u .fap.fcl-off { border-left-color: var(--estado-pr); }
+.u .fap-prs { margin: 0 0 var(--e2); padding-left: 1.2em; }
+.u .fap-prs li { margin: 0 0 var(--e1); }
 .u .bloque ul { margin: 2px 0; padding-left: 18px; }
 /* T0420 · Qué hay que hacer y Conclusiones, por partes: una frase por línea, apartados con su título, listas y el «está bien hecho cuando» aparte */
 .u .bloque .fx { line-height: 1.5; max-width: 72ch; }
