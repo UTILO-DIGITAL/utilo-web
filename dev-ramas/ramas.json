@@ -4,10 +4,10 @@
    "tarea": "T0441",
    "titulo": "App «Utilo DEV» en el móvil con selector de ramas, una carpeta por rama",
    "pr": null,
-   "commit": "6f0a540",
-   "ultimo": "T0441: En el selector, el título del primer commit de la rama, main sin autor y la cabecera siempre amarilla",
+   "commit": "e09093e",
+   "ultimo": "T0441: El selector, primero por iniciativa (main siempre y sus ramas abiertas), y las páginas como Plataforma y Área de jugadoras",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T11:18:25.833Z",
+   "fecha": "2026-11-11T11:29:30.752Z",
    "toca": [
     "konamigas",
     "utilo"
@@ -16,17 +16,17 @@
    "paginas": [
     {
      "ruta": "dev/area/",
-     "nombre": "Área Konamigas",
+     "nombre": "Área de jugadoras",
      "iniciativa": "konamigas"
     },
     {
      "ruta": "dev/konamigas/",
-     "nombre": "Konamigas",
+     "nombre": "Plataforma",
      "iniciativa": "konamigas"
     },
     {
      "ruta": "dev/plataforma/",
-     "nombre": "Utilo",
+     "nombre": "Plataforma",
      "iniciativa": "utilo"
     }
    ],
