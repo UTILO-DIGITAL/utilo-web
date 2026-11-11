@@ -529,6 +529,14 @@ body.ver-entregas .filtros, body.ver-entregas #tablero, body.ver-entregas .bj { 
 .u .fresp textarea { width: 100%; min-height: 44px; padding: var(--e2) var(--e3); border: 1.5px solid var(--color-borde-campo); border-radius: var(--radio);
   background: var(--color-superficie); color: var(--color-texto); font: inherit; resize: vertical; box-sizing: border-box; }
 .u .fresp .pie { display: flex; justify-content: flex-end; }
+/* T0439 · «Que lo haga Claude» en la ficha: lanzar el agente autónomo con esta tarea, o por qué no puede */
+.u .fcl { border-left: 4px solid var(--estado-ec); }
+.u .fcl.fcl-off { border-left-color: var(--color-borde-campo); }
+.u .fcl p { margin: 0 0 var(--e2); }
+.u .fcl p:last-child { margin-bottom: 0; }
+.u .fcl-no { color: var(--color-suave); }
+.u .fcl-b { display: flex; flex-wrap: wrap; gap: var(--e2); }
+.u .fcl-b .tb-auto { width: 18px; height: 18px; }
 .u .bloque ul { margin: 2px 0; padding-left: 18px; }
 /* T0420 · Qué hay que hacer y Conclusiones, por partes: una frase por línea, apartados con su título, listas y el «está bien hecho cuando» aparte */
 .u .bloque .fx { line-height: 1.5; max-width: 72ch; }

@@ -1,6 +1,13 @@
 {
-  "version": "5.19-1.17",
+  "version": "5.20-1.18",
   "versiones": [
+    {
+      "v": "5.20-1.18",
+      "fecha": "11/11/2026",
+      "novedades": [
+        "En la ficha de una tarea, «Que lo haga Claude» se la pasa al agente sin salir de la plataforma y, si no puede hacerla, dice por qué."
+      ]
+    },
     {
       "v": "5.19-1.17",
       "fecha": "11/11/2026",

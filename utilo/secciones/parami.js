@@ -139,8 +139,6 @@
   var TS = 'BANDEJA'; // T0412: las solicitudes de los clientes
   /** Días que una tarea puede esperar sin que se marque: el plan avisa si nadie revisa en 3 días. */
   var DIAS_ANTIGUA = 3;
-  /** La acción «Autónomo» en GitHub (Run workflow, con la tarea). En el móvil, en el navegador con la versión de escritorio. */
-  var AUTONOMO = 'https://github.com/UTILO-DIGITAL/utilo-apps/actions/workflows/autonomo.yml';
 
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function fechaEs(s) { var m = /^(\d{4})-(\d\d)-(\d\d)/.exec(String(s || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; }
@@ -229,8 +227,8 @@
           cifra(r.vencidas ? 'pm-avisos' : 'pm-sig', r.enCurso, 'en curso', r.vencidas ? '<span class="pm-mal">' + uno(r.vencidas, 'vencida', 'vencidas') + '</span>' : '', r.vencidas ? ' pm-cifra-bl' : '') +
           cifra('pm-sig', r.enCola, 'en tu cola', r.autonomas ? uno(r.autonomas, 'autónoma', 'autónomas') : '') + '</div>';
         if (lanzarId) h += '<div class="pm-lanzar" role="status"><p><b>' + texto(lanzarId) + '</b> vuelve a la cola y es autónoma. Para que el agente la haga ya, ' +
-          'lanza «Autónomo» en GitHub («Run workflow», con ' + texto(lanzarId) + '); si no, espera a que alguien la empiece.</p>' +
-          '<div class="pm-lanzar-b"><a class="u-btn" href="' + AUTONOMO + '" target="_blank" rel="noopener">Lanzar Autónomo</a>' +
+          'pulsa «Que lo haga Claude» en su ficha; si no, espera a que alguien la empiece.</p>' +
+          '<div class="pm-lanzar-b"><a class="u-btn" href="?s=tablero&amp;t=' + encodeURIComponent(lanzarId) + '" data-sx="TABLERO">Abrir la ficha</a>' +
           '<button type="button" class="u-btn u-btn-texto" data-lanzar-no>Ahora no</button></div></div>';
 
         // T0412 · Las solicitudes de los clientes, delante: lo que pide un cliente lleva su tiempo esperando.
