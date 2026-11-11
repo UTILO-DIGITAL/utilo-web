@@ -518,6 +518,200 @@
     ]
    },
    "rama": "T0449-pedir-cambios"
+  },
+  "T0452-recargar-dev-copia-produccion": {
+   "tarea": "T0452",
+   "titulo": "El Supabase de DEV se recarga cada noche con main y las ramas abiertas (copia de producción preparada, apagada)",
+   "pr": null,
+   "commit": "b335eb8",
+   "ultimo": "T0452: El Supabase de DEV se recarga cada noche con main y las ramas abiertas (copia de producción preparada, apagada)",
+   "quien": "Javi Canela",
+   "fecha": "2026-11-11T17:54:18.591Z",
+   "toca": [
+    "konamigas",
+    "utilo"
+   ],
+   "comun": false,
+   "paginas": [
+    {
+     "ruta": "dev/konamigas/",
+     "nombre": "Plataforma",
+     "iniciativa": "konamigas",
+     "proyecto": "konamigas/plataforma",
+     "carga": [
+      "web/estilos/base.css",
+      "web/kanban4/tablas.js",
+      "web/konamigas/marca.css",
+      "web/konamigas/plataforma/montaje.js",
+      "web/konamigas/secciones/competicion.js",
+      "web/nucleo/acceso-supabase.js",
+      "web/nucleo/nucleo.js",
+      "web/nucleo/supabase.js"
+     ],
+     "clave": "dev-konamigas-plataforma",
+     "supabase": {
+      "url": "https://bizkhbuahaqmxmlrdios.supabase.co",
+      "clave": "sb_publishable_-7pWx7lxVtCygyO-hYLhOA_IfA_xCLF",
+      "nombre": "konamigas-dev"
+     },
+     "perfiles": [
+      "admin",
+      "socio",
+      "gestor",
+      "arbitro",
+      "capitana",
+      "jugadora"
+     ],
+     "entrar": [
+      "google",
+      "codigo"
+     ],
+     "cambia": true
+    },
+    {
+     "ruta": "dev/plataforma/",
+     "nombre": "Plataforma",
+     "iniciativa": "utilo",
+     "proyecto": "utilo/plataforma",
+     "carga": [
+      "web/dev/plataforma/manifest.webmanifest",
+      "web/estilos/base.css",
+      "web/kanban4/tablas.js",
+      "web/nucleo/acceso-supabase.js",
+      "web/nucleo/nucleo.js",
+      "web/nucleo/supabase.js",
+      "web/utilo/icono-180.png",
+      "web/utilo/marca.css",
+      "web/utilo/plataforma/montaje.js",
+      "web/utilo/secciones/bandeja.js",
+      "web/utilo/secciones/entregas.js",
+      "web/utilo/secciones/parami.js",
+      "web/utilo/secciones/tablero.js"
+     ],
+     "clave": "dev-plataforma",
+     "supabase": {
+      "url": "https://wpjcdszlkzxbmqkqyjsn.supabase.co",
+      "clave": "sb_publishable_bKp5qCd6Gk5NaToFOz0Wig_dKxkLaKV",
+      "nombre": "utilo-dev"
+     },
+     "perfiles": [
+      "admin",
+      "responsable",
+      "colaborador",
+      "lector"
+     ],
+     "entrar": [
+      "google"
+     ],
+     "cambia": true
+    },
+    {
+     "ruta": "dev/area/",
+     "nombre": "Área de jugadoras",
+     "iniciativa": "konamigas",
+     "proyecto": "konamigas/area",
+     "carga": [
+      "web/estilos/base.css",
+      "web/kanban4/tablas.js",
+      "web/konamigas/area/montaje.js",
+      "web/konamigas/marca.css",
+      "web/konamigas/secciones/mificha.js",
+      "web/nucleo/acceso-supabase.js",
+      "web/nucleo/nucleo.js",
+      "web/nucleo/supabase.js"
+     ],
+     "clave": "dev-area",
+     "supabase": {
+      "url": "https://bizkhbuahaqmxmlrdios.supabase.co",
+      "clave": "sb_publishable_-7pWx7lxVtCygyO-hYLhOA_IfA_xCLF",
+      "nombre": "konamigas-dev"
+     },
+     "perfiles": [
+      "admin",
+      "socio",
+      "gestor",
+      "arbitro",
+      "capitana",
+      "jugadora"
+     ],
+     "entrar": [
+      "codigo",
+      "google"
+     ],
+     "cambia": true
+    },
+    {
+     "ruta": "dev/konamigas/competiciones/",
+     "nombre": "Consulta pública",
+     "iniciativa": "konamigas",
+     "proyecto": "konamigas/competiciones",
+     "carga": [
+      "web/estilos/base.css",
+      "web/kanban4/tablas.js",
+      "web/konamigas/competiciones/montaje.js",
+      "web/konamigas/icono-180.png",
+      "web/konamigas/icono-192.png",
+      "web/konamigas/marca.css",
+      "web/konamigas/secciones/competicion.js",
+      "web/nucleo/publica-supabase.js",
+      "web/nucleo/supabase.js"
+     ],
+     "clave": "dev-konamigas-competiciones",
+     "supabase": {
+      "url": "https://bizkhbuahaqmxmlrdios.supabase.co",
+      "clave": "sb_publishable_-7pWx7lxVtCygyO-hYLhOA_IfA_xCLF",
+      "nombre": "konamigas-dev"
+     },
+     "publica": true,
+     "cambia": true
+    }
+   ],
+   "migraciones": {
+    "konamigas": [
+     "20261105150000_latido.sql",
+     "20261105170000_acceso.sql",
+     "20261106210905_esquema.sql",
+     "20261106211000_reglas.sql",
+     "20261107122414_personas.sql",
+     "20261107123000_roles.sql",
+     "20261107175900_correos.sql",
+     "20261107175950_codigo.sql",
+     "20261107180000_ligas.sql",
+     "20261110140000_ligas_resumen.sql",
+     "20261110170000_ligas_pantalla.sql",
+     "20261111120000_ligas_publico.sql",
+     "20261111120001_nombre_publico.sql",
+     "20261111190000_personas_de_prueba.sql"
+    ],
+    "utilo": [
+     "20261105150000_latido.sql",
+     "20261105170000_acceso.sql",
+     "20261105174008_gestion_tablas.sql",
+     "20261105174009_gestion.sql",
+     "20261105180000_gestion_espera.sql",
+     "20261106090000_gestion_herramientas.sql",
+     "20261106210628_tareas_orden.sql",
+     "20261106210700_gestion_orden.sql",
+     "20261107100000_gestion_chats.sql",
+     "20261107160000_tablero_para_mi.sql",
+     "20261107170000_gestion_responder.sql",
+     "20261107170001_bitacora_entregas.sql",
+     "20261107170100_gestion_entregas.sql",
+     "20261107175900_correos.sql",
+     "20261107190000_entregas_en_directo.sql",
+     "20261109200149_solicitudes_tabla.sql",
+     "20261109200150_solicitudes.sql",
+     "20261109230350_mensajes_tabla.sql",
+     "20261109230351_mensajes.sql",
+     "20261110120000_entregas_solas.sql",
+     "20261110180000_avisos.sql",
+     "20261110200000_tareas_sin_urgente.sql",
+     "20261111120000_avisos_preguntas.sql",
+     "20261111150000_lanzar_autonomo.sql",
+     "20261111190000_personas_de_prueba.sql"
+    ]
+   },
+   "rama": "T0452-recargar-dev-copia-produccion"
   }
  },
  "bases": {
