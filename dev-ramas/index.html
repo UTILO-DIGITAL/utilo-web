@@ -70,6 +70,7 @@
   var ULTIMA = 'dev_ramas_ultima';           // la última página abierta en este dispositivo: { carpeta, ruta }
   var ULTIMA_INI = 'dev_ramas_iniciativa';   // la última iniciativa elegida
   var NOMBRES = { utilo: 'Utilo', konamigas: 'Konamigas' };
+  var VERSION = '129443cb81';               // la pone dev-ramas.js selector; ramas.json dice la publicada
   var lista = document.getElementById('lista');
   var datos = null, verTodas = false;
 
@@ -176,7 +177,14 @@
   function cargar() {
     return fetch('ramas.json?t=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function (j) { datos = { ramas: j.ramas || {}, bases: j.bases || {} }; pintar(); })
+      .then(function (j) {
+        // El móvil guarda la página 10 minutos: si hay un selector más nuevo, se carga con otra dirección (no la guardada).
+        if (j.selector && j.selector !== VERSION && VERSION.indexOf('__') && location.search.indexOf('v=' + j.selector) < 0) {
+          location.replace(location.pathname + '?v=' + j.selector + location.hash);
+          return;
+        }
+        datos = { ramas: j.ramas || {}, bases: j.bases || {} }; pintar();
+      })
       .catch(function () { lista.innerHTML = '<p class="vacio">No se puede leer la lista de ramas. Comprueba la conexión y toca «Actualizar».</p>'; });
   }
 
