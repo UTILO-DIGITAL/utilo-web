@@ -333,10 +333,10 @@
    "tarea": "T0440",
    "titulo": "Aprobar una tarea fusiona su PR, y «Por publicar» en su columna",
    "pr": 298,
-   "commit": "28b4dda",
-   "ultimo": "T0440: Trae main (T0450); Aprobar, debajo de «Qué mirar» en la ficha y en DEV",
+   "commit": "ca17724",
+   "ultimo": "T0440: La migración de Aprobar, con un número que no choca con la de T0398",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T21:10:12.718Z",
+   "fecha": "2026-11-11T21:25:33.430Z",
    "toca": [
     "konamigas",
     "utilo"
@@ -526,7 +526,7 @@
      "20261111200001_revision_dev_tablas.sql",
      "20261111200002_revision_dev.sql",
      "20261111210000_dev_cerrado.sql",
-     "20261111220000_aprobar.sql"
+     "20261111230000_aprobar.sql"
     ]
    },
    "rama": "T0440-aprobar-y-fusionar"
