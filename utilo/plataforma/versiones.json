@@ -1,6 +1,13 @@
 {
-  "version": "5.18-1.15",
+  "version": "5.18-1.16",
   "versiones": [
+    {
+      "v": "5.18-1.16",
+      "fecha": "11/11/2026",
+      "novedades": [
+        "El robot de las tareas autónomas sale también en las ya entregadas, así se ven al filtrar por autónomas."
+      ]
+    },
     {
       "v": "5.18-1.15",
       "fecha": "11/11/2026",

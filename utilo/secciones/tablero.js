@@ -491,7 +491,7 @@
           [t.ESTADO].concat(pasos).map(function (e) { return '<option' + (e === t.ESTADO ? ' selected' : '') + '>' + texto(e) + '</option>'; }).join('') + '</select></div>' : '';
         return '<div class="card ' + cls(t.ESTADO) + '-b' + (t._pendiente ? ' guardando' : '') + '"' + (puede && !TACTIL ? ' draggable="true"' : '') + ' data-id="' + texto(id) + '">' +
           '<a class="card-link" href="?s=' + texto(ctx.id.toLowerCase()) + '&amp;t=' + encodeURIComponent(id) + '" data-abrir="' + texto(id) + '">' +
-          '<div class="top"><span class="id">' + (id ? texto(id) : 'Creando…') + (t.AUTONOMA && CERRADOS.indexOf(t.ESTADO) < 0 ? ICO_AUTO : '') + '</span>' +
+          '<div class="top"><span class="id">' + (id ? texto(id) : 'Creando…') + (t.AUTONOMA ? ICO_AUTO : '') /* también en las cerradas: si no, con el filtro de autónomas no se ve en ninguna (Javi) */ + '</span>' +
           (t.ENTREGA_CORTA ? '<span class="u-chip" title="Entrega">' + texto(t.ENTREGA_CORTA) + '</span>' : '') + (t._pendiente ? '<span class="u-chip">Guardando</span>' : '') + '</div>' +
           '<div class="t">' + texto(t.TITULO) + '</div>' +
           (m.length ? '<div class="m">' + texto(m.join(' · ')) + '</div>' : '') + x.join('') + '</a>' + mover + '</div>';
