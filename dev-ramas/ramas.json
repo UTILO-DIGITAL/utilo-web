@@ -757,9 +757,9 @@
    ]
   },
   "utilo": {
-   "rama": "T0450-revision-con-dev",
-   "commit": "ada89a6",
-   "fecha": "2026-11-11T19:57:37.099Z",
+   "rama": "T0398-subdominios-konamigas",
+   "commit": "a1c3e58",
+   "fecha": "2026-11-11T21:10:33.187Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
@@ -791,7 +791,8 @@
     "20261111200000_avisos_registro.sql",
     "20261111200001_revision_dev_tablas.sql",
     "20261111200002_revision_dev.sql",
-    "20261111210000_dev_cerrado.sql"
+    "20261111210000_dev_cerrado.sql",
+    "20261111220000_correo_enviar.sql"
    ]
   }
  },
