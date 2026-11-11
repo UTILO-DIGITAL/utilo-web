@@ -248,9 +248,13 @@
   }
 
   /** En DEV, la banda «DEV · rama · commit · modo» (la misma que DEV.gs del motor: colores fijos, solo en DEV). */
+  // T0441: en dev-ramas/<rama>/, «Cambiar» vuelve al selector de ramas (dev-ramas/, la app «Utilo DEV»).
   function bandaDev(t) {
+    var sel = (/^(.*\/dev-ramas\/)[^/]+\//.exec(location.pathname) || [])[1];
     return t ? '<div role="status" style="position:sticky;top:0;z-index:99999;padding:6px 12px;font:600 13px/1.35 system-ui,sans-serif;text-align:center;' +
-      'color:#1C1C1C;background:#FFE08A;border-bottom:2px solid #B88A00;overflow-wrap:anywhere">' + texto(t) + '</div>' : '';
+      'color:#1C1C1C;background:#FFE08A;border-bottom:2px solid #B88A00;overflow-wrap:anywhere">' + texto(t) +
+      (sel ? ' <a href="' + texto(sel) + '" style="margin-left:8px;padding:2px 10px;border:1px solid #1C1C1C;border-radius:8px;color:#1C1C1C;text-decoration:none;white-space:nowrap">Cambiar</a>' : '') +
+      '</div>' : '';
   }
 
   /* ---------- el marco ---------- */
@@ -373,7 +377,7 @@
 
   /* ---------- T0283 · versión y novedades ---------- */
 
-  // La última versión cuyas novedades se han visto aquí. DEV (dev-rama/) comparte dirección con producción: va aparte.
+  // La última versión cuyas novedades se han visto aquí. DEV (dev-rama/, dev-ramas/) comparte dirección con producción: va aparte.
   function vista() { return 'nucleo_version_vista_' + (cred && cred.dev ? 'dev_' : '') + (C.clave || 'negocio'); }
   function leerVista() { try { return localStorage.getItem(vista()); } catch (e) { return null; } }
   function marcarVista() { var v = cred && cred.versiones && cred.versiones[0]; if (v) try { localStorage.setItem(vista(), v.v); } catch (e) {} }

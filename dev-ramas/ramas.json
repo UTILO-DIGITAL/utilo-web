@@ -4,27 +4,33 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "f31b4e6",
-   "ultimo": "Merge pull request #279 from UTILO-DIGITAL/T0437-responder-desde-plataforma",
+   "commit": "79c9613",
+   "ultimo": "Merge pull request #281 from UTILO-DIGITAL/T0441-dev-ramas-movil",
    "quien": "",
-   "fecha": "2026-11-11T11:18:28.641Z",
+   "fecha": "2026-11-11T12:08:05.297Z",
    "toca": [],
    "comun": false,
    "paginas": [
     {
-     "ruta": "dev/area/",
-     "nombre": "Konamigas",
-     "iniciativa": "konamigas"
-    },
-    {
      "ruta": "dev/konamigas/",
-     "nombre": "Konamigas",
-     "iniciativa": "konamigas"
+     "nombre": "Plataforma",
+     "iniciativa": "konamigas",
+     "proyecto": "konamigas/plataforma",
+     "cambia": true
     },
     {
      "ruta": "dev/plataforma/",
-     "nombre": "Utilo",
-     "iniciativa": "utilo"
+     "nombre": "Plataforma",
+     "iniciativa": "utilo",
+     "proyecto": "utilo/plataforma",
+     "cambia": true
+    },
+    {
+     "ruta": "dev/area/",
+     "nombre": "Área de jugadoras",
+     "iniciativa": "konamigas",
+     "proyecto": "konamigas/area",
+     "cambia": true
     }
    ],
    "migraciones": {
@@ -64,12 +70,12 @@
      "20261110120000_entregas_solas.sql",
      "20261110180000_avisos.sql",
      "20261110200000_tareas_sin_urgente.sql",
-     "20261111120000_avisos_preguntas.sql"
+     "20261111120000_avisos_preguntas.sql",
+     "20261111150000_lanzar_autonomo.sql"
     ]
    },
    "rama": "main"
   }
  },
- "bases": {},
- "selector": "a5d3949ad2"
+ "bases": {}
 }

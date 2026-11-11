@@ -289,7 +289,33 @@
       return '<div class="fx-parte' + (x.anadido ? ' fx-anadido' : '') + '">' + tit + h + '</div>';
     }).join('');
   }
-  var CALC = { frases: frases, numerada: numerada, partesTexto: partesTexto, htmlTexto: htmlTexto, conEnlaces: conEnlaces };
+  /**
+   * T0439 · «Que lo haga Claude»: por qué el agente autónomo no puede coger esta tarea, con las palabras de la base
+   * (preparar_autonomo, que es la que manda y además mira la fase y el tope de 3 por revisar). [] si, por lo que se ve aquí,
+   * puede. o: { yo (persona), deps: [{ id, estado }] (las que espera, las que se sepan), hoy (aaaa-mm-dd), nombre(persona) }.
+   * El tamaño M lo deja pasar: depende de la fase, que sabe la función del servidor.
+   */
+  function motivoClaude(t, o) {
+    o = o || {};
+    var m = [], est = t.ESTADO, desde = String(t.DISPONIBLE_DESDE || '').slice(0, 10);
+    var faltan = (o.deps || []).filter(function (d) { return CERRADOS.indexOf(d.estado) < 0; }).map(function (d) { return d.id; });
+    if (est !== 'En cola') {
+      m.push(est === 'Esperando' && faltan.length ? 'espera a ' + faltan.join(', ')
+        : est === 'Esperando' && desde && o.hoy && desde > o.hoy ? 'no se puede empezar hasta el ' + desde.split('-').reverse().join('/')
+        : CERRADOS.indexOf(est) >= 0 ? 'está cerrada (' + est + ')'
+        : 'está ' + est + ': el agente solo coge las que están En cola');
+    }
+    if (!t.HERRAMIENTA) m.push('no tiene herramienta: el agente solo hace las de Claude Code');
+    else if (t.HERRAMIENTA !== 'Claude Code') m.push('se hace con ' + t.HERRAMIENTA + ': el agente solo hace las de Claude Code');
+    if (!t.T) m.push('no tiene tamaño');
+    else if (['XS', 'S', 'M'].indexOf(t.T) < 0) m.push('es ' + t.T + ': el agente solo hace XS y S (y M desde la fase 3)');
+    if (o.yo && t.ASIGNADO && t.ASIGNADO !== o.yo) m.push('está asignada a ' + ((o.nombre && o.nombre(t.ASIGNADO)) || 'otra persona') + ': el agente solo hace las tuyas');
+    return m;
+  }
+  /** Con qué estados sale «Que lo haga Claude» en la ficha: los de antes de empezar (en los demás ya la lleva alguien o está hecha). */
+  var ANTES_DE_EMPEZAR = ['Esperando', 'En cola', 'Necesita tu respuesta', 'Bloqueada', 'Aplazada'];
+
+  var CALC = { frases: frases, numerada: numerada, partesTexto: partesTexto, htmlTexto: htmlTexto, conEnlaces: conEnlaces, motivoClaude: motivoClaude, ANTES_DE_EMPEZAR: ANTES_DE_EMPEZAR };
   // En las pruebas (node, sin navegador), solo las cuentas.
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
@@ -1055,11 +1081,61 @@
         ctx.llamar('responder', [{ tarea: id, texto: txt }]).then(function (estado) {
           delete respuestas[id];
           if (ctx.abierta()) ctx.aviso('Respondida: ' + id + ' vuelve a ' + (typeof estado === 'string' && estado ? estado : 'la cola') + '.' +
-            (auto && estado === 'En cola' ? ' Es autónoma: lanza «Autónomo» en GitHub para que siga.' : ''));
+            (auto && estado === 'En cola' ? ' Es autónoma: pulsa «Que lo haga Claude» para que siga.' : ''));
           return Promise.all([ctx.tablas.refrescar([T], true), abiertaId === id ? bitacora(id, true) : null]);
         }, function (e) {
           if (ctx.abierta()) ctx.aviso('No se ha enviado la respuesta: ' + String(e.message).replace(/^\w+:\s*/, ''));
           b.disabled = false; b.textContent = 'Responder';
+        }).then(function () { if (ctx.abierta() && abiertaId === id && !ocupado()) pintarFicha(); });
+      }
+
+      /**
+       * T0439 · «Que lo haga Claude»: la marca autónoma y lanza «Autónomo» con ella (la función del servidor lanzar_autonomo,
+       * con la llave de GitHub). Lo lanza quien administra Utilo. En dos pasos: el primero pregunta a la base si el agente la
+       * puede coger (fase, tope y todo lo demás: probar) y el segundo, tras «Lanzar», la lanza. Si no puede, dice por qué.
+       */
+      var claude = {};   // por tarea: { paso: 'comprobando' | 'confirmar' | 'lanzando' | 'lanzada' | 'no', texto, ver, simulada }
+      function puedeClaude(t) { return ctx.admin && !SOLO_LEE && !t._nueva && ANTES_DE_EMPEZAR.indexOf(t.ESTADO) >= 0; }
+      function motivoAqui(t) {
+        var deps = esperaA(String(t.ID)).filter(function (x) { return tarea(x); }).map(function (x) { return { id: x, estado: tarea(x).ESTADO }; });
+        return motivoClaude(t, { yo: ctx.personaId, deps: deps, hoy: hoyISO(), nombre: nombre });
+      }
+      function sinPrefijo(e) { return String((e && e.message) || e).replace(/^\w+:\s*/, ''); }
+      function htmlClaude(t) {
+        var id = String(t.ID), c = claude[id] || {}, no = motivoAqui(t);
+        var bot = function (txt, attr, cls) { return '<button type="button" class="u-btn ' + (cls || '') + '" ' + attr + '>' + txt + '</button>'; };
+        var h = '';
+        if (c.paso === 'lanzada') {
+          h = '<p><b>Lanzada.</b> El agente la coge en un par de minutos, la hace en su rama y te avisa cuando esté para revisar o si tiene una duda.' +
+            (c.simulada ? ' <i>(En local no sale nada hacia GitHub.)</i>' : '') + '</p>' +
+            '<div class="fcl-b"><a class="u-btn u-btn-claro" href="' + texto(c.ver) + '" target="_blank" rel="noopener">Ver en GitHub</a></div>';
+        } else if (no.length || c.paso === 'no') {
+          h = '<p class="fcl-no"><b>Claude no puede hacerla:</b> ' + texto(no.length ? no.join('; ') : c.texto) + '.</p>';
+        } else if (c.paso === 'confirmar' || c.paso === 'lanzando') {
+          h = '<p>' + (t.AUTONOMA ? '' : 'Pasa a autónoma y ') + (t.AUTONOMA ? 'E' : 'e') + 'l agente la hace solo en su rama: la deja en Para revisar con su PR, o te pregunta. ' +
+            'Si cambia algo que se ve, de momento te pregunta antes.</p>' +
+            '<div class="fcl-b">' + bot(c.paso === 'lanzando' ? 'Lanzando…' : 'Lanzar', 'data-claude-si' + (c.paso === 'lanzando' ? ' disabled' : ''), 'u-btn-accion') +
+            (c.paso === 'lanzando' ? '' : bot('Ahora no', 'data-claude-no', 'u-btn-texto')) + '</div>';
+        } else {
+          h = '<div class="fcl-b">' + bot(ICO_AUTO.replace(' role="img" aria-label="Autónoma"', ' aria-hidden="true"').replace(/<title>.*?<\/title>/, '') + (c.paso === 'comprobando' ? 'Comprobando…' : 'Que lo haga Claude'), 'data-claude' + (c.paso === 'comprobando' ? ' disabled' : '')) + '</div>';
+        }
+        return '<div class="bloque fcl' + (no.length || c.paso === 'no' ? ' fcl-off' : '') + '">' + h + '</div>';
+      }
+      function pedirClaude(id, probar) {
+        var c = claude[id] = { paso: probar ? 'comprobando' : 'lanzando' };
+        pintarFicha();
+        return ctx.llamar('lanzar_autonomo', [{ tarea: id, probar: !!probar }]).then(function (r) {
+          if (claude[id] !== c) return;
+          claude[id] = probar ? { paso: 'confirmar' } : { paso: 'lanzada', ver: (r && r.ver) || '', simulada: !!(r && r.simulada) };
+          if (!probar && ctx.abierta()) ctx.aviso(id + ': lanzado el agente autónomo.');
+          if (!probar) return Promise.all([ctx.tablas.refrescar([T], true), abiertaId === id ? bitacora(id, true) : null]);
+        }, function (e) {
+          if (claude[id] !== c) return;
+          var m = sinPrefijo(e), por = /^Claude no puede hacer T\d+: (.*?)\.?$/.exec(m);
+          if (por) { claude[id] = { paso: 'no', texto: por[1] }; return; }
+          delete claude[id];
+          if (ctx.abierta()) ctx.aviso((probar ? 'No se ha podido comprobar: ' : 'No se ha lanzado: ') + m);
+          if (!probar && abiertaId === id) return bitacora(id, true);
         }).then(function () { if (ctx.abierta() && abiertaId === id && !ocupado()) pintarFicha(); });
       }
 
@@ -1079,6 +1155,7 @@
       function abrirFicha(id, sinUrl) {
         if (!tarea(id)) return;
         abiertaId = id; editando = false; cambiando = '';
+        if (claude[id] && claude[id].paso !== 'lanzando') delete claude[id]; // T0439: al volver a abrirla, se comprueba otra vez
         pintarFicha();
         fv.classList.add('abierto');
         document.documentElement.classList.add('fv-abierta');
@@ -1132,6 +1209,9 @@
         if (d && !e.target.closest('a')) { abrirCampo(d.getAttribute('data-ed')); return; }
         if (e.target.closest('[data-editar]')) { editando = true; cambiando = ''; pintarFicha(); return; }
         if (e.target.closest('[data-cancelar]')) { editando = false; pintarFicha(); return; }
+        if (e.target.closest('[data-claude]')) { pedirClaude(abiertaId, true); return; }
+        if (e.target.closest('[data-claude-si]')) { pedirClaude(abiertaId, false); return; }
+        if (e.target.closest('[data-claude-no]')) { delete claude[abiertaId]; pintarFicha(); return; }
         var rb = e.target.closest('[data-responder]');
         if (rb) { var ra = caja.querySelector('#tb-resp'), rt = ra ? ra.value.trim() : ''; if (rt) responder(abiertaId, rt, rb); else if (ra) { ra.focus(); ctx.aviso('Escribe la respuesta antes de enviarla.'); } return; }
         var b = e.target.closest('[data-anotar]');
@@ -1267,6 +1347,7 @@
             (ab('TITULO') ? '<h1 id="kb-f-tit" class="fed-abierto">' + control(t, 'TITULO') + '</h1>' : '<h1 id="kb-f-tit"' + pulsa(t, 'TITULO') + '>' + texto(t.TITULO) + '</h1>') + '</div>' +
           '<div class="fmeta">' + tags.join('') + '</div>' + estado +
           (motivo.length ? '<div class="bloque">' + motivo.join('') + '</div>' : '') +
+          (puedeClaude(t) ? htmlClaude(t) : '') +
           '<div class="datos"><div class="fila"><b>Fechas</b><div class="ffechas">' + fs.join('') + '</div></div></div>' +
           largoFx('DESCRIPCION') +
           (personas.length ? '<div class="bloque"><h3>Personas</h3>' + personas.join('') + '</div>' : '') +
