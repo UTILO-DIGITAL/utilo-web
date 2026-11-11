@@ -4,10 +4,10 @@
    "tarea": "T0441",
    "titulo": "App «Utilo DEV» en el móvil con selector de ramas, una carpeta por rama",
    "pr": null,
-   "commit": "e09093e",
-   "ultimo": "T0441: El selector, primero por iniciativa (main siempre y sus ramas abiertas), y las páginas como Plataforma y Área de jugadoras",
+   "commit": "ccda508",
+   "ultimo": "T0441: El selector se recarga solo cuando hay uno más nuevo (el móvil guarda la página 10 minutos)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-11T11:29:30.752Z",
+   "fecha": "2026-11-11T11:37:31.402Z",
    "toca": [
     "konamigas",
     "utilo"
@@ -141,6 +141,5 @@
    "rama": "main"
   }
  },
- "bases": {},
- "selector": "129443cb81"
+ "bases": {}
 }
