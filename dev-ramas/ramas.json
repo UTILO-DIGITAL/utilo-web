@@ -544,9 +544,9 @@
    ]
   },
   "utilo": {
-   "rama": "T0449-pedir-cambios",
-   "commit": "ddb4eff",
-   "fecha": "2026-11-11T17:55:07.995Z",
+   "rama": "main y las ramas abiertas",
+   "commit": "9fb62b2",
+   "fecha": "2026-11-11T18:15:08.810Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
@@ -574,7 +574,8 @@
     "20261111150000_lanzar_autonomo.sql",
     "20261111190000_personas_de_prueba.sql",
     "20261111190001_pedir_cambios_tablas.sql",
-    "20261111190002_pedir_cambios.sql"
+    "20261111190002_pedir_cambios.sql",
+    "20261111200000_avisos_registro.sql"
    ]
   }
  },
