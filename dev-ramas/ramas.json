@@ -532,9 +532,9 @@
  },
  "bases": {
   "konamigas": {
-   "rama": "T0395-consulta-publica-ligas",
-   "commit": "0663b17",
-   "fecha": "2026-11-11T12:26:00.779Z",
+   "rama": "T0446-app-dev-borde",
+   "commit": "9a7294d",
+   "fecha": "2026-11-11T14:54:53.193Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
@@ -548,7 +548,8 @@
     "20261110140000_ligas_resumen.sql",
     "20261110170000_ligas_pantalla.sql",
     "20261111120000_ligas_publico.sql",
-    "20261111120001_nombre_publico.sql"
+    "20261111120001_nombre_publico.sql",
+    "20261111190000_personas_de_prueba.sql"
    ]
   }
  },
