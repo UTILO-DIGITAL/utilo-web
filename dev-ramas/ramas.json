@@ -523,9 +523,9 @@
  },
  "bases": {
   "konamigas": {
-   "rama": "T0446-app-dev-borde",
-   "commit": "9a7294d",
-   "fecha": "2026-11-11T14:54:53.193Z",
+   "rama": "main y las ramas abiertas",
+   "commit": "9fb62b2",
+   "fecha": "2026-11-11T18:15:03.537Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
