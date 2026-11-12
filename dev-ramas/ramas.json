@@ -337,11 +337,11 @@
   "T0340-anular-partidos-baja": {
    "tarea": "T0340",
    "titulo": "Al dar de baja un equipo, sus partidos pendientes se anulan sin puntos",
-   "pr": null,
-   "commit": "6a94843",
-   "ultimo": "T0340: Al dar de baja un equipo, sus partidos pendientes se anulan sin puntos",
+   "pr": 303,
+   "commit": "31eb698",
+   "ultimo": "T0340: Los partidos por jugar del equipo de baja salen del calendario y su rival descansa",
    "quien": "Javi Canela",
-   "fecha": "2026-11-12T08:54:30.394Z",
+   "fecha": "2026-11-12T09:28:34.947Z",
    "toca": [
     "konamigas"
    ],
