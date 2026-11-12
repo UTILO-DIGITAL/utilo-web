@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Competiciones · Konamigas DEV</title>
+<meta name="dev-ramas" content="Consulta pública"><!-- T0441: su nombre en el selector de la app DEV -->
+<!-- T0395: web de DEV de la consulta pública de Ligas de Konamigas (clientes/konamigas/competiciones de utilo-apps), sin entrar: calendario,
+     resultados, clasificación y goleadoras con la sección Ligas solo para ver (nucleo/publica-supabase.js). Lee con la clave
+     publishable solo lo que la base deja ver sin entrar, sin el robot de Apps Script. T0337 la pondrá en konamigas.com (K7).
+     En utilo-web/dev-rama/ o dev-ramas/<rama>/ (T0441) va al Supabase de DEV (konamigas-dev, con los datos de ejemplo de seed.sql) con el montaje de la rama. montaje.js lo escribe node herramientas/montar.js konamigas/competiciones --web. Iconos, los de konamigas/. -->
+<link rel="apple-touch-icon" href="../../../konamigas/icono-180.png?v=2">
+<link rel="icon" href="../../../konamigas/icono-192.png?v=2">
+<meta name="theme-color" content="#020252">
+<link rel="stylesheet" href="../../../konamigas/marca.css?v=48">
+<link rel="stylesheet" href="../../../estilos/base.css?v=93">
+<style>
+  html, body { overscroll-behavior-x: none; }
+  .pub-dev { position: sticky; top: 0; z-index: 99999; padding: 6px 12px; font: 600 13px/1.35 system-ui, sans-serif; text-align: center;
+    color: #1C1C1C; background: #FFE08A; border-bottom: 2px solid #B88A00; overflow-wrap: anywhere; }
+  .u .pub-cab { align-items: baseline; }
+  .u .pub-marca { font-weight: 700; letter-spacing: .04em; text-transform: uppercase; font-size: 13px; opacity: .85; }
+  .u .n-main { max-width: 1100px; margin: 0 auto; }
+</style>
+<script>
+  window.KANBAN = {
+    clave: 'dev-konamigas-competiciones',
+    marca: 'konamigas',
+    nombreApp: 'Konamigas DEV',
+    supabase: true
+  };
+</script>
+</head>
+<body class="u">
+<div class="kz"><div class="kz-caja kz-centro" role="status"><div class="u-carga"></div><p>Cargando las competiciones…</p></div></div>
+<script src="../../../konamigas/competiciones/montaje.js?v=6f36b07079"></script>
+<script src="../../../kanban4/tablas.js?v=53"></script>
+<script src="../../../nucleo/supabase.js?v=3"></script>
+<script src="../../../nucleo/publica-supabase.js?v=2"></script>
+</body>
+</html>
