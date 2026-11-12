@@ -787,9 +787,9 @@
    ]
   },
   "utilo": {
-   "rama": "main y las ramas abiertas",
-   "commit": "d652960",
-   "fecha": "2026-11-12T11:49:33.981Z",
+   "rama": "T0435-quitar-telegram",
+   "commit": "6985569",
+   "fecha": "2026-11-12T12:23:45.495Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
@@ -828,7 +828,8 @@
     "20261111233001_que_mirar_chat_tablas.sql",
     "20261112100919_esquema.sql",
     "20261112103648_por_publicar_tablas.sql",
-    "20261112103649_por_publicar.sql"
+    "20261112103649_por_publicar.sql",
+    "20261112160000_avisos_sin_telegram.sql"
    ]
   }
  },
