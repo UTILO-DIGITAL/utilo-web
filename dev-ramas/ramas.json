@@ -336,12 +336,12 @@
   },
   "T0340-anular-partidos-baja": {
    "tarea": "T0340",
-   "titulo": "Al dar de baja un equipo, sus partidos pendientes se anulan sin puntos",
+   "titulo": "Al dar de baja un equipo, sus partidos por jugar salen del calendario y su rival descansa",
    "pr": 303,
-   "commit": "31eb698",
-   "ultimo": "T0340: Los partidos por jugar del equipo de baja salen del calendario y su rival descansa",
+   "commit": "4ced4b1",
+   "ultimo": "T0340: La migración, con otra hora para que DEV aplique la versión nueva",
    "quien": "Javi Canela",
-   "fecha": "2026-11-12T09:28:34.947Z",
+   "fecha": "2026-11-12T09:31:14.345Z",
    "toca": [
     "konamigas"
    ],
@@ -498,7 +498,7 @@
      "20261111190000_personas_de_prueba.sql",
      "20261111210000_dev_cerrado.sql",
      "20261111220000_correo_enviar.sql",
-     "20261112120000_ligas_baja.sql"
+     "20261112130000_ligas_baja.sql"
     ],
     "utilo": [
      "20261105150000_latido.sql",
