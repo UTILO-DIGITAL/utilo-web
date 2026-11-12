@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "eb5e7ee",
-   "ultimo": "Merge pull request #307 from UTILO-DIGITAL/T0454-telegram-pedir-cambios",
+   "commit": "7d55f36",
+   "ultimo": "Merge pull request #308 from UTILO-DIGITAL/T0435-quitar-telegram",
    "quien": "",
-   "fecha": "2026-11-12T11:52:17.130Z",
+   "fecha": "2026-11-12T13:56:20.207Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -203,7 +203,8 @@
      "20261111233001_que_mirar_chat_tablas.sql",
      "20261112100919_esquema.sql",
      "20261112103648_por_publicar_tablas.sql",
-     "20261112103649_por_publicar.sql"
+     "20261112103649_por_publicar.sql",
+     "20261112170000_avisos_sin_telegram.sql"
     ]
    },
    "rama": "main"

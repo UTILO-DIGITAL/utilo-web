@@ -1657,7 +1657,7 @@
       });
       gente().catch(function () {});
 
-      // T0386: en directo. Cuando alguien (otra persona, el agente, Telegram) cambia una tarea, sus dependencias o la bitácora,
+      // T0386: en directo. Cuando alguien (otra persona, el agente) cambia una tarea, sus dependencias o la bitácora,
       // la base avisa (Realtime) y el tablero se pone al día solo, en un segundo; si es la de la ficha abierta, también su bitácora.
       // Los avisos de un momento se juntan en una lectura; mientras se arrastra una tarjeta, espera a que se suelte.
       var directo = null, tDirecto = null, pendiente = {};
