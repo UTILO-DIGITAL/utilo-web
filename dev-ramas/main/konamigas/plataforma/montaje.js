@@ -18,7 +18,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Ligas",
    "icono": "<path d=\"M8 4h8v5a4 4 0 0 1-8 0z\"/><path d=\"M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4\"/><path d=\"M12 13v4M9 20h6\"/>",
    "web": "konamigas/secciones/competicion.js",
-   "version": "5177fe9b72",
+   "version": "21664f6728",
    "perfiles": "todos",
    "config": {},
    "api": [
@@ -1354,6 +1354,10 @@ window.NUCLEO_MONTAJE = {
      {
       "nombre": "RACHA",
       "tipo": "texto"
+     },
+     {
+      "nombre": "BAJA",
+      "tipo": "booleano"
      }
     ],
     "restricciones": {}

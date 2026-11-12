@@ -249,7 +249,7 @@
     return (filas || []).filter(function (f) { return String(f.ID_LIGA) === String(idLiga); }).map(function (f) {
       var n = function (k) { return num(f[k]) || 0; };
       return { pos: n('PUESTO'), id: String(f.ID_INSCRIPCION_EQUIPO), pj: n('PJ'), pg: n('PG'), pe: n('PE'), pp: n('PP'), gf: n('GF'), gc: n('GC'), dg: n('DG'),
-        pts: n('PTS'), jugar: n('POR_JUGAR'), racha: String(f.RACHA || '') };
+        pts: n('PTS'), jugar: n('POR_JUGAR'), racha: String(f.RACHA || ''), baja: f.BAJA === true || f.BAJA === 'true' };
     }).sort(function (a, b) { return a.pos - b.pos; });
   }
   /** Goles y partidos jugados de unas ligas (vista LIGAS_RESUMEN, sin el 0-5 de los anulados): { goles, jugados, media }. */
@@ -703,15 +703,17 @@
           '<th class="u-solo-ancho" title="Los últimos 5 partidos, del más viejo al más nuevo">Últimos</th></tr></thead><tbody>' +
           cl.map(function (e) {
             var ed = M.ix.eqd[e.id] || {}, ra = htmlRacha(e.racha);
-            return '<tr><td class="num">' + e.pos + '</td><td class="u-tabla-t"><button type="button" class="lg-eqf" data-eqf="' + texto(e.id) + '"><span class="lg-eqt">' + punto(e.id) + texto(equipo(e.id)) + '</span></button>' +
+            return '<tr><td class="num">' + (e.baja ? '–' : e.pos) + '</td><td class="u-tabla-t"><button type="button" class="lg-eqf" data-eqf="' + texto(e.id) + '"><span class="lg-eqt">' + punto(e.id) + texto(equipo(e.id)) + '</span></button>' +
+              (e.baja ? ' <span class="u-chip">Baja</span>' : '') +
               (ra ? '<div class="u-solo-movil">' + ra + '</div>' : '') + (num(ed.DEBE) > 0 ? '<div class="u-nota lg-san-nota">Debe ' + euros(ed.DEBE) + ' de multas</div>' : '') +
-              (e.jugar ? '<div class="u-nota u-solo-ancho">' + e.jugar + ' por jugar</div>' : '') + '</td>' +
+              (e.jugar && !e.baja ? '<div class="u-nota u-solo-ancho">' + e.jugar + ' por jugar</div>' : '') + '</td>' +
               '<td class="num">' + e.pj + '</td><td class="num">' + e.pg + '</td><td class="num">' + e.pe + '</td><td class="num">' + e.pp + '</td>' +
               '<td class="num u-solo-ancho">' + e.gf + '</td><td class="num u-solo-ancho">' + e.gc + '</td><td class="num">' + (e.dg > 0 ? '+' : '') + e.dg + '</td><td class="num"><b>' + e.pts + '</b></td>' +
               '<td class="u-solo-ancho">' + ra + '</td></tr>';
           }).join('') + '</tbody></table></div>' +
           '<p class="u-nota">' + R.jugados + (R.jugados === 1 ? ' partido jugado' : ' partidos jugados') + '. ' + num(P.GANAR) + ' puntos por ganar y ' + num(P.EMPATAR) + ' por empatar; ' +
           'a igualdad de puntos, mejor diferencia de goles y después más goles a favor.' + (nAn > 0 ? ' Un partido anulado cuenta como 0-' + nAn + ' para el equipo que lo provoca.' : '') +
+          (cl.some(function (e) { return e.baja; }) ? ' Los equipos de baja van al final, con lo que jugaron.' : '') +
           ' Los últimos partidos van del más viejo al más nuevo. Toca un equipo para ver su ficha.</p>';
       }
 
@@ -1017,7 +1019,7 @@
         var html = '<h2 id="lg-vt"><span class="lg-eqt">' + punto(e.ID) + texto(equipo(e.ID)) + '</span></h2>' +
           '<p class="u-nota">' + texto([ligaCompleta(e.ID_LIGA), c.NOMBRE ? 'Color ' + c.NOMBRE.toLowerCase() : '', e.ESTADO === 'Baja' ? 'De baja' : ''].filter(String).join(' · ')) + '</p>' +
           (num(ed.DEBE) > 0 ? '<p class="lg-pav lg-pav-ficha lg-av-no">Debe ' + euros(ed.DEBE) + ' de multas.</p>' : '') +
-          (fe ? '<div class="pf-cifras lg-ef-cifras">' + cifra(fe.pos + '.º', 'de ' + clasificacion(M.clas, e.ID_LIGA).length) + cifra(fe.pts, fe.pts === 1 ? 'punto' : 'puntos') +
+          (fe ? '<div class="pf-cifras lg-ef-cifras">' + (fe.baja ? cifra('–', 'de baja') : cifra(fe.pos + '.º', 'de ' + clasificacion(M.clas, e.ID_LIGA).filter(function (x) { return !x.baja; }).length)) + cifra(fe.pts, fe.pts === 1 ? 'punto' : 'puntos') +
             cifra(fe.pg + ' · ' + fe.pe + ' · ' + fe.pp, 'ganados · empatados · perdidos') + cifra(fe.gf + '–' + fe.gc, 'goles a favor y en contra') + '</div>' +
             '<p class="u-nota">' + fe.pj + (fe.pj === 1 ? ' partido jugado' : ' partidos jugados') + (fe.jugar ? ' y ' + fe.jugar + ' por jugar' : '') + '.</p>' : '') +
           (proximo ? '<h3 class="lg-sub">Próximo partido</h3><ul class="lg-ef-ps"><li><button type="button" class="lg-ef-p" data-p="' + texto(proximo.ID) + '"><span class="lg-ef-txt"><b>' +

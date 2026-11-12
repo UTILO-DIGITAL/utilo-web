@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "2d9f048",
-   "ultimo": "Merge pull request #302 from UTILO-DIGITAL/T0463-impedir-dos-migraciones-misma",
+   "commit": "c71763c",
+   "ultimo": "Merge pull request #303 from UTILO-DIGITAL/T0340-anular-partidos-baja",
    "quien": "",
-   "fecha": "2026-11-11T23:04:52.916Z",
+   "fecha": "2026-11-12T10:09:42.309Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -161,7 +161,9 @@
      "20261111120001_nombre_publico.sql",
      "20261111190000_personas_de_prueba.sql",
      "20261111210000_dev_cerrado.sql",
-     "20261111220000_correo_enviar.sql"
+     "20261111220000_correo_enviar.sql",
+     "20261112130000_ligas_baja.sql",
+     "20261112140000_clasificacion_baja.sql"
     ],
     "utilo": [
      "20261105150000_latido.sql",
