@@ -11,6 +11,11 @@
  *   árbitro. Arriba, lo pendiente: actas por cerrar, aplazados por recuperar y anulados sin su sanción.
  * - Clasificación y Goleadoras salen de las vistas de la base (clasificacion, goleadoras, ligas_resumen), que cuentan todos
  *   los partidos aunque quien mira solo vea los suyos.
+ * - La fase final (T0313): bloques fijos de 4 por la clasificación (Oro, Plata…), semifinales una semana y final y tercer
+ *   puesto la siguiente, en los horarios de la liga. Sus partidos van atados al puesto: quien lleva la liga los crea cuando
+ *   quiera (ligas_fase_final) y cada puesto pasa a ser su equipo al acabar la liga (lo hace la base). Hasta entonces se ve
+ *   quién iría si la liga acabara hoy. Sale en Partidos («Semis» y «Final» en la tira) y en Clasificación, debajo de la
+ *   tabla, que solo cuenta la liga. Un empate se decide por penaltis, en el acta.
  * - Fichas: la del partido (marcador con los colores, quién marcó, datos, sanciones y lo que se puede hacer), la del equipo
  *   (cómo va, próximo partido, últimos resultados, plantilla, su carta de aplazamiento y sus sanciones) y la de una jugadora
  *   (sus goles por temporada).
@@ -38,7 +43,8 @@
     ligas_partido: ['PARTIDOS', 'GOLES', 'SANCIONES', 'CLASIFICACION', 'GOLEADORAS', 'LIGAS_RESUMEN'],
     ligas_mover: ['PARTIDOS'], ligas_jornadas: ['PARTIDOS'], ligas_recuperar: ['PARTIDOS', 'CLASIFICACION'],
     ligas_sancion: ['SANCIONES'], ligas_sancion_quitar: ['SANCIONES'], ligas_sanciones_faltan: ['SANCIONES'],
-    ligas_sancion_pagar: ['SANCIONES'], ligas_sancion_despagar: ['SANCIONES'], justificante: ['SANCIONES']
+    ligas_sancion_pagar: ['SANCIONES'], ligas_sancion_despagar: ['SANCIONES'], justificante: ['SANCIONES'],
+    ligas_fase_final: ['PARTIDOS', 'EQUIPOS_INSCRITOS'], ligas_fase_final_quitar: ['PARTIDOS', 'EQUIPOS_INSCRITOS']
   };
   var DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -131,13 +137,17 @@
     ps.forEach(function (p) { var j = num(p.JORNADA); if (isFinite(j)) o[j] = 1; });
     return Object.keys(o).map(Number).sort(function (a, b) { return a - b; });
   }
-  /** Los días de juego, en orden: [{ fecha, jornadas (sin las recuperaciones), jr (solo recuperaciones), ps }]. */
+  /**
+   * Los días de juego, en orden: [{ fecha, jornadas (sin las recuperaciones), jr (solo recuperaciones), ff, ps }]. ff (T0313):
+   * un día de la fase final, «Semifinales» o «Finales» (con final o tercer puesto); vacío si es de la liga.
+   */
   function diasDeJuego(ps) {
     var o = {};
     ps.forEach(function (p) { if (p.FECHA) (o[p.FECHA] = o[p.FECHA] || []).push(p); });
     return Object.keys(o).sort().map(function (f) {
-      var js = jornadas(o[f].filter(function (p) { return !p.ID_PARTIDO_ORIGEN; }));
-      return { fecha: f, jornadas: js, jr: !js.length, ps: o[f] };
+      var base = o[f].filter(function (p) { return !p.ID_PARTIDO_ORIGEN; }), js = jornadas(base.filter(function (p) { return !p.FASE; }));
+      var ff = base.length > 0 && base.every(function (p) { return !!p.FASE; }) ? (base.every(function (p) { return p.RONDA === 'Semifinal'; }) ? 'Semifinales' : 'Finales') : '';
+      return { fecha: f, jornadas: js, jr: !js.length && !ff, ff: ff, ps: o[f] };
     });
   }
   /** Cómo va un día: { jugado, anulado, aplazado (o suspendido), pendiente, total }, sin los de campo libre. */
@@ -182,6 +192,65 @@
   function queEs(p) {
     if (p.ESTADO === 'Anulado' && p.APLAZADO_POR && p.APLAZADO_POR === p.ANULADO_POR) return 'aplazado'; // pidió aplazarlo y no se aceptó
     return { Jugado: 'jugado', Suspendido: 'suspendido', Aplazado: 'aplazado', Libre: 'libre' }[p.ESTADO] || (p.ESTADO === 'Anulado' ? (p.ANULADO_POR ? 'nopresentado' : 'anulado') : 'porjugar');
+  }
+
+  /* ---------- la fase final (T0313) ---------- */
+
+  var RONDAS = ['Semifinal', 'Final', 'Tercer puesto'];
+  /** Lo que es un partido de la fase final, «Oro · Semifinal»; vacío si es de la liga. */
+  function faseDe(p) { return p.FASE ? p.FASE + (p.RONDA ? ' · ' + p.RONDA : '') : ''; }
+  /** Quién gana un partido con marcador ('l', 'v' o ''): el que marca más y, en un empate, el de los penaltis. */
+  function ganaLado(p) {
+    if (!conMarcador(p)) return '';
+    var gl = num(p.GOLES_LOCAL), gv = num(p.GOLES_VISITANTE), pl = num(p.PENALTIS_LOCAL), pv = num(p.PENALTIS_VISITANTE);
+    return gl > gv ? 'l' : gl < gv ? 'v' : isFinite(pl) && isFinite(pv) && pl !== pv ? (pl > pv ? 'l' : 'v') : '';
+  }
+  /** Los bloques de la fase final de una liga, en el orden en que se crearon: [{ fase, ps }] (semifinales, final y tercer puesto). */
+  function bloquesFase(ps) {
+    var orden1 = [], o = {};
+    (ps || []).filter(function (p) { return !!p.FASE; }).sort(function (a, b) { return orden(String(a.ID), String(b.ID)); }).forEach(function (p) {
+      if (!o[p.FASE]) { o[p.FASE] = []; orden1.push(p.FASE); }
+      o[p.FASE].push(p);
+    });
+    return orden1.map(function (f) {
+      return { fase: f, ps: o[f].sort(function (a, b) { return RONDAS.indexOf(a.RONDA) - RONDAS.indexOf(b.RONDA) || orden(cuando(a), cuando(b)); }) };
+    });
+  }
+  /**
+   * Lo que le queda a la liga antes de su fase final (como ligas.lados): { porJugar (programados), aplazados (aplazados o
+   * suspendidos sin una recuperación que no esté anulada) }. Solo los partidos de la liga, sin la fase final.
+   */
+  function quedaLiga(ps) {
+    var liga = (ps || []).filter(function (p) { return !p.FASE && p.ID_INSCRIPCION_LOCAL && p.ID_INSCRIPCION_VISITANTE; });
+    var recuperado = function (p) { return liga.some(function (r) { return String(r.ID_PARTIDO_ORIGEN) === String(p.ID) && r.ESTADO !== 'Anulado'; }); };
+    return { porJugar: liga.filter(function (p) { return p.ESTADO === 'Programado'; }).length,
+      aplazados: liga.filter(function (p) { return (p.ESTADO === 'Aplazado' || p.ESTADO === 'Suspendido') && !recuperado(p); }).length };
+  }
+  /** Los bloques de la fase final de una liga con n equipos (como ligas.bloques_fase): [{ fase, desde, hasta }]; si sobra uno, descansa. */
+  function bloquesPuestos(n) {
+    var r = [], nombres = ['Oro', 'Plata', 'Bronce'];
+    for (var b = 1; 4 * b - 3 <= n; b++) if (Math.min(4 * b, n) > 4 * b - 3) r.push({ fase: nombres[b - 1] || 'Bloque ' + b, desde: 4 * b - 3, hasta: Math.min(4 * b, n) });
+    return r;
+  }
+  /**
+   * Los partidos de un bloque, como los crea la base: [{ FASE, RONDA, PUESTO_LOCAL, PUESTO_VISITANTE }]; la final y el tercer
+   * puesto de un bloque de 4 salen de las semifinales (sin puestos). De 3: semifinal 2.ª–3.ª y final contra la 1.ª. De 2: la final.
+   */
+  function crucesBloque(b) {
+    var d = b.desde, k = b.hasta - d + 1, x = function (r, l, v) { return { FASE: b.fase, RONDA: r, PUESTO_LOCAL: l, PUESTO_VISITANTE: v, ESTADO: 'Programado' }; };
+    if (k === 4) return [x('Semifinal', d, d + 3), x('Semifinal', d + 1, d + 2), x('Final', '', ''), x('Tercer puesto', '', '')];
+    if (k === 3) return [x('Semifinal', d + 1, d + 2), x('Final', d, '')];
+    return [x('Final', d, d + 1)];
+  }
+  /**
+   * Quién juega en un lado ('l' o 'v') de un partido de la fase final sin equipo: «1.ª» o, en una final o un tercer puesto, de
+   * qué semifinal sale («Ganadora 1.ª–4.ª»). semis: las semifinales de su bloque, por su orden. { puesto (número o NaN), txt }.
+   */
+  function huecoFase(p, lado, semis) {
+    var n = num(lado === 'l' ? p.PUESTO_LOCAL : p.PUESTO_VISITANTE);
+    if (isFinite(n)) return { puesto: n, txt: n + '.ª' };
+    var s = (semis || []).length === 1 ? semis[0] : (semis || [])[lado === 'l' ? 0 : 1];
+    return { puesto: NaN, txt: s ? (p.RONDA === 'Tercer puesto' ? 'Perdedora ' : 'Ganadora ') + num(s.PUESTO_LOCAL) + '.ª–' + num(s.PUESTO_VISITANTE) + '.ª' : 'Por decidir' };
   }
 
   /* ---------- sanciones ---------- */
@@ -386,7 +455,7 @@
   var CALC = { hoy: hoy, sumarDias: sumarDias, fecha: fecha, fechaDia: fechaDia, fechaLarga: fechaLarga, euros: euros, configuracion: configuracion,
     temporadaActual: temporadaActual, ligasDe: ligasDe, conMarcador: conMarcador, resultadoDe: resultadoDe, incompleto: incompleto, jornadas: jornadas,
     diasDeJuego: diasDeJuego, resumenDia: resumenDia, diaInicial: diaInicial, descansan: descansan, equiposDe: equiposDe, golesEquipo: golesEquipo,
-    queEs: queEs, sancionesDe: sancionesDe, dineroSancion: dineroSancion, multaDe: multaDe, staffDe: staffDe, coloresDe: coloresDe, jugadorasDe: jugadorasDe,
+    queEs: queEs, faseDe: faseDe, ganaLado: ganaLado, bloquesFase: bloquesFase, bloquesPuestos: bloquesPuestos, quedaLiga: quedaLiga, crucesBloque: crucesBloque, huecoFase: huecoFase, sancionesDe: sancionesDe, dineroSancion: dineroSancion, multaDe: multaDe, staffDe: staffDe, coloresDe: coloresDe, jugadorasDe: jugadorasDe,
     plantilla: plantilla, clasificacion: clasificacion, resumenGoles: resumenGoles, goleadoras: goleadoras, golesJugadora: golesJugadora, textoAviso: textoAviso,
     grupoHoja: grupoHoja, lista: lista, elegirEn: elegirEn, TABLAS: TABLAS, CAMBIA: CAMBIA };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
@@ -507,12 +576,23 @@
       function golesDe(id) { return M.gol.filter(function (g) { return String(g.ID_PARTIDO) === String(id); }); }
       function esMio(p) { return !!staff.yo && [p.ID_ARBITRO, p.ID_ARBITRO_REAL, p.ID_GESTOR].indexOf(staff.yo) >= 0; }
       function copa(idL) { var l = M.ix.liga[idL], c = l && M.ix.comp[l.ID_COMPETICION]; return !!c && cfg.SIN_CLASIFICACION.indexOf(String(c.TIPO || '')) >= 0; }
-      function falta(p) { return incompleto(p, copa(p.ID_LIGA)); }
+      function falta(p) { return incompleto(p, copa(p.ID_LIGA) || !!p.FASE); } // la final de la fase final, por decidir
       function titulo(p) {
+        if (p.FASE) return [['l', p.ID_INSCRIPCION_LOCAL], ['v', p.ID_INSCRIPCION_VISITANTE]].map(function (x) { return x[1] ? equipo(x[1]) : huecoFase(p, x[0], semisDe(p)).txt; }).join(' – ');
         if (!p.ID_INSCRIPCION_LOCAL && !p.ID_INSCRIPCION_VISITANTE) return 'Campo libre';
         var x = falta(p) ? '(falta el equipo)' : 'Por decidir';
         return (equipo(p.ID_INSCRIPCION_LOCAL) || x) + ' – ' + (equipo(p.ID_INSCRIPCION_VISITANTE) || x);
       }
+      /** Las semifinales del bloque de un partido de la fase final, por su orden (las recuperaciones, no). */
+      function semisDe(p) {
+        if (p._semis) return p._semis;   // los cruces de «si acabara hoy», que aún no son partidos
+        return M.par.filter(function (x) { return x.FASE === p.FASE && x.RONDA === 'Semifinal' && !x.ID_PARTIDO_ORIGEN && String(x.ID_LIGA) === String(p.ID_LIGA); })
+          .sort(function (a, b) { return orden(String(a.ID), String(b.ID)); });
+      }
+      /** Quién va hoy en cada puesto de una liga (sin los de baja): ['', id del 1.º, id del 2.º…]. */
+      function puestosHoy(idL) { return [''].concat(clasificacion(M.clas, idL).filter(function (e) { return !e.baja; }).map(function (e) { return e.id; })); }
+      /** «Jornada 3» (corta, «J3») o, en la fase final, «Oro · Semifinal». */
+      function nomJornada(p, corta) { return p.FASE ? faseDe(p) : (corta ? 'J' : 'Jornada ') + p.JORNADA; }
       function buscado(txt) { var q = sinTildes(F.busca).trim(); return !q || sinTildes(txt).indexOf(q) >= 0; }
 
       /**
@@ -550,7 +630,7 @@
         $('lg-viendo').textContent = !M.tempo ? '' : (M.todas ? 'Todas las ligas' : M.actual ? ligaCompleta(M.actual.liga.ID) : 'Sin ligas') + ' · ' + M.tempo.NOMBRE + (F.mios && staff.yo && S.tab === 'PARTIDOS' ? ' · solo mis partidos' : '');
         if (!M.tempo) { cont.innerHTML = '<p class="u-vacio">Todavía no hay temporadas.</p>'; return; }
         if (!M.actual) { cont.innerHTML = '<p class="u-vacio">Esta temporada todavía no tiene ligas.</p>'; return; }
-        cont.innerHTML = ({ PARTIDOS: htmlPartidos, CLASIFICACION: htmlClasificacion, GOLEADORAS: htmlGoleadoras })[S.tab]();
+        cont.innerHTML = ({ PARTIDOS: htmlPartidos, CLASIFICACION: function () { return htmlClasificacion() + htmlFaseFinal(); }, GOLEADORAS: htmlGoleadoras })[S.tab]();
         var tira = cont.querySelector('.lg-dias-tira'), abierto = tira && tira.querySelector('[aria-pressed=true]');
         if (abierto) tira.scrollLeft = Math.max(0, abierto.offsetLeft - tira.offsetLeft - (tira.clientWidth - abierto.offsetWidth) / 2);
         if (S.tab === 'GOLEADORAS') cargarGoleadoras();
@@ -581,27 +661,38 @@
       }
       /** Un partido en una lista: el marcador en el centro, la hora, el campo y el árbitro a un lado y, debajo, lo que hay que saber. */
       function htmlPartido(p, conLiga) {
-        var res = conMarcador(p), gl = num(p.GOLES_LOCAL), gv = num(p.GOLES_VISITANTE), av = avisoPartido(p), d = det(p);
-        var roto = falta(p), libre = p.ESTADO === 'Libre' || (!p.ID_INSCRIPCION_LOCAL && !p.ID_INSCRIPCION_VISITANTE);
+        var res = conMarcador(p), gl = num(p.GOLES_LOCAL), gv = num(p.GOLES_VISITANTE), av = avisoPartido(p), d = det(p), gana = ganaLado(p);
+        var pen = res && isFinite(num(p.PENALTIS_LOCAL)) && isFinite(num(p.PENALTIS_VISITANTE)) ? num(p.PENALTIS_LOCAL) + '-' + num(p.PENALTIS_VISITANTE) : '';
+        var roto = falta(p), libre = p.ESTADO === 'Libre' || (!p.ID_INSCRIPCION_LOCAL && !p.ID_INSCRIPCION_VISITANTE && !p.FASE);
+        var hoyEn = p.FASE ? puestosHoy(p.ID_LIGA) : null;
         var eq = function (id, lado, gana) {
+          if (!id && p.FASE) {
+            var hu = huecoFase(p, lado, semisDe(p)), ya = isFinite(hu.puesto) && hoyEn[hu.puesto];
+            return '<span class="lg-p' + lado + '"><span class="lg-nom"><b>' + texto(hu.txt) + '</b>' + (ya ? '<br><small>' + texto(equipo(ya)) + '</small>' : '') + '</span></span>';
+          }
           if (!id) return '<span class="lg-p' + lado + (roto ? ' lg-falta' : '') + '"><span class="lg-nom">' + (roto ? 'Falta el equipo' : 'Por decidir') + '</span></span>';
           return '<span class="lg-p' + lado + (gana ? ' lg-gana' : '') + '">' + (lado === 'l' ? '<span class="lg-nom">' + texto(equipo(id)) + '</span>' + punto(id) : punto(id) + '<span class="lg-nom">' + texto(equipo(id)) + '</span>') + '</span>';
         };
         var arb = p.ID_ARBITRO_REAL || p.ID_ARBITRO;
-        var info = '<span class="lg-pi"><b class="u-cifra">' + texto(p.HORA || '--:--') + '</b><small>' + texto(campo(p.ID_CAMPO)) + '</small>' +
+        var info = !p.ID ? '<span class="lg-pi"></span>' : '<span class="lg-pi"><b class="u-cifra">' + texto(p.HORA || '--:--') + '</b><small>' + texto(campo(p.ID_CAMPO)) + '</small>' +
           (libre || publica ? '' : '<small class="lg-parb" title="Árbitro">' + texto(arb ? persona(arb) : 'Sin árbitro') + '</small>') + '</span>';
-        var debajo = [conLiga ? '<span class="lg-pliga">' + texto(ligaCompleta(p.ID_LIGA) + ' · J' + p.JORNADA) + '</span>' : '',
+        var debajo = [conLiga ? '<span class="lg-pliga">' + texto(ligaCompleta(p.ID_LIGA) + ' · ' + (p.FASE ? faseDe(p) : 'J' + p.JORNADA)) + '</span>' : '',
+          p.FASE && !conLiga ? '<span class="lg-pav lg-av-rec">' + texto(faseDe(p) + (p.FECHA ? ' · ' + fechaDia(p.FECHA) : '')) + '</span>' : '',
+          p.FASE && p.ESTADO === 'Programado' && (!p.ID_INSCRIPCION_LOCAL || !p.ID_INSCRIPCION_VISITANTE) && [p.PUESTO_LOCAL, p.PUESTO_VISITANTE].some(function (x) { return isFinite(num(x)); })
+            && p.ID ? '<span class="lg-pav">Si la liga acabara hoy</span>' : '',
+          pen ? '<span class="lg-pav lg-av-si">' + texto('Penaltis: ' + pen + ', gana ' + equipo(gana === 'l' ? p.ID_INSCRIPCION_LOCAL : p.ID_INSCRIPCION_VISITANTE)) + '</span>' : '',
           p._pendiente ? '<span class="u-chip">Guardando</span>' : '',
           roto ? '<span class="lg-pav lg-av-no">Le falta el ' + (p.ID_INSCRIPCION_LOCAL ? 'visitante' : 'local') + ': no cuenta en la clasificación</span>' : '',
           av ? '<span class="lg-pav ' + av.clase + '">' + texto(av.texto) + (p.MOTIVO && FUERA.indexOf(p.ESTADO) >= 0 ? ' · ' + texto(p.MOTIVO) : '') + '</span>' : '',
           avisoMultas(p).map(function (t) { return '<span class="lg-pav lg-av-no">' + texto(t) + '</span>'; }).join(''),
           d.SIN_SANCION && d.GESTIONA ? '<span class="lg-pav lg-av-si">Sin su sanción de no presentado</span>' : ''].join('');
-        return '<button type="button" class="lg-p' + (esMio(p) ? ' lg-mio' : '') + (FUERA.indexOf(p.ESTADO) >= 0 ? ' lg-p-fuera' : '') + '" data-p="' + texto(p.ID) + '"' +
-          ' aria-label="' + texto(titulo(p) + ', ' + (p.HORA || '') + ', ' + campo(p.ID_CAMPO) + (res ? ', ' + gl + ' a ' + gv : '')) + '">' + info +
+        var tag = p.ID ? 'button' : 'div';
+        return '<' + tag + (p.ID ? ' type="button"' : '') + ' class="lg-p' + (esMio(p) ? ' lg-mio' : '') + (FUERA.indexOf(p.ESTADO) >= 0 ? ' lg-p-fuera' : '') + '"' + (p.ID ? ' data-p="' + texto(p.ID) + '"' : '') +
+          ' aria-label="' + texto(titulo(p) + ', ' + (p.HORA || '') + ', ' + campo(p.ID_CAMPO) + (res ? ', ' + gl + ' a ' + gv : '') + (pen ? ', penaltis ' + pen : '')) + '">' + info +
           (libre ? '<span class="lg-pl"></span><span class="lg-pc lg-pvs">' + texto(equipo(p.ID_INSCRIPCION_LOCAL || p.ID_INSCRIPCION_VISITANTE) || 'Campo libre') + '</span><span class="lg-pv"></span>'
-            : eq(p.ID_INSCRIPCION_LOCAL, 'l', res && gl > gv) + '<span class="lg-pc' + (res ? '' : ' lg-pvs') + (p.ESTADO === 'Anulado' ? ' lg-pc-an' : '') + '">' +
-              (res ? '<b class="u-cifra">' + gl + '<span>–</span>' + gv + '</b>' : 'vs') + '</span>' + eq(p.ID_INSCRIPCION_VISITANTE, 'v', res && gv > gl)) +
-          (debajo ? '<span class="lg-pa">' + debajo + '</span>' : '') + '</button>';
+            : eq(p.ID_INSCRIPCION_LOCAL, 'l', gana === 'l') + '<span class="lg-pc' + (res ? '' : ' lg-pvs') + (p.ESTADO === 'Anulado' ? ' lg-pc-an' : '') + '">' +
+              (res ? '<b class="u-cifra">' + gl + '<span>–</span>' + gv + '</b>' : 'vs') + '</span>' + eq(p.ID_INSCRIPCION_VISITANTE, 'v', gana === 'v')) +
+          (debajo ? '<span class="lg-pa">' + debajo + '</span>' : '') + '</' + tag + '>';
       }
       /** La barrita de un día: verde lo jugado, rojo lo anulado, gris lo aplazado y vacío lo que falta. */
       function barraDia(ps) {
@@ -659,13 +750,13 @@
           dias.map(function (x) {
             var dt = deIso(x.fecha), r = resumenDia(x.ps), completa = r.total > 0 && !r.pendiente && !r.aplazado;
             return '<button type="button" data-fecha="' + x.fecha + '" aria-pressed="' + (x.fecha === S.fecha) + '" class="' + [x.jr ? 'lg-jr' : '', completa ? 'lg-completa' : '', x.fecha === hoy() ? 'lg-hoy' : '', especial(x.fecha) ? 'lg-choque' : ''].join(' ').trim() + '"' +
-              ' aria-label="' + texto((x.jr ? 'Jornada de recuperación' : todas ? '' : 'Jornada ' + x.jornadas.join(' y ')) + ' ' + fechaDia(x.fecha)) + '"><b>' +
-              texto(todas ? DIAS[dt.getDay()].slice(0, 3) : x.jr ? 'JR' : 'J' + x.jornadas.join('/')) + '</b><small>' + dt.getDate() + ' ' + MESES[dt.getMonth()] + '</small>' + barraDia(x.ps) + '</button>';
+              ' aria-label="' + texto((x.ff ? 'Fase final, ' + x.ff.toLowerCase() : x.jr ? 'Jornada de recuperación' : todas ? '' : 'Jornada ' + x.jornadas.join(' y ')) + ' ' + fechaDia(x.fecha)) + '"><b>' +
+              texto(todas ? DIAS[dt.getDay()].slice(0, 3) : x.ff ? (x.ff === 'Semifinales' ? 'Semis' : 'Final') : x.jr ? 'JR' : 'J' + x.jornadas.join('/')) + '</b><small>' + dt.getDate() + ' ' + MESES[dt.getMonth()] + '</small>' + barraDia(x.ps) + '</button>';
           }).join('') + '</div><button type="button" class="u-btn u-btn-icono" data-dias="1" aria-label="Días siguientes">›</button></div>' +
           '<p class="lg-leyenda" aria-hidden="true"><span><i class="lg-s-jugado"></i>Jugado</span><span><i class="lg-s-anulado"></i>Anulado</span><span><i class="lg-s-aplazado"></i>Aplazado</span><span><i class="lg-s-pendiente"></i>Por jugar</span></p>';
-        var jornada = !todas && dia.jornadas.length === 1 ? dia.jornadas[0] : null, jor = jornada !== null && M.ix.jor[idL + '·' + jornada];
+        var jornada = !todas && !dia.ff && dia.jornadas.length === 1 ? dia.jornadas[0] : null, jor = jornada !== null && M.ix.jor[idL + '·' + jornada];
         var sub = (todas ? '' : fechaDia(dia.fecha)) + (dia.fecha === hoy() ? (todas ? 'Hoy' : ' · hoy') : '');
-        h += '<div class="lg-jcab"><h2 class="n-grupo' + (dia.jr ? ' lg-jr-t' : '') + '">' + texto(todas ? fechaDia(dia.fecha) : dia.jr ? 'Jornada de recuperación' : 'Jornada ' + dia.jornadas.join(' y ')) + '</h2>' +
+        h += '<div class="lg-jcab"><h2 class="n-grupo' + (dia.jr ? ' lg-jr-t' : '') + '">' + texto(todas ? fechaDia(dia.fecha) : dia.ff ? 'Fase final · ' + dia.ff.toLowerCase() : dia.jr ? 'Jornada de recuperación' : 'Jornada ' + dia.jornadas.join(' y ')) + '</h2>' +
           (sub || (jor && jor.MOVIBLE) ? '<p class="lg-jfecha">' + (sub ? '<span>' + texto(sub) + '</span>' : '') +
             (jor && jor.MOVIBLE ? '<button type="button" class="lg-jcambiar" data-jornadas="' + jornada + '" title="Intercambiar la fecha con otra jornada"><span aria-hidden="true">⇄</span> Cambiar de fecha</button>' : '') + '</p>' : '') + '</div>';
         var esp = especial(dia.fecha), juegan = dia.ps.filter(function (p) { return FUERA.indexOf(p.ESTADO) < 0 && p.ESTADO !== 'Libre'; }).length;
@@ -715,6 +806,64 @@
           'a igualdad de puntos, mejor diferencia de goles y después más goles a favor.' + (nAn > 0 ? ' Un partido anulado cuenta como 0-' + nAn + ' para el equipo que lo provoca.' : '') +
           (cl.some(function (e) { return e.baja; }) ? ' Los equipos de baja van al final, con lo que jugaron.' : '') +
           ' Los últimos partidos van del más viejo al más nuevo. Toca un equipo para ver su ficha.</p>';
+      }
+
+      /* ---------- la fase final (T0313) ---------- */
+
+      /**
+       * Debajo de la clasificación, la fase final: sus partidos por bloques o, si aún no están, cómo quedaría si la liga acabara
+       * hoy. A quien lleva la liga, crearla o deshacerla.
+       */
+      function htmlFaseFinal() {
+        var l = M.actual.liga, ps = partidosLiga(l.ID).filter(function (p) { return !!p.FASE; }), gest = !publica && !!M.ix.gest[l.ID];
+        if (copa(l.ID) || F.busca) return '';
+        var hoyEn = puestosHoy(l.ID), n = hoyEn.length - 1, bl = bloquesPuestos(n);
+        if (!ps.length && !bl.length) return '';
+        var lista = function (fase, xs) { return '<h3 class="lg-sub">' + texto(fase) + '</h3><div class="lg-lista">' + xs.map(function (p) { return htmlPartido(p, false); }).join('') + '</div>'; };
+        var sinEquipos = ps.some(function (p) { return p.ESTADO === 'Programado' && (!p.ID_INSCRIPCION_LOCAL || !p.ID_INSCRIPCION_VISITANTE) && isFinite(num(p.PUESTO_LOCAL)); });
+        var descansa = n % 4 === 1 && n > 1 && hoyEn[n] ? '<p class="u-nota">' + texto('Descansa la ' + n + '.ª' + (sinEquipos || !ps.length ? ' (hoy, ' + equipo(hoyEn[n]) + ')' : '') + '.') + '</p>' : '';
+        var h = '<h2 class="n-grupo">Fase final</h2>';
+        if (!ps.length) {
+          return h + '<p class="u-nota">Al acabar la liga, dos semanas más en bloques de 4 por la clasificación: semifinales y, la semana siguiente, final y tercer puesto. Así quedaría si la liga acabara hoy:</p>' +
+            bl.map(function (b) {
+              var xs = crucesBloque(b), semis = xs.filter(function (p) { return p.RONDA === 'Semifinal'; });
+              xs.forEach(function (p) { p.ID_LIGA = l.ID; p._semis = semis; });
+              return lista(b.fase, xs);
+            }).join('') + descansa +
+            (gest ? '<p class="u-nota">Al ponerlos, cada partido tiene ya su día y su hora; los equipos se ponen solos al jugarse el último partido de la liga.</p>' +
+              '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" data-accion="fasefinal">Poner los partidos de la fase final</button></div>' : '');
+        }
+        if (sinEquipos) h += '<p class="u-nota">Los equipos se ponen solos al jugarse el último partido de la liga. Mientras, sale quién iría si acabara hoy.</p>';
+        h += bloquesFase(ps).map(function (b) { return lista(b.fase, b.ps); }).join('') + descansa;
+        var deshacer = gest && ps.every(function (p) { return p.ESTADO === 'Programado' && !p.ID_PARTIDO_ORIGEN; });
+        return h + (deshacer ? '<div class="n-botones"><button type="button" class="u-btn" data-accion="ffquitar">Deshacer la fase final</button></div>' : '');
+      }
+      /**
+       * Pone la fase final. Si a la liga aún le quedan partidos por jugar o aplazados sin recuperar, primero avisa (las fechas
+       * van después del último partido de ahora y no se mueven solas) y hay que pulsar otra vez.
+       */
+      function crearFaseFinal(b) {
+        var q = quedaLiga(partidosLiga(M.actual.liga.ID));
+        if ((q.porJugar || q.aplazados) && !b.getAttribute('data-ok')) {
+          var partes = [q.porJugar ? (q.porJugar === 1 ? 'queda 1 partido' : 'quedan ' + q.porJugar + ' partidos') + ' por jugar' : '',
+            q.aplazados ? (q.aplazados === 1 ? 'hay 1 aplazado' : 'hay ' + q.aplazados + ' aplazados') + ' sin recuperar' : ''].filter(String);
+          var av = document.createElement('p');
+          av.className = 'lg-pav lg-pav-ficha lg-av-si';
+          av.textContent = 'Ojo: a la liga aún le ' + partes.join(' y ') + '. La fase final va después del último partido de ahora: si la liga se alarga (una recuperación más tarde), sus fechas no se mueven solas y tendrás que deshacerla y ponerla otra vez.';
+          b.parentNode.parentNode.insertBefore(av, b.parentNode);
+          b.setAttribute('data-ok', '1'); b.textContent = 'Ponerla igualmente';
+          return;
+        }
+        b.disabled = true; b.textContent = 'Poniendo…';
+        guardar('ligas_fase_final', { liga: M.actual.liga.ID }).then(function (z) {
+          if (ctx.abierta()) ctx.aviso('Fase final puesta: ' + z.partidos + ' partidos, el ' + fechaLarga(z.semana_1) + ' y el ' + fechaLarga(z.semana_2) + '.');
+        }, function () { b.disabled = false; b.textContent = b.getAttribute('data-ok') ? 'Ponerla igualmente' : 'Poner los partidos de la fase final'; });
+      }
+      function quitarFaseFinal(b) {
+        if (!b.getAttribute('data-ok')) { b.setAttribute('data-ok', '1'); b.textContent = 'Se borran sus partidos: pulsa otra vez'; return; }
+        b.disabled = true; b.textContent = 'Deshaciendo…';
+        guardar('ligas_fase_final_quitar', { liga: M.actual.liga.ID }).then(function () { if (ctx.abierta()) ctx.aviso('Fase final deshecha.'); },
+          function () { b.disabled = false; b.removeAttribute('data-ok'); b.textContent = 'Deshacer la fase final'; });
       }
 
       /* ---------- Goleadoras ---------- */
@@ -806,7 +955,7 @@
         var d = det(p), c = M.ix.cam[p.ID_CAMPO], ins = c && M.ix.ins[c.ID_INSTALACION], ges = M.ix.staff[p.ID_GESTOR], tel = ges && wa(ges.TELEFONO);
         var L = p.ID_INSCRIPCION_LOCAL, V = p.ID_INSCRIPCION_VISITANTE, gs = golesDe(p.ID), av = avisoPartido(p);
         var fila = function (dt, dd) { return dd ? '<dt>' + dt + '</dt><dd>' + dd + '</dd>' : ''; };
-        var html = '<h2 id="lg-vt">' + texto(titulo(p)) + '</h2><p class="u-nota">' + texto(ligaCompleta(p.ID_LIGA) + ' · Jornada ' + p.JORNADA) + '</p>' +
+        var html = '<h2 id="lg-vt">' + texto(titulo(p)) + '</h2><p class="u-nota">' + texto(ligaCompleta(p.ID_LIGA) + ' · ' + nomJornada(p)) + '</p>' +
           (L && V ? '<div class="lg-marcador">' + ladoMarcador(p, L, V, 'Local') + '<div class="lg-mcentro">' +
             (conMarcador(p) ? '<b class="u-cifra' + (p.ESTADO === 'Anulado' ? ' lg-mcentro-an' : '') + '">' + num(p.GOLES_LOCAL) + '<span>–</span>' + num(p.GOLES_VISITANTE) + '</b>' : '<b class="lg-mhora u-cifra">' + texto(p.HORA || '--:--') + '</b>') +
             chipEstado(p) + '</div>' + ladoMarcador(p, V, L, 'Visitante') + '</div>' : '') +
@@ -862,7 +1011,7 @@
       function htmlSanciones(ss, que) {
         return '<ul class="lg-san">' + ss.map(function (s) {
           var p = s.ID_PARTIDO ? T.fila('PARTIDOS', s.ID_PARTIDO) : null, din = dineroSancion(s, equipo(rivalDe(s)));
-          var de = [que === 'partido' ? equipo(s.ID_INSCRIPCION_EQUIPO) : p ? 'Jornada ' + p.JORNADA + ' · ' + titulo(p) : 'Sin partido', s.FECHA ? fecha(s.FECHA) : ''].filter(String).join(' · ');
+          var de = [que === 'partido' ? equipo(s.ID_INSCRIPCION_EQUIPO) : p ? nomJornada(p) + ' · ' + titulo(p) : 'Sin partido', s.FECHA ? fecha(s.FECHA) : ''].filter(String).join(' · ');
           var dentro = '<span class="lg-san-tipo">' + texto(s.TIPO || 'Sanción') + '</span><span class="lg-san-txt"><b>' + texto(s.MOTIVO) + '</b><small>' + texto(de) + '</small>' +
             (din ? '<small class="lg-san-din' + (!s.FECHA_PAGO ? ' lg-san-debe' : '') + '">' + texto(din) + '</small>' : '') + '</span>';
           var attr = s._nueva ? '' : sanciona(s) ? ' data-san="' + texto(s.ID) + '"' : que === 'equipo' && p ? ' data-p="' + texto(p.ID) + '"' : '';
@@ -883,7 +1032,7 @@
         var tipo = s ? s.TIPO : anulo ? 'No presentado' : '', motivo = s ? s.MOTIVO : anulo ? pFijo.MOTIVO || '' : '';
         var fechaDe = function (id) { var p = id && T.fila('PARTIDOS', id); return (p && p.FECHA) || hoy(); };
         var suyos = M.par.filter(function (p) { return p.ID_INSCRIPCION_LOCAL === idEq || p.ID_INSCRIPCION_VISITANTE === idEq; }).sort(function (a, b) { return orden(cuando(b), cuando(a)); });
-        var nomP = function (p) { return (p.FECHA ? fecha(p.FECHA) + ' · ' : '') + 'J' + p.JORNADA + ' · ' + titulo(p) + (p.ESTADO !== 'Jugado' && p.ESTADO !== 'Programado' ? ' (' + String(p.ESTADO).toLowerCase() + ')' : ''); };
+        var nomP = function (p) { return (p.FECHA ? fecha(p.FECHA) + ' · ' : '') + nomJornada(p, true) + ' · ' + titulo(p) + (p.ESTADO !== 'Jugado' && p.ESTADO !== 'Programado' ? ' (' + String(p.ESTADO).toLowerCase() + ')' : ''); };
         var ini = s ? { IMPORTE: s.IMPORTE, COMPENSACION: s.COMPENSACION, PARA_ARBITRO: s.PARA_ARBITRO } : multaDe(cfg.SANCION_MULTAS, tipo);
         var importe = function (k, fijo) { return '<input type="text" inputmode="decimal" id="lg-s-' + k + '" value="' + texto(ini[k] === '' || ini[k] == null ? '' : String(ini[k]).replace('.', ',')) + '" placeholder="0"' + (fijo ? ' disabled' : '') + '>'; };
         var precio = function (m) {
@@ -893,7 +1042,7 @@
           return 'Multa: ' + euros(x) + (partes.length ? ' (' + partes.join(' y ') + ')' : '') + ', la de la normativa. Solo un socio la cambia.';
         };
         var html = '<h2 id="lg-vt">' + (s ? 'Cambiar la sanción' : 'Apuntar una sanción') + '</h2>' +
-          '<p class="u-nota">' + texto(pFijo ? titulo(pFijo) + ' · Jornada ' + pFijo.JORNADA : equipo(idEq) + ' · ' + ligaCompleta((M.ix.eq[idEq] || {}).ID_LIGA)) + '</p><div class="u-campos">' +
+          '<p class="u-nota">' + texto(pFijo ? titulo(pFijo) + ' · ' + nomJornada(pFijo) : equipo(idEq) + ' · ' + ligaCompleta((M.ix.eq[idEq] || {}).ID_LIGA)) + '</p><div class="u-campos">' +
           (pFijo ? campoF('Equipo sancionado', '<select id="lg-s-eq">' + opciones([pFijo.ID_INSCRIPCION_LOCAL, pFijo.ID_INSCRIPCION_VISITANTE].filter(Boolean).map(function (x) { return [x, equipo(x)]; }), idEq, 'Elige el equipo') + '</select>')
             : campoF('Partido', '<select id="lg-s-par">' + opciones(suyos.map(function (p) { return [p.ID, nomP(p)]; }), idP, 'Sin partido') + '</select>', 'u-ancho')) +
           campoF('Tipo', '<select id="lg-s-tipo">' + opciones(TIPOS_SANCION.concat(tipo && TIPOS_SANCION.indexOf(tipo) < 0 ? [tipo] : []).map(function (x) { return [x, x]; }), tipo, 'Elige el tipo') + '</select>') +
@@ -1012,7 +1161,7 @@
         var proximo = ps.filter(function (p) { return p.ESTADO === 'Programado' && String(p.FECHA || '') >= hoy(); }).sort(function (a, b) { return orden(cuando(a), cuando(b)); })[0];
         var linea = function (x) {
           return '<li><button type="button" class="lg-ef-p" data-p="' + texto(x.p.ID) + '"><span class="lg-ef-r lg-ef-' + x.r + '">' + x.r + '</span><span class="lg-ef-txt"><b>' + texto('Contra ' + equipo(x.rival)) + '</b>' +
-            '<small>' + texto('J' + x.p.JORNADA + ' · ' + fecha(x.p.FECHA) + (x.p.ID_INSCRIPCION_LOCAL === e.ID ? ' · local' : ' · visitante') + (x.p.ESTADO === 'Anulado' ? ' · anulado' : '')) + '</small></span>' +
+            '<small>' + texto(nomJornada(x.p, true) + ' · ' + fecha(x.p.FECHA) + (x.p.ID_INSCRIPCION_LOCAL === e.ID ? ' · local' : ' · visitante') + (x.p.ESTADO === 'Anulado' ? ' · anulado' : '')) + '</small></span>' +
             '<b class="u-cifra">' + x.a + '–' + x.b + '</b></button></li>';
         };
         var cifra = function (v, t) { return '<div><b class="u-cifra">' + texto(v) + '</b><span>' + texto(t) + '</span></div>'; };
@@ -1087,7 +1236,11 @@
             '<button type="button" class="u-btn u-btn-icono" data-paso="1" data-e="' + texto(e) + '" aria-label="Un gol más de ' + texto(equipo(e)) + '">+</button></div><div class="lg-quien" id="lg-q-' + texto(e) + '"></div></div>';
         };
         ventana('<h2 id="lg-vt">Acta · ' + texto(titulo(p)) + '</h2><p class="u-nota">' + texto([fechaDia(p.FECHA) + ' · ' + fecha(p.FECHA), p.HORA, campo(p.ID_CAMPO)].filter(String).join(' · ')) + '. Apunta el resultado y quién marcó cada gol.</p>' +
-          '<div class="lg-acta">' + lado(L, 'Local') + lado(V, 'Visitante') + '</div><div class="u-campos">' +
+          '<div class="lg-acta">' + lado(L, 'Local') + lado(V, 'Visitante') + '</div>' +
+          (p.FASE ? '<div class="u-campos" id="lg-pen" hidden><p class="u-nota u-ancho">Empate en la fase final: se decide por penaltis.</p>' +
+            campoF('Penaltis de ' + texto(equipo(L)), '<input type="number" inputmode="numeric" min="0" step="1" id="lg-pen-l" value="' + texto(p.PENALTIS_LOCAL == null ? '' : p.PENALTIS_LOCAL) + '">') +
+            campoF('Penaltis de ' + texto(equipo(V)), '<input type="number" inputmode="numeric" min="0" step="1" id="lg-pen-v" value="' + texto(p.PENALTIS_VISITANTE == null ? '' : p.PENALTIS_VISITANTE) + '">') + '</div>' : '') +
+          '<div class="u-campos">' +
           campoF('Arbitró', '<select id="lg-real">' + opciones(arbs.map(function (x) { return [x, persona(x)]; }), p.ID_ARBITRO_REAL || p.ID_ARBITRO, 'Sin árbitro') + '</select>') +
           campoF('Notas', '<textarea id="lg-notas" rows="2">' + texto(p.NOTAS) + '</textarea>', 'u-ancho') + '</div>' +
           botones('<button type="button" class="u-btn u-btn-accion" id="lg-guardar">Guardar el acta</button><button type="button" class="u-btn" data-cerrar>Cancelar</button>'), function () {
@@ -1102,16 +1255,18 @@
             }
             caja.innerHTML = h;
           }
-          function todo() { quien(L); quien(V); }
+          function empate() { return parseInt(vent.querySelector('#lg-g-' + L).value, 10) === parseInt(vent.querySelector('#lg-g-' + V).value, 10); }
+          function todo() { quien(L); quien(V); var pn = vent.querySelector('#lg-pen'); if (pn) pn.hidden = !empate(); }
           todo();
           cargarJugadoras('ID_INSCRIPCION_EQUIPO', [L, V]).then(function () { if (velo.classList.contains('abierto')) todo(); }, function (e) { verError(['No se han podido leer las jugadoras: ' + limpio(e)]); });
-          vent.oninput = function (e) { if (/^lg-g-/.test(e.target.id || '')) quien(e.target.id.slice(5)); };
+          vent.oninput = function (e) { if (/^lg-g-/.test(e.target.id || '')) { quien(e.target.id.slice(5)); var pn = vent.querySelector('#lg-pen'); if (pn) pn.hidden = !empate(); } };
           vent.onclick = function (e) {
             var b = e.target.closest('[data-paso]');
             if (!b) return;
             var k = b.getAttribute('data-e'), inp = vent.querySelector('#lg-g-' + k);
             inp.value = Math.max(0, (parseInt(inp.value, 10) || 0) + Number(b.getAttribute('data-paso')));
             quien(k);
+            var pn = vent.querySelector('#lg-pen'); if (pn) pn.hidden = !empate();
           };
           vent.querySelector('#lg-guardar').onclick = function () {
             todo();
@@ -1124,13 +1279,20 @@
                 goles.push({ id_inscripcion_equipo: x[0], id_inscripcion_jugadora: v.charAt(0) === '_' ? null : v, tipo: v === '_puntualidad' ? PUNTUALIDAD : v === '_nadie' ? EN_PROPIA : null });
               }
             });
+            var pl = null, pv = null;
+            if (p.FASE && gl === gv && gl >= 0) {
+              pl = parseInt(val('lg-pen-l'), 10); pv = parseInt(val('lg-pen-v'), 10);
+              if (!(pl >= 0) || !(pv >= 0)) mal.push('Empate: apunta cómo acabaron los penaltis.');
+              else if (pl === pv) mal.push('En los penaltis gana alguien: no pueden acabar empatados.');
+            }
             verError(mal);
             if (mal.length) return;
             var real = val('lg-real'), notas = val('lg-notas');
             cerrar(true);
-            guardar('ligas_acta', { partido: p.ID, goles_local: gl, goles_visitante: gv, goles: goles, arbitro_real: real || null, notas: notas },
-              { tabla: 'PARTIDOS', id: p.ID, cambios: { GOLES_LOCAL: gl, GOLES_VISITANTE: gv, ESTADO: 'Jugado', ID_ARBITRO_REAL: real === p.ID_ARBITRO ? '' : real, MOTIVO: '', ANULADO_POR: '', NOTAS: notas } })
-              .then(function () { if (ctx.abierta()) ctx.aviso('Acta guardada: ' + equipo(L) + ' ' + gl + ' – ' + gv + ' ' + equipo(V) + '.'); }, nada);
+            guardar('ligas_acta', { partido: p.ID, goles_local: gl, goles_visitante: gv, goles: goles, arbitro_real: real || null, notas: notas, penaltis_local: pl, penaltis_visitante: pv },
+              { tabla: 'PARTIDOS', id: p.ID, cambios: { GOLES_LOCAL: gl, GOLES_VISITANTE: gv, ESTADO: 'Jugado', ID_ARBITRO_REAL: real === p.ID_ARBITRO ? '' : real, MOTIVO: '', ANULADO_POR: '', NOTAS: notas,
+                PENALTIS_LOCAL: pl === null ? '' : pl, PENALTIS_VISITANTE: pv === null ? '' : pv } })
+              .then(function () { if (ctx.abierta()) ctx.aviso('Acta guardada: ' + equipo(L) + ' ' + gl + ' – ' + gv + ' ' + equipo(V) + (pl !== null ? ' (penaltis ' + pl + '-' + pv + ')' : '') + '.'); }, nada);
           };
         });
       }
@@ -1388,7 +1550,7 @@
         ventana('<h2 id="lg-vt">Recuperar aplazados</h2><p class="u-nota">' + texto(ligaCompleta(idL)) + '</p>' +
           '<p class="lg-regla">Solo en los campos reservados para la liga esta temporada. Eliges el día y, para cada partido, su hora y su campo entre los libres. El aplazado se queda como estaba y la recuperación es un partido nuevo.</p>' +
           '<h3 class="lg-sub">1 · Qué partidos</h3><div class="lg-rec-ps">' + pend.map(function (p) {
-            return '<label class="u-check"><input type="checkbox" data-rec="' + texto(p.ID) + '"' + (marcados[p.ID] ? ' checked' : '') + '><span class="lg-eqt"><span><b>' + texto('J' + p.JORNADA + ' · ' + titulo(p)) + '</b>' +
+            return '<label class="u-check"><input type="checkbox" data-rec="' + texto(p.ID) + '"' + (marcados[p.ID] ? ' checked' : '') + '><span class="lg-eqt"><span><b>' + texto(nomJornada(p, true) + ' · ' + titulo(p)) + '</b>' +
               '<small>' + texto('Era el ' + fechaDia(p.FECHA).toLowerCase() + ' · ' + p.HORA + ' · ' + campo(p.ID_CAMPO) + (p.MOTIVO ? ' · ' + p.MOTIVO : '')) + '</small></span></span></label>';
           }).join('') + '</div><h3 class="lg-sub">2 · Qué día</h3><div id="lg-rec-dias"></div><div id="lg-conf" class="lg-conf"></div>' +
           botones('<button type="button" class="u-btn u-btn-accion" id="lg-guardar" disabled>Recuperar</button><button type="button" class="u-btn" data-cerrar>Cancelar</button>'), function () {
@@ -1504,6 +1666,8 @@
         b = t.closest('[data-jornadas]'); if (b) { formJornadas(Number(b.getAttribute('data-jornadas'))); return; }
         b = t.closest('[data-accion="recuperar"]'); if (b) { formRecuperar(M.actual.liga.ID, null); return; }
         b = t.closest('[data-accion="sanciones"]'); if (b) { apuntarSanciones(); return; }
+        b = t.closest('[data-accion="fasefinal"]'); if (b) { crearFaseFinal(b); return; }
+        b = t.closest('[data-accion="ffquitar"]'); if (b) { quitarFaseFinal(b); return; }
         b = t.closest('[data-ir-actas]'); if (b) { F.liga = '*'; F.mios = true; S.fecha = b.getAttribute('data-ir-actas'); pintar(); return; }
         b = t.closest('[data-p]'); if (b) ficha(b.getAttribute('data-p'));
       });

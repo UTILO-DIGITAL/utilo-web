@@ -18,7 +18,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Ligas",
    "icono": "<path d=\"M8 4h8v5a4 4 0 0 1-8 0z\"/><path d=\"M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4\"/><path d=\"M12 13v4M9 20h6\"/>",
    "web": "konamigas/secciones/competicion.js",
-   "version": "1177c9a1e5",
+   "version": "595523ce94",
    "perfiles": "todos",
    "config": {},
    "api": [
@@ -35,7 +35,9 @@ window.NUCLEO_MONTAJE = {
     "ligas_sanciones_faltan",
     "ligas_sancion_cuentas",
     "ligas_sancion_pagar",
-    "ligas_sancion_despagar"
+    "ligas_sancion_despagar",
+    "ligas_fase_final",
+    "ligas_fase_final_quitar"
    ],
    "servidor": [
     "justificante"
@@ -745,6 +747,35 @@ window.NUCLEO_MONTAJE = {
      {
       "nombre": "LOG",
       "tipo": "log"
+     },
+     {
+      "nombre": "FASE",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "RONDA",
+      "tipo": "lista",
+      "valores": [
+       "Semifinal",
+       "Final",
+       "Tercer puesto"
+      ]
+     },
+     {
+      "nombre": "PUESTO_LOCAL",
+      "tipo": "numero"
+     },
+     {
+      "nombre": "PUESTO_VISITANTE",
+      "tipo": "numero"
+     },
+     {
+      "nombre": "PENALTIS_LOCAL",
+      "tipo": "numero"
+     },
+     {
+      "nombre": "PENALTIS_VISITANTE",
+      "tipo": "numero"
      }
     ],
     "restricciones": {
@@ -789,6 +820,9 @@ window.NUCLEO_MONTAJE = {
      ],
      "partidos_aplazado_por_fkey": [
       "APLAZADO_POR"
+     ],
+     "partidos_ronda_valores": [
+      "RONDA"
      ],
      "partidos_id_campo_fecha_hora_key": [
       "ID_CAMPO",
@@ -1150,6 +1184,10 @@ window.NUCLEO_MONTAJE = {
        "Confirmada",
        "Baja"
       ]
+     },
+     {
+      "nombre": "FASE_FINAL",
+      "tipo": "texto"
      }
     ],
     "restricciones": {}

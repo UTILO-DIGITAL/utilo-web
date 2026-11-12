@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "2b2f313",
-   "ultimo": "Merge pull request #309 from UTILO-DIGITAL/T0468-entregar-acentos",
+   "commit": "aac280c",
+   "ultimo": "Merge pull request #310 from UTILO-DIGITAL/T0313-fase-final",
    "quien": "",
-   "fecha": "2026-11-12T16:55:36.473Z",
+   "fecha": "2026-11-12T18:21:03.292Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -163,7 +163,9 @@
      "20261111210000_dev_cerrado.sql",
      "20261111220000_correo_enviar.sql",
      "20261112130000_ligas_baja.sql",
-     "20261112140000_clasificacion_baja.sql"
+     "20261112140000_clasificacion_baja.sql",
+     "20261112155900_fase_final_columnas.sql",
+     "20261112160000_fase_final.sql"
     ],
     "utilo": [
      "20261105150000_latido.sql",

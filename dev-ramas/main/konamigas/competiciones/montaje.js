@@ -11,7 +11,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Competiciones",
    "icono": "<path d=\"M8 4h8v5a4 4 0 0 1-8 0z\"/><path d=\"M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4\"/><path d=\"M12 13v4M9 20h6\"/>",
    "web": "konamigas/secciones/competicion.js",
-   "version": "1177c9a1e5",
+   "version": "595523ce94",
    "config": {},
    "api": []
   }
@@ -353,6 +353,35 @@ window.NUCLEO_MONTAJE = {
       "nombre": "APLAZADO_POR",
       "tipo": "ref",
       "ref": "INSCRIPCIONES_EQUIPOS"
+     },
+     {
+      "nombre": "FASE",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "RONDA",
+      "tipo": "lista",
+      "valores": [
+       "Semifinal",
+       "Final",
+       "Tercer puesto"
+      ]
+     },
+     {
+      "nombre": "PUESTO_LOCAL",
+      "tipo": "numero"
+     },
+     {
+      "nombre": "PUESTO_VISITANTE",
+      "tipo": "numero"
+     },
+     {
+      "nombre": "PENALTIS_LOCAL",
+      "tipo": "numero"
+     },
+     {
+      "nombre": "PENALTIS_VISITANTE",
+      "tipo": "numero"
      }
     ],
     "restricciones": {}
@@ -623,6 +652,10 @@ window.NUCLEO_MONTAJE = {
        "Confirmada",
        "Baja"
       ]
+     },
+     {
+      "nombre": "FASE_FINAL",
+      "tipo": "texto"
      }
     ],
     "restricciones": {}
