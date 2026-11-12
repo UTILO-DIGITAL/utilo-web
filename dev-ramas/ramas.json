@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "c71763c",
-   "ultimo": "Merge pull request #303 from UTILO-DIGITAL/T0340-anular-partidos-baja",
+   "commit": "4c6bc69",
+   "ultimo": "Merge pull request #304 from UTILO-DIGITAL/T0464-como-probarlo",
    "quien": "",
-   "fecha": "2026-11-12T10:09:42.309Z",
+   "fecha": "2026-11-12T10:42:29.126Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -200,7 +200,8 @@
      "20261111220000_correo_enviar.sql",
      "20261111230000_aprobar.sql",
      "20261111233000_que_mirar_chat.sql",
-     "20261111233001_que_mirar_chat_tablas.sql"
+     "20261111233001_que_mirar_chat_tablas.sql",
+     "20261112100919_esquema.sql"
     ]
    },
    "rama": "main"
