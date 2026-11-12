@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "addc021",
-   "ultimo": "Merge pull request #305 from UTILO-DIGITAL/T0465-menos-minutos-pruebas",
+   "commit": "d652960",
+   "ultimo": "Merge pull request #306 from UTILO-DIGITAL/T0466-falta-por-publicar",
    "quien": "",
-   "fecha": "2026-11-12T10:46:38.274Z",
+   "fecha": "2026-11-12T11:47:31.335Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -201,7 +201,9 @@
      "20261111230000_aprobar.sql",
      "20261111233000_que_mirar_chat.sql",
      "20261111233001_que_mirar_chat_tablas.sql",
-     "20261112100919_esquema.sql"
+     "20261112100919_esquema.sql",
+     "20261112103648_por_publicar_tablas.sql",
+     "20261112103649_por_publicar.sql"
     ]
    },
    "rama": "main"
