@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Konamigas DEV</title>
+<link rel="icon" href="data:,">
+<meta name="dev-ramas" content="Plataforma"><!-- T0441: su nombre en el selector de la app DEV -->
+<!-- T0394: web de DEV de la plataforma de Konamigas sobre Supabase (clientes/konamigas/plataforma de utilo-apps: Ligas). En utilo-web/dev-rama/
+     va al Supabase de DEV (konamigas-dev, con los datos de ejemplo de seed.sql) con el montaje de la rama
+     (konamigas/plataforma/montaje.js). Se entra con Google o con un código al correo: los correos no salen, se ven con «Ver el buzón de
+     pruebas» (los de @ejemplo.com). No la carga ninguna página de producción. -->
+<link rel="stylesheet" href="../../konamigas/marca.css?v=48">
+<link rel="stylesheet" href="../../estilos/base.css?v=93">
+<style>html, body { overscroll-behavior-x: none; }</style>
+<script>
+  window.KANBAN = {
+    clave: 'dev-konamigas-plataforma',
+    marca: 'konamigas',
+    nombreApp: 'Konamigas DEV',
+    supabase: true
+  };
+</script>
+</head>
+<body class="u">
+<div class="kz"><div class="kz-caja kz-centro" role="status"><div class="u-carga"></div><p>Cargando…</p></div></div>
+<script src="../../konamigas/plataforma/montaje.js?v=bd83280dc3"></script>
+<script src="../../kanban4/tablas.js?v=53"></script>
+<script src="../../nucleo/supabase.js?v=3"></script>
+<script src="../../nucleo/acceso-supabase.js?v=11"></script>
+<script src="../../nucleo/nucleo.js?v=20"></script>
+</body>
+</html>
