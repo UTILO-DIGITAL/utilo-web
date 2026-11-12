@@ -553,10 +553,10 @@
    "tarea": "T0313",
    "titulo": "Al acabar la liga, su fase final Oro y Plata con semifinales, final y penaltis",
    "pr": null,
-   "commit": "13e0a72",
-   "ultimo": "T0313: Al acabar la liga, su fase final Oro y Plata con semifinales, final y penaltis",
+   "commit": "588d38b",
+   "ultimo": "T0313: La fase final va por puestos, en bloques fijos de 4, y sin Supercopa",
    "quien": "Javi Canela",
-   "fecha": "2026-11-12T12:58:05.401Z",
+   "fecha": "2026-11-12T16:57:00.375Z",
    "toca": [
     "konamigas"
    ],
@@ -715,7 +715,7 @@
      "20261111220000_correo_enviar.sql",
      "20261112130000_ligas_baja.sql",
      "20261112140000_clasificacion_baja.sql",
-     "20261112140001_fase_final_columnas.sql",
+     "20261112155900_fase_final_columnas.sql",
      "20261112160000_fase_final.sql"
     ],
     "utilo": [

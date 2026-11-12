@@ -18,7 +18,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Ligas",
    "icono": "<path d=\"M8 4h8v5a4 4 0 0 1-8 0z\"/><path d=\"M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4\"/><path d=\"M12 13v4M9 20h6\"/>",
    "web": "konamigas/secciones/competicion.js",
-   "version": "e78ba13af4",
+   "version": "b9d7d7d01c",
    "perfiles": "todos",
    "config": {},
    "api": [
@@ -36,7 +36,6 @@ window.NUCLEO_MONTAJE = {
     "ligas_sancion_cuentas",
     "ligas_sancion_pagar",
     "ligas_sancion_despagar",
-    "ligas_fase_final_propuesta",
     "ligas_fase_final",
     "ligas_fase_final_quitar"
    ],
@@ -761,6 +760,14 @@ window.NUCLEO_MONTAJE = {
        "Final",
        "Tercer puesto"
       ]
+     },
+     {
+      "nombre": "PUESTO_LOCAL",
+      "tipo": "numero"
+     },
+     {
+      "nombre": "PUESTO_VISITANTE",
+      "tipo": "numero"
      },
      {
       "nombre": "PENALTIS_LOCAL",
