@@ -550,12 +550,12 @@
   },
   "T0435-quitar-telegram": {
    "tarea": "T0435",
-   "titulo": "Los avisos salen solo de la plataforma; Telegram, fuera",
-   "pr": null,
-   "commit": "6985569",
-   "ultimo": "T0435: Los avisos salen solo de la plataforma; Telegram, fuera",
+   "titulo": "Los avisos llegan solo al móvil desde la plataforma; adiós a Telegram",
+   "pr": 308,
+   "commit": "666e9b0",
+   "ultimo": "T0435: Lo que dijo la revisión: avisos que no se pierden en silencio",
    "quien": "Javi Canela",
-   "fecha": "2026-11-12T12:20:25.940Z",
+   "fecha": "2026-11-12T12:53:28.970Z",
    "toca": [
     "utilo"
    ],
@@ -754,7 +754,7 @@
      "20261112100919_esquema.sql",
      "20261112103648_por_publicar_tablas.sql",
      "20261112103649_por_publicar.sql",
-     "20261112160000_avisos_sin_telegram.sql"
+     "20261112170000_avisos_sin_telegram.sql"
     ]
    },
    "rama": "T0435-quitar-telegram"
