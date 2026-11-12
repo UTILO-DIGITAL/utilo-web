@@ -544,8 +544,8 @@
  "bases": {
   "konamigas": {
    "rama": "T0340-anular-partidos-baja",
-   "commit": "6a94843",
-   "fecha": "2026-11-12T08:59:20.075Z",
+   "commit": "4ced4b1",
+   "fecha": "2026-11-12T09:35:44.979Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
@@ -563,7 +563,8 @@
     "20261111190000_personas_de_prueba.sql",
     "20261111210000_dev_cerrado.sql",
     "20261111220000_correo_enviar.sql",
-    "20261112120000_ligas_baja.sql"
+    "20261112120000_ligas_baja.sql",
+    "20261112130000_ligas_baja.sql"
    ]
   },
   "utilo": {
