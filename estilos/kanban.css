@@ -1095,3 +1095,13 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
 .u .bloque.frevision { border-left: 4px solid var(--estado-pr); }
 .u .bloque .fcomprobar { margin: 0 0 var(--e2); }
 .u .bloque .fver-dev { background: #F5C518; border-color: #1C1C1C; color: #1C1C1C; }
+/* T0466 · Por publicar: qué falta para entregarla (ficha) y la columna agrupada por los botones que faltan */
+.u .bloque.fpp { border-left: 4px solid var(--estado-co); }
+.u .bloque.fpp p { margin: 0 0 var(--e2); }
+.u .bloque.fpp p:last-child { margin-bottom: 0; }
+.u .fpp-lista { margin: 0 0 var(--e2); padding-left: var(--e5); }
+.u .fpp-lista span { color: var(--color-suave); }
+.u .fpp-duda { color: var(--estado-pr); }
+.u .tb-pp { display: grid; gap: 2px; padding: var(--e1) var(--e1) 0; font-size: 13px; overflow-wrap: anywhere; }
+.u .tb-pp:not(:first-child) { margin-top: var(--e2); border-top: 1px solid var(--color-linea); padding-top: var(--e2); }
+.u .tb-pp span { color: var(--color-suave); font-size: 12px; }

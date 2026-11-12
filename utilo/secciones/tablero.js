@@ -31,6 +31,9 @@
  *   «Añadir». «Editar tarea» sigue para cambiar varios a la vez.
  * - Crear y editar escriben TAREAS (y sus DEPENDENCIAS) con la capa de tablas; la tarjeta sale al momento con «Guardando».
  *   Una nota va a la bitácora con anotar(). Después se trae el tablero (en manos de, lo que la base mueve sola).
+ * - T0466 · Por publicar: la ficha dice qué falta para llegar a producción (qué botón: «Publicar» de qué proyecto, «Supabase»
+ *   de qué iniciativa en producción, o a mano) y qué ya está; y la columna las agrupa por los botones que les faltan. Lo
+ *   calcula herramientas/entregar.js al fusionar y al publicar (TAREAS.POR_PUBLICAR); aquí solo se lee.
  * - T0387 · Una tarea en Necesita tu respuesta se responde en su ficha (responder() de la base, como en Para mí): quien la
  *   pidió o quien lleva la iniciativa. Lo escrito se guarda aunque la ficha se repinte.
  */
@@ -350,8 +353,64 @@
     return APP_DEV + '?probar&tarea=' + encodeURIComponent(id) + (v ? '&web=' + encodeURIComponent(v.ruta) + (v.como ? '&como=' + encodeURIComponent(v.como) : '') : '');
   }
 
+  /* ---------- T0466 · Qué falta por publicar ---------- */
+  var PR_GITHUB = /https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/pull\/\d+/;
+  /**
+   * Lo que le falta a una tarea Por publicar, de POR_PUBLICAR (el JSON que apunta entregar.js):
+   *   { que: 'calculado', faltan: [{ donde, con: [botón] }], ya: [versión], dudas: [texto], el }
+   *   { que: 'sin-pr' }        sin PR en DOCUMENTOS_RELEVANTES: se envía o se publica a mano
+   *   { que: 'sin-calcular' }  aún no lo ha calculado nadie (se acaba de aprobar) o no se entiende
+   */
+  function porPublicar(t) {
+    if (!t || !PR_GITHUB.test(String(t.DOCUMENTOS_RELEVANTES || ''))) return { que: 'sin-pr' };
+    var v = null;
+    try { v = t.POR_PUBLICAR ? (typeof t.POR_PUBLICAR === 'string' ? JSON.parse(t.POR_PUBLICAR) : t.POR_PUBLICAR) : null; } catch (e) { v = null; }
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return { que: 'sin-calcular' };
+    var l = function (x) { return Array.isArray(x) ? x : []; };
+    return { que: 'calculado', el: v.el || '', ya: l(v.ya).map(String), dudas: l(v.dudas).map(String),
+      faltan: l(v.faltan).filter(function (f) { return f && l(f.con).length; }).map(function (f) { return { donde: String(f.donde || ''), con: l(f.con).map(String) }; }) };
+  }
+  /** Un instante ISO, como dd/mm/aaaa hh:mm en la hora de quien mira ('' si no se entiende). */
+  function horaLocal(iso) {
+    var d = new Date(iso), z = function (n) { return ('0' + n).slice(-2); };
+    return iso && !isNaN(d.getTime()) ? z(d.getDate()) + '/' + z(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()) : '';
+  }
+  /** La acción de GitHub de un botón, con las opciones ya puestas (boton-*.yml): solo hay que pulsar «Run workflow». '' para
+   *  los de «A mano». Igual que accionDe de herramientas/entregar.js (probar-plataforma.js comprueba que dan lo mismo). */
+  function enlaceBoton(b) {
+    var m = /^Publicar · ([a-z0-9_-]+)\/([a-z0-9_-]+)$/.exec(b), a = m ? 'boton-publicar-' + m[1] + '-' + m[2] + '.yml' : '';
+    if (!a && (m = /^Supabase · ([a-z0-9_-]+) · Producción$/.exec(b))) a = 'boton-supabase-' + m[1] + '.yml';
+    return a ? 'https://github.com/UTILO-DIGITAL/utilo-apps/actions/workflows/' + a : '';
+  }
+  /** Un sitio que falta, como se lee: «Publicar · konamigas/nucleo», o «… o …» si vale cualquiera de sus botones. */
+  function botonTexto(f) { return f.con.join(' o '); }
+  /**
+   * La columna «Por publicar», agrupada por lo que les falta (T0466, Javi: de un vistazo, qué saldría con cada botón):
+   * [{ clave, titulo, nota, ts }], primero las que salen con un solo botón; cada tarea, en un grupo. ts en el orden recibido.
+   */
+  function gruposPorPublicar(ts) {
+    var g = {}, orden = [];
+    (ts || []).forEach(function (t) {
+      var p = porPublicar(t), k, tit, nota, peso;
+      if (p.que === 'sin-pr') { k = '~sin-pr'; tit = 'Sin PR: se envía o se publica a mano'; nota = 'Cuando esté, pásala a Entregada.'; peso = 90; }
+      else if (p.que === 'sin-calcular') { k = '~sin-calcular'; tit = 'Calculando qué les falta'; nota = 'Sale en un minuto, al fusionar su PR.'; peso = 80; }
+      else if (!p.faltan.length && p.dudas.length) { k = '~dudas'; tit = 'Algo no cuadra con su PR'; nota = 'Lo dice su ficha.'; peso = 70; }
+      else if (!p.faltan.length) { k = '~ya'; tit = 'Ya están en su sitio'; nota = 'Pasan solas a Entregada con la próxima publicación.'; peso = 60; }
+      else {
+        var bs = p.faltan.map(botonTexto).sort();
+        k = bs.join(' + '); tit = 'Con ' + bs.join(' y '); peso = bs.length;
+        nota = bs.length > 1 ? 'Hacen falta las ' + (bs.length === 2 ? 'dos' : bs.length) + '; con la última, pasan a Entregada.' : 'Al acabar, pasan solas a Entregada.';
+        if (bs.some(function (b) { return /^A mano/.test(b); })) { nota = 'Lo de «A mano» se le pide a Claude.'; peso += 10; } // después de las de botón
+      }
+      if (!g[k]) { g[k] = { clave: k, titulo: tit, nota: nota, peso: peso, ts: [] }; orden.push(g[k]); }
+      g[k].ts.push(t);
+    });
+    return orden.sort(function (a, b) { return a.peso - b.peso || a.clave.localeCompare(b.clave); });
+  }
+
   var CALC = { frases: frases, numerada: numerada, partesTexto: partesTexto, htmlTexto: htmlTexto, conEnlaces: conEnlaces, motivoClaude: motivoClaude, ANTES_DE_EMPEZAR: ANTES_DE_EMPEZAR,
-    enlaceDev: enlaceDev, COMPROBAR: COMPROBAR, EN_REVISION: EN_REVISION, VER_EN_DEV: VER_EN_DEV, SIN_CODIGO: SIN_CODIGO };
+    enlaceDev: enlaceDev, COMPROBAR: COMPROBAR, EN_REVISION: EN_REVISION, VER_EN_DEV: VER_EN_DEV, SIN_CODIGO: SIN_CODIGO,
+    porPublicar: porPublicar, gruposPorPublicar: gruposPorPublicar, enlaceBoton: enlaceBoton };
   // En las pruebas (node, sin navegador), solo las cuentas.
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
@@ -571,7 +630,13 @@
           return '<section class="col' + (pl ? ' plegada' : '') + '" data-est="' + texto(c.id) + '">' +
             '<h2 class="' + cls(c.estados[0], c) + ' ch" title="' + texto(queEs(c)) + '" role="button" tabindex="0" aria-expanded="' + (pl ? 'false' : 'true') + '" data-plegar="' + texto(c.id) + '">' + texto(c.titulo) +
             '<span class="n">' + ts.length + '</span><span class="fl"></span></h2>' +
-            '<div class="lista">' + (ts.length ? ts.map(function (t) { return tarjeta(t, c); }).join('') : '<div class="vacio">Ninguna tarea con estos filtros.</div>') + '</div></section>';
+            '<div class="lista">' + (!ts.length ? '<div class="vacio">Ninguna tarea con estos filtros.</div>'
+              // T0466: Por publicar, agrupadas por los botones que les faltan.
+              : c.estados.length === 1 && c.estados[0] === 'Aprobada' ? gruposPorPublicar(ts).map(function (g) {
+                return '<div class="tb-pp" title="' + texto(g.nota) + '"><b>' + texto(g.titulo) + '</b><span>' + texto(g.nota) + '</span></div>' +
+                  g.ts.map(function (t) { return tarjeta(t, c); }).join('');
+              }).join('')
+              : ts.map(function (t) { return tarjeta(t, c); }).join('')) + '</div></section>';
         }).join('');
       }
 
@@ -1418,6 +1483,28 @@
       }
       function quien(b) { return b.QUIEN || nombre(b.PERSONA) || (b.EMPLEADO ? b.EMPLEADO : 'Sistema'); }
 
+      /** T0466 · El bloque «Para entregarla» de una tarea Por publicar. */
+      function htmlPorPublicar(t) {
+        var p = porPublicar(t), h = '';
+        if (p.que === 'sin-pr') h = '<p>No tiene PR: falta enviarla o publicarla a mano. Cuando esté, pásala a Entregada.</p>';
+        else if (p.que === 'sin-calcular') h = '<p>Calculando qué le falta: sale en un minuto, al fusionar su PR.</p>';
+        else {
+          if (p.faltan.length) h += '<p>Falta:</p><ul class="fpp-lista">' + p.faltan.map(function (f) {
+            var bs = f.con.map(function (b) {
+              var u = enlaceBoton(b);
+              return u ? '<a href="' + texto(u) + '" target="_blank" rel="noopener" title="Abre la acción en GitHub con todo puesto: pulsa «Run workflow»"><b>' + texto(b) + '</b></a>' : '<b>' + texto(b) + '</b>';
+            }).join(' o ');
+            return '<li>' + bs + (f.donde && botonTexto(f).indexOf(f.donde) < 0 ? ' <span>(' + texto(f.donde) + ')</span>' : '') + '</li>';
+          }).join('') + '</ul>';
+          if (p.ya.length) h += '<p><b>Ya está:</b> ' + texto(p.ya.join(', ')) + '</p>';
+          if (p.dudas.length) h += p.dudas.map(function (d) { return '<p class="fpp-duda"><b>Ojo:</b> ' + texto(d) + '</p>'; }).join('');
+          if (!p.faltan.length && !p.dudas.length) h += '<p>Ya está en todos sus sitios: pasa sola a Entregada con la próxima publicación.</p>';
+          else if (p.faltan.length) h += '<p class="u-nota">' + (p.faltan.some(function (f) { return /^A mano/.test(f.con[0]); })
+            ? 'Lo de «A mano» se le pide a Claude. ' : '') + (p.faltan.some(function (f) { return f.con.some(enlaceBoton); })
+            ? 'Cada botón abre su acción en GitHub con todo puesto: pulsa «Run workflow». ' : '') + 'Cuando esté todo, pasa sola a Entregada.' + (horaLocal(p.el) ? ' Mirado el ' + texto(horaLocal(p.el)) + '.' : '') + '</p>';
+        }
+        return '<div class="bloque fpp"><h3>Para entregarla</h3>' + h + '</div>';
+      }
       function pintarFicha() {
         var t = tarea(abiertaId);
         if (!t) { cerrarFicha(); return; }
@@ -1516,12 +1603,14 @@
           if (cmp || qm || ver) revision = '<div class="bloque frevision"><h3>Qué mirar</h3>' + cmp + qm + ver + '</div>';
         }
         if (t.MOTIVO) motivo.push('<p><b>Motivo:</b> ' + texto(t.MOTIVO) + '</p>');
+        // T0466: qué le falta para llegar a producción y con qué botón (lo calcula entregar.js al fusionar y al publicar).
+        var publicar = t.ESTADO === 'Aprobada' ? htmlPorPublicar(t) : '';
         caja.innerHTML =
           '<div class="barra"><button type="button" class="volver" data-cerrar>' + ICO_VOLVER + texto(vieneDe ? 'Volver a ' + vieneDe.titulo : 'Volver al tablero') + '</button></div>' +
           '<div class="cab"><div class="id"><span class="n">' + texto(id) + '</span></div>' +
             (ab('TITULO') ? '<h1 id="kb-f-tit" class="fed-abierto">' + control(t, 'TITULO') + '</h1>' : '<h1 id="kb-f-tit"' + pulsa(t, 'TITULO') + '>' + texto(t.TITULO) + '</h1>') + '</div>' +
           '<div class="fmeta">' + tags.join('') + '</div>' + estado +
-          (motivo.length ? '<div class="bloque">' + motivo.join('') + '</div>' : '') + revision +
+          publicar + (motivo.length ? '<div class="bloque">' + motivo.join('') + '</div>' : '') + revision +
           (puedeAprobar(t) || aprob[id] ? htmlAprobar(t) : '') +
           (puedeClaude(t) ? htmlClaude(t) : '') +
           '<div class="datos"><div class="fila"><b>Fechas</b><div class="ffechas">' + fs.join('') + '</div></div></div>' +
@@ -1568,7 +1657,7 @@
       });
       gente().catch(function () {});
 
-      // T0386: en directo. Cuando alguien (otra persona, el agente, Telegram) cambia una tarea, sus dependencias o la bitácora,
+      // T0386: en directo. Cuando alguien (otra persona, el agente) cambia una tarea, sus dependencias o la bitácora,
       // la base avisa (Realtime) y el tablero se pone al día solo, en un segundo; si es la de la ficha abierta, también su bitácora.
       // Los avisos de un momento se juntan en una lectura; mientras se arrastra una tarjeta, espera a que se suelte.
       var directo = null, tDirecto = null, pendiente = {};

@@ -7,7 +7,7 @@
  * - Lo siguiente: sus tres primeras tareas En cola (ASIGNADO), por prioridad, después por deadline y, a igualdad, por cuántas
  *   tareas desbloquean (DESBLOQUEA); lo urgente, delante, como en la cola. Cada una con su herramienta.
  * - Avisos: sus tareas En curso con el deadline pasado (solo si hay).
- * Las preguntas se responden ahí mismo (responder() de la base, como por Telegram: la respuesta va a la DESCRIPCION y a la
+ * Las preguntas se responden ahí mismo (responder() de la base: la respuesta va a la DESCRIPCION y a la
  * bitácora y la tarea vuelve a la cola); lo escrito se guarda mientras la vista se pone al día.
  * Si la respondida es AUTÓNOMA y vuelve a En cola, un recuadro (hasta cerrarlo) lleva a lanzar «Autónomo» en GitHub: con el
  * agente en la fase 1 nadie la coge sola. En Lo siguiente, las autónomas llevan su etiqueta.
