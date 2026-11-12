@@ -574,9 +574,9 @@
    ]
   },
   "utilo": {
-   "rama": "T0466-falta-por-publicar",
-   "commit": "b550c1c",
-   "fecha": "2026-11-12T11:34:05.769Z",
+   "rama": "main y las ramas abiertas",
+   "commit": "d652960",
+   "fecha": "2026-11-12T11:49:33.981Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
@@ -610,7 +610,6 @@
     "20261111200002_revision_dev.sql",
     "20261111210000_dev_cerrado.sql",
     "20261111220000_correo_enviar.sql",
-    "20261111220001_que_mirar_chat_tablas.sql",
     "20261111230000_aprobar.sql",
     "20261111233000_que_mirar_chat.sql",
     "20261111233001_que_mirar_chat_tablas.sql",
