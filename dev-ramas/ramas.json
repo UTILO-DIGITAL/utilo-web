@@ -577,9 +577,9 @@
    ]
   },
   "utilo": {
-   "rama": "T0464-como-probarlo",
-   "commit": "2b2746d",
-   "fecha": "2026-11-12T10:20:35.239Z",
+   "rama": "T0466-falta-por-publicar",
+   "commit": "b550c1c",
+   "fecha": "2026-11-12T11:34:05.769Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
@@ -617,7 +617,9 @@
     "20261111230000_aprobar.sql",
     "20261111233000_que_mirar_chat.sql",
     "20261111233001_que_mirar_chat_tablas.sql",
-    "20261112100919_esquema.sql"
+    "20261112100919_esquema.sql",
+    "20261112103648_por_publicar_tablas.sql",
+    "20261112103649_por_publicar.sql"
    ]
   }
  },
