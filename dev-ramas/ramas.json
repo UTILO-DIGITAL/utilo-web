@@ -793,9 +793,9 @@
    ]
   },
   "utilo": {
-   "rama": "T0435-quitar-telegram",
-   "commit": "666e9b0",
-   "fecha": "2026-11-12T12:56:25.442Z",
+   "rama": "T0467-aviso-prueba-diaria",
+   "commit": "3061d6d",
+   "fecha": "2026-11-12T18:38:37.340Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
@@ -836,7 +836,8 @@
     "20261112103648_por_publicar_tablas.sql",
     "20261112103649_por_publicar.sql",
     "20261112160000_avisos_sin_telegram.sql",
-    "20261112170000_avisos_sin_telegram.sql"
+    "20261112170000_avisos_sin_telegram.sql",
+    "20261112190000_avisos_prueba_diaria.sql"
    ]
   }
  },
