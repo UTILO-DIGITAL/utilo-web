@@ -338,12 +338,12 @@
   },
   "T0464-como-probarlo": {
    "tarea": "T0464",
-   "titulo": "Al dejar una tarea para revisar se dice siempre cómo probarla, con casos concretos",
-   "pr": null,
-   "commit": "2b2746d",
-   "ultimo": "T0464: Al dejar una tarea para revisar se dice siempre cómo probarla, con casos concretos",
+   "titulo": "Al dejar una tarea para revisar se dice siempre cómo probarla",
+   "pr": 304,
+   "commit": "0d2645e",
+   "ultimo": "T0464: El filtro de lo vago no mira lo citado entre «»",
    "quien": "Javi Canela",
-   "fecha": "2026-11-12T10:16:47.765Z",
+   "fecha": "2026-11-12T10:29:57.997Z",
    "toca": [
     "utilo"
    ],
