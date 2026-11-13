@@ -1009,9 +1009,9 @@
    ]
   },
   "utilo": {
-   "rama": "T0457-plan-de-pruebas",
-   "commit": "f5dae70",
-   "fecha": "2026-11-13T06:16:34.652Z",
+   "rama": "main y las ramas abiertas",
+   "commit": "aac280c",
+   "fecha": "2026-11-13T11:32:08.908Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
@@ -1051,7 +1051,6 @@
     "20261112100919_esquema.sql",
     "20261112103648_por_publicar_tablas.sql",
     "20261112103649_por_publicar.sql",
-    "20261112160000_avisos_sin_telegram.sql",
     "20261112170000_avisos_sin_telegram.sql",
     "20261112182957_plan_pruebas_tablas.sql",
     "20261112183000_plan_pruebas.sql",
