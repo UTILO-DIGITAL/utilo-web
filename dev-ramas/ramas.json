@@ -982,9 +982,9 @@
  },
  "bases": {
   "konamigas": {
-   "rama": "T0313-fase-final",
-   "commit": "76a7f24",
-   "fecha": "2026-11-12T17:40:36.140Z",
+   "rama": "main y las ramas abiertas",
+   "commit": "aac280c",
+   "fecha": "2026-11-13T11:32:35.375Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
@@ -1004,6 +1004,7 @@
     "20261111220000_correo_enviar.sql",
     "20261112130000_ligas_baja.sql",
     "20261112140000_clasificacion_baja.sql",
+    "20261112150000_ligas_premios.sql",
     "20261112155900_fase_final_columnas.sql",
     "20261112160000_fase_final.sql"
    ]
