@@ -1012,7 +1012,7 @@
   "utilo": {
    "rama": "main y las ramas abiertas",
    "commit": "aac280c",
-   "fecha": "2026-11-13T11:32:08.908Z",
+   "fecha": "2026-11-14T10:55:52.761Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
