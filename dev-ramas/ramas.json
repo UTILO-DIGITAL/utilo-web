@@ -984,7 +984,7 @@
   "konamigas": {
    "rama": "main y las ramas abiertas",
    "commit": "aac280c",
-   "fecha": "2026-11-13T11:32:35.375Z",
+   "fecha": "2026-11-14T10:56:03.866Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
