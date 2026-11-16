@@ -553,12 +553,12 @@
   },
   "T0467-aviso-prueba-diaria": {
    "tarea": "T0467",
-   "titulo": "Si la prueba diaria no llega al móvil, incidencia en Para mí y el latido en rojo",
-   "pr": null,
-   "commit": "3061d6d",
-   "ultimo": "T0467: Si la prueba diaria no llega al móvil, incidencia en Para mí y el latido en rojo",
+   "titulo": "Si la prueba diaria no llega al móvil, se avisa en Para mí y por correo de GitHub",
+   "pr": 311,
+   "commit": "4b09a4a",
+   "ultimo": "T0467: La prueba diaria sale aunque GitHub lance el latido con horas de retraso",
    "quien": "Javi Canela",
-   "fecha": "2026-11-12T18:34:55.667Z",
+   "fecha": "2026-11-16T12:53:58.798Z",
    "toca": [
     "utilo"
    ],
