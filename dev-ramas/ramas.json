@@ -558,10 +558,10 @@
    "tarea": "T0599",
    "titulo": "Sección de listado con ficha, tablero y avisos, una por tabla en el menú",
    "pr": 317,
-   "commit": "44a8607",
-   "ultimo": "T0599: Las columnas del tablero llegan hasta abajo: se suelta también debajo de la última tarjeta",
+   "commit": "975c5f0",
+   "ultimo": "T0599: Prueba con Telas de verdad: las secciones de ejemplo se montan y cuadran con los YAML de GESTION",
    "quien": "Javi Canela",
-   "fecha": "2026-11-17T16:33:37.910Z",
+   "fecha": "2026-11-17T16:53:05.713Z",
    "toca": [
     "konamigas",
     "utilo"

@@ -585,7 +585,7 @@
   var ICONO_X = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   var ICONO_COPIAR = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>';
   var MENU = 'MENU'; // la fila de PREFERENCIAS con el orden del menú
-  var teclaEsc = null, mover = null, soltar = null, cancelar = null; // oyentes del documento, para quitarlos al cerrar
+  var teclaEsc = null, alMover = null, alSoltar = null, alCancelar = null; // oyentes del documento, para quitarlos al cerrar
 
   window.UN.registrar('LISTADO', {
     abrir: function (el, ctx) {
@@ -975,7 +975,7 @@
         var b = ev.target.closest && ev.target.closest('.li-tarjeta[data-mover]'); if (!b) return;
         arr = { id: b.getAttribute('data-id'), b: b, x: ev.clientX, y: ev.clientY, moviendo: false, fantasma: null };
       });
-      document.addEventListener('pointermove', mover = function (ev) {
+      document.addEventListener('pointermove', alMover = function (ev) {
         if (!arr) return;
         if (!arr.moviendo) {
           if (Math.abs(ev.clientX - arr.x) + Math.abs(ev.clientY - arr.y) < 6) return; // un clic no es arrastrar
@@ -993,7 +993,7 @@
         var tb = cont.querySelector('.li-tablero');
         if (tb) { var rc = tb.getBoundingClientRect(); if (ev.clientX > rc.right - 60) tb.scrollLeft += 24; else if (ev.clientX < rc.left + 60) tb.scrollLeft -= 24; }
       });
-      document.addEventListener('pointerup', soltar = function (ev) {
+      document.addEventListener('pointerup', alSoltar = function (ev) {
         if (!arr) return;
         var era = arr, col = era.moviendo ? columnaEn(ev.clientX, ev.clientY) : null;
         soltarArrastre();
@@ -1006,7 +1006,7 @@
         var cambios = {}; cambios[c] = cp.ids && v in cp.ids ? cp.ids[v] : v; // una columna que apunta a otra tabla guarda el código
         Promise.resolve(T.actualizar(a.tabla, era.id, cambios)).then(function () { ctx.aviso('Movida a «' + (v || 'sin ' + campo(a, c).titulo.toLowerCase()) + '».'); }, function (e) { ctx.aviso('No se ha movido: ' + ((e && e.message) || e)); });
       });
-      document.addEventListener('pointercancel', cancelar = function () { soltarArrastre(); });
+      document.addEventListener('pointercancel', alCancelar = function () { soltarArrastre(); });
       // Después de arrastrar no se abre la ficha (el navegador manda un clic al soltar).
       cont.addEventListener('click', function (ev) { if (sinClic) { ev.stopImmediatePropagation(); ev.preventDefault(); } }, true);
       velo.addEventListener('click', function (ev) {
@@ -1045,10 +1045,10 @@
     },
     cerrar: function () {
       if (teclaEsc) document.removeEventListener('keydown', teclaEsc); teclaEsc = null;
-      if (mover) document.removeEventListener('pointermove', mover);
-      if (soltar) document.removeEventListener('pointerup', soltar);
-      if (cancelar) document.removeEventListener('pointercancel', cancelar);
-      mover = soltar = cancelar = null;
+      if (alMover) document.removeEventListener('pointermove', alMover);
+      if (alSoltar) document.removeEventListener('pointerup', alSoltar);
+      if (alCancelar) document.removeEventListener('pointercancel', alCancelar);
+      alMover = alSoltar = alCancelar = null;
     }
   });
 })();
