@@ -1095,6 +1095,11 @@ html.fv-abierta, html.fv-abierta body { overflow: hidden; }
 .u .bloque.frevision { border-left: 4px solid var(--estado-pr); }
 .u .bloque .fcomprobar { margin: 0 0 var(--e2); }
 .u .bloque .fver-dev { background: #F5C518; border-color: #1C1C1C; color: #1C1C1C; }
+/* T0457 · El plan de pruebas, plegado, con «Copiar» (para Claude en Chrome) */
+.u .bloque .fplan { margin: var(--e2) 0 0; }
+.u .bloque .fplan h4 { margin: 0 0 var(--e2); }
+.u .bloque .fplan summary { cursor: pointer; color: var(--color-suave); }
+.u .bloque .fplan details[open] summary { margin-bottom: var(--e2); }
 /* T0466 · Por publicar: qué falta para entregarla (ficha) y la columna agrupada por los botones que faltan */
 .u .bloque.fpp { border-left: 4px solid var(--estado-co); }
 .u .bloque.fpp p { margin: 0 0 var(--e2); }

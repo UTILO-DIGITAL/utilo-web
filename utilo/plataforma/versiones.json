@@ -1,6 +1,13 @@
 {
-  "version": "5.23.1-1.21.2",
+  "version": "5.24-1.22",
   "versiones": [
+    {
+      "v": "5.24-1.22",
+      "fecha": "17/11/2026",
+      "novedades": [
+        "La ficha de una tarea en revisión trae su plan de pruebas con un botón «Copiar», listo para que Claude en Chrome lo pruebe en el ordenador y en el móvil."
+      ]
+    },
     {
       "v": "5.23.1-1.21.2",
       "fecha": "12/11/2026",

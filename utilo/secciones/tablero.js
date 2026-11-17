@@ -107,7 +107,7 @@
     ENTREGA: 'Entrega', DEADLINE: 'Fecha límite', DISPONIBLE_DESDE: 'No empezar antes del', FECHA_CIERRE: 'Cerrada el', REVISAR_EL: 'Se vuelve a mirar el',
     DESCRIPCION: 'Qué hay que hacer', DOCUMENTOS_RELEVANTES: 'Documentos', CONCLUSIONES: 'Conclusiones', PREGUNTA: 'Pregunta', MOTIVO: 'Motivo',
     MOTIVO_BLOQUEO: 'Motivo del bloqueo', HERRAMIENTA: 'Herramienta', EMPLEADO: 'Empleado IA', TITULO: 'Título', DEPENDE: 'Espera a',
-    AUTONOMA: 'Autónoma', QUE_MIRAR: 'Qué mirar' };
+    AUTONOMA: 'Autónoma', QUE_MIRAR: 'Qué mirar', PLAN_PRUEBAS: 'Plan de pruebas' };
   var OBLIGA = { TITULO: 'Título', DESCRIPCION: 'Qué hay que hacer', INICIATIVA: 'Iniciativa', ASIGNADO: 'Asignada a', P: 'Prioridad', T: 'Tamaño' };
   /** T0074: la épica que se sugiere a una tarea nueva de la entrega e: la que más llevan sus tareas (sin las descartadas); a
    *  igualdad, la de la tarea más reciente. '' sin entrega o si ninguna de sus tareas tiene épica. */
@@ -352,6 +352,25 @@
     var v = m && s.trim() ? { ruta: m[1].replace(/^\/+/, '') + '/', como: (m[2] || '').toLowerCase() } : null;
     return APP_DEV + '?probar&tarea=' + encodeURIComponent(id) + (v ? '&web=' + encodeURIComponent(v.ruta) + (v.como ? '&como=' + encodeURIComponent(v.como) : '') : '');
   }
+  /**
+   * T0457 · Lo que copia «Copiar» del plan de pruebas, para pegárselo a Claude en Chrome: qué abrir (el enlace de «Verlo en
+   * DEV»), cómo probar, qué contar y el plan. Igual que textoParaChrome de herramientas/revision.js (probar-plataforma.js
+   * comprueba que dan lo mismo).
+   */
+  function textoParaChrome(t) {
+    t = t || {};
+    var id = String(t.ID || t.id || ''), tit = t.TITULO || t.titulo || '';
+    return [
+      'Prueba en Chrome la tarea ' + id + (tit ? ' · ' + tit : '') + ', que está para revisar en DEV.',
+      'Ábrela con este enlace: la app «Utilo DEV» ya en su rama, sus datos de ejemplo y su persona: ' + enlaceDev(id, t.VER_EN_DEV || t.ver_en_dev),
+      'Haz cada caso del plan, tal cual y en orden, primero con la ventana de ordenador (1280 px de ancho) y después de móvil (390 px).',
+      'Para entrar como otra persona: toca abajo la línea «DEV · rama · persona», y en «Entrar como» elige la de prueba (@ejemplo.com) y «Abrir». Nunca con una cuenta de verdad, y no toques nada que el plan no diga.',
+      'Al acabar, una lista: cada caso con ✅ o ❌, en ordenador y en móvil, y lo que has visto; de lo que falle, una captura y qué esperabas.',
+      '',
+      'Plan de pruebas',
+      String(t.PLAN_PRUEBAS || t.plan_pruebas || '').trim()
+    ].join('\n');
+  }
 
   /* ---------- T0466 · Qué falta por publicar ---------- */
   var PR_GITHUB = /https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/pull\/\d+/;
@@ -409,7 +428,7 @@
   }
 
   var CALC = { frases: frases, numerada: numerada, partesTexto: partesTexto, htmlTexto: htmlTexto, conEnlaces: conEnlaces, motivoClaude: motivoClaude, ANTES_DE_EMPEZAR: ANTES_DE_EMPEZAR,
-    enlaceDev: enlaceDev, COMPROBAR: COMPROBAR, EN_REVISION: EN_REVISION, VER_EN_DEV: VER_EN_DEV, SIN_CODIGO: SIN_CODIGO,
+    enlaceDev: enlaceDev, textoParaChrome: textoParaChrome, COMPROBAR: COMPROBAR, EN_REVISION: EN_REVISION, VER_EN_DEV: VER_EN_DEV, SIN_CODIGO: SIN_CODIGO,
     porPublicar: porPublicar, gruposPorPublicar: gruposPorPublicar, enlaceBoton: enlaceBoton };
   // En las pruebas (node, sin navegador), solo las cuentas.
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
@@ -1093,7 +1112,7 @@
 
       /* ---------- cambiar un dato pulsándolo en la ficha (T0386) ---------- */
 
-      var LARGO = { DESCRIPCION: 6, DOCUMENTOS_RELEVANTES: 4, CONCLUSIONES: 4, QUE_MIRAR: 3 }; // textos de varias líneas: se guardan con «Guardar»
+      var LARGO = { DESCRIPCION: 6, DOCUMENTOS_RELEVANTES: 4, CONCLUSIONES: 4, QUE_MIRAR: 3, PLAN_PRUEBAS: 10 }; // textos de varias líneas: se guardan con «Guardar»
       var epicaNueva = false; // T0420: en la ficha, se está escribiendo una épica que aún no existe
       function ocupado() { return editando || !!cambiando; }
       function puedeCambiar(t) { return !SOLO_LEE && !t._nueva && CERRADOS.indexOf(t.ESTADO) < 0; }
@@ -1222,6 +1241,7 @@
        * momento y, si la base dice que no, vuelve.
        */
       var cambiosTxt = {};   // lo escrito en «Pedir cambios» de cada tarea, para que repintar la ficha no lo borre
+      var planAbierto = {};  // T0457: el plan de pruebas desplegado, para que repintar la ficha no lo pliegue
       function puedePedirCambios(t) {
         return (t.ESTADO === 'Para revisar' || t.ESTADO === 'Aprobada') && !SOLO_LEE && !t._nueva && !t._pendiente &&
           (ctx.admin || (ctx.personaId && t.REVISA === ctx.personaId) || /^responsable/.test(ctx.perfil || ''));
@@ -1278,6 +1298,22 @@
           h = '<div class="fcl-b">' + bot(a.paso === 'mirando' ? 'Mirando la PR…' : 'Aprobar', 'data-aprobar' + (a.paso === 'mirando' ? ' disabled' : ''), 'u-btn-accion') + '</div>';
         }
         return '<div class="bloque fcl fap' + (a.paso === 'no' ? ' fcl-off' : '') + '">' + h + '</div>';
+      }
+      /** T0457 · Copia el plan de pruebas, listo para Claude en Chrome. Sin permiso del portapapeles, con el truco de siempre. */
+      function copiarPlan(t, boton) {
+        if (!t) return;
+        var txt = textoParaChrome(t);
+        var bien = function () { boton.textContent = 'Copiado'; setTimeout(function () { boton.textContent = 'Copiar'; }, 2000); ctx.aviso('Copiado: pégaselo a Claude en Chrome.'); };
+        var aMano = function () {
+          var a = document.createElement('textarea');
+          a.value = txt; a.setAttribute('readonly', ''); a.style.position = 'fixed'; a.style.opacity = '0';
+          document.body.appendChild(a); a.select();
+          var ok = false;
+          try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+          document.body.removeChild(a);
+          if (ok) bien(); else ctx.aviso('No se ha podido copiar: abre «Plan de pruebas» y cópialo a mano.');
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(bien, aMano); else aMano();
       }
       function pedirAprobar(id, probar) {
         var a = aprob[id] = { paso: probar ? 'mirando' : 'aprobando', r: (aprob[id] || {}).r };
@@ -1428,6 +1464,8 @@
         if (e.target.closest('[data-aprobar]')) { pedirAprobar(abiertaId, true); return; }
         if (e.target.closest('[data-aprobar-si]')) { pedirAprobar(abiertaId, false); return; }
         if (e.target.closest('[data-aprobar-no]')) { delete aprob[abiertaId]; pintarFicha(); return; }
+        var cp = e.target.closest('[data-copiar-plan]');
+        if (cp) { copiarPlan(tarea(abiertaId), cp); return; }
         var pc0 = e.target.closest('[data-pedir-cambios]');
         if (pc0) { var pa = caja.querySelector('#tb-cambios'), pt = pa ? pa.value.trim() : ''; if (pt) pedirCambios(abiertaId, pt, pc0); else if (pa) { pa.focus(); ctx.aviso('Di qué hay que cambiar.'); } return; }
         var rb = e.target.closest('[data-responder]');
@@ -1435,6 +1473,9 @@
         var b = e.target.closest('[data-anotar]');
         if (b) { var a = caja.querySelector('#tb-nota'), txt = a ? a.value.trim() : ''; if (txt) anotar(abiertaId, txt, b); else if (a) a.focus(); }
       });
+      fv.addEventListener('toggle', function (e) { // T0457: no sube como los demás: se coge al bajar
+        if (abiertaId && e.target.matches && e.target.matches('.fplan details')) planAbierto[abiertaId] = e.target.open;
+      }, true);
       fv.addEventListener('input', function (e) {
         if (e.target.id === 'tb-resp' && abiertaId) respuestas[abiertaId] = e.target.value;
         if (e.target.id === 'tb-cambios' && abiertaId) cambiosTxt[abiertaId] = e.target.value;
@@ -1600,7 +1641,12 @@
           // Ya dentro de la app DEV (una rama en dev-ramas/), el botón volvería a abrirla: no sale (Javi).
           var ver = t.COMPROBAR === 'DEV' && VER_EN_DEV.indexOf(t.ESTADO) >= 0 && !/\/dev-ramas\//.test(location.pathname)
             ? '<div class="pie"><a class="u-btn fver-dev" href="' + texto(enlaceDev(id, t.VER_EN_DEV)) + '" target="_blank" rel="noopener">Verlo en DEV</a></div>' : '';
-          if (cmp || qm || ver) revision = '<div class="bloque frevision"><h3>Qué mirar</h3>' + cmp + qm + ver + '</div>';
+          // T0457 · El plan de pruebas, plegado (es para Claude en Chrome, no para leerlo): «Copiar» lo deja listo para pegárselo.
+          // Solo Para revisar, como «Verlo en DEV»: al aprobar se fusiona, la rama sale de DEV y su enlace ya no lleva a nada.
+          var plan = ab('PLAN_PRUEBAS') ? '<div class="fplan"><h4>Plan de pruebas</h4><div class="fed-abierto"><div class="edit">' + control(t, 'PLAN_PRUEBAS') + '</div></div></div>'
+            : t.PLAN_PRUEBAS && VER_EN_DEV.indexOf(t.ESTADO) >= 0 ? '<div class="fplan"><details' + (planAbierto[id] ? ' open' : '') + '><summary>Plan de pruebas, para Claude en Chrome</summary><div class="fx"' + pulsa(t, 'PLAN_PRUEBAS') + '>' + htmlTexto(t.PLAN_PRUEBAS) + '</div></details>' +
+              '<div class="pie"><button type="button" class="sec" data-copiar-plan>Copiar</button></div></div>' : '';
+          if (cmp || qm || plan || ver) revision = '<div class="bloque frevision"><h3>Qué mirar</h3>' + cmp + qm + plan + ver + '</div>';
         }
         if (t.MOTIVO) motivo.push('<p><b>Motivo:</b> ' + texto(t.MOTIVO) + '</p>');
         // T0466: qué le falta para llegar a producción y con qué botón (lo calcula entregar.js al fusionar y al publicar).
