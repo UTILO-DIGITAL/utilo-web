@@ -1940,3 +1940,109 @@ html .u .u-velo, html .u .gs5 .gs-velo, html .u #alta-velo, html .u .ver-velo, h
  * Sin la etiqueta black-translucent (T0430), la franja de la hora del iPhone instalado toma el color de fondo del body (la
  * plataforma de Utilo lo pone verde en su index.html). */
 body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
+
+/* ---------- T0599 · Sección Listado (nucleo/secciones/listado.js): listado con ficha y avisos, configurable ----------
+ * Los niveles de los avisos y de los estados usan los colores funcionales de los estados del kanban:
+ * alto = Bloqueada (rojo), medio = Pendiente de revisión (ámbar), info = En curso (azul), bien = Completada, apagado = suave. */
+.u .li-arriba { display: flex; align-items: flex-end; gap: var(--e2); margin: 0 0 var(--e3); }
+.u .li-pers { flex: none; text-decoration: none; }
+.u .li-n { display: inline-block; min-width: 20px; padding: 0 var(--e1); margin-left: var(--e1); border-radius: 999px; text-align: center;
+  background: var(--estado-bl); color: #fff; font: 700 12px/20px var(--fuente-texto); font-variant-numeric: tabular-nums; }
+.u .li-cli { font-weight: 400; font-size: 12px; opacity: .85; }
+.u .li-texto { margin: 0 0 var(--e3); }
+.u .li-cliente { margin: 0 0 var(--e3); padding: var(--e2) var(--e3); border-radius: var(--radio); font-size: 14px;
+  background: color-mix(in srgb, var(--estado-ec) 10%, var(--color-superficie)); border-left: 4px solid var(--estado-ec); }
+.u .li-avisos { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); margin: 0 0 var(--e3); }
+.u .li-av { min-height: 36px; padding: 0 var(--e3); border-radius: var(--radio); cursor: pointer; text-align: left;
+  border: 1.5px solid var(--li-c, var(--estado-pr)); background: color-mix(in srgb, var(--li-c, var(--estado-pr)) 9%, var(--color-superficie)); color: var(--color-texto); font: 600 14px/1.2 var(--fuente-texto); }
+.u .li-av b { color: var(--li-c, var(--estado-pr)); font-variant-numeric: tabular-nums; }
+.u .li-av[aria-pressed=true] { background: var(--li-c, var(--estado-pr)); color: #fff; }
+.u .li-av[aria-pressed=true] b { color: #fff; }
+.u .li-alto { --li-c: var(--estado-bl); } .u .li-medio { --li-c: var(--estado-pr); } .u .li-info { --li-c: var(--estado-ec); }
+.u .li-bien { --li-c: var(--color-bien); } .u .li-apagado { --li-c: var(--color-suave); }
+.u .li-grupo { margin: 0 0 var(--e4); }
+.u .li-grupo .n-grupo { margin-top: var(--e3); }
+.u .li-tabla { overflow-x: auto; border: 1px solid var(--color-linea); border-radius: var(--radio); }
+.u .li-tabla .u-tabla th { position: static; }
+.u .li-nada { color: var(--color-suave); }
+.u .li-estado { background: color-mix(in srgb, var(--li-c, var(--color-texto)) 12%, var(--color-superficie)); color: var(--color-texto);
+  border: 1px solid color-mix(in srgb, var(--li-c, var(--color-texto)) 45%, var(--color-superficie)); }
+.u .li-estado.li-apagado { color: var(--color-suave); }
+.u .li-aviso { display: inline-flex; align-items: center; gap: var(--e1); font: 700 12px/1.4 var(--fuente-texto); color: var(--li-c, var(--estado-pr)); margin-right: var(--e2); }
+.u .li-aviso::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--li-c, var(--estado-pr)); flex: none; }
+.u .li-marcas { margin-top: var(--e1); font-weight: 400; }
+.u .u-tabla tr.li-con-aviso td:first-child { box-shadow: inset 4px 0 0 var(--li-c, var(--estado-pr)); }
+.u .li-f-alto { --li-c: var(--estado-bl); --li-barra: var(--estado-bl); } .u .li-f-medio { --li-c: var(--estado-pr); --li-barra: var(--estado-pr); }
+.u .li-f-info { --li-c: var(--estado-ec); --li-barra: var(--estado-ec); }
+.u .li-mini { width: 40px; height: 40px; border-radius: var(--radio-peq); object-fit: cover; display: block; border: 1px solid var(--color-linea); }
+.u .li-foto { width: 100%; max-width: 240px; aspect-ratio: 1; border-radius: var(--radio); object-fit: cover; display: block; border: 1px solid var(--color-linea); }
+.u .li-tarjetas { list-style: none; margin: 0; padding: 0; }
+@media (max-width: 639px) { .u .li-tarjetas { display: grid; gap: var(--e2); } }
+.u .li-tarjeta { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: var(--e1); text-align: left; cursor: pointer;
+  padding: var(--e3); border-radius: var(--radio); border: 1px solid var(--color-linea); background: var(--color-superficie); color: var(--color-texto);
+  font: 400 15px/1.35 var(--fuente-texto); box-shadow: inset 4px 0 0 var(--li-barra, transparent); }
+.u .li-tarjeta strong { font-weight: 700; display: flex; gap: var(--e2); align-items: center; }
+.u .li-det { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e3); font-size: 14px; color: var(--color-suave); }
+.u .li-det .li-mini { width: 32px; height: 32px; }
+.u .li-errores { margin: 0 0 var(--e3); border-left: 4px solid var(--estado-bl); font-size: 14px; }
+.u .li-errores ul { margin: var(--e1) 0 0; padding-left: var(--e4); }
+/* Ficha */
+.u .li-ficha-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e2); }
+.u .li-ficha-cab h2 { overflow-wrap: anywhere; }
+.u .li-ficha-avisos { margin-top: calc(var(--e2) * -1); }
+.u .li-fgrupo { display: flex; flex-direction: column; gap: var(--e2); }
+.u .li-fg-t { font-size: 15px; color: var(--color-principal-oscuro); border-bottom: 1px solid var(--color-linea); padding-bottom: var(--e1); }
+.u .li-fg-t .u-cifra { font-family: var(--fuente-texto); font-weight: 400; color: var(--color-suave); }
+.u .li-dato { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.u .li-dato.u-ancho { grid-column: 1 / -1; }
+.u .li-valor { overflow-wrap: anywhere; white-space: pre-line; }
+.u .li-rel { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e1); }
+.u .li-rel-f { width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: var(--e1) var(--e3); text-align: left; cursor: pointer;
+  padding: var(--e2) var(--e3); border-radius: var(--radio-peq); border: 1px solid var(--color-linea); background: var(--color-superficie);
+  color: var(--color-texto); font: 400 14px/1.35 var(--fuente-texto); }
+.u .li-rel-f .li-mini { width: 32px; height: 32px; }
+/* Personalizar */
+.u .li-p-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e1); }
+.u .li-p-fila { display: flex; align-items: center; gap: var(--e2); padding: var(--e1) var(--e2); border-radius: var(--radio-peq); background: var(--color-superficie); border: 1px solid var(--color-linea); }
+.u .li-p-t { flex: 1; min-width: 0; font-weight: 600; display: flex; flex-direction: column; }
+.u .li-p-t small { font-weight: 400; }
+.u .li-p-fila .u-btn-icono { min-height: 36px; width: 36px; border-color: var(--color-linea); }
+.u .li-p-dias { display: inline-flex; align-items: center; gap: var(--e1); font-size: 14px; white-space: nowrap; }
+.u .li-p-dias input { width: 64px; min-height: 36px; text-align: right; }
+@media (max-width: 639px) { .u .li-arriba { flex-direction: column; align-items: stretch; } .u .li-pers { align-self: flex-end; } .u .li-barra .li-nueva { order: 3; } }
+.u .li-form { display: flex; flex-direction: column; gap: var(--e5); }
+/* T0599 · Vista tablero de la sección Listado: una columna por valor, como el Kanban; en el móvil se desliza de lado. */
+.u .li-tablero { display: flex; gap: var(--e3); overflow-x: auto; padding: 0 0 var(--e2); scroll-snap-type: x proximity; align-items: stretch; }
+/* Todas las columnas llegan hasta abajo (la más larga): se suelta en cualquier punto de la columna, también debajo de su última tarjeta. */
+.u .li-col-l { align-content: start; }
+.u .li-col { flex: 1 0 220px; max-width: 320px; scroll-snap-align: start; background: color-mix(in srgb, var(--color-bloque) 45%, var(--color-fondo)); border-radius: var(--radio);
+  padding: var(--e2); border-top: 4px solid var(--li-c, var(--color-linea)); display: flex; flex-direction: column; gap: var(--e2); min-height: 120px; }
+.u .li-col.li-encima { outline: 3px dashed var(--color-principal-oscuro); outline-offset: -3px; }
+.u .li-col-t { font-size: 15px; padding: var(--e1) var(--e1) 0; }
+.u .li-col-t .u-cifra { font-family: var(--fuente-texto); font-weight: 400; color: var(--color-suave); }
+.u .li-col-l { display: grid; gap: var(--e2); }
+.u .li-col-vacia { margin: 0; padding: var(--e2) var(--e1); }
+.u .li-col .li-tarjeta[data-mover] { cursor: grab; touch-action: pan-x pan-y; }
+.u .li-fantasma { position: fixed; z-index: 80; pointer-events: none; opacity: .9; box-shadow: var(--sombra-flota); transform: rotate(1.5deg); }
+
+.u .li-tarjeta.li-cogida { opacity: .5; }
+.u .li-col-ayuda { margin: var(--e2) 0 0; }
+@media (max-width: 639px) { .u .li-col { flex-basis: 82%; } }
+/* T0599 · Listado como sección del menú: barra de buscar, el código de cada fila (T0012, para trabajarla en Claude) y la ficha. */
+.u .li-barra { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e3); margin: 0 0 var(--e3); }
+.u .li-barra .li-buscar { flex: 1 1 240px; display: flex; min-width: 0; }
+.u .li-barra .li-buscar input { flex: 1; min-width: 0; }
+.u .li-barra .li-cuenta { margin: 0; white-space: nowrap; }
+.u .li-barra .li-nueva { font-size: 15px; padding: 0 var(--e4); }
+.u .li-arriba .li-vistas { flex: 1; min-width: 0; }
+.u .li-cod { display: inline-block; padding: 0 var(--e1); border-radius: var(--radio-peq); font: 700 12px/1.6 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  letter-spacing: .02em; color: var(--color-principal-oscuro); background: color-mix(in srgb, var(--color-principal) 10%, var(--color-superficie));
+  border: 1px solid color-mix(in srgb, var(--color-principal) 30%, var(--color-superficie)); white-space: nowrap; vertical-align: 1px; }
+.u .u-tabla td.li-td-cod { width: 1%; white-space: nowrap; }
+.u .li-ficha-cab h2 .li-cod { font-size: 14px; vertical-align: 3px; }
+.u .li-claude { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e3); margin-top: calc(var(--e2) * -1); }
+.u .li-claude .u-btn { min-height: 36px; font-size: 14px; padding: 0 var(--e3); }
+.u .li-volver { align-self: flex-start; padding-left: 0; text-decoration: none; margin-bottom: calc(var(--e3) * -1); }
+.u a.li-rel-f { text-decoration: none; }
+.u .li-rel-f .li-ir { margin-left: auto; font-weight: 700; color: var(--color-principal-oscuro); white-space: nowrap; }
+.u div.li-rel-f { cursor: default; }

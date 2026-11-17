@@ -276,8 +276,32 @@
     /** Cada sección se registra al cargar su JS: UN.registrar('EJEMPLO', { abrir: function (el, ctx) {}, cerrar: function () {} }). */
     registrar: function (id, def) { DEF[String(id).toUpperCase()] = def; },
     /** T0283: el bloque «Versión» de Perfil (vacío si no hay versión: DEV, local sin ejemplo). */
-    htmlVersion: function () { return htmlVersion(); }
+    htmlVersion: function () { return htmlVersion(); },
+    /**
+     * T0599 · El orden del menú que ha elegido quien personaliza (la sección Listado lo guarda para todos): ids de las
+     * secciones. Se recuerda en el dispositivo, para pintar el menú en ese orden desde el principio, y se vuelve a pintar.
+     * Sin ids, el de config.json. Lo que no nombra va detrás, como venía.
+     */
+    ordenMenu: function (ids) {
+      if (ids === undefined) return ordenGuardado();
+      var antes = JSON.stringify(ordenGuardado());
+      try { if (ids && ids.length) localStorage.setItem(ORDEN_CLAVE, JSON.stringify(ids)); else localStorage.removeItem(ORDEN_CLAVE); } catch (e) {}
+      if (cred && JSON.stringify(ordenGuardado()) !== antes) repintarMenu();
+    }
   };
+  var ORDEN_CLAVE = 'nucleo_orden_' + (C.clave || 'negocio');
+  function ordenGuardado() { try { var o = JSON.parse(localStorage.getItem(ORDEN_CLAVE) || '[]'); return Array.isArray(o) ? o.map(String) : []; } catch (e) { return []; } }
+  /** Vuelve a pintar solo el menú (con el orden nuevo), con la sección abierta marcada. */
+  function repintarMenu() {
+    var nav = document.querySelector('nav.sx');
+    if (!nav) return;
+    var d = document.createElement('div'); d.innerHTML = htmlMenu();
+    nav.parentNode.replaceChild(d.firstChild, nav);
+    $('n-plegar').onclick = plegar;
+    var marcada = (seccion(actual) || {}).enPerfil ? 'PERFIL' : actual;
+    [].forEach.call(document.querySelectorAll('.sx a[data-sx]'), function (a) { if (a.getAttribute('data-sx') === marcada) a.setAttribute('aria-current', 'page'); });
+    cifras();
+  }
 
   function tablas() {
     if (T) return T;
@@ -299,6 +323,10 @@
   /** Las secciones que ves y, al final, Perfil (la sección PERFIL si el cliente la tiene; si no, la del marco). */
   function todas() {
     var ss = (cred.secciones || []).filter(function (s) { return s.id !== 'PERFIL'; });
+    // T0599: en el orden que ha elegido quien personaliza (UN.ordenMenu); las que no nombra, detrás y como venían.
+    var o = ordenGuardado();
+    if (o.length) ss = ss.filter(function (s) { return o.indexOf(s.id) >= 0; }).sort(function (a, b) { return o.indexOf(a.id) - o.indexOf(b.id); })
+      .concat(ss.filter(function (s) { return o.indexOf(s.id) < 0; }));
     var p = (cred.secciones || []).filter(function (s) { return s.id === 'PERFIL'; })[0] || { id: 'PERFIL', titulo: 'Perfil', icono: ICONO_PERFIL, propia: true };
     return ss.concat([p]);
   }
@@ -323,6 +351,12 @@
       }).join('') + '</div></nav>';
   }
 
+  function plegar() {
+    var p = document.body.classList.toggle('u-menu-plegado');
+    this.setAttribute('aria-label', p ? 'Desplegar el menú' : 'Plegar el menú'); this.title = this.getAttribute('aria-label');
+    try { if (p) localStorage.setItem(MENU_CLAVE, '1'); else localStorage.removeItem(MENU_CLAVE); } catch (e) {}
+  }
+
   /** Pinta el marco entero y abre la sección de la URL (o la primera). */
   function marco(c) {
     if (T && T.persona() !== copiaDe(c)) soltarTablas();  // T0275: otra persona, otra copia
@@ -334,11 +368,7 @@
       '<a class="n-quien" href="?s=perfil" data-sx="PERFIL"><span>' + texto(cred.persona) + '</span>' + (cred.perfil ? '<small>' + texto(cred.perfil) + '</small>' : '') + '</a></header>' +
       '<main class="u-main n-main" id="n-sec"></main></div>' +
       '<div class="u-aviso" id="n-aviso" role="status" hidden></div>';
-    $('n-plegar').onclick = function () {
-      var p = document.body.classList.toggle('u-menu-plegado');
-      this.setAttribute('aria-label', p ? 'Desplegar el menú' : 'Plegar el menú'); this.title = this.getAttribute('aria-label');
-      try { if (p) localStorage.setItem(MENU_CLAVE, '1'); else localStorage.removeItem(MENU_CLAVE); } catch (e) {}
-    };
+    $('n-plegar').onclick = plegar;
     tope();
     abrir(pedida() || menu()[0].id, false);
     avisarVersiones();
@@ -625,16 +655,19 @@
 
   /** El JS de una sección, una vez. */
   function cargar(s) {
-    if (DEF[s.id]) return Promise.resolve(DEF[s.id]);
-    if (cargas[s.id]) return cargas[s.id];
-    cargas[s.id] = new Promise(function (ok, ko) {
+    // T0599: una sección que sale varias veces en el menú (Seguimiento y Clientes, las dos de Listado) lleva en «base» el id
+    // con el que se registra su JS, que se carga una sola vez.
+    var k = s.base || s.id;
+    if (DEF[k]) return Promise.resolve(DEF[k]);
+    if (cargas[k]) return cargas[k];
+    cargas[k] = new Promise(function (ok, ko) {
       var sc = document.createElement('script');
       sc.src = RAIZ + s.web + '?v=' + encodeURIComponent(s.version || '1');
-      sc.onload = function () { if (DEF[s.id]) ok(DEF[s.id]); else ko(new Error('La sección ' + s.id + ' no se ha registrado.')); };
-      sc.onerror = function () { delete cargas[s.id]; ko(new Error('No se ha podido cargar la sección.')); };
+      sc.onload = function () { if (DEF[k]) ok(DEF[k]); else ko(new Error('La sección ' + k + ' no se ha registrado.')); };
+      sc.onerror = function () { delete cargas[k]; ko(new Error('No se ha podido cargar la sección.')); };
       document.head.appendChild(sc);
     });
-    return cargas[s.id];
+    return cargas[k];
   }
 
   /**
