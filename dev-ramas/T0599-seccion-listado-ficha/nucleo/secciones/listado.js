@@ -214,7 +214,8 @@
       nombre: cfg.NOMBRE || cfg.CLAVE || 'ID', columnas: cfg.COLUMNAS || [], detalle: cfg.DETALLE || [], orden: cfg.ORDEN || '',
       buscar: cfg.BUSCAR && cfg.BUSCAR.length ? cfg.BUSCAR : null, campos: cfg.CAMPOS || {}, ficha: cfg.FICHA || [],
       relacionados: cfg.RELACIONADOS || [], vistas: cfg.VISTAS || [], avisos: cfg.AVISOS || [], editar: cfg.EDITAR || [],
-      crear: !!cfg.CREAR, texto: cfg.TEXTO || '', vacio: cfg.VACIO || '', refs: cfg._refs || {}, filtro: cfg.FILTRO || [] };
+      crear: !!cfg.CREAR, texto: cfg.TEXTO || '', vacio: cfg.VACIO || '', refs: cfg._refs || {}, filtro: cfg.FILTRO || [],
+      nueva: cfg.NUEVA || {}, obligatorias: cfg.OBLIGATORIAS || [] };
   }
   /** El campo de un apartado, con su título y tipo por defecto (una columna FECHA… es una fecha; ESTADO, un estado). */
   function campo(ap, c) {
@@ -364,6 +365,8 @@
       }
     });
     lista(ap.filtro).forEach(function (cnd) { if (cnd.campo) hay(cnd.campo, 'el FILTRO usa'); });
+    Object.keys(ap.nueva).forEach(function (c) { hay(c, 'NUEVA pone'); });
+    ap.obligatorias.forEach(function (c) { hay(c, 'OBLIGATORIAS nombra'); });
     var vids = {};
     vistasDe(ap).forEach(function (v) {
       if (vids[v.id]) errores.push(donde + 'la vista «' + v.id + '» está dos veces.');
@@ -621,7 +624,7 @@
       var VAL = {};
       // Las secciones a las que se puede ir (las que ve quien ha entrado), para los enlaces de lo relacionado.
       var veo = {}; (ctx.secciones || []).forEach(function (s) { veo[s.id] = s.titulo; });
-      var errores = null;
+      var errores = null, pintado = '';
 
       /* ---------- pintar ---------- */
       function celda(a, c, f, conEnlaces, cliente) {
@@ -683,6 +686,9 @@
         else if (!fs.length) html += '<p class="u-vacio">' + (S.q ? 'Nada con «' + texto(S.q) + '».' : 'Nada en esta vista.') + '</p>';
         else if (vista.tablero) html += pintarTablero(a, vista, fs, hoy);
         else html += agrupar(a, vista, fs, hoy).map(function (g) { return pintarGrupo(a, vista, g, hoy); }).join('');
+        // Si no ha cambiado nada (un refresco por detrás con lo mismo), no se rehace: un toque a medias en una fila no se pierde.
+        if (html === pintado) return;
+        pintado = html;
         var foco = document.activeElement && document.activeElement.id === 'li-q' ? document.activeElement.selectionStart : null;
         cont.innerHTML = html;
         if (foco !== null) { var q = cont.querySelector('#li-q'); q.focus(); try { q.setSelectionRange(foco, foco); } catch (e) {} }
@@ -700,7 +706,7 @@
         var cols = columnasDe(a, vista).filter(function (c) { return fuera.indexOf(c) < 0 && c !== a.codigo; });
         // En la tabla, el código va en su columna, la primera (en las tarjetas, delante del nombre).
         var conCod = a.codigo && a.codigo !== nom ? [a.codigo].concat(cols) : cols;
-        var det = (a.detalle.length ? a.detalle : cols.filter(function (c) { return c !== nom; }).slice(0, 2)).filter(function (c) { return fuera.indexOf(c) < 0 && c !== nom; });
+        var det = (a.detalle.length ? a.detalle : cols.filter(function (c) { return c !== nom; }).slice(0, 2)).filter(function (c) { return fuera.indexOf(c) < 0 && c !== nom && (!cli || cols.indexOf(c) >= 0); });
         var cab = g.titulo ? '<h2 class="n-grupo">' + texto(g.titulo) + ' <span class="u-cifra">' + g.filas.length + '</span></h2>' : '';
         var num = function (cp) { return /importe|numero|porcentaje/.test(cp.tipo); };
         // Ordenador: tabla (con el código delante del nombre). Móvil: una tarjeta por fila.
@@ -742,6 +748,16 @@
         // Si se llegó con ?ficha=…, se quita de la dirección para que al volver no se abra otra vez.
         if (new URLSearchParams(location.search).get('ficha')) { var u = new URL(location.href); u.searchParams.delete('ficha'); history.replaceState(history.state, '', u.pathname + u.search + u.hash); }
       }
+      /** Una fila nueva con lo que pone NUEVA (por el nombre en una columna que apunta a otra tabla; «hoy» en una fecha). */
+      function nuevaFila(a) {
+        var r = {};
+        Object.keys(a.nueva || {}).forEach(function (c) {
+          var v = a.nueva[c], cp = campo(a, c);
+          if (v === 'hoy' && cp.tipo === 'fecha') v = hoyIso();
+          r[c] = cp.ids && v in cp.ids ? cp.ids[v] : v;
+        });
+        return r;
+      }
       function editables(a) {
         if (a.editar === true) {
           var t = [a.nombre].concat(a.columnas); a.ficha.forEach(function (g) { t = t.concat(g.campos || []); });
@@ -764,17 +780,27 @@
           return '<div class="u-campo">' + et + '<select id="' + id + '" data-c="' + texto(c) + '"><option value=""></option>' +
             ops.map(function (o) { return '<option' + (String(v) === o ? ' selected' : '') + '>' + texto(o) + '</option>'; }).join('') + '</select></div>';
         }
-        if (cp.tipo === 'nota') return '<div class="u-campo u-ancho">' + et + '<textarea id="' + id + '" rows="3" data-c="' + texto(c) + '">' + texto(v) + '</textarea></div>';
+        // Lo que no se guarda (una cuenta, un DNI) tampoco se enseña al editar: sale tapado y, si se guarda, se quita.
+        var tapado = !vacio(v) && prohibido(v, PROHIB).length ? tapar(v, PROHIB) : null;
+        var nota = tapado !== null ? '<span class="u-nota">Hemos tapado un dato que aquí no se guarda. Si guardas este campo, se quita.</span>' : '';
+        if (tapado !== null) v = tapado;
+        if (cp.tipo === 'nota') return '<div class="u-campo u-ancho">' + et + '<textarea id="' + id + '" rows="3" data-c="' + texto(c) + '">' + texto(v) + '</textarea>' + nota + '</div>';
         var tipo = cp.tipo === 'fecha' ? 'date' : (cp.tipo === 'email' ? 'email' : (cp.tipo === 'telefono' ? 'tel' : (cp.tipo === 'enlace' || cp.tipo === 'foto' ? 'url' : 'text')));
         var d = cp.tipo === 'fecha' ? aFecha(v) : null;
         var val = d ? d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()) : (vacio(v) ? '' : String(v));
-        return '<div class="u-campo">' + et + '<input id="' + id + '" type="' + tipo + '"' + (/importe|numero|porcentaje/.test(cp.tipo) ? ' inputmode="decimal"' : '') + ' data-c="' + texto(c) + '" value="' + texto(val) + '"></div>';
+        return '<div class="u-campo">' + et + '<input id="' + id + '" type="' + tipo + '"' + (/importe|numero|porcentaje/.test(cp.tipo) ? ' inputmode="decimal"' : '') + ' data-c="' + texto(c) + '" value="' + texto(val) + '">' + nota + '</div>';
+      }
+      /** El valor con el que se abrió un campo de la ficha (para guardar solo lo que se ha cambiado). */
+      function inicial(i) {
+        if (i.tagName === 'SELECT') { var o = [].filter.call(i.options, function (x) { return x.defaultSelected; })[0]; return o ? o.value : ''; }
+        return i.defaultValue;
       }
       var abierta = null; // { id } de la ficha abierta, para «Copiar para Claude»
       function ficha(id, nueva) {
         var a = ap(), vista = vistaActual(a), fuera = ocultas(a, vista), f = nueva ? {} : filaVista(a, id), hoy = hoyIso(), cli = !!vista.cliente;
         if (!f) { ctx.aviso('Esa fila ya no está.'); return; }
         var crudo = f.__crudo || {}; // lo que de verdad hay (los códigos), para editar
+        if (nueva) crudo = nuevaFila(a);
         abierta = nueva ? null : { id: id };
         var ed = cli ? [] : editables(a).filter(function (c) { return fuera.indexOf(c) < 0; });
         var grupos = a.ficha.length ? a.ficha : [{ titulo: '', campos: columnasDe(a, vista) }];
@@ -787,14 +813,15 @@
         if (cli) h += '<p class="li-cliente">Ficha para enseñar a un cliente: sin datos privados.</p>';
         var puestos = [];
         h += '<form id="li-form" class="li-form" novalidate>' + grupos.map(function (g) {
-          var cs = (g.campos || []).filter(function (c) { return fuera.indexOf(c) < 0 && c !== a.codigo && (nueva ? ed.indexOf(c) >= 0 : true); });
+          // Para enseñar a un cliente, la ficha enseña solo lo que enseña su vista (ni marcas interesadas ni muestras).
+          var cs = (g.campos || []).filter(function (c) { return fuera.indexOf(c) < 0 && c !== a.codigo && (nueva ? ed.indexOf(c) >= 0 : true) && (!cli || columnasDe(a, vista).indexOf(c) >= 0); });
           if (!cs.length) return '';
           var cuerpo = cs.map(function (c) {
             puestos.push(c);
             if (ed.indexOf(c) >= 0) return entrada(a, c, crudo);
             var cp = campo(a, c);
             return '<div class="li-dato' + (cp.tipo === 'nota' || cp.tipo === 'foto' ? ' u-ancho' : '') + '"><span class="u-etiqueta">' + texto(cp.titulo) + '</span><span class="li-valor">' + celda(a, c, f, true, cli) + '</span>' +
-              (cp.ayuda ? '<span class="u-nota">' + texto(cp.ayuda) + '</span>' : '') + '</div>';
+              (cp.ayuda && !cli ? '<span class="u-nota">' + texto(cp.ayuda) + '</span>' : '') + '</div>';
           }).join('');
           return '<section class="li-fgrupo">' + (g.titulo ? '<h3 class="li-fg-t">' + texto(g.titulo) + '</h3>' : '') + '<div class="u-campos">' + cuerpo + '</div></section>';
         }).join('');
@@ -820,14 +847,16 @@
         var form = vent.querySelector('#li-form');
         form.addEventListener('submit', function (ev) {
           ev.preventDefault();
-          var err = vent.querySelector('#li-err'), cambios = {}, malos = [];
+          var err = vent.querySelector('#li-err'), cambios = {}, malos = [], faltan = [];
           [].forEach.call(form.querySelectorAll('[data-c]'), function (i) {
             var c = i.getAttribute('data-c'), v = i.value.trim(), cp = campo(a, c);
             var p = prohibido(v, PROHIB); if (p.length) { malos = malos.concat(p); i.setAttribute('aria-invalid', 'true'); } else i.removeAttribute('aria-invalid');
-            var antes = vacio(crudo[c]) ? '' : (cp.tipo === 'fecha' && aFecha(crudo[c]) ? i.defaultValue : String(crudo[c]));
-            if (v !== antes) cambios[c] = cp.tipo === 'importe' || cp.tipo === 'numero' ? (v === '' ? '' : (isNaN(aNumero(v)) ? v : aNumero(v))) : v;
+            if (v === '' && a.obligatorias.indexOf(c) >= 0) { faltan.push(cp.titulo); i.setAttribute('aria-invalid', 'true'); }
+            // Al añadir, todo lo que tiene valor (también lo que viene puesto); al editar, solo lo que ha cambiado.
+            if (nueva ? v !== '' : v !== String(inicial(i)).trim()) cambios[c] = cp.tipo === 'importe' || cp.tipo === 'numero' ? (v === '' ? '' : (isNaN(aNumero(v)) ? v : aNumero(v))) : v;
           });
           if (malos.length) { err.textContent = textoProhibido(malos.filter(function (k, i) { return malos.indexOf(k) === i; })); err.hidden = false; return; }
+          if (faltan.length) { err.textContent = 'Falta ' + faltan.join(', ').replace(/, ([^,]*)$/, ' y $1') + '.'; err.hidden = false; return; }
           if (!Object.keys(cambios).length) { cerrarVentana(); return; }
           var p = nueva ? T.crear(a.tabla, cambios) : T.actualizar(a.tabla, id, cambios);
           cerrarVentana();
@@ -860,7 +889,12 @@
         return Promise.resolve(p).then(function () { return 'para todos'; });
       }
       /** Las secciones del menú, en el orden de ahora (sin Perfil ni las de dentro de Perfil). */
-      function delMenu() { return (ctx.secciones || []).filter(function (s) { return !s.enPerfil && s.id !== 'PERFIL'; }); }
+      function delMenu() {
+        var ss = (ctx.secciones || []).filter(function (s) { return !s.enPerfil && s.id !== 'PERFIL'; });
+        // ctx.secciones es el orden de cuando se abrió la sección: el de ahora es el que guarda el marco.
+        var o = window.UN.ordenMenu ? window.UN.ordenMenu() || [] : [];
+        return o.length ? ss.filter(function (s) { return o.indexOf(s.id) >= 0; }).sort(function (x, y) { return o.indexOf(x.id) - o.indexOf(y.id); }).concat(ss.filter(function (s) { return o.indexOf(s.id) < 0; })) : ss;
+      }
       function personalizar() {
         var base = BASE, p = prefDe(ctx.id) || {}, conPref = ap();
         var ordenV = (base.vistas || []).slice().sort(function (x, y) { var o = lista(p.vistas); var ia = o.indexOf(x.id), ib = o.indexOf(y.id); return (ia < 0 ? 1e6 : ia) - (ib < 0 ? 1e6 : ib); });
@@ -939,6 +973,9 @@
         ev.preventDefault();
         [].forEach.call(cont.querySelectorAll('.li-encima'), function (x) { if (x !== col) x.classList.remove('li-encima'); });
         col.classList.add('li-encima');
+        // Cerca del borde del tablero, se desplaza solo: la última columna puede no caber (Hecha, en un portátil).
+        var tb = col.parentNode, rc = tb.getBoundingClientRect();
+        if (ev.clientX > rc.right - 60) tb.scrollLeft += 24; else if (ev.clientX < rc.left + 60) tb.scrollLeft -= 24;
       });
       cont.addEventListener('drop', function (ev) {
         var col = ev.target.closest && ev.target.closest('[data-soltar]'); if (!col || arrastrada === null) return;

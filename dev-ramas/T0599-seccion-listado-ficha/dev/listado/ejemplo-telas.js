@@ -196,7 +196,8 @@
         { id: 'PRONTO', titulo: 'Vence pronto', texto: 'Lo que no está hecho y vence en los próximos días.', nivel: 'medio', dias: 3, si: [NO_HECHAS, { campo: 'FECHA', desde: 0, hasta: 'dias' }] },
         { id: 'ESPERANDO', titulo: 'Esperando respuesta hace días', texto: 'Para insistir.', nivel: 'medio', dias: 3, si: [{ campo: 'ID_ESTADO', es: 'Esperando respuesta' }, { campo: 'FECHA', hasta: '-dias' }] }
       ],
-      EDITAR: ['FECHA', 'ID_TIPO', 'ID_ESTADO', 'ID_TEMA', 'ID_FORMATO', 'DETALLE', 'NOTAS', 'ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO'], CREAR: true, _refs: refsDesde('SEGUIMIENTO') }) },
+      EDITAR: ['FECHA', 'ID_TIPO', 'ID_ESTADO', 'ID_TEMA', 'ID_FORMATO', 'DETALLE', 'NOTAS', 'ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO'], CREAR: true,
+      NUEVA: { ID_ESTADO: 'Pendiente', ID_TIPO: 'Tarea', FECHA: 'hoy' }, OBLIGATORIAS: ['DETALLE', 'ID_ESTADO'], _refs: refsDesde('SEGUIMIENTO') }) },
 
     clientes: { modulo: 'listado', titulo: 'Clientes', icono: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.6.9 2.6 2.6 3 5.2"/>', config: mezcla(COMUN, {
       TABLA: 'MARCAS', CODIGO: 'ID', NOMBRE: 'NOMBRE', ORDEN: 'NOMBRE', TEXTO: 'Las marcas: las que ya son clientes y las de prospección, según su fase.',

@@ -772,10 +772,10 @@
    "tarea": "T0599",
    "titulo": "Sección de listado con ficha, tablero y avisos, una por tabla en el menú",
    "pr": 317,
-   "commit": "cb8c423",
-   "ultimo": "T0599: Listado sobre tablas normalizadas y en apps con motor (Excel), como la de Marta",
+   "commit": "09fe8c9",
+   "ultimo": "T0599: Arreglos de las pruebas en Chrome: tablero, notas tapadas al editar, orden del menú y Añadir",
    "quien": "Javi Canela",
-   "fecha": "2026-11-17T15:32:37.352Z",
+   "fecha": "2026-11-17T16:17:21.172Z",
    "toca": [
     "konamigas",
     "utilo"

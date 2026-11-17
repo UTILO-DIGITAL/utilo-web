@@ -15,7 +15,7 @@
   var GENTE = {
     duena: { persona: 'Marta Canela', correo: 'marta@ejemplo.com', perfil: 'Dueña', admin: false },
     ayudante: { persona: 'Ayudante', correo: 'ayudante@ejemplo.com', perfil: 'Ayudante', admin: false },
-    admin: { persona: 'Javi Canela', correo: 'admin@ejemplo.com', perfil: 'Dueña', admin: true }
+    admin: { persona: 'Javi Canela', correo: 'admin@ejemplo.com', perfil: '', admin: true }
   };
   var quien = GENTE[(location.hash || '').slice(1)] ? (location.hash || '').slice(1) : 'duena', yo = GENTE[quien];
 

@@ -19,6 +19,9 @@
     font: 600 13px/1.2 system-ui, sans-serif; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
   #mf-quien select { font: inherit; border-radius: 999px; border: 0; padding: 4px 8px; max-width: 60vw; }
   @media (min-width: 900px) { #mf-quien { bottom: max(16px, env(safe-area-inset-bottom, 0px)); } }
+  /* Mientras sale un aviso del marco («Copiado…»), el selector se aparta para no taparlo. */
+  html:has(#n-aviso:not([hidden])) #mf-quien { opacity: 0; pointer-events: none; }
+  #mf-quien { transition: opacity .2s; }
 </style>
 <script>
   window.KANBAN = { clave: 'listado-ejemplo', marca: 'utilo', nombreApp: 'Telas', api: 'motor-de-ejemplo' };
