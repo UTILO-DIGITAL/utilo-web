@@ -23,7 +23,7 @@
       ['Teléfono', j.TELEFONO], ['Correo', j.EMAIL], ['Instagram', j.INSTAGRAM ? '@' + j.INSTAGRAM : ''], ['Idioma', j.IDIOMA],
       ['Nacimiento', fecha(j.FECHA_NACIMIENTO)], ['Documento', [j.TIPO_DOCUMENTO, j.NUM_DOCUMENTO].filter(Boolean).join(' ')],
       ['Juegas desde', fecha(j.FECHA_ALTA)],
-      ['Tu nombre en lo público', j.NOMBRE_PUBLICO ? 'Entero' : 'Solo la inicial (' + (j.NOMBRE ? j.NOMBRE.charAt(0) + '. ' : '') + (j.APELLIDO_1 || '') + ')']
+      ['Tu nombre en lo público', j.NOMBRE_PUBLICO ? 'Entero' : 'Nombre e inicial del apellido (' + [j.NOMBRE || '', String(j.APELLIDO_1 || '').trim() ? String(j.APELLIDO_1).trim().charAt(0).toUpperCase() + '.' : ''].filter(String).join(' ') + ')'] // T0395: «Berta E.», como nombres_jugadoras
     ].filter(function (d) { return d[1]; });
     return '<div class="u-perfil"><div class="u-perfil-quien"><strong>' + texto(nombre) + '</strong><span>Ficha ' + texto(j.ID) + '</span></div>' +
       '<dl>' + datos.map(function (d) { return '<dt>' + texto(d[0]) + '</dt><dd>' + texto(d[1]) + '</dd>'; }).join('') + '</dl></div>';
