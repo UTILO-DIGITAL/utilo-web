@@ -558,10 +558,10 @@
    "tarea": "T0598",
    "titulo": "El Excel de Telas en formato Utilo y normalizado, con la copia del Excel de Marta",
    "pr": 316,
-   "commit": "fd3508b",
-   "ultimo": "T0598: Lo cambiado desde la app es provisional mientras dure la copia",
+   "commit": "fd4fcf7",
+   "ultimo": "T0598: La implementación web de Telas (primera subida, versión 1)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-17T15:12:45.543Z",
+   "fecha": "2026-11-17T15:30:19.819Z",
    "toca": [],
    "comun": false,
    "paginas": [
