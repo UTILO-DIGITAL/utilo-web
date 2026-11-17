@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "6e96536",
-   "ultimo": "Merge pull request #315 from UTILO-DIGITAL/T0584-patron-proyectos",
+   "commit": "b29fcbc",
+   "ultimo": "Merge pull request #312 from UTILO-DIGITAL/T0457-plan-de-pruebas",
    "quien": "",
-   "fecha": "2026-11-16T17:25:43.972Z",
+   "fecha": "2026-11-17T11:59:50.503Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -206,7 +206,9 @@
      "20261112100919_esquema.sql",
      "20261112103648_por_publicar_tablas.sql",
      "20261112103649_por_publicar.sql",
-     "20261112170000_avisos_sin_telegram.sql"
+     "20261112170000_avisos_sin_telegram.sql",
+     "20261112182957_plan_pruebas_tablas.sql",
+     "20261112183000_plan_pruebas.sql"
     ]
    },
    "rama": "main"

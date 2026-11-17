@@ -16,7 +16,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Para mí",
    "icono": "<path d=\"M4 13h4l2 3h4l2-3h4\"/><path d=\"M6.5 5h11L20 13v6H4v-6z\"/>",
    "web": "utilo/secciones/parami.js",
-   "version": "c29b953297",
+   "version": "b76a6ba287",
    "perfiles": "todos",
    "config": {},
    "api": [
@@ -32,7 +32,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Tareas",
    "icono": "<rect x=\"3\" y=\"4\" width=\"5\" height=\"16\" rx=\"1\"/><rect x=\"10\" y=\"4\" width=\"5\" height=\"11\" rx=\"1\"/><rect x=\"17\" y=\"4\" width=\"4\" height=\"7\" rx=\"1\"/>",
    "web": "utilo/secciones/tablero.js",
-   "version": "fcae96ba21",
+   "version": "6fb1b2be97",
    "perfiles": "todos",
    "config": {
     "VISTA": "ocho",
@@ -57,7 +57,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Entregas",
    "icono": "<path d=\"M3 7l9-4 9 4-9 4-9-4z\"/><path d=\"M3 7v10l9 4 9-4V7\"/><path d=\"M12 11v10\"/>",
    "web": "utilo/secciones/entregas.js",
-   "version": "f382c427dc",
+   "version": "06de925f13",
    "perfiles": "todos",
    "config": {
     "VISTA": "Mapa",
@@ -76,7 +76,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Bandeja",
    "icono": "<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><path d=\"M3 7l9 6 9-6\"/>",
    "web": "utilo/secciones/bandeja.js",
-   "version": "b4702e2d0e",
+   "version": "0354128a67",
    "perfiles": [
     "admin",
     "responsable",
@@ -470,6 +470,10 @@ window.NUCLEO_MONTAJE = {
      },
      {
       "nombre": "VER_EN_DEV",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "PLAN_PRUEBAS",
       "tipo": "texto"
      },
      {
@@ -940,6 +944,10 @@ window.NUCLEO_MONTAJE = {
      },
      {
       "nombre": "VER_EN_DEV",
+      "tipo": "texto"
+     },
+     {
+      "nombre": "PLAN_PRUEBAS",
       "tipo": "texto"
      },
      {
