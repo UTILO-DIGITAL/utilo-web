@@ -2020,7 +2020,9 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-col-t .u-cifra { font-family: var(--fuente-texto); font-weight: 400; color: var(--color-suave); }
 .u .li-col-l { display: grid; gap: var(--e2); }
 .u .li-col-vacia { margin: 0; padding: var(--e2) var(--e1); }
-.u .li-col .li-tarjeta[draggable] { cursor: grab; }
+.u .li-col .li-tarjeta[data-mover] { cursor: grab; touch-action: pan-x pan-y; }
+.u .li-fantasma { position: fixed; z-index: 80; pointer-events: none; opacity: .9; box-shadow: var(--sombra-flota); transform: rotate(1.5deg); }
+
 .u .li-tarjeta.li-cogida { opacity: .5; }
 .u .li-col-ayuda { margin: var(--e2) 0 0; }
 @media (max-width: 639px) { .u .li-col { flex-basis: 82%; } }
