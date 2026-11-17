@@ -556,12 +556,12 @@
   },
   "T0598-copia-excel-marta": {
    "tarea": "T0598",
-   "titulo": "La copia limpia del Excel de Marta, en su propio Supabase",
+   "titulo": "El Excel de Telas en formato Utilo, con la copia del Excel de Marta",
    "pr": 316,
-   "commit": "81ae6d3",
-   "ultimo": "T0598: La copia va al Excel TELAS · GESTION, no a Supabase",
+   "commit": "ae7171b",
+   "ultimo": "T0598: GESTION normalizado: tablas pequeñas, IDs y sin lo calculado",
    "quien": "Javi Canela",
-   "fecha": "2026-11-17T14:17:22.856Z",
+   "fecha": "2026-11-17T14:50:44.477Z",
    "toca": [],
    "comun": false,
    "paginas": [
