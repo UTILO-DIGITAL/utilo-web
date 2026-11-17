@@ -1945,16 +1945,11 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
  * Los niveles de los avisos y de los estados usan los colores funcionales de los estados del kanban:
  * alto = Bloqueada (rojo), medio = Pendiente de revisión (ámbar), info = En curso (azul), bien = Completada, apagado = suave. */
 .u .li-arriba { display: flex; align-items: flex-end; gap: var(--e2); margin: 0 0 var(--e3); }
-.u .li-arriba .li-aps { flex: 1; min-width: 0; }
 .u .li-pers { flex: none; text-decoration: none; }
 .u .li-n { display: inline-block; min-width: 20px; padding: 0 var(--e1); margin-left: var(--e1); border-radius: 999px; text-align: center;
   background: var(--estado-bl); color: #fff; font: 700 12px/20px var(--fuente-texto); font-variant-numeric: tabular-nums; }
-.u .li-ayuda, .u .li-texto { margin: 0 0 var(--e3); }
-.u .li-vistas { display: flex; flex-wrap: wrap; gap: var(--e2); margin: 0 0 var(--e3); }
-.u .li-vista { min-height: 36px; padding: 0 var(--e3); border-radius: 999px; border: 1.5px solid var(--color-borde-campo); background: var(--color-superficie);
-  color: var(--color-texto); font: 600 14px/1.2 var(--fuente-texto); cursor: pointer; }
-.u .li-vista[aria-pressed=true] { background: var(--color-principal-oscuro); border-color: var(--color-principal-oscuro); color: var(--color-fondo); }
 .u .li-cli { font-weight: 400; font-size: 12px; opacity: .85; }
+.u .li-texto { margin: 0 0 var(--e3); }
 .u .li-cliente { margin: 0 0 var(--e3); padding: var(--e2) var(--e3); border-radius: var(--radio); font-size: 14px;
   background: color-mix(in srgb, var(--estado-ec) 10%, var(--color-superficie)); border-left: 4px solid var(--estado-ec); }
 .u .li-avisos { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); margin: 0 0 var(--e3); }
@@ -1965,9 +1960,6 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-av[aria-pressed=true] b { color: #fff; }
 .u .li-alto { --li-c: var(--estado-bl); } .u .li-medio { --li-c: var(--estado-pr); } .u .li-info { --li-c: var(--estado-ec); }
 .u .li-bien { --li-c: var(--color-bien); } .u .li-apagado { --li-c: var(--color-suave); }
-.u .li-buscar { display: flex; gap: var(--e2); margin: 0 0 var(--e1); }
-.u .li-buscar input { flex: 1; min-width: 0; }
-.u .li-cuenta { margin: 0 0 var(--e2); }
 .u .li-grupo { margin: 0 0 var(--e4); }
 .u .li-grupo .n-grupo { margin-top: var(--e3); }
 .u .li-tabla { overflow-x: auto; border: 1px solid var(--color-linea); border-radius: var(--radio); }
@@ -2017,7 +2009,7 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-p-fila .u-btn-icono { min-height: 36px; width: 36px; border-color: var(--color-linea); }
 .u .li-p-dias { display: inline-flex; align-items: center; gap: var(--e1); font-size: 14px; white-space: nowrap; }
 .u .li-p-dias input { width: 64px; min-height: 36px; text-align: right; }
-@media (max-width: 639px) { .u .li-arriba { flex-direction: column; align-items: stretch; } .u .li-pers { align-self: flex-end; } }
+@media (max-width: 639px) { .u .li-arriba { flex-direction: column; align-items: stretch; } .u .li-pers { align-self: flex-end; } .u .li-barra .li-nueva { order: 3; } }
 .u .li-form { display: flex; flex-direction: column; gap: var(--e5); }
 /* T0599 · Vista tablero de la sección Listado: una columna por valor, como el Kanban; en el móvil se desliza de lado. */
 .u .li-tablero { display: flex; gap: var(--e3); overflow-x: auto; padding: 0 0 var(--e2); scroll-snap-type: x proximity; align-items: flex-start; }
@@ -2032,3 +2024,21 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-tarjeta.li-cogida { opacity: .5; }
 .u .li-col-ayuda { margin: var(--e2) 0 0; }
 @media (max-width: 639px) { .u .li-col { flex-basis: 82%; } }
+/* T0599 · Listado como sección del menú: barra de buscar, el código de cada fila (T0012, para trabajarla en Claude) y la ficha. */
+.u .li-barra { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e3); margin: 0 0 var(--e3); }
+.u .li-barra .li-buscar { flex: 1 1 240px; display: flex; min-width: 0; }
+.u .li-barra .li-buscar input { flex: 1; min-width: 0; }
+.u .li-barra .li-cuenta { margin: 0; white-space: nowrap; }
+.u .li-barra .li-nueva { font-size: 15px; padding: 0 var(--e4); }
+.u .li-arriba .li-vistas { flex: 1; min-width: 0; }
+.u .li-cod { display: inline-block; padding: 0 var(--e1); border-radius: var(--radio-peq); font: 700 12px/1.6 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  letter-spacing: .02em; color: var(--color-principal-oscuro); background: color-mix(in srgb, var(--color-principal) 10%, var(--color-superficie));
+  border: 1px solid color-mix(in srgb, var(--color-principal) 30%, var(--color-superficie)); white-space: nowrap; vertical-align: 1px; }
+.u .u-tabla td.li-td-cod { width: 1%; white-space: nowrap; }
+.u .li-ficha-cab h2 .li-cod { font-size: 14px; vertical-align: 3px; }
+.u .li-claude { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e3); margin-top: calc(var(--e2) * -1); }
+.u .li-claude .u-btn { min-height: 36px; font-size: 14px; padding: 0 var(--e3); }
+.u .li-volver { align-self: flex-start; padding-left: 0; text-decoration: none; margin-bottom: calc(var(--e3) * -1); }
+.u a.li-rel-f { text-decoration: none; }
+.u .li-rel-f .li-ir { margin-left: auto; font-weight: 700; color: var(--color-principal-oscuro); white-space: nowrap; }
+.u div.li-rel-f { cursor: default; }

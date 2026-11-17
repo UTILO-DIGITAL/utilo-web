@@ -771,11 +771,11 @@
   "T0599-seccion-listado-ficha": {
    "tarea": "T0599",
    "titulo": "Sección de listado con ficha, tablero y avisos que se monta solo con configuración",
-   "pr": null,
-   "commit": "0c52893",
-   "ultimo": "T0599: Sección de listado con ficha, tablero y avisos que se monta solo con configuración",
+   "pr": 317,
+   "commit": "ab2bc7a",
+   "ultimo": "T0599: Cada apartado de Listado es una sección del menú, con el código de cada fila y «Copiar para Claude»",
    "quien": "Javi Canela",
-   "fecha": "2026-11-17T13:58:41.371Z",
+   "fecha": "2026-11-17T14:33:50.419Z",
    "toca": [
     "konamigas",
     "utilo"

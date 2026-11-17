@@ -37,7 +37,7 @@
 
   /* ---------- tablas ---------- */
 
-  var S = { FILA: 0, FECHA: '', CON_QUIEN: '', AREA: '', DETALLE: '', ESTADO: '', TIPO: '', NOTAS: '' };
+  var S = { ID: '', FECHA: '', CON_QUIEN: '', AREA: '', DETALLE: '', ESTADO: '', TIPO: '', NOTAS: '' };
   var seguimiento = [
     [dia(-9), 'Casa Albero', 'Clientes', 'Mandar la propuesta de lino lavado', 'Pendiente', 'Tarea', 'Piden 3 colores y precio puesto en su taller de Valencia.'],
     [diaBarras(-4), 'Tejidos Varanasi Loom', 'Proveedores', 'Pedir la carta de colores del ikat', 'Esperando respuesta', 'Tarea', 'Escrito por WhatsApp; suelen tardar.'],
@@ -58,7 +58,7 @@
     [diaBarras(-20), 'Nido Sur', 'Clientes', 'Llamada de presentación', 'Hecha', 'Reunión', ''],
     [dia(-30), 'Telar Gris', 'Clientes', 'Propuesta de jacquard', 'Descartada', 'Tarea', 'No les cuadra el pedido mínimo.'],
     [dia(-6), 'Kutch Weavers', 'Proveedores', 'Pedir muestras de rayas de telar', 'Hecha', 'Tarea', '']
-  ].map(function (r, i) { return { FILA: i + 2, FECHA: r[0], CON_QUIEN: r[1], AREA: r[2], DETALLE: r[3], ESTADO: r[4], TIPO: r[5], NOTAS: r[6] }; });
+  ].map(function (r, i) { return { ID: 'T' + ('000' + (i + 1)).slice(-4), FECHA: r[0], CON_QUIEN: r[1], AREA: r[2], DETALLE: r[3], ESTADO: r[4], TIPO: r[5], NOTAS: r[6] }; });
 
   var C0 = { ID: '', CLIENTE: '', FASE: '', CONTACTO: '', EMAIL: '', TELEFONO: '', CIUDAD: '', PROXIMO_PASO: '', FECHA: '', VENTAS: '', VIA: '', WEB: '',
     INSTAGRAM: '', DIRECCION: '', CARGO: '', QUE_FABRICAN: '', MATERIAL: '', QUE_TELAS: '', ANCHO: '', PESO: '', MARTINDALE_MIN: '', PAGAN_HOY: '',
@@ -126,7 +126,7 @@
   ];
 
   var TABLAS = {
-    SEGUIMIENTO: { clave: 'FILA', columnas: cols(S), filas: seguimiento },
+    SEGUIMIENTO: { clave: 'ID', columnas: cols(S), filas: seguimiento },
     CLIENTES: { clave: 'ID', columnas: cols(C0), filas: clientes },
     PROSPECCION: { clave: 'ID', columnas: cols(P0), filas: prospeccion },
     PROVEEDORES: { clave: 'ID', columnas: cols(V0), filas: proveedores },
@@ -148,7 +148,7 @@
     ['+', ['o', 'COSTE_EUR', ['/', 'COSTE_INR', '$RUPIAS']], ['o', 'ENVIO_ARANCEL', '$ENVIO']],
     ['+', 1, ['o', 'MARGEN', '$MARGEN']]], 2];
 
-  var CONFIG = {
+  var CONFIG = { // (más abajo, NUCLEO: una sección del menú por apartado)
     AYUDA: '',
     VALORES: {
       RUPIAS: { tabla: 'AJUSTES', fila: 1, columna: 'RUPIAS_POR_EURO' },
@@ -158,7 +158,7 @@
     PERSONALIZAN: ['Dueña'],
     PREFERENCIAS: 'PREFERENCIAS',
     APARTADOS: [
-      { id: 'SEGUIMIENTO', titulo: 'Seguimiento', tabla: 'SEGUIMIENTO', clave: 'FILA', nombre: 'DETALLE',
+      { id: 'SEGUIMIENTO', titulo: 'Seguimiento', tabla: 'SEGUIMIENTO', clave: 'ID', codigo: 'ID', nombre: 'DETALLE',
         texto: 'Tareas y reuniones en una sola lista.',
         columnas: ['FECHA', 'TIPO', 'CON_QUIEN', 'DETALLE', 'ESTADO'], detalle: ['CON_QUIEN', 'FECHA', 'ESTADO'], orden: 'FECHA',
         campos: { FECHA: { tipo: 'fecha' }, TIPO: { opciones: ['Tarea', 'Reunión'] }, AREA: { opciones: TEMAS }, CON_QUIEN: { titulo: 'Con quién' },
@@ -178,7 +178,7 @@
         ],
         editar: ['FECHA', 'TIPO', 'CON_QUIEN', 'AREA', 'ESTADO', 'DETALLE', 'NOTAS'], crear: true },
 
-      { id: 'CLIENTES', titulo: 'Clientes', tabla: 'CLIENTES', nombre: 'CLIENTE',
+      { id: 'CLIENTES', titulo: 'Clientes', tabla: 'CLIENTES', codigo: 'ID', nombre: 'CLIENTE',
         columnas: ['CLIENTE', 'FASE', 'CONTACTO', 'CIUDAD', 'PROXIMO_PASO', 'FECHA', 'VENTAS'], detalle: ['FASE', 'PROXIMO_PASO'], orden: '-FASE',
         campos: mezcla(CONTACTO, { FASE: { tipo: 'estado', opciones: FASES, colores: COLORES_FASE }, FECHA: { tipo: 'fecha', titulo: 'Fecha del próximo paso' },
           VENTAS: { tipo: 'importe', titulo: 'Ventas' }, DIRECCION: { titulo: 'Dirección (envíos)' }, QUE_FABRICAN: { titulo: 'Qué fabrican' }, MATERIAL: { titulo: 'Material que buscan' },
@@ -203,7 +203,7 @@
           { id: 'SIN_PASO', titulo: 'Sin próximo paso', nivel: 'medio', si: [{ campo: 'FASE', no: ['En pausa', 'Descartado'] }, { campo: 'PROXIMO_PASO', vacio: true }] }
         ] },
 
-      { id: 'PROSPECCION', titulo: 'Prospección', tabla: 'PROSPECCION', nombre: 'NOMBRE',
+      { id: 'PROSPECCION', titulo: 'Prospección', tabla: 'PROSPECCION', codigo: 'ID', nombre: 'NOMBRE',
         columnas: ['NOMBRE', 'TIPO', 'ESTADO', 'PRIORIDAD', 'CIUDAD', 'NOTA'], detalle: ['ESTADO', 'PRIORIDAD', 'CIUDAD'], orden: 'NOMBRE',
         campos: mezcla(CONTACTO, { NOMBRE: { titulo: 'Marca' }, ESTADO: { tipo: 'estado', opciones: ['Por contactar'].concat(FASES), colores: { 'Por contactar': 'medio', 'Descartado': 'apagado' } },
           PRIORIDAD: { opciones: ['Alta', 'Media', 'Baja'], colores: { 'Alta': 'alto' } }, NOTA: { titulo: 'Nota (una línea)' }, QUE_FABRICAN: { titulo: 'Qué fabrican / venden' } }),
@@ -219,7 +219,7 @@
         ],
         avisos: [{ id: 'ALTA_SIN_CONTACTAR', titulo: 'Prioridad alta sin contactar', nivel: 'medio', si: [{ campo: 'PRIORIDAD', es: 'Alta' }, { campo: 'ESTADO', es: 'Por contactar' }] }] },
 
-      { id: 'PROVEEDORES', titulo: 'Proveedores', tabla: 'PROVEEDORES', nombre: 'PROVEEDOR',
+      { id: 'PROVEEDORES', titulo: 'Proveedores', tabla: 'PROVEEDORES', codigo: 'ID', nombre: 'PROVEEDOR',
         columnas: ['PROVEEDOR', 'ESTADO', 'PRIORIDAD', 'ZONA', 'TIPO', 'PROXIMO_PASO', 'FECHA'], detalle: ['ESTADO', 'ZONA', 'PROXIMO_PASO'], orden: 'PROVEEDOR',
         campos: mezcla(CONTACTO, { PROVEEDOR: { privado: true }, ESTADO: { tipo: 'estado', opciones: ESTADO_PROV, colores: COLORES_PROV }, PRIORIDAD: { opciones: ['Alta', 'Media', 'Baja'], colores: { 'Alta': 'alto' } },
           ZONA: { titulo: 'Ciudad / zona' }, FECHA: { tipo: 'fecha', titulo: 'Fecha del próximo paso' }, REGION: { titulo: 'Estado (India)' }, QUE_TIENEN: { titulo: 'Qué tienen' },
@@ -246,7 +246,7 @@
           { id: 'PASO_PASADO', titulo: 'Próximo paso con la fecha pasada', nivel: 'alto', si: [{ campo: 'ESTADO', no: ['En pausa', 'Descartado', 'Muestras pedidas'] }, { campo: 'FECHA', hasta: -1 }] }
         ] },
 
-      { id: 'TELAS', titulo: 'Mis telas', tabla: 'TELAS', clave: 'CODIGO', nombre: 'CODIGO',
+      { id: 'TELAS', titulo: 'Mis telas', tabla: 'TELAS', clave: 'CODIGO', codigo: 'CODIGO', nombre: 'COLOR',
         columnas: ['ENLACE_FOTO', 'CODIGO', 'TECNICA', 'COLOR', 'ANCHO', 'GSM', 'PROVEEDOR', 'PRECIO_TALLER', 'ESTADO'], detalle: ['TECNICA', 'COLOR', 'PRECIO_TALLER'], orden: 'CODIGO',
         campos: {
           CODIGO: { titulo: 'Código' }, ENLACE_FOTO: { titulo: 'Foto', tipo: 'foto' }, ANCHO: { titulo: 'Ancho', unidad: 'cm' }, GSM: { titulo: 'Peso', unidad: 'g/m²' },
@@ -281,7 +281,32 @@
     ]
   };
 
-  var E = { config: CONFIG, tablas: TABLAS };
+  /* ---------- las secciones del menú (config.json · nucleo), cada una la sección Listado con lo suyo ---------- */
+  // Arriba, cada apartado con sus claves en minúsculas, más corto de leer; aquí se pasa a la configuración de cada sección.
+  var ICONOS = {
+    SEGUIMIENTO: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9l2 2 4-4M8 15h8"/>',
+    CLIENTES: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.6.9 2.6 2.6 3 5.2"/>',
+    PROSPECCION: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l5 5"/>',
+    PROVEEDORES: '<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>',
+    TELAS: '<path d="M4 5h12a3 3 0 0 1 0 6H8a3 3 0 0 0 0 6h12"/><path d="M4 5v14"/>'
+  };
+  var POR_ID = {}; CONFIG.APARTADOS.forEach(function (a) { POR_ID[a.id] = a; });
+  function seccionDe(a) {
+    var c = { TABLA: a.tabla, CLAVE: a.clave || 'ID', CODIGO: a.codigo || '', NOMBRE: a.nombre, COLUMNAS: a.columnas || [], DETALLE: a.detalle || [], ORDEN: a.orden || '',
+      CAMPOS: a.campos || {}, FICHA: a.ficha || [], VISTAS: a.vistas || [], AVISOS: a.avisos || [], EDITAR: a.editar || [], CREAR: !!a.crear, TEXTO: a.texto || '',
+      VALORES: CONFIG.VALORES, PERSONALIZAN: CONFIG.PERSONALIZAN, PREFERENCIAS: CONFIG.PREFERENCIAS };
+    // Lo relacionado apunta a otro apartado: su tabla, su sección y cómo se ven sus filas (su código y sus campos).
+    c.RELACIONADOS = (a.relacionados || []).map(function (r) {
+      var o = POR_ID[r.apartado];
+      return { titulo: r.titulo, tabla: o.tabla, seccion: o.id.toLowerCase(), campo: r.campo, con: r.con, orden: r.orden || '', columnas: r.columnas,
+        clave: o.clave || 'ID', codigo: o.codigo || '', nombre: o.nombre, campos: o.campos || {} };
+    });
+    return { modulo: 'listado', titulo: a.titulo, icono: ICONOS[a.id], perfiles: /PROVEEDORES|TELAS/.test(a.id) ? ['Dueña'] : 'todos', config: c };
+  }
+  var NUCLEO = { perfiles: ['Dueña', 'Ayudante'], secciones: {} };
+  CONFIG.APARTADOS.forEach(function (a) { NUCLEO.secciones[a.id.toLowerCase()] = seccionDe(a); });
+
+  var E = { nucleo: NUCLEO, tablas: TABLAS };
   if (typeof module !== 'undefined' && module.exports) module.exports = E;
   if (typeof window !== 'undefined') window.LISTADO_EJEMPLO = E;
 })();

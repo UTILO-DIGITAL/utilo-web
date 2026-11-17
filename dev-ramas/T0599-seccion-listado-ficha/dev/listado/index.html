@@ -2,104 +2,35 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Listado · prueba</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Telas · ejemplo</title>
 <link rel="icon" href="data:,">
-<!-- T0599: la sección Listado (nucleo/secciones/listado.js, la de verdad) con los datos de ejemplo de ejemplo-telas.js, sin
-     motor ni Supabase: las tablas viven en memoria (se pierden al recargar) y el marco es uno sencillo con la cabecera y
-     el selector de persona, no nucleo.js. Sirve para verla en npm run local (http://localhost:8080/dev/listado/) y para
-     la vista previa. Con Supabase de verdad se verá cuando la monte la app de Marta (T0600 a T0602). -->
+<!-- T0599: la app de ejemplo de la sección Listado (nucleo/secciones/listado.js) con el marco de verdad (nucleo/nucleo.js: el
+     menú a la izquierda en el ordenador y abajo en el móvil) y la capa de tablas de verdad (kanban4/tablas.js), con los datos
+     inventados de ejemplo-telas.js (como las pestañas del Excel de Marta) y un motor de mentira en memoria (motor-falso.js):
+     sin Google ni Supabase, y lo que se cambia se pierde al recargar. npm run local → http://localhost:8080/dev/listado/
+     (#duena, #ayudante o #admin: quién entra). La app de Marta de verdad, sobre su Supabase, llega con T0600 a T0602. -->
 <link rel="stylesheet" href="../../utilo/marca.css?v=47">
 <link rel="stylesheet" href="../../estilos/base.css?v=94">
 <style>
-  body.u { margin: 0; background: var(--color-fondo); color: var(--color-texto); font-family: var(--fuente-texto); }
-  .pr-cab { background: var(--color-principal); color: var(--color-sobre-principal, #fff); padding: 12px 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
-  .pr-cab h1 { font-size: 20px; margin: 0; flex: 1; min-width: 0; }
-  .pr-cab label { font-size: 14px; display: inline-flex; gap: 6px; align-items: center; }
-  .pr-cab select { min-height: 36px; }
-  .pr-nota { margin: 0; padding: 8px 16px; font-size: 13px; background: var(--color-bloque); color: var(--color-texto); }
-  main.pr-main { max-width: 1180px; margin: 0 auto; padding: 16px; box-sizing: border-box; }
+  /* El selector de quién entra: fuera del marco (que rehace el body), abajo a la derecha, encima de la barra del móvil. */
+  #mf-quien { position: fixed; right: max(12px, env(safe-area-inset-right, 0px)); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 90;
+    display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 12px; border-radius: 999px; background: #1C1C1C; color: #fff;
+    font: 600 13px/1.2 system-ui, sans-serif; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+  #mf-quien select { font: inherit; border-radius: 999px; border: 0; padding: 4px 8px; max-width: 60vw; }
+  @media (min-width: 900px) { #mf-quien { bottom: max(16px, env(safe-area-inset-bottom, 0px)); } }
 </style>
+<script>
+  window.KANBAN = { clave: 'listado-ejemplo', marca: 'utilo', nombreApp: 'Telas', api: 'motor-de-ejemplo' };
+  // Las tablas viven en el motor de mentira: sin copia en el dispositivo (IndexedDB), que traería las de otra vez.
+  try { Object.defineProperty(window, 'indexedDB', { value: undefined, configurable: true }); } catch (e) {}
+</script>
 </head>
 <body class="u">
-<header class="pr-cab">
-  <h1 id="n-titulo">Mi negocio</h1>
-  <label>Ver como
-    <select id="pr-quien">
-      <option value="duena">Marta (Dueña, personaliza)</option>
-      <option value="ayudante">Ayudante (sin Proveedores ni Mis telas)</option>
-      <option value="admin">Quien administra (ve los errores de configuración)</option>
-    </select>
-  </label>
-</header>
-<p class="pr-nota">Prueba de la sección Listado con datos inventados. Los cambios se quedan en esta página: al recargar vuelven los del ejemplo.</p>
-<main class="pr-main" id="pr-main"></main>
-<div class="u-aviso" id="pr-aviso" role="status" hidden></div>
-
-<script>
-  // El registro de secciones del marco (lo mínimo de nucleo.js que usa una sección).
-  window.UN = { DEF: {}, registrar: function (id, def) { this.DEF[String(id).toUpperCase()] = def; } };
-</script>
+<div class="kz"><div class="kz-caja kz-centro" role="status"><div class="u-carga"></div><p>Cargando…</p></div></div>
 <script src="ejemplo-telas.js"></script>
-<script src="../../nucleo/secciones/listado.js"></script>
-<script>
-(function () {
-  'use strict';
-  var E = window.LISTADO_EJEMPLO, oyentes = [];
-  // Persona de ejemplo: el perfil de cada una y lo que ve (el Ayudante no ve Proveedores ni Mis telas: «perfiles» del apartado).
-  var QUIEN = {
-    duena: { persona: 'Marta', perfil: 'Dueña', admin: false },
-    ayudante: { persona: 'Ayudante', perfil: 'Ayudante', admin: false },
-    admin: { persona: 'Quien administra', perfil: 'Dueña', admin: true }
-  };
-  E.config.APARTADOS.forEach(function (a) { a.perfiles = /PROVEEDORES|TELAS/.test(a.id) ? ['Dueña'] : ['Dueña', 'Ayudante']; });
-
-  /** La capa de tablas en memoria, con lo que usa una sección (leer, filas, fila, columnas, actualizar, crear). */
-  var D = JSON.parse(JSON.stringify(E.tablas));
-  function avisar(t) { oyentes.forEach(function (f) { f(t); }); }
-  function buscar(t, id) { var d = D[t]; return d ? d.filas.filter(function (f) { return String(f[d.clave]) === String(id); })[0] || null : null; }
-  var T = {
-    leer: function () { return new Promise(function (r) { setTimeout(r, 150); }); },
-    filas: function (t) { return D[t] ? D[t].filas : []; },
-    fila: buscar,
-    columnas: function (t) { return D[t] ? D[t].columnas.slice() : []; },
-    actualizar: function (t, id, c) { var f = buscar(t, id); if (!f) return Promise.reject(new Error('Esa fila ya no está.')); Object.assign(f, c); avisar(t); return Promise.resolve({ fila: f }); },
-    crear: function (t, v) {
-      var d = D[t], f = {}; d.columnas.forEach(function (c) { f[c] = ''; }); Object.assign(f, v);
-      if (f[d.clave] === '' || f[d.clave] === undefined) f[d.clave] = d.filas.reduce(function (m, x) { return Math.max(m, +x[d.clave] || 0); }, 1) + 1;
-      d.filas.push(f); avisar(t); return Promise.resolve({ id: f[d.clave], fila: f });
-    },
-    borrar: function (t, id) { var d = D[t]; d.filas = d.filas.filter(function (f) { return String(f[d.clave]) !== String(id); }); avisar(t); return Promise.resolve(); }
-  };
-
-  var main = document.getElementById('pr-main'), sel = document.getElementById('pr-quien'), avisoEl = document.getElementById('pr-aviso'), tAviso;
-  function abrir() {
-    var q = QUIEN[sel.value], def = window.UN.DEF.LISTADO;
-    if (def.cerrar) def.cerrar();
-    oyentes = [];
-    def.abrir(main, {
-      id: 'LISTADO', titulo: 'Mi negocio', persona: q.persona, perfil: q.perfil, admin: q.admin, correo: '', secciones: [], como: null, autor: q.persona,
-      config: E.config, tablas: T,
-      alCambiar: function (f) { oyentes.push(f); },
-      aviso: function (s) { avisoEl.textContent = s; avisoEl.hidden = false; clearTimeout(tAviso); tAviso = setTimeout(function () { avisoEl.hidden = true; }, 2600); },
-      ponerTitulo: function (s) { document.getElementById('n-titulo').textContent = s; },
-      abierta: function () { return true; }
-    });
-  }
-  sel.addEventListener('change', abrir);
-  // Para las capturas y las pruebas: ?quien=ayudante&ap=TELAS&vista=ENSENAR&ficha=BP-001 (o &pers=1) abre justo eso.
-  var url = new URLSearchParams(location.search);
-  try {
-    if (url.get('ap')) localStorage.setItem('li_LISTADO_ap', url.get('ap'));
-    if (url.get('vista')) { var v = {}; v[url.get('ap')] = url.get('vista'); localStorage.setItem('li_LISTADO_vistas', JSON.stringify(v)); }
-  } catch (e) {}
-  if (QUIEN[url.get('quien')]) sel.value = url.get('quien');
-  abrir();
-  setTimeout(function () {
-    var b = url.get('ficha') ? main.querySelector('tr[data-id="' + url.get('ficha') + '"]') : (url.get('pers') ? main.querySelector('[data-pers]') : null);
-    if (b) b.click();
-  }, 400);
-})();
-</script>
+<script src="motor-falso.js"></script>
+<script src="../../kanban4/tablas.js?v=53"></script>
+<script src="../../nucleo/nucleo.js?v=21"></script>
 </body>
 </html>

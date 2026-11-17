@@ -1,23 +1,25 @@
 /*
  * Sección Listado base del núcleo · UTILO_CORE 5.0 (T0599) · motor/modulos/listado de utilo-apps
  *
- * Un listado con ficha y avisos que sirve para cualquier tabla de cualquier cliente, sin una pantalla a medida por
- * pestaña: cada cliente dice en su config.json (nucleo.secciones.listado.config.APARTADOS) sus apartados, y de cada uno
- * qué columnas salen en la lista, los apartados de la ficha, las vistas y los avisos. Lee y escribe con la capa de
- * tablas (ctx.tablas), con un Sheet o con Supabase: la sección no lo sabe.
+ * Un listado con ficha y avisos que sirve para cualquier tabla de cualquier cliente, sin una pantalla a medida por tabla:
+ * cada sección del menú (Seguimiento, Clientes, Proveedores…) es esta misma con su configuración (config.json ·
+ * nucleo.secciones.<nombre>, con «modulo»: «listado»): qué tabla, qué columnas, la ficha, las vistas y los avisos. Lee y
+ * escribe con la capa de tablas (ctx.tablas), con un Sheet o con Supabase: la sección no lo sabe.
  *
- *   Pestañas   un apartado cada una, con cuántas filas tienen un aviso.
- *   Vistas     filtros guardados (con su orden, sus grupos y las columnas que ocultan). Una vista «para enseñar a un
- *              cliente» (cliente: true) oculta siempre los campos privados (el proveedor), también en la ficha.
+ *   Vistas     pestañas arriba: filtros guardados con su orden, sus grupos (por valor o por plazo) y lo que ocultan, o un
+ *              tablero por columnas como el Kanban. Una vista «para enseñar a un cliente» (cliente: true) oculta siempre
+ *              los campos privados (el proveedor), también en la ficha.
  *   Avisos     lo que no se puede escapar (fecha pasada, vence en unos días, sin hacer): arriba de la lista, en cada fila
  *              y en la ficha. Tocar uno filtra la lista.
- *   Ficha      los apartados de la ficha, en orden; las filas relacionadas de otro apartado (el seguimiento de un
- *              cliente) y, si se puede, editar.
- *   Personalizar  quien está en PERSONALIZAN (y quien administra) cambia el orden de los apartados, qué vistas se ven y
- *              en qué orden, y qué avisos están encendidos y con cuántos días. Se guarda en la tabla PREFERENCIAS (para
- *              todos los dispositivos) o, sin ella, en este dispositivo.
+ *   Código     cada fila con su identificador delante (T0012), como las tareas de Utilo; la ficha lo copia con sus datos
+ *              («Copiar para Claude») para trabajar esa fila en una sesión de Claude.
+ *   Ficha      sus apartados, en orden; lo relacionado de otra tabla (el seguimiento de un cliente), que lleva a su
+ *              sección con la ficha abierta y «Volver a …»; y, si se puede, editar y añadir.
+ *   Personalizar  quien está en PERSONALIZAN (y quien administra) cambia el orden del menú, qué vistas se ven y en qué
+ *              orden, y qué avisos están encendidos y con cuántos días. Se guarda en la tabla PREFERENCIAS (para todos) o,
+ *              sin ella, en este dispositivo.
  * Reglas que cumple sola: un campo calculado con «precio» nunca enseña un importe sin su envío; los datos de PROHIBIDO
- * (contraseñas, números de cuenta, DNI/NIE) no se guardan y, si ya están en la tabla, no se enseñan.
+ * (contraseñas, números de cuenta, DNI/NIE) no se guardan y, si ya están en la tabla, se enseñan tapados.
  * Claves de la configuración: docs/SECCION_LISTADO.md.
  */
 (function () {
@@ -202,15 +204,27 @@
     return 'Aquí no se guardan ' + (n.length > 1 ? n.slice(0, -1).join(', ') + ' ni ' + n[n.length - 1] : n[0]) + ': quítalo antes de guardar.';
   }
 
-  /* ---------- configuración ---------- */
-  /** El campo de un apartado, con su título y tipo por defecto. */
+  /* ---------- configuración ----------
+   * Cada sección del menú es un apartado (una tabla): Seguimiento, Clientes… son la misma sección con su configuración
+   * (config.json · nucleo.secciones.<nombre>, con «modulo»: «listado»). apartado(cfg) la pasa a un objeto con sus claves. */
+  var PROHIB_DEFECTO = ['CONTRASENA', 'CUENTA', 'DNI'];
+  function apartado(cfg, id, tit) {
+    cfg = cfg || {};
+    return { id: id || 'LISTADO', titulo: tit || '', tabla: cfg.TABLA || '', clave: cfg.CLAVE || 'ID', codigo: cfg.CODIGO || '',
+      nombre: cfg.NOMBRE || cfg.CLAVE || 'ID', columnas: cfg.COLUMNAS || [], detalle: cfg.DETALLE || [], orden: cfg.ORDEN || '',
+      buscar: cfg.BUSCAR && cfg.BUSCAR.length ? cfg.BUSCAR : null, campos: cfg.CAMPOS || {}, ficha: cfg.FICHA || [],
+      relacionados: cfg.RELACIONADOS || [], vistas: cfg.VISTAS || [], avisos: cfg.AVISOS || [], editar: cfg.EDITAR || [],
+      crear: !!cfg.CREAR, texto: cfg.TEXTO || '', vacio: cfg.VACIO || '' };
+  }
+  /** El campo de un apartado, con su título y tipo por defecto (una columna FECHA… es una fecha; ESTADO, un estado). */
   function campo(ap, c) {
     var d = (ap.campos || {})[c] || {};
-    return { n: c, titulo: d.titulo || titulo(c), tipo: d.tipo || (d.calculo ? 'importe' : 'texto'), opciones: d.opciones || null,
+    var tipo = d.tipo || (d.calculo ? 'importe' : (/^FECHA/.test(c) ? 'fecha' : (c === 'ESTADO' ? 'estado' : 'texto')));
+    return { n: c, titulo: d.titulo || (c === ap.codigo ? 'Código' : titulo(c)), tipo: tipo, opciones: d.opciones || null,
       unidad: d.unidad || '', calculo: d.calculo || null, precio: d.precio || null, privado: !!d.privado, colores: d.colores || null,
       ayuda: d.ayuda || '' };
   }
-  function columnasDe(ap, vista) { return (vista && vista.columnas) || ap.columnas || [ap.nombre || 'ID']; }
+  function columnasDe(ap, vista) { return (vista && vista.columnas) || (ap.columnas && ap.columnas.length ? ap.columnas : [ap.nombre]); }
   /** Lo que una vista no enseña: lo que dice ocultar y, si es para enseñar a un cliente, todos los campos privados. */
   function ocultas(ap, vista) {
     var o = lista(vista && vista.ocultar).slice();
@@ -221,104 +235,115 @@
   function vistasDe(ap) { return ap.vistas && ap.vistas.length ? ap.vistas : [{ id: 'TODO', titulo: 'Todo' }]; }
 
   /**
-   * Comprueba la configuración (para quien administra y para las pruebas): ids repetidos, columnas que faltan, un
-   * precio cuyo cálculo no lleva el envío, una vista para clientes que enseñaría un campo privado y columnas con datos
-   * que no se guardan. columnasDe(tabla) da las columnas de la tabla, si se saben (si no, no se miran).
+   * Comprueba la configuración de una sección (para quien administra y para las pruebas): columnas que faltan, un precio
+   * cuyo cálculo no lleva el envío, una vista para clientes que enseñaría algo privado, columnas con datos que no se
+   * guardan, vistas y avisos repetidos. columnasTabla(tabla) da las columnas de una tabla, si se saben (si no, no se miran).
    */
-  function comprobar(cfg, columnasTabla) {
-    var errores = [], aps = cfg.APARTADOS || [], vistos = {}, prohib = cfg.PROHIBIDO === undefined ? ['CONTRASENA', 'CUENTA', 'DNI'] : cfg.PROHIBIDO;
-    aps.forEach(function (ap, i) {
-      var donde = 'Apartado ' + (ap.id || '#' + (i + 1));
-      if (!ap.id || !/^[A-Z0-9_]+$/.test(ap.id)) errores.push(donde + ': el id va en mayúsculas, sin tildes ni espacios.');
-      if (vistos[ap.id]) errores.push(donde + ': está dos veces.');
-      vistos[ap.id] = true;
-      if (!ap.tabla) { errores.push(donde + ': falta la tabla.'); return; }
-      var cols = columnasTabla ? columnasTabla(ap.tabla) : null, calc = Object.keys(ap.campos || {}).filter(function (c) { return ap.campos[c].calculo; });
-      function hay(c, que) {
-        if (calc.indexOf(c) >= 0) return;
-        if (cols && cols.indexOf(c) < 0) errores.push(donde + ': ' + que + ' «' + c + '» no es una columna de ' + ap.tabla + '.');
+  function comprobar(cfg, columnasTabla, id) {
+    var errores = [], ap = apartado(cfg, id), prohib = cfg.PROHIBIDO === undefined ? PROHIB_DEFECTO : cfg.PROHIBIDO, donde = id ? id + ': ' : '';
+    if (!ap.tabla) return [donde + 'falta la tabla (TABLA).'];
+    var cols = columnasTabla ? columnasTabla(ap.tabla) : null, calc = Object.keys(ap.campos).filter(function (c) { return ap.campos[c].calculo; });
+    function hay(c, que, t, cs) {
+      if (!t && calc.indexOf(c) >= 0) return;
+      var en = t ? cs : cols;
+      if (en && en.indexOf(c) < 0) errores.push(donde + que + ' «' + c + '» no es una columna de ' + (t || ap.tabla) + '.');
+    }
+    var todas = [ap.nombre, ap.clave].concat(ap.codigo ? [ap.codigo] : [], ap.columnas, ap.detalle);
+    ap.ficha.forEach(function (g) { todas = todas.concat(g.campos || []); });
+    todas.forEach(function (c) { hay(c, 'la columna'); });
+    var ed = ap.editar === true ? [] : lista(ap.editar);
+    ed.forEach(function (c) { hay(c, 'la columna que se edita'); if (calc.indexOf(c) >= 0) errores.push(donde + '«' + c + '» es calculado, no se edita.'); });
+    var nombres = todas.concat(ed, cols || []);
+    nombres.filter(function (c, i) { return nombres.indexOf(c) === i; }).forEach(function (c) {
+      prohib.forEach(function (k) { if (NOMBRES_PROHIBIDOS[k] && NOMBRES_PROHIBIDOS[k].test(norm(c).toUpperCase())) errores.push(donde + 'la columna «' + c + '» guardaría ' + QUE_ES[k] + ', que aquí no se guardan.'); });
+    });
+    calc.forEach(function (c) {
+      var d = ap.campos[c];
+      usa(d.calculo).forEach(function (u) {
+        if (u.charAt(0) === '$') { if (!cfg.VALORES || !(u.slice(1) in cfg.VALORES)) errores.push(donde + '«' + c + '» usa ' + u + ', que no está en VALORES.'); }
+        else hay(u, 'el cálculo de «' + c + '» usa');
+      });
+      if (d.precio) {
+        var env = lista(d.precio.envio);
+        if (!env.length) errores.push(donde + 'el precio «' + c + '» no dice cuál es su envío (precio.envio).');
+        else if (!env.some(function (e) { return usa(d.calculo).indexOf(e) >= 0; })) errores.push(donde + 'el precio «' + c + '» no suma su envío (' + env.join(' o ') + '): se vería un precio sin envío.');
       }
-      var todas = [ap.nombre || ap.clave || 'ID'].concat(ap.columnas || [], ap.detalle || []);
-      (ap.ficha || []).forEach(function (g) { todas = todas.concat(g.campos || []); });
-      todas.forEach(function (c) { hay(c, 'la columna'); });
-      lista(ap.editar === true ? [] : ap.editar).forEach(function (c) { hay(c, 'la columna que se edita'); if (calc.indexOf(c) >= 0) errores.push(donde + ': «' + c + '» es calculado, no se edita.'); });
-      todas.concat(lista(ap.editar === true ? [] : ap.editar), cols || []).forEach(function (c) {
-        prohib.forEach(function (k) { if (NOMBRES_PROHIBIDOS[k] && NOMBRES_PROHIBIDOS[k].test(norm(c).toUpperCase())) errores.push(donde + ': la columna «' + c + '» guardaría ' + QUE_ES[k] + ', que aquí no se guardan.'); });
-      });
-      calc.forEach(function (c) {
-        var d = ap.campos[c];
-        usa(d.calculo).forEach(function (u) {
-          if (u.charAt(0) === '$') { if (!cfg.VALORES || !(u.slice(1) in cfg.VALORES)) errores.push(donde + ': «' + c + '» usa ' + u + ', que no está en VALORES.'); }
-          else hay(u, 'el cálculo de «' + c + '» usa');
-        });
-        if (d.precio) {
-          var env = lista(d.precio.envio);
-          if (!env.length) errores.push(donde + ': el precio «' + c + '» no dice cuál es su envío (precio.envio).');
-          else if (!env.some(function (e) { return usa(d.calculo).indexOf(e) >= 0; })) errores.push(donde + ': el precio «' + c + '» no suma su envío (' + env.join(' o ') + '): se vería un precio sin envío.');
-        }
-      });
-      var vids = {};
-      vistasDe(ap).forEach(function (v) {
-        if (vids[v.id]) errores.push(donde + ': la vista «' + v.id + '» está dos veces.');
-        vids[v.id] = true;
-        lista(v.filtro).forEach(function (cnd) { if (cnd.campo) hay(cnd.campo, 'el filtro de la vista «' + v.id + '» usa'); });
-        if (v.agrupar) hay(v.agrupar.campo || v.agrupar, 'la vista «' + v.id + '» agrupa por');
-        if (v.tablero) {
-          if (!v.tablero.campo) errores.push(donde + ': el tablero de la vista «' + v.id + '» no dice por qué columna (tablero.campo).');
-          else hay(v.tablero.campo, 'el tablero de la vista «' + v.id + '» usa');
-          if (v.agrupar) errores.push(donde + ': la vista «' + v.id + '» es un tablero: no agrupa además.');
-        }
-        if (v.cliente) {
-          var priv = function (c) { return (ap.campos || {})[c] && ap.campos[c].privado; };
-          var se = columnasDe(ap, v).filter(function (c) { return ocultas(ap, v).indexOf(c) < 0 && priv(c); });
-          // El nombre de la fila sale siempre (en la tarjeta y en el título de la ficha): no puede ser privado.
-          if (ap.nombre && priv(ap.nombre) && se.indexOf(ap.nombre) < 0) se.push(ap.nombre);
-          if (se.length) errores.push(donde + ': la vista para clientes «' + v.id + '» enseñaría ' + se.join(', ') + '.');
-        }
-      });
-      var aids = {};
-      (ap.avisos || []).forEach(function (a) {
-        if (!a.id) errores.push(donde + ': un aviso sin id.');
-        if (aids[a.id]) errores.push(donde + ': el aviso «' + a.id + '» está dos veces.');
-        aids[a.id] = true;
-        lista(a.si).forEach(function (cnd) { if (cnd.campo) hay(cnd.campo, 'el aviso «' + a.id + '» usa'); });
-      });
-      (ap.relacionados || []).forEach(function (r) {
-        if (!aps.some(function (x) { return x.id === r.apartado; })) errores.push(donde + ': lo relacionado «' + (r.titulo || r.apartado) + '» apunta a un apartado que no existe.');
-      });
+    });
+    var vids = {};
+    vistasDe(ap).forEach(function (v) {
+      if (vids[v.id]) errores.push(donde + 'la vista «' + v.id + '» está dos veces.');
+      vids[v.id] = true;
+      lista(v.filtro).forEach(function (cnd) { if (cnd.campo) hay(cnd.campo, 'el filtro de la vista «' + v.id + '» usa'); });
+      if (v.agrupar) hay(v.agrupar.campo || v.agrupar, 'la vista «' + v.id + '» agrupa por');
+      if (v.tablero) {
+        if (!v.tablero.campo) errores.push(donde + 'el tablero de la vista «' + v.id + '» no dice por qué columna (tablero.campo).');
+        else hay(v.tablero.campo, 'el tablero de la vista «' + v.id + '» usa');
+        if (v.agrupar) errores.push(donde + 'la vista «' + v.id + '» es un tablero: no agrupa además.');
+      }
+      if (v.cliente) {
+        var priv = function (c) { return ap.campos[c] && ap.campos[c].privado; };
+        var se = columnasDe(ap, v).filter(function (c) { return ocultas(ap, v).indexOf(c) < 0 && priv(c); });
+        // El nombre y el código salen siempre (en la tarjeta y en el título de la ficha): no pueden ser privados.
+        [ap.nombre, ap.codigo].forEach(function (c) { if (c && priv(c) && se.indexOf(c) < 0) se.push(c); });
+        if (se.length) errores.push(donde + 'la vista para clientes «' + v.id + '» enseñaría ' + se.join(', ') + '.');
+      }
+    });
+    var aids = {};
+    ap.avisos.forEach(function (a) {
+      if (!a.id) errores.push(donde + 'un aviso sin id.');
+      if (aids[a.id]) errores.push(donde + 'el aviso «' + a.id + '» está dos veces.');
+      aids[a.id] = true;
+      lista(a.si).forEach(function (cnd) { if (cnd.campo) hay(cnd.campo, 'el aviso «' + a.id + '» usa'); });
+    });
+    ap.relacionados.forEach(function (r) {
+      var q = 'lo relacionado «' + (r.titulo || r.tabla) + '»';
+      if (!r.tabla) { errores.push(donde + q + ' no dice su tabla.'); return; }
+      var cs = columnasTabla ? columnasTabla(r.tabla) : null;
+      if (columnasTabla && !cs) errores.push(donde + q + ': la tabla ' + r.tabla + ' no está.');
+      hay(r.con, q + ' usa');
+      if (cs) [r.campo].concat(r.columnas || []).forEach(function (c) { hay(c, q + ' usa', r.tabla, cs); });
     });
     return errores;
   }
 
   /* ---------- personalizar ----------
-   * Lo que se personaliza: { orden: [apartados], apartados: { ID: { vistas: [orden], ocultas: [vistas], avisos: { ID: { activo, dias } } } } }.
-   * Se aplica sobre la configuración: lo que no nombra se queda como está y lo que ya no existe se olvida. */
-  function aplicar(aps, pref) {
-    pref = pref || {};
-    var orden = lista(pref.orden), copia = JSON.parse(JSON.stringify(aps || []));
-    // Primero las que nombra, en su orden; después las demás (las nuevas), como vienen.
-    copia = copia.filter(function (a) { return orden.indexOf(a.id) >= 0; }).sort(function (a, b) { return orden.indexOf(a.id) - orden.indexOf(b.id); })
-      .concat(copia.filter(function (a) { return orden.indexOf(a.id) < 0; }));
-    copia.forEach(function (ap) {
-      var p = (pref.apartados || {})[ap.id];
-      if (!p) return;
-      if (ap.vistas && ap.vistas.length) {
-        var ov = lista(p.vistas), fuera = lista(p.ocultas);
-        var vs = ap.vistas.filter(function (v) { return ov.indexOf(v.id) >= 0; }).sort(function (a, b) { return ov.indexOf(a.id) - ov.indexOf(b.id); })
-          .concat(ap.vistas.filter(function (v) { return ov.indexOf(v.id) < 0; }));
-        var quedan = vs.filter(function (v) { return fuera.indexOf(v.id) < 0; });
-        ap.vistas = quedan.length ? quedan : vs.slice(0, 1); // al menos una vista
-      }
-      (ap.avisos || []).forEach(function (a) {
-        var pa = (p.avisos || {})[a.id];
-        if (!pa) return;
-        if (pa.activo !== undefined) a.activo = !!pa.activo;
-        if (typeof pa.dias === 'number' && isFinite(pa.dias)) a.dias = Math.max(0, Math.min(365, Math.round(pa.dias)));
-      });
+   * Lo de una sección: { vistas: [orden], ocultas: [vistas], avisos: { ID: { activo, dias } } }. Se aplica sobre su
+   * configuración: lo que no nombra se queda como está y lo que ya no existe se olvida. El orden del menú va aparte (el
+   * marco: UN.ordenMenu). */
+  function aplicar(ap, p) {
+    var r = JSON.parse(JSON.stringify(ap));
+    p = p || {};
+    if (r.vistas && r.vistas.length) {
+      var ov = lista(p.vistas), fuera = lista(p.ocultas);
+      var vs = r.vistas.filter(function (v) { return ov.indexOf(v.id) >= 0; }).sort(function (a, b) { return ov.indexOf(a.id) - ov.indexOf(b.id); })
+        .concat(r.vistas.filter(function (v) { return ov.indexOf(v.id) < 0; }));
+      var quedan = vs.filter(function (v) { return fuera.indexOf(v.id) < 0; });
+      r.vistas = quedan.length ? quedan : vs.slice(0, 1); // al menos una vista
+    }
+    (r.avisos || []).forEach(function (a) {
+      var pa = (p.avisos || {})[a.id];
+      if (!pa) return;
+      if (pa.activo !== undefined) a.activo = !!pa.activo;
+      if (typeof pa.dias === 'number' && isFinite(pa.dias)) a.dias = Math.max(0, Math.min(365, Math.round(pa.dias)));
     });
-    return copia;
+    return r;
   }
-  function apartadoVisible(ap, perfil, admin) { return admin || !ap.perfiles || lista(ap.perfiles).indexOf(perfil) >= 0; }
+  /** El orden del menú con uno movido: ids en el orden de ahora, el que se mueve y hacia dónde (-1 sube, 1 baja). */
+  function mover(ids, id, d) {
+    var r = ids.slice(), i = r.indexOf(id), j = i + d;
+    if (i < 0 || j < 0 || j >= r.length) return r;
+    r[i] = r[j]; r[j] = id;
+    return r;
+  }
+  /** Lo que se copia para trabajar una fila en Claude: «Seguimiento T0012 · Mandar la propuesta» y sus datos, una línea cada uno. */
+  function paraClaude(ap, f, valores, prohib, negocio) {
+    var cod = ap.codigo && !vacio(f[ap.codigo]) ? String(f[ap.codigo]) : '';
+    var nom = verTexto(campo(ap, ap.nombre), f, valores, prohib);
+    var cs = [];
+    (ap.ficha.length ? ap.ficha : [{ campos: ap.columnas }]).forEach(function (g) { (g.campos || []).forEach(function (c) { if (cs.indexOf(c) < 0 && c !== ap.nombre && c !== ap.codigo) cs.push(c); }); });
+    var lineas = cs.map(function (c) { var cp = campo(ap, c), t = verTexto(cp, f, valores, prohib); return t ? cp.titulo + ': ' + t.replace(/\s*\n\s*/g, ' / ') : ''; }).filter(String);
+    return (ap.titulo || ap.id) + (cod ? ' ' + cod : '') + ' · ' + nom + (negocio ? ' (' + negocio + ')' : '') + '\n' + lineas.join('\n');
+  }
 
   /* ---------- avisos, vistas y orden ---------- */
   function avisosActivos(ap) { return (ap.avisos || []).filter(function (a) { return a.activo !== false; }); }
@@ -345,7 +370,7 @@
   function filtrar(ap, vista, filas, o) {
     o = o || {};
     var q = norm(o.q), fuera = ocultas(ap, vista);
-    var dondeBuscar = (ap.buscar || [ap.nombre].concat(columnasDe(ap, vista), ap.detalle || [])).filter(function (c) { return c && fuera.indexOf(c) < 0; });
+    var dondeBuscar = (ap.buscar || [ap.nombre, ap.codigo].concat(columnasDe(ap, vista), ap.detalle || [])).filter(function (c) { return c && fuera.indexOf(c) < 0; });
     var r = filas.filter(function (f) {
       if (vista && vista.filtro && !cumple(f, vista.filtro, { hoy: o.hoy })) return false;
       if (o.aviso) { var a = (ap.avisos || []).filter(function (x) { return x.id === o.aviso; })[0]; if (a && !cumple(f, a.si, { hoy: o.hoy, dias: a.dias === undefined ? 7 : a.dias })) return false; }
@@ -445,9 +470,10 @@
   }
 
   var CALC = { titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, cumple: cumple, calcular: calcular, usa: usa,
-    valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, campo: campo, ocultas: ocultas, vistasDe: vistasDe,
-    columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, visible: apartadoVisible, avisosDe: avisosDe, avisosActivos: avisosActivos,
-    filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero, relacionadas: relacionadas, verTexto: verTexto, cuando: cuando, comparar: comparar };
+    valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, campo: campo,
+    ocultas: ocultas, vistasDe: vistasDe, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, mover: mover, paraClaude: paraClaude,
+    avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
+    relacionadas: relacionadas, verTexto: verTexto, cuando: cuando, comparar: comparar };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -455,46 +481,49 @@
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function guardado(k, v) { try { if (v === undefined) return localStorage.getItem(k) || ''; localStorage.setItem(k, v); } catch (e) {} return ''; }
   function hoyIso() { var d = new Date(); return d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()); }
+  function json(t) { try { return JSON.parse(t || 'null'); } catch (e) { return null; } }
   var ICONO_AJUSTAR = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>';
-  var CLAVE_PREF = 'LISTADO';
+  var ICONO_X = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  var ICONO_COPIAR = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>';
+  var MENU = 'MENU'; // la fila de PREFERENCIAS con el orden del menú
   var teclaEsc = null;
 
   window.UN.registrar('LISTADO', {
     abrir: function (el, ctx) {
-      var T = ctx.tablas, cfg = ctx.config || {};
-      var BASE = cfg.APARTADOS || [], PROHIB = cfg.PROHIBIDO === undefined ? ['CONTRASENA', 'CUENTA', 'DNI'] : cfg.PROHIBIDO;
+      var T = ctx.tablas, cfg = ctx.config || {}, PROHIB = cfg.PROHIBIDO === undefined ? PROHIB_DEFECTO : cfg.PROHIBIDO;
+      var BASE = apartado(cfg, ctx.id, ctx.titulo), PREF = cfg.PREFERENCIAS || '';
       var puedePersonalizar = !!ctx.admin || (cfg.PERSONALIZAN || []).indexOf(ctx.perfil) >= 0;
       var K = 'li_' + ctx.id + '_';
-      var S = { ap: guardado(K + 'ap'), vista: {}, q: '', aviso: '', leido: false };
-      try { S.vista = JSON.parse(guardado(K + 'vistas') || '{}') || {}; } catch (e) { S.vista = {}; }
-      var errores = comprobar(cfg, function (t) { var c = T.columnas && T.columnas(t); return c && c.length ? c : null; });
+      var S = { vista: guardado(K + 'vista'), q: '', aviso: '', leido: false };
+      var url = new URLSearchParams(location.search), pedida = url.get('ficha');
 
       el.innerHTML = '<div id="li-cont"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div>' +
-        '<div class="u-velo" id="li-velo"><div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="li-vt"><div class="n-ventana" id="li-vent"></div></div></div>';
+        '<div class="u-velo" id="li-velo"><div class="u-ventana li-ventana" role="dialog" aria-modal="true" aria-labelledby="li-vt"><div class="n-ventana" id="li-vent"></div></div></div>';
       var cont = el.querySelector('#li-cont'), velo = el.querySelector('#li-velo'), vent = el.querySelector('#li-vent');
 
       /* ---------- datos ---------- */
-      var tablas = [];
-      BASE.forEach(function (a) { if (tablas.indexOf(a.tabla) < 0) tablas.push(a.tabla); });
+      var tablas = [BASE.tabla];
+      BASE.relacionados.forEach(function (r) { if (r.tabla && tablas.indexOf(r.tabla) < 0) tablas.push(r.tabla); });
       Object.keys(cfg.VALORES || {}).forEach(function (k) { var v = cfg.VALORES[k]; if (v && v.tabla && tablas.indexOf(v.tabla) < 0) tablas.push(v.tabla); });
-      if (cfg.PREFERENCIAS && tablas.indexOf(cfg.PREFERENCIAS) < 0) tablas.push(cfg.PREFERENCIAS);
+      if (PREF && tablas.indexOf(PREF) < 0) tablas.push(PREF);
       function filas(t) { return T.filas(t) || []; }
       function filaDe(t, id) { return T.fila ? T.fila(t, id) : null; }
-      function pref() {
-        var txt = '';
-        if (cfg.PREFERENCIAS) { var f = filaDe(cfg.PREFERENCIAS, CLAVE_PREF); txt = f ? f.VALOR : ''; }
-        if (!txt) txt = guardado(K + 'pref');
-        try { return JSON.parse(txt || '{}') || {}; } catch (e) { return {}; }
+      /** Lo personalizado: de la tabla PREFERENCIAS (para todos) o, sin ella, del dispositivo. */
+      function prefDe(clave) {
+        var f = PREF ? filaDe(PREF, clave) : null;
+        return json(f ? f.VALOR : guardado('li_pref_' + clave));
       }
-      function apartados() { return aplicar(BASE, pref()).filter(function (a) { return apartadoVisible(a, ctx.perfil, ctx.admin); }); }
-      function apActual(aps) { return aps.filter(function (a) { return a.id === S.ap; })[0] || aps[0] || null; }
-      function vistaActual(ap) { var vs = vistasDe(ap); return vs.filter(function (v) { return v.id === S.vista[ap.id]; })[0] || vs[0]; }
-      function clave(ap) { return ap.clave || 'ID'; }
+      function ap() { return aplicar(BASE, prefDe(ctx.id)); }
+      function vistaActual(a) { var vs = vistasDe(a); return vs.filter(function (v) { return v.id === S.vista; })[0] || vs[0]; }
       var VAL = {};
+      // Las secciones a las que se puede ir (las que ve quien ha entrado), para los enlaces de lo relacionado.
+      var veo = {}; (ctx.secciones || []).forEach(function (s) { veo[s.id] = s.titulo; });
+      var errores = null;
 
       /* ---------- pintar ---------- */
-      function celda(ap, c, f, conEnlaces, cliente) {
-        var cp = campo(ap, c), t = verTexto(cp, f, VAL, PROHIB);
+      function celda(a, c, f, conEnlaces, cliente) {
+        var cp = campo(a, c), t = verTexto(cp, f, VAL, PROHIB);
+        if (c === a.codigo && t) return '<span class="li-cod">' + texto(t) + '</span>';
         if (t === '') return '<span class="li-nada">—</span>';
         var v = f[c];
         if (cp.calculo && cp.precio && t.indexOf('Falta') === 0) return cliente ? 'Precio a consultar' : '<span class="u-mal">' + texto(t) + '</span>';
@@ -509,110 +538,94 @@
           var col = (cp.colores || {})[String(v)] || '';
           return '<span class="u-chip li-estado' + (col ? ' li-' + texto(col) : '') + '">' + texto(t) + '</span>';
         }
-        if (cp.tipo === 'fecha') {
-          var cu = cuando(v, hoyIso());
-          return texto(t) + (cu ? ' <span class="u-nota">· ' + texto(cu) + '</span>' : '');
-        }
+        if (cp.tipo === 'fecha') { var cu = cuando(v, hoyIso()); return texto(t) + (cu ? ' <span class="u-nota">· ' + texto(cu) + '</span>' : ''); }
         return texto(t);
       }
-      function marcas(avs) {
-        return avs.map(function (a) { return '<span class="li-aviso li-' + texto(a.nivel || 'medio') + '">' + texto(a.titulo) + '</span>'; }).join('');
+      /** El nombre de una fila con su código delante (el de la tarea, para trabajarla en Claude). */
+      function titulo2(a, f, cli) {
+        var cod = a.codigo && a.codigo !== a.nombre && !vacio(f[a.codigo]) ? '<span class="li-cod">' + texto(f[a.codigo]) + '</span> ' : '';
+        return cod + celda(a, a.nombre, f, false, cli);
       }
+      function marcas(avs) { return avs.map(function (x) { return '<span class="li-aviso li-' + texto(x.nivel || 'medio') + '">' + texto(x.titulo) + '</span>'; }).join(''); }
+
       function pintar() {
         if (!S.leido) return;
         VAL = valoresDe(cfg.VALORES, filaDe);
-        var aps = apartados();
-        if (!aps.length) {
-          cont.innerHTML = '<p class="u-vacio">' + (BASE.length ? 'No tienes ningún apartado a la vista. Pide a quien administra que te dé alguno.' :
-            'Todavía no hay apartados. Quien administra la app los dice en config.json (nucleo.secciones.listado.config.APARTADOS).') + '</p>';
-          return;
-        }
-        var ap = apActual(aps), vista = vistaActual(ap), hoy = hoyIso();
-        S.ap = ap.id;
-        ctx.ponerTitulo(ctx.titulo);
-        var todas = filas(ap.tabla);
-        var conAviso = function (a) { return filas(a.tabla).filter(function (f) { return avisosDe(a, f, hoy).some(function (x) { return (x.nivel || 'medio') === 'alto'; }); }).length; };
+        if (errores === null) errores = ctx.admin ? comprobar(cfg, function (t) { var c = T.columnas && T.columnas(t); return c && c.length ? c : null; }, '') : [];
+        var a = ap(), vista = vistaActual(a), hoy = hoyIso(), todas = filas(a.tabla);
+        S.vista = vista.id;
         var html = '';
-        if (ctx.admin && errores.length) html += '<div class="u-bloque li-errores"><strong>La configuración tiene cosas que no cuadran (solo lo ve quien administra):</strong><ul>' + errores.map(function (e) { return '<li>' + texto(e) + '</li>'; }).join('') + '</ul></div>';
-        if (cfg.AYUDA) html += '<p class="u-nota li-ayuda">' + texto(cfg.AYUDA) + '</p>';
-        html += '<div class="li-arriba"><div class="u-pestanas li-aps" role="tablist">' + aps.map(function (a) {
-          var n = conAviso(a);
-          return '<button type="button" role="tab" data-ap="' + texto(a.id) + '" aria-selected="' + (a.id === ap.id) + '">' + texto(a.titulo || titulo(a.id)) +
-            (n ? ' <span class="li-n" title="Filas con un aviso">' + n + '</span>' : '') + '</button>';
-        }).join('') + '</div>' +
+        if (errores.length) html += '<div class="u-bloque li-errores"><strong>La configuración de esta sección tiene cosas que no cuadran (solo lo ve quien administra):</strong><ul>' + errores.map(function (e) { return '<li>' + texto(e) + '</li>'; }).join('') + '</ul></div>';
+        var vs = vistasDe(a);
+        html += '<div class="li-arriba">' + (vs.length > 1 ? '<div class="u-pestanas li-vistas" role="tablist" aria-label="Vistas">' + vs.map(function (v) {
+          return '<button type="button" role="tab" data-vista="' + texto(v.id) + '" aria-selected="' + (v.id === vista.id) + '">' + texto(v.titulo) + (v.cliente ? ' <span class="li-cli">para clientes</span>' : '') + '</button>';
+        }).join('') + '</div>' : '<div class="li-vistas"></div>') +
           (puedePersonalizar ? '<button type="button" class="u-btn u-btn-texto li-pers" data-pers>' + ICONO_AJUSTAR + 'Personalizar</button>' : '') + '</div>';
-        if (ap.texto) html += '<p class="u-nota li-texto">' + texto(ap.texto) + '</p>';
-        var vs = vistasDe(ap);
-        if (vs.length > 1) html += '<div class="li-vistas" role="group" aria-label="Vistas">' + vs.map(function (v) {
-          return '<button type="button" class="li-vista" data-vista="' + texto(v.id) + '" aria-pressed="' + (v.id === vista.id) + '">' + texto(v.titulo) + (v.cliente ? ' <span class="li-cli">para clientes</span>' : '') + '</button>';
-        }).join('') + '</div>';
+        if (a.texto) html += '<p class="u-nota li-texto">' + texto(a.texto) + '</p>';
         if (vista.cliente) {
-          var nombres = []; ocultas(ap, vista).forEach(function (c) { var t = campo(ap, c).titulo; if (nombres.indexOf(t) < 0) nombres.push(t); });
+          var nombres = []; ocultas(a, vista).forEach(function (c) { var t = campo(a, c).titulo; if (nombres.indexOf(t) < 0) nombres.push(t); });
           html += '<p class="li-cliente">Vista para enseñar a un cliente: sin avisos y sin ' + (nombres.length ? nombres.map(function (t) { return t.toLowerCase(); }).join(', ').replace(/, ([^,]*)$/, ' ni $1') : 'los datos privados') + '.</p>';
         }
-        // Avisos: cuántas filas de la vista tiene cada uno; tocar uno filtra.
-        var deVista = filtrar(ap, vista, todas, { hoy: hoy });
-        var avs = vista.cliente ? [] : avisosActivos(ap).map(function (a) { return { a: a, n: filtrar(ap, vista, todas, { hoy: hoy, aviso: a.id }).length }; }).filter(function (x) { return x.n; });
+        var deVista = filtrar(a, vista, todas, { hoy: hoy });
+        var avs = vista.cliente ? [] : avisosActivos(a).map(function (x) { return { a: x, n: filtrar(a, vista, todas, { hoy: hoy, aviso: x.id }).length }; }).filter(function (x) { return x.n; });
         if (S.aviso && !avs.some(function (x) { return x.a.id === S.aviso; })) S.aviso = '';
+        var fs = filtrar(a, vista, todas, { hoy: hoy, q: S.q, aviso: S.aviso });
+        html += '<div class="li-barra"><div class="li-buscar"><label class="u-oculto" for="li-q">Buscar</label><input id="li-q" type="search" placeholder="Buscar en ' + texto((a.titulo || '').toLowerCase()) + '" value="' + texto(S.q) + '" autocomplete="off"></div>' +
+          '<span class="u-nota li-cuenta">' + (fs.length === deVista.length ? fs.length + (fs.length === 1 ? ' fila' : ' filas') : fs.length + ' de ' + deVista.length) + '</span>' +
+          (a.crear && editables(a).length && !vista.cliente ? '<button type="button" class="u-btn u-btn-accion li-nueva" data-nueva>Añadir</button>' : '') + '</div>';
         if (avs.length) html += '<div class="li-avisos" role="group" aria-label="Avisos">' + avs.map(function (x) {
           return '<button type="button" class="li-av li-' + texto(x.a.nivel || 'medio') + '" data-aviso="' + texto(x.a.id) + '" aria-pressed="' + (S.aviso === x.a.id) + '"><b>' + x.n + '</b> ' + texto(x.a.titulo) + '</button>';
         }).join('') + (S.aviso ? '<button type="button" class="u-btn u-btn-texto" data-aviso="">Ver todas</button>' : '') + '</div>';
-        html += '<div class="li-buscar"><label class="u-oculto" for="li-q">Buscar</label><input id="li-q" type="search" placeholder="Buscar en ' + texto((ap.titulo || '').toLowerCase()) + '" value="' + texto(S.q) + '" autocomplete="off">' +
-          (ap.crear && ap.editar ? '<button type="button" class="u-btn" data-nueva>Añadir</button>' : '') + '</div>';
-        var fs = filtrar(ap, vista, todas, { hoy: hoy, q: S.q, aviso: S.aviso });
-        html += '<p class="u-nota li-cuenta">' + (fs.length === deVista.length ? fs.length + (fs.length === 1 ? ' fila' : ' filas') : fs.length + ' de ' + deVista.length) + '</p>';
-        if (!todas.length) html += '<p class="u-vacio">' + texto(ap.vacio || 'Todavía no hay nada en ' + (ap.titulo || '').toLowerCase() + '.') + '</p>';
+        if (!todas.length) html += '<p class="u-vacio">' + texto(a.vacio || 'Todavía no hay nada en ' + (a.titulo || '').toLowerCase() + '.') + '</p>';
         else if (!fs.length) html += '<p class="u-vacio">' + (S.q ? 'Nada con «' + texto(S.q) + '».' : 'Nada en esta vista.') + '</p>';
-        else if (vista.tablero) html += pintarTablero(ap, vista, fs, hoy);
-        else html += agrupar(ap, vista, fs, hoy).map(function (g) { return pintarGrupo(ap, vista, g, hoy); }).join('');
+        else if (vista.tablero) html += pintarTablero(a, vista, fs, hoy);
+        else html += agrupar(a, vista, fs, hoy).map(function (g) { return pintarGrupo(a, vista, g, hoy); }).join('');
         var foco = document.activeElement && document.activeElement.id === 'li-q' ? document.activeElement.selectionStart : null;
         cont.innerHTML = html;
         if (foco !== null) { var q = cont.querySelector('#li-q'); q.focus(); try { q.setSelectionRange(foco, foco); } catch (e) {} }
       }
+      function tarjeta(a, f, det, cli, hoy, arrastrar) {
+        var avs = cli ? [] : avisosDe(a, f, hoy);
+        return '<li><button type="button" class="li-tarjeta' + (avs.length ? ' li-f-' + texto(avs[0].nivel || 'medio') : '') + '" data-id="' + texto(f[a.clave]) + '"' + (arrastrar ? ' draggable="true"' : '') + '>' +
+          '<strong>' + titulo2(a, f, cli) + '</strong>' +
+          (det.length ? '<span class="li-det">' + det.map(function (x) { return '<span>' + celda(a, x, f, false, cli) + '</span>'; }).join('') + '</span>' : '') +
+          (avs.length ? '<span class="li-marcas">' + marcas(avs) + '</span>' : '') + '</button></li>';
+      }
+      function pintarGrupo(a, vista, g, hoy) {
+        // En una vista para clientes no salen los avisos (son para quien trabaja) y un precio que falta es «a consultar».
+        var cli = !!vista.cliente, fuera = ocultas(a, vista), nom = a.nombre;
+        var cols = columnasDe(a, vista).filter(function (c) { return fuera.indexOf(c) < 0 && c !== a.codigo; });
+        // En la tabla, el código va en su columna, la primera (en las tarjetas, delante del nombre).
+        var conCod = a.codigo && a.codigo !== nom ? [a.codigo].concat(cols) : cols;
+        var det = (a.detalle.length ? a.detalle : cols.filter(function (c) { return c !== nom; }).slice(0, 2)).filter(function (c) { return fuera.indexOf(c) < 0 && c !== nom; });
+        var cab = g.titulo ? '<h2 class="n-grupo">' + texto(g.titulo) + ' <span class="u-cifra">' + g.filas.length + '</span></h2>' : '';
+        var num = function (cp) { return /importe|numero|porcentaje/.test(cp.tipo); };
+        // Ordenador: tabla (con el código delante del nombre). Móvil: una tarjeta por fila.
+        var tabla = '<div class="u-solo-ancho li-tabla"><table class="u-tabla"><thead><tr>' + conCod.map(function (c) {
+          var cp = campo(a, c); return '<th' + (num(cp) ? ' class="num"' : '') + '>' + texto(cp.titulo) + '</th>';
+        }).join('') + '</tr></thead><tbody>' + g.filas.map(function (f) {
+          var avs = cli ? [] : avisosDe(a, f, hoy);
+          return '<tr tabindex="0" data-id="' + texto(f[a.clave]) + '"' + (avs.length ? ' class="li-con-aviso li-f-' + texto(avs[0].nivel || 'medio') + '"' : '') + '>' + conCod.map(function (c) {
+            var cp = campo(a, c), principal = c === nom;
+            return '<td class="' + (num(cp) ? 'num' : '') + (principal ? ' u-tabla-t' : '') + (c === a.codigo ? ' li-td-cod' : '') + '">' + celda(a, c, f, false, cli) +
+              (principal && avs.length ? '<div class="li-marcas">' + marcas(avs) + '</div>' : '') + '</td>';
+          }).join('') + '</tr>';
+        }).join('') + '</tbody></table></div>';
+        var tarjetas = '<ul class="u-solo-movil li-tarjetas">' + g.filas.map(function (f) { return tarjeta(a, f, det, cli, hoy, false); }).join('') + '</ul>';
+        return '<section class="li-grupo">' + cab + tabla + tarjetas + '</section>';
+      }
       /** Tablero: una columna por valor, con sus tarjetas; se arrastra de una a otra si ese campo se edita (y no es para clientes). */
-      function pintarTablero(ap, vista, fs, hoy) {
-        var cli = !!vista.cliente, fuera = ocultas(ap, vista), c = vista.tablero.campo, nom = ap.nombre || clave(ap);
-        var mueve = !cli && editables(ap).indexOf(c) >= 0;
-        var det = (ap.detalle || columnasDe(ap, vista)).filter(function (x) { return fuera.indexOf(x) < 0 && x !== nom && x !== c; }).slice(0, 3);
-        var cp = campo(ap, c);
-        return '<div class="li-tablero" data-campo="' + texto(c) + '">' + columnasTablero(ap, vista, fs).map(function (col) {
+      function pintarTablero(a, vista, fs, hoy) {
+        var cli = !!vista.cliente, fuera = ocultas(a, vista), c = vista.tablero.campo, nom = a.nombre;
+        var mueve = !cli && editables(a).indexOf(c) >= 0;
+        var det = (a.detalle.length ? a.detalle : columnasDe(a, vista)).filter(function (x) { return fuera.indexOf(x) < 0 && x !== nom && x !== c && x !== a.codigo; }).slice(0, 3);
+        var cp = campo(a, c);
+        return '<div class="li-tablero" data-campo="' + texto(c) + '">' + columnasTablero(a, vista, fs).map(function (col) {
           var color = (cp.colores || {})[col.id] || '';
           return '<section class="li-col' + (color ? ' li-' + texto(color) : '') + '" data-valor="' + texto(col.id) + '"' + (mueve ? ' data-soltar' : '') + '>' +
             '<h2 class="li-col-t">' + texto(col.titulo) + ' <span class="u-cifra">' + col.filas.length + '</span></h2>' +
-            (col.filas.length ? '<ul class="li-tarjetas li-col-l">' + col.filas.map(function (f) {
-              var avs = cli ? [] : avisosDe(ap, f, hoy);
-              return '<li><button type="button" class="li-tarjeta' + (avs.length ? ' li-f-' + texto(avs[0].nivel || 'medio') : '') + '" data-id="' + texto(f[clave(ap)]) + '"' + (mueve ? ' draggable="true"' : '') + '>' +
-                '<strong>' + celda(ap, nom, f, false, cli) + '</strong>' +
-                '<span class="li-det">' + det.map(function (x) { return '<span>' + celda(ap, x, f, false, cli) + '</span>'; }).join('') + '</span>' +
-                (avs.length ? '<span class="li-marcas">' + marcas(avs) + '</span>' : '') + '</button></li>';
-            }).join('') + '</ul>' : '<p class="u-nota li-col-vacia">Nada</p>') + '</section>';
+            (col.filas.length ? '<ul class="li-tarjetas li-col-l">' + col.filas.map(function (f) { return tarjeta(a, f, det, cli, hoy, mueve); }).join('') + '</ul>' : '<p class="u-nota li-col-vacia">Nada</p>') + '</section>';
         }).join('') + '</div>' + (mueve ? '<p class="u-nota li-col-ayuda">En el ordenador, arrastra una tarjeta a otra columna para cambiar su ' + texto(cp.titulo.toLowerCase()) + '. En el móvil, ábrela y cámbialo en su ficha.</p>' : '');
-      }
-      function pintarGrupo(ap, vista, g, hoy) {
-        // En una vista para clientes no salen los avisos (son para quien trabaja) y un precio que falta es «a consultar».
-        var cli = !!vista.cliente, fuera = ocultas(ap, vista), cols = columnasDe(ap, vista).filter(function (c) { return fuera.indexOf(c) < 0; });
-        var nom = ap.nombre || clave(ap), det = (ap.detalle || []).filter(function (c) { return fuera.indexOf(c) < 0 && c !== nom; });
-        var cab = g.titulo ? '<h2 class="n-grupo">' + texto(g.titulo) + ' <span class="u-cifra">' + g.filas.length + '</span></h2>' : '';
-        // Ordenador: tabla. Móvil: una tarjeta por fila con el nombre, lo de debajo y los avisos.
-        var tabla = '<div class="u-solo-ancho li-tabla"><table class="u-tabla"><thead><tr>' + cols.map(function (c) {
-          var cp = campo(ap, c); return '<th' + (/importe|numero|porcentaje/.test(cp.tipo) ? ' class="num"' : '') + '>' + texto(cp.titulo) + '</th>';
-        }).join('') + '</tr></thead><tbody>' + g.filas.map(function (f) {
-          var avs = cli ? [] : avisosDe(ap, f, hoy);
-          return '<tr tabindex="0" data-id="' + texto(f[clave(ap)]) + '"' + (avs.length ? ' class="li-con-aviso li-f-' + texto(avs[0].nivel || 'medio') + '"' : '') + '>' + cols.map(function (c, i) {
-            var cp = campo(ap, c);
-            return '<td class="' + (/importe|numero|porcentaje/.test(cp.tipo) ? 'num' : '') + (c === nom ? ' u-tabla-t' : '') + '">' + celda(ap, c, f, false, cli) +
-              (i === 0 && avs.length ? '<div class="li-marcas">' + marcas(avs) + '</div>' : '') + '</td>';
-          }).join('') + '</tr>';
-        }).join('') + '</tbody></table></div>';
-        var tarjetas = '<ul class="u-solo-movil li-tarjetas">' + g.filas.map(function (f) {
-          var avs = cli ? [] : avisosDe(ap, f, hoy);
-          var debajo = det.length ? det : cols.filter(function (c) { return c !== nom; }).slice(0, 2);
-          return '<li><button type="button" class="li-tarjeta' + (avs.length ? ' li-f-' + texto(avs[0].nivel || 'medio') : '') + '" data-id="' + texto(f[clave(ap)]) + '">' +
-            '<strong>' + celda(ap, nom, f, false, cli) + '</strong>' +
-            '<span class="li-det">' + debajo.map(function (c) { return '<span>' + celda(ap, c, f, false, cli) + '</span>'; }).join('') + '</span>' +
-            (avs.length ? '<span class="li-marcas">' + marcas(avs) + '</span>' : '') + '</button></li>';
-        }).join('') + '</ul>';
-        return '<section class="li-grupo">' + cab + tabla + tarjetas + '</section>';
       }
 
       /* ---------- ficha ---------- */
@@ -621,16 +634,20 @@
         velo.classList.add('abierto');
         var h = vent.querySelector('h2'); if (h) { h.setAttribute('tabindex', '-1'); h.focus(); }
       }
-      function cerrarVentana() { velo.classList.remove('abierto'); vent.innerHTML = ''; }
-      function editables(ap) {
-        if (ap.editar === true) {
-          var t = [ap.nombre].concat(ap.columnas || []); (ap.ficha || []).forEach(function (g) { t = t.concat(g.campos || []); });
-          return t.filter(function (c, i) { return c && t.indexOf(c) === i && c !== clave(ap) && !campo(ap, c).calculo; });
-        }
-        return lista(ap.editar).filter(function (c) { return !campo(ap, c).calculo; });
+      function cerrarVentana() {
+        velo.classList.remove('abierto'); vent.innerHTML = '';
+        // Si se llegó con ?ficha=…, se quita de la dirección para que al volver no se abra otra vez.
+        if (new URLSearchParams(location.search).get('ficha')) { var u = new URL(location.href); u.searchParams.delete('ficha'); history.replaceState(history.state, '', u.pathname + u.search + u.hash); }
       }
-      function entrada(ap, c, f) {
-        var cp = campo(ap, c), v = f ? f[c] : '', id = 'li-c-' + c;
+      function editables(a) {
+        if (a.editar === true) {
+          var t = [a.nombre].concat(a.columnas); a.ficha.forEach(function (g) { t = t.concat(g.campos || []); });
+          return t.filter(function (c, i) { return c && t.indexOf(c) === i && c !== a.clave && c !== a.codigo && !campo(a, c).calculo; });
+        }
+        return lista(a.editar).filter(function (c) { return !campo(a, c).calculo; });
+      }
+      function entrada(a, c, f) {
+        var cp = campo(a, c), v = f ? f[c] : '', id = 'li-c-' + c;
         var et = '<label class="u-etiqueta" for="' + id + '">' + texto(cp.titulo) + '</label>';
         if (cp.opciones) {
           var ops = cp.opciones.slice(); if (!vacio(v) && ops.indexOf(String(v)) < 0) ops.unshift(String(v));
@@ -639,49 +656,53 @@
         }
         if (cp.tipo === 'nota') return '<div class="u-campo u-ancho">' + et + '<textarea id="' + id + '" rows="3" data-c="' + texto(c) + '">' + texto(v) + '</textarea></div>';
         var tipo = cp.tipo === 'fecha' ? 'date' : (cp.tipo === 'email' ? 'email' : (cp.tipo === 'telefono' ? 'tel' : (cp.tipo === 'enlace' || cp.tipo === 'foto' ? 'url' : 'text')));
-        var val = cp.tipo === 'fecha' && aFecha(v) ? (function (d) { return d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()); })(aFecha(v)) : (vacio(v) ? '' : String(v));
+        var d = cp.tipo === 'fecha' ? aFecha(v) : null;
+        var val = d ? d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()) : (vacio(v) ? '' : String(v));
         return '<div class="u-campo">' + et + '<input id="' + id + '" type="' + tipo + '"' + (/importe|numero|porcentaje/.test(cp.tipo) ? ' inputmode="decimal"' : '') + ' data-c="' + texto(c) + '" value="' + texto(val) + '"></div>';
       }
-      function ficha(ap, id, nueva) {
-        var vista = vistaActual(ap), fuera = ocultas(ap, vista), f = nueva ? {} : filaDe(ap.tabla, id), hoy = hoyIso();
+      var abierta = null; // { id } de la ficha abierta, para «Copiar para Claude»
+      function ficha(id, nueva) {
+        var a = ap(), vista = vistaActual(a), fuera = ocultas(a, vista), f = nueva ? {} : filaDe(a.tabla, id), hoy = hoyIso(), cli = !!vista.cliente;
         if (!f) { ctx.aviso('Esa fila ya no está.'); return; }
-        var ed = vista.cliente ? [] : editables(ap).filter(function (c) { return fuera.indexOf(c) < 0; });
-        var nom = ap.nombre || clave(ap), grupos = ap.ficha && ap.ficha.length ? ap.ficha : [{ titulo: '', campos: columnasDe(ap, vista) }];
-        var avs = nueva || vista.cliente ? [] : avisosDe(ap, f, hoy);
-        var h = '<div class="li-ficha-cab"><h2 id="li-vt">' + (nueva ? 'Añadir · ' + texto(ap.titulo || '') : celda(ap, nom, f, false)) + '</h2>' +
-          '<button type="button" class="u-btn u-btn-icono" data-cerrar aria-label="Cerrar"><svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>';
+        abierta = nueva ? null : { id: id };
+        var ed = cli ? [] : editables(a).filter(function (c) { return fuera.indexOf(c) < 0; });
+        var grupos = a.ficha.length ? a.ficha : [{ titulo: '', campos: columnasDe(a, vista) }];
+        var avs = nueva || cli ? [] : avisosDe(a, f, hoy);
+        var vuelta = ctx.desde && pedida && !nueva ? '<button type="button" class="u-btn u-btn-texto li-volver" data-volver>‹ Volver a ' + texto(ctx.desde.titulo) + '</button>' : '';
+        var h = vuelta + '<div class="li-ficha-cab"><h2 id="li-vt">' + (nueva ? 'Añadir · ' + texto(a.titulo) : titulo2(a, f, cli)) + '</h2>' +
+          '<button type="button" class="u-btn u-btn-icono" data-cerrar aria-label="Cerrar">' + ICONO_X + '</button></div>';
+        if (!nueva && !cli && a.codigo) h += '<div class="li-claude"><button type="button" class="u-btn" data-claude>' + ICONO_COPIAR + 'Copiar para Claude</button><span class="u-nota">Pégalo al empezar una sesión de Claude para trabajar ' + texto(vacio(f[a.codigo]) ? 'esta fila' : f[a.codigo]) + '.</span></div>';
         if (avs.length) h += '<div class="li-ficha-avisos">' + marcas(avs) + '</div>';
-        if (vista.cliente) h += '<p class="li-cliente">Ficha para enseñar a un cliente: sin datos privados.</p>';
+        if (cli) h += '<p class="li-cliente">Ficha para enseñar a un cliente: sin datos privados.</p>';
         var puestos = [];
         h += '<form id="li-form" class="li-form" novalidate>' + grupos.map(function (g) {
-          var cs = (g.campos || []).filter(function (c) { return fuera.indexOf(c) < 0 && (nueva ? ed.indexOf(c) >= 0 : true); });
+          var cs = (g.campos || []).filter(function (c) { return fuera.indexOf(c) < 0 && c !== a.codigo && (nueva ? ed.indexOf(c) >= 0 : true); });
           if (!cs.length) return '';
           var cuerpo = cs.map(function (c) {
             puestos.push(c);
-            if (ed.indexOf(c) >= 0) return entrada(ap, c, f);
-            var cp = campo(ap, c);
-            return '<div class="li-dato' + (cp.tipo === 'nota' || cp.tipo === 'foto' ? ' u-ancho' : '') + '"><span class="u-etiqueta">' + texto(cp.titulo) + '</span><span class="li-valor">' + celda(ap, c, f, true, vista.cliente) + '</span>' +
+            if (ed.indexOf(c) >= 0) return entrada(a, c, f);
+            var cp = campo(a, c);
+            return '<div class="li-dato' + (cp.tipo === 'nota' || cp.tipo === 'foto' ? ' u-ancho' : '') + '"><span class="u-etiqueta">' + texto(cp.titulo) + '</span><span class="li-valor">' + celda(a, c, f, true, cli) + '</span>' +
               (cp.ayuda ? '<span class="u-nota">' + texto(cp.ayuda) + '</span>' : '') + '</div>';
           }).join('');
           return '<section class="li-fgrupo">' + (g.titulo ? '<h3 class="li-fg-t">' + texto(g.titulo) + '</h3>' : '') + '<div class="u-campos">' + cuerpo + '</div></section>';
         }).join('');
         // Lo que se edita y no está en ningún apartado de la ficha, al final.
         var resto = ed.filter(function (c) { return puestos.indexOf(c) < 0; });
-        if (resto.length) h += '<section class="li-fgrupo"><div class="u-campos">' + resto.map(function (c) { return entrada(ap, c, f); }).join('') + '</div></section>';
+        if (resto.length) h += '<section class="li-fgrupo"><div class="u-campos">' + resto.map(function (c) { return entrada(a, c, f); }).join('') + '</div></section>';
         h += '<p class="u-error" id="li-err" role="alert" hidden></p>';
         if (ed.length) h += '<div class="n-botones"><button type="submit" class="u-btn u-btn-accion">' + (nueva ? 'Añadir' : 'Guardar') + '</button></div>';
         h += '</form>';
-        if (!nueva && !vista.cliente) (ap.relacionados || []).forEach(function (r) {
-          var otro = BASE.filter(function (a) { return a.id === r.apartado; })[0];
-          if (!otro || !apartadoVisible(otro, ctx.perfil, ctx.admin)) return;
-          var rs = relacionadas(r, f, filas(otro.tabla));
-          if (otro.orden || r.orden) rs = rs.slice().sort(comparar(r.orden || otro.orden));
-          var cols = r.columnas || (otro.columnas || []).slice(0, 3);
-          h += '<section class="li-fgrupo"><h3 class="li-fg-t">' + texto(r.titulo || otro.titulo) + ' <span class="u-cifra">' + rs.length + '</span></h3>' +
+        // Lo relacionado (el seguimiento de un cliente): cada fila lleva a su sección, con su ficha abierta.
+        if (!nueva && !cli) a.relacionados.forEach(function (r) {
+          var rs = relacionadas(r, f, filas(r.tabla)), sec = String(r.seccion || '').toUpperCase(), va = sec && veo[sec];
+          if (r.orden) rs = rs.slice().sort(comparar(r.orden));
+          var otro = { id: sec, titulo: r.titulo, clave: r.clave || 'ID', codigo: r.codigo || '', nombre: r.nombre || (r.columnas || [r.clave || 'ID'])[0], campos: r.campos || {} };
+          var cols = (r.columnas || [otro.nombre]).filter(function (c) { return c !== otro.codigo; });
+          h += '<section class="li-fgrupo"><h3 class="li-fg-t">' + texto(r.titulo || r.tabla) + ' <span class="u-cifra">' + rs.length + '</span></h3>' +
             (rs.length ? '<ul class="li-rel">' + rs.slice(0, r.max || 20).map(function (x) {
-              var ra = avisosDe(otro, x, hoy);
-              return '<li><button type="button" class="li-rel-f" data-rel="' + texto(otro.id) + '" data-id="' + texto(x[clave(otro)]) + '">' +
-                cols.map(function (c) { return '<span>' + celda(otro, c, x, false) + '</span>'; }).join('') + (ra.length ? marcas(ra) : '') + '</button></li>';
+              var dentro = (otro.codigo && !vacio(x[otro.codigo]) ? '<span class="li-cod">' + texto(x[otro.codigo]) + '</span>' : '') + cols.map(function (c) { return '<span>' + celda(otro, c, x, false) + '</span>'; }).join('');
+              return '<li>' + (va ? '<a class="li-rel-f" href="?s=' + encodeURIComponent(sec.toLowerCase()) + '&ficha=' + encodeURIComponent(x[otro.clave]) + '" data-sx="' + texto(sec) + '">' + dentro + '<span class="li-ir">' + texto(va) + ' ›</span></a>' : '<div class="li-rel-f">' + dentro + '</div>') + '</li>';
             }).join('') + '</ul>' : '<p class="u-vacio">' + texto(r.vacio || 'Nada todavía.') + '</p>') + '</section>';
         });
         abrirVentana(h);
@@ -690,91 +711,110 @@
           ev.preventDefault();
           var err = vent.querySelector('#li-err'), cambios = {}, malos = [];
           [].forEach.call(form.querySelectorAll('[data-c]'), function (i) {
-            var c = i.getAttribute('data-c'), v = i.value.trim(), cp = campo(ap, c);
+            var c = i.getAttribute('data-c'), v = i.value.trim(), cp = campo(a, c);
             var p = prohibido(v, PROHIB); if (p.length) { malos = malos.concat(p); i.setAttribute('aria-invalid', 'true'); } else i.removeAttribute('aria-invalid');
             var antes = vacio(f[c]) ? '' : (cp.tipo === 'fecha' && aFecha(f[c]) ? i.defaultValue : String(f[c]));
             if (v !== antes) cambios[c] = cp.tipo === 'importe' || cp.tipo === 'numero' ? (v === '' ? '' : (isNaN(aNumero(v)) ? v : aNumero(v))) : v;
           });
           if (malos.length) { err.textContent = textoProhibido(malos.filter(function (k, i) { return malos.indexOf(k) === i; })); err.hidden = false; return; }
           if (!Object.keys(cambios).length) { cerrarVentana(); return; }
-          var p = nueva ? T.crear(ap.tabla, cambios) : T.actualizar(ap.tabla, id, cambios);
+          var p = nueva ? T.crear(a.tabla, cambios) : T.actualizar(a.tabla, id, cambios);
           cerrarVentana();
           Promise.resolve(p).then(function () { ctx.aviso(nueva ? 'Añadido.' : 'Guardado.'); }, function (e) { ctx.aviso('No se ha guardado: ' + ((e && e.message) || e)); });
         });
       }
+      function copiarClaude() {
+        var a = ap(), f = abierta && filaDe(a.tabla, abierta.id);
+        if (!f) return;
+        var t = paraClaude(a, f, VAL, PROHIB, '');
+        var hecho = function () { ctx.aviso('Copiado: pégalo en Claude al empezar la sesión.'); };
+        var aMano = function () {
+          var ta = document.createElement('textarea'); ta.value = t; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select();
+          var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+          document.body.removeChild(ta);
+          if (ok) hecho(); else ctx.aviso('No se ha podido copiar: selecciona el texto de la ficha y cópialo.');
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(hecho, aMano); else aMano();
+      }
 
       /* ---------- personalizar ---------- */
-      function guardarPref(p) {
-        var txt = JSON.stringify(p);
-        guardado(K + 'pref', txt);
-        if (!cfg.PREFERENCIAS) { pintar(); ctx.aviso('Guardado en este dispositivo.'); return; }
-        var hay = filaDe(cfg.PREFERENCIAS, CLAVE_PREF), v = {}; v.VALOR = txt;
-        var pr = hay ? T.actualizar(cfg.PREFERENCIAS, CLAVE_PREF, v) : T.crear(cfg.PREFERENCIAS, (function () { var o = { VALOR: txt }; o.ID = CLAVE_PREF; return o; })());
-        pintar();
-        Promise.resolve(pr).then(function () { ctx.aviso('Guardado para todos.'); }, function (e) { ctx.aviso('No se ha guardado: ' + ((e && e.message) || e)); });
+      function guardarPref(clave, valor, otraVez) {
+        var txt = JSON.stringify(valor);
+        guardado('li_pref_' + clave, txt);
+        if (!PREF) { if (otraVez) otraVez(); return Promise.resolve('en este dispositivo'); }
+        var hay = filaDe(PREF, clave);
+        var p = hay ? T.actualizar(PREF, clave, { VALOR: txt }) : T.crear(PREF, { ID: clave, VALOR: txt });
+        if (otraVez) otraVez();
+        return Promise.resolve(p).then(function () { return 'para todos'; });
       }
+      /** Las secciones del menú, en el orden de ahora (sin Perfil ni las de dentro de Perfil). */
+      function delMenu() { return (ctx.secciones || []).filter(function (s) { return !s.enPerfil && s.id !== 'PERFIL'; }); }
       function personalizar() {
-        var p = pref(), aps = aplicar(BASE, p), ap = apActual(aps), base = BASE.filter(function (a) { return a.id === ap.id; })[0];
-        var pa = (p.apartados || {})[ap.id] || {}, conPref = aplicar(BASE, p).filter(function (a) { return a.id === ap.id; })[0];
-        var ordenV = (base.vistas || []).slice().sort(function (a, b) { var o = lista(pa.vistas); var ia = o.indexOf(a.id), ib = o.indexOf(b.id); return (ia < 0 ? 1e6 : ia) - (ib < 0 ? 1e6 : ib); });
-        var fuera = lista(pa.ocultas);
+        var base = BASE, p = prefDe(ctx.id) || {}, conPref = ap();
+        var ordenV = (base.vistas || []).slice().sort(function (x, y) { var o = lista(p.vistas); var ia = o.indexOf(x.id), ib = o.indexOf(y.id); return (ia < 0 ? 1e6 : ia) - (ib < 0 ? 1e6 : ib); });
+        var fuera = lista(p.ocultas), menu = delMenu();
         function fila(id, tit, extra, i, n, grupo) {
           return '<li class="li-p-fila" data-g="' + grupo + '" data-id="' + texto(id) + '">' + extra + '<span class="li-p-t">' + texto(tit) + '</span>' +
             '<button type="button" class="u-btn u-btn-icono" data-sube aria-label="Subir ' + texto(tit) + '"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
             '<button type="button" class="u-btn u-btn-icono" data-baja aria-label="Bajar ' + texto(tit) + '"' + (i === n - 1 ? ' disabled' : '') + '>↓</button></li>';
         }
-        var h = '<div class="li-ficha-cab"><h2 id="li-vt">Personalizar</h2><button type="button" class="u-btn u-btn-icono" data-cerrar aria-label="Cerrar"><svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
-          '<p class="u-nota">' + (cfg.PREFERENCIAS ? 'Vale para todos los que usan la app.' : 'Se guarda en este dispositivo.') + '</p>' +
-          '<section class="li-fgrupo"><h3 class="li-fg-t">Orden de los apartados</h3><ul class="li-p-lista">' +
-          aps.map(function (a, i) { return fila(a.id, a.titulo || titulo(a.id), '', i, aps.length, 'ap'); }).join('') + '</ul></section>';
-        if (ordenV.length > 1) h += '<section class="li-fgrupo"><h3 class="li-fg-t">Vistas de ' + texto(ap.titulo) + '</h3><p class="u-nota">La primera se abre al entrar. Quita las que no uses.</p><ul class="li-p-lista">' +
+        var h = '<div class="li-ficha-cab"><h2 id="li-vt">Personalizar</h2><button type="button" class="u-btn u-btn-icono" data-cerrar aria-label="Cerrar">' + ICONO_X + '</button></div>' +
+          '<p class="u-nota">' + (PREF ? 'Vale para todos los que usan la app.' : 'Se guarda en este dispositivo.') + '</p>';
+        if (menu.length > 1 && window.UN.ordenMenu) h += '<section class="li-fgrupo"><h3 class="li-fg-t">Orden del menú</h3><ul class="li-p-lista">' +
+          menu.map(function (s, i) { return fila(s.id, s.titulo, '', i, menu.length, 'menu'); }).join('') + '</ul></section>';
+        if (ordenV.length > 1) h += '<section class="li-fgrupo"><h3 class="li-fg-t">Vistas de ' + texto(ctx.titulo) + '</h3><p class="u-nota">La primera se abre al entrar. Quita las que no uses.</p><ul class="li-p-lista">' +
           ordenV.map(function (v, i) { return fila(v.id, v.titulo, '<input type="checkbox" data-ver aria-label="Ver ' + texto(v.titulo) + '"' + (fuera.indexOf(v.id) < 0 ? ' checked' : '') + '>', i, ordenV.length, 'vi'); }).join('') + '</ul></section>';
-        if ((conPref.avisos || []).length) h += '<section class="li-fgrupo"><h3 class="li-fg-t">Avisos de ' + texto(ap.titulo) + '</h3><ul class="li-p-lista">' +
-          conPref.avisos.map(function (a) {
-            var usaDias = JSON.stringify(a.si || []).indexOf('dias"') >= 0;
-            return '<li class="li-p-fila" data-g="av" data-id="' + texto(a.id) + '"><input type="checkbox" data-on aria-label="Avisar: ' + texto(a.titulo) + '"' + (a.activo !== false ? ' checked' : '') + '>' +
-              '<span class="li-p-t">' + texto(a.titulo) + (a.texto ? '<small class="u-nota">' + texto(a.texto) + '</small>' : '') + '</span>' +
-              (usaDias ? '<label class="li-p-dias">con <input type="number" min="0" max="365" inputmode="numeric" data-dias value="' + (a.dias === undefined ? 7 : a.dias) + '"> días</label>' : '') + '</li>';
+        if ((conPref.avisos || []).length) h += '<section class="li-fgrupo"><h3 class="li-fg-t">Avisos de ' + texto(ctx.titulo) + '</h3><ul class="li-p-lista">' +
+          conPref.avisos.map(function (x) {
+            var usaDias = JSON.stringify(x.si || []).indexOf('dias"') >= 0;
+            return '<li class="li-p-fila" data-g="av" data-id="' + texto(x.id) + '"><input type="checkbox" data-on aria-label="Avisar: ' + texto(x.titulo) + '"' + (x.activo !== false ? ' checked' : '') + '>' +
+              '<span class="li-p-t">' + texto(x.titulo) + (x.texto ? '<small class="u-nota">' + texto(x.texto) + '</small>' : '') + '</span>' +
+              (usaDias ? '<label class="li-p-dias">con <input type="number" min="0" max="365" inputmode="numeric" data-dias value="' + (x.dias === undefined ? 7 : x.dias) + '"> días</label>' : '') + '</li>';
           }).join('') + '</ul></section>';
         h += '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" data-guardar>Guardar</button><button type="button" class="u-btn u-btn-texto" data-defecto>Volver a como venía</button></div>';
         abrirVentana(h);
-        vent.querySelector('[data-defecto]').addEventListener('click', function () { cerrarVentana(); guardarPref({}); });
+        var fin = function (donde) { ctx.aviso('Guardado ' + donde + '.'); }, mal = function (e) { ctx.aviso('No se ha guardado: ' + ((e && e.message) || e)); };
+        vent.querySelector('[data-defecto]').addEventListener('click', function () {
+          cerrarVentana();
+          if (window.UN.ordenMenu) window.UN.ordenMenu([]);
+          Promise.all([guardarPref(ctx.id, {}, pintar), menu.length > 1 ? guardarPref(MENU, []) : null]).then(function (r) { fin(r[0]); }, mal);
+        });
         vent.querySelector('[data-guardar]').addEventListener('click', function () {
-          var n = JSON.parse(JSON.stringify(p)); n.apartados = n.apartados || {};
-          n.orden = [].map.call(vent.querySelectorAll('[data-g=ap]'), function (li) { return li.getAttribute('data-id'); });
-          var q = n.apartados[ap.id] = n.apartados[ap.id] || {};
+          var n = { vistas: [], ocultas: [], avisos: {} };
           var vis = vent.querySelectorAll('[data-g=vi]');
           if (vis.length) {
-            q.vistas = [].map.call(vis, function (li) { return li.getAttribute('data-id'); });
-            q.ocultas = [].filter.call(vis, function (li) { return !li.querySelector('[data-ver]').checked; }).map(function (li) { return li.getAttribute('data-id'); });
-            if (q.ocultas.length === q.vistas.length) { ctx.aviso('Deja al menos una vista.'); return; }
+            n.vistas = [].map.call(vis, function (li) { return li.getAttribute('data-id'); });
+            n.ocultas = [].filter.call(vis, function (li) { return !li.querySelector('[data-ver]').checked; }).map(function (li) { return li.getAttribute('data-id'); });
+            if (n.ocultas.length === n.vistas.length) { ctx.aviso('Deja al menos una vista.'); return; }
           }
-          q.avisos = q.avisos || {};
           [].forEach.call(vent.querySelectorAll('[data-g=av]'), function (li) {
             var d = li.querySelector('[data-dias]'), o = { activo: li.querySelector('[data-on]').checked };
             if (d && d.value !== '' && isFinite(+d.value)) o.dias = Math.max(0, Math.min(365, Math.round(+d.value)));
-            q.avisos[li.getAttribute('data-id')] = o;
+            n.avisos[li.getAttribute('data-id')] = o;
           });
+          var orden = [].map.call(vent.querySelectorAll('[data-g=menu]'), function (li) { return li.getAttribute('data-id'); });
           cerrarVentana();
-          guardarPref(n);
+          var ps = [guardarPref(ctx.id, n, pintar)];
+          if (orden.length && JSON.stringify(orden) !== JSON.stringify(menu.map(function (s) { return s.id; }))) { ps.push(guardarPref(MENU, orden)); window.UN.ordenMenu(orden); }
+          Promise.all(ps).then(function (r) { fin(r[0]); }, mal);
         });
       }
 
       /* ---------- eventos ---------- */
       cont.addEventListener('click', function (ev) {
-        var t = ev.target.closest('[data-ap],[data-vista],[data-aviso],[data-id],[data-pers],[data-nueva]');
+        var t = ev.target.closest('[data-vista],[data-aviso],[data-id],[data-pers],[data-nueva]');
         if (!t) return;
-        if (t.hasAttribute('data-ap')) { S.ap = t.getAttribute('data-ap'); S.aviso = ''; S.q = ''; guardado(K + 'ap', S.ap); pintar(); return; }
-        if (t.hasAttribute('data-vista')) { S.vista[S.ap] = t.getAttribute('data-vista'); S.aviso = ''; guardado(K + 'vistas', JSON.stringify(S.vista)); pintar(); return; }
-        if (t.hasAttribute('data-aviso')) { var a = t.getAttribute('data-aviso'); S.aviso = S.aviso === a ? '' : a; pintar(); return; }
+        if (t.hasAttribute('data-vista')) { S.vista = t.getAttribute('data-vista'); S.aviso = ''; guardado(K + 'vista', S.vista); pintar(); return; }
+        if (t.hasAttribute('data-aviso')) { var x = t.getAttribute('data-aviso'); S.aviso = S.aviso === x ? '' : x; pintar(); return; }
         if (t.hasAttribute('data-pers')) { personalizar(); return; }
-        var aps = apartados(), ap = apActual(aps);
-        if (t.hasAttribute('data-nueva')) { ficha(ap, null, true); return; }
-        ficha(ap, t.getAttribute('data-id'));
+        if (t.hasAttribute('data-nueva')) { ficha(null, true); return; }
+        ficha(t.getAttribute('data-id'));
       });
       cont.addEventListener('keydown', function (ev) {
-        if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('tr[data-id]')) { ev.preventDefault(); ficha(apActual(apartados()), ev.target.getAttribute('data-id')); }
+        if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('tr[data-id]')) { ev.preventDefault(); ficha(ev.target.getAttribute('data-id')); }
       });
+      cont.addEventListener('input', function (ev) { if (ev.target.id === 'li-q') { S.q = ev.target.value; pintar(); } });
       // Tablero: arrastrar una tarjeta a otra columna cambia ese campo (con la capa de tablas: al momento y por detrás).
       var arrastrada = null;
       cont.addEventListener('dragstart', function (ev) {
@@ -792,17 +832,18 @@
       cont.addEventListener('drop', function (ev) {
         var col = ev.target.closest && ev.target.closest('[data-soltar]'); if (!col || arrastrada === null) return;
         ev.preventDefault();
-        var ap = apActual(apartados()), c = cont.querySelector('.li-tablero').getAttribute('data-campo'), v = col.getAttribute('data-valor'), id = arrastrada;
+        var a = ap(), c = cont.querySelector('.li-tablero').getAttribute('data-campo'), v = col.getAttribute('data-valor'), id = arrastrada;
         arrastrada = null;
-        var f = filaDe(ap.tabla, id);
+        var f = filaDe(a.tabla, id);
         if (!f || norm(f[c]) === norm(v)) { pintar(); return; }
         var cambios = {}; cambios[c] = v;
-        Promise.resolve(T.actualizar(ap.tabla, id, cambios)).then(function () { ctx.aviso('Movida a «' + (v || 'sin ' + campo(ap, c).titulo.toLowerCase()) + '».'); }, function (e) { ctx.aviso('No se ha movido: ' + ((e && e.message) || e)); });
+        Promise.resolve(T.actualizar(a.tabla, id, cambios)).then(function () { ctx.aviso('Movida a «' + (v || 'sin ' + campo(a, c).titulo.toLowerCase()) + '».'); }, function (e) { ctx.aviso('No se ha movido: ' + ((e && e.message) || e)); });
       });
-      cont.addEventListener('input', function (ev) { if (ev.target.id === 'li-q') { S.q = ev.target.value; pintar(); } });
       velo.addEventListener('click', function (ev) {
         if (ev.target === velo || ev.target.closest('[data-cerrar]')) { cerrarVentana(); return; }
-        // Personalizar: subir y bajar un apartado o una vista.
+        if (ev.target.closest('[data-volver]')) { velo.classList.remove('abierto'); ctx.volver(); return; }
+        if (ev.target.closest('[data-claude]')) { copiarClaude(); return; }
+        // Personalizar: subir y bajar una sección del menú o una vista.
         var b = ev.target.closest('[data-sube],[data-baja]');
         if (b) {
           var li = b.closest('li'), ul = li.parentNode;
@@ -812,15 +853,23 @@
           b.focus();
           return;
         }
-        var r = ev.target.closest('[data-rel]');
-        if (r) { var otro = BASE.filter(function (a) { return a.id === r.getAttribute('data-rel'); })[0]; if (otro) ficha(otro, r.getAttribute('data-id')); }
+        // Un enlace a otra sección (lo relacionado): el marco lo abre; aquí solo se cierra la ventana.
+        if (ev.target.closest('a[data-sx]')) velo.classList.remove('abierto');
       });
       teclaEsc = function (ev) { if (ev.key === 'Escape' && ctx.abierta() && velo.classList.contains('abierto')) cerrarVentana(); };
       document.addEventListener('keydown', teclaEsc);
 
-      ctx.alCambiar(function (t) { if (tablas.indexOf(t) >= 0) pintar(); });
-      if (!tablas.length) { S.leido = true; pintar(); return; }
-      T.leer(tablas).then(function () { S.leido = true; pintar(); }, function (e) {
+      ctx.alCambiar(function (t) {
+        if (t === PREF && window.UN.ordenMenu) { var m = prefDe(MENU); if (Array.isArray(m)) window.UN.ordenMenu(m); }
+        if (tablas.indexOf(t) >= 0) pintar();
+      });
+      T.leer(tablas).then(function () {
+        S.leido = true;
+        // El orden del menú que ha guardado quien personaliza (para todos), por si este dispositivo aún no lo tiene.
+        if (PREF && window.UN.ordenMenu) { var m = prefDe(MENU); if (Array.isArray(m)) window.UN.ordenMenu(m); }
+        pintar();
+        if (pedida) ficha(pedida);
+      }, function (e) {
         cont.innerHTML = '<p class="u-error">No se han podido leer los datos: ' + texto((e && e.message) || e) + '</p>';
       });
     },
