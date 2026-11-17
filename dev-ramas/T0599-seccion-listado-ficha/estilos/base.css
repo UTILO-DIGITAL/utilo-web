@@ -2012,7 +2012,9 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 @media (max-width: 639px) { .u .li-arriba { flex-direction: column; align-items: stretch; } .u .li-pers { align-self: flex-end; } .u .li-barra .li-nueva { order: 3; } }
 .u .li-form { display: flex; flex-direction: column; gap: var(--e5); }
 /* T0599 · Vista tablero de la sección Listado: una columna por valor, como el Kanban; en el móvil se desliza de lado. */
-.u .li-tablero { display: flex; gap: var(--e3); overflow-x: auto; padding: 0 0 var(--e2); scroll-snap-type: x proximity; align-items: flex-start; }
+.u .li-tablero { display: flex; gap: var(--e3); overflow-x: auto; padding: 0 0 var(--e2); scroll-snap-type: x proximity; align-items: stretch; }
+/* Todas las columnas llegan hasta abajo (la más larga): se suelta en cualquier punto de la columna, también debajo de su última tarjeta. */
+.u .li-col-l { align-content: start; }
 .u .li-col { flex: 1 0 220px; max-width: 320px; scroll-snap-align: start; background: color-mix(in srgb, var(--color-bloque) 45%, var(--color-fondo)); border-radius: var(--radio);
   padding: var(--e2); border-top: 4px solid var(--li-c, var(--color-linea)); display: flex; flex-direction: column; gap: var(--e2); min-height: 120px; }
 .u .li-col.li-encima { outline: 3px dashed var(--color-principal-oscuro); outline-offset: -3px; }

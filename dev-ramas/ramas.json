@@ -558,10 +558,10 @@
    "tarea": "T0599",
    "titulo": "Sección de listado con ficha, tablero y avisos, una por tabla en el menú",
    "pr": 317,
-   "commit": "3c4ea06",
-   "ultimo": "T0599: El tablero se arrastra con el ratón a mano (pointer events), no con el arrastre del navegador",
+   "commit": "44a8607",
+   "ultimo": "T0599: Las columnas del tablero llegan hasta abajo: se suelta también debajo de la última tarjeta",
    "quien": "Javi Canela",
-   "fecha": "2026-11-17T16:33:04.470Z",
+   "fecha": "2026-11-17T16:33:37.910Z",
    "toca": [
     "konamigas",
     "utilo"
