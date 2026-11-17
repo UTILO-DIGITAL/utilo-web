@@ -214,13 +214,15 @@
       nombre: cfg.NOMBRE || cfg.CLAVE || 'ID', columnas: cfg.COLUMNAS || [], detalle: cfg.DETALLE || [], orden: cfg.ORDEN || '',
       buscar: cfg.BUSCAR && cfg.BUSCAR.length ? cfg.BUSCAR : null, campos: cfg.CAMPOS || {}, ficha: cfg.FICHA || [],
       relacionados: cfg.RELACIONADOS || [], vistas: cfg.VISTAS || [], avisos: cfg.AVISOS || [], editar: cfg.EDITAR || [],
-      crear: !!cfg.CREAR, texto: cfg.TEXTO || '', vacio: cfg.VACIO || '' };
+      crear: !!cfg.CREAR, texto: cfg.TEXTO || '', vacio: cfg.VACIO || '', refs: cfg._refs || {}, filtro: cfg.FILTRO || [] };
   }
   /** El campo de un apartado, con su título y tipo por defecto (una columna FECHA… es una fecha; ESTADO, un estado). */
   function campo(ap, c) {
     var d = (ap.campos || {})[c] || {};
-    var tipo = d.tipo || (d.calculo ? 'importe' : (/^FECHA/.test(c) ? 'fecha' : (c === 'ESTADO' ? 'estado' : 'texto')));
-    return { n: c, titulo: d.titulo || (c === ap.codigo ? 'Código' : titulo(c)), tipo: tipo, opciones: d.opciones || null,
+    var base = String(c).split('.').pop();
+    var tipo = d.tipo || (d.calculo ? 'importe' : (d.de && !d.de.columna ? 'numero' : (/^FECHA/.test(base) ? 'fecha' : (/^(ID_)?ESTADO$/.test(base) ? 'estado' : 'texto'))));
+    return { n: c, titulo: d.titulo || (c === ap.codigo ? 'Código' : titulo(base)), tipo: tipo, opciones: d.opciones || null, ref: d.ref || refDe(ap, ap.tabla, c), ids: d._ids || null,
+      de: d.de || null, primero: d.primero || null,
       unidad: d.unidad || '', calculo: d.calculo || null, precio: d.precio || null, privado: !!d.privado, colores: d.colores || null,
       ayuda: d.ayuda || '' };
   }
@@ -234,6 +236,91 @@
   /** Las vistas de un apartado; sin ninguna, «Todo». */
   function vistasDe(ap) { return ap.vistas && ap.vistas.length ? ap.vistas : [{ id: 'TODO', titulo: 'Todo' }]; }
 
+  /* ---------- referencias y datos de otras tablas (T0599, para tablas normalizadas como las de GESTION) ----------
+   * config._refs (lo pone montar.js desde los YAML): { TABLA: { COLUMNA: tabla a la que apunta } }. Una columna que apunta a
+   * otra tabla (ID_ESTADO → ESTADOS_TAREA) se enseña con el nombre de esa fila (NOMBRE) y sus opciones van en su ORDEN; una
+   * ruta («ID_DISENO.COSTE_INR», «ID_MARCA.ID_FASE») sigue las referencias; un campo con «de» saca su valor de otra tabla
+   * (el próximo paso de una marca, de su Seguimiento; cuántas telas tiene un proveedor) y uno con «primero», el primero de
+   * varios que no esté vacío (con quién: la marca, el proveedor u otro contacto). Los filtros, avisos y colores usan los
+   * nombres, como se ven; lo que se guarda sigue siendo el código. D: { filas(t), fila(t, id) }. */
+  function refDe(ap, t, c) { return ((ap.refs || {})[t] || {})[c] || ''; }
+  function nombreDe(D, t, id) {
+    if (vacio(id)) return '';
+    var f = D.fila(t, id);
+    if (!f) return String(id);
+    var n = ['NOMBRE', 'TITULO', 'DETALLE'].filter(function (k) { return !vacio(f[k]); })[0];
+    return n ? String(f[n]) : String(id);
+  }
+  /** Una fila de otra tabla con sus referencias ya en nombre (un salto). */
+  function conNombres(ap, D, t, x) {
+    var r = {}, rs = (ap.refs || {})[t] || {};
+    Object.keys(x).forEach(function (k) { r[k] = rs[k] ? nombreDe(D, rs[k], x[k]) : x[k]; });
+    r.__crudo = x;
+    return r;
+  }
+  /** El valor de una ruta («ID_DISENO.ID_TECNICA») desde una fila de la tabla t: sigue las referencias y da el nombre al final. */
+  function seguir(ap, D, t, f, ruta) {
+    var ps = ruta.split('.'), fila = f, tt = t;
+    for (var i = 0; i < ps.length - 1; i++) {
+      var r = refDe(ap, tt, ps[i]);
+      if (!r || !fila || vacio(fila[ps[i]])) return '';
+      fila = D.fila(r, fila[ps[i]]); tt = r;
+    }
+    if (!fila) return '';
+    var ult = ps[ps.length - 1], rr = refDe(ap, tt, ult);
+    return rr ? nombreDe(D, rr, fila[ult]) : fila[ult];
+  }
+  /** Todas las columnas que nombra la configuración (para saber qué rutas preparar). */
+  function nombradas(ap) {
+    var t = [ap.nombre, ap.codigo, ap.orden].concat(ap.columnas, ap.detalle, ap.buscar || []);
+    ap.ficha.forEach(function (g) { t = t.concat(g.campos || []); });
+    vistasDe(ap).forEach(function (v) {
+      t = t.concat(v.columnas || [], [v.orden, v.agrupar && (v.agrupar.campo || v.agrupar), v.tablero && v.tablero.campo]);
+      lista(v.filtro).forEach(function (c) { t.push(c.campo); });
+    });
+    lista(ap.filtro).forEach(function (c) { t.push(c.campo); });
+    ap.avisos.forEach(function (a) { lista(a.si).forEach(function (c) { t.push(c.campo); }); });
+    Object.keys(ap.campos).forEach(function (c) { t.push(c); if (ap.campos[c].calculo) t = t.concat(usa(ap.campos[c].calculo)); t = t.concat(ap.campos[c].primero || []); });
+    return t.filter(function (c, i) { return c && typeof c === 'string' && c.charAt(0) !== '$' && t.indexOf(c) === i; }).map(function (c) { return c.replace(/^-/, ''); });
+  }
+  /**
+   * El apartado listo para pintar con estos datos: cada columna que apunta a otra tabla, con sus opciones (los nombres, en
+   * su ORDEN) y sus códigos (_ids: nombre → código, para guardar). No cambia la configuración.
+   */
+  function enriquecer(ap, D) {
+    var a = JSON.parse(JSON.stringify(ap)), rs = (a.refs || {})[a.tabla] || {};
+    Object.keys(rs).forEach(function (c) {
+      var d = a.campos[c] = a.campos[c] || {}, t = rs[c];
+      var fs = (D.filas(t) || []).slice();
+      if (fs.length && 'ORDEN' in fs[0]) fs.sort(comparar('ORDEN'));
+      d._ids = {};
+      var ops = fs.map(function (x) { var n = nombreDe(D, t, x.ID !== undefined ? x.ID : x[Object.keys(x)[0]]); d._ids[n] = x.ID !== undefined ? x.ID : x[Object.keys(x)[0]]; return n; });
+      if (!d.opciones) d.opciones = ops;
+      d.ref = t;
+    });
+    return a;
+  }
+  /** Las filas como se ven: con nombres, rutas, «de» y «primero». Cada una guarda la de verdad en __crudo. */
+  function preparar(a, filas, D) {
+    var rs = (a.refs || {})[a.tabla] || {}, rutas = nombradas(a).filter(function (c) { return c.indexOf('.') > 0; });
+    var conDe = Object.keys(a.campos).filter(function (c) { return a.campos[c].de; }), conPrimero = Object.keys(a.campos).filter(function (c) { return a.campos[c].primero; });
+    return filas.map(function (f) {
+      var r = {};
+      Object.keys(f).forEach(function (k) { r[k] = rs[k] ? nombreDe(D, rs[k], f[k]) : f[k]; });
+      rutas.forEach(function (ruta) { r[ruta] = seguir(a, D, a.tabla, f, ruta); });
+      conDe.forEach(function (c) {
+        var de = a.campos[c].de, clave = f[de.con || a.clave];
+        var xs = vacio(clave) ? [] : (D.filas(de.tabla) || []).filter(function (x) { return norm(x[de.campo]) === norm(clave); }).map(function (x) { return conNombres(a, D, de.tabla, x); });
+        if (de.filtro) xs = xs.filter(function (x) { return cumple(x, de.filtro, { hoy: de.hoy }); });
+        if (de.orden) xs.sort(comparar(de.orden));
+        r[c] = de.columna ? (xs.length ? xs[0][de.columna] : '') : xs.length;
+      });
+      conPrimero.forEach(function (c) { r[c] = a.campos[c].primero.map(function (x) { return r[x]; }).filter(function (v) { return !vacio(v); })[0] || ''; });
+      r.__crudo = f;
+      return r;
+    });
+  }
+
   /**
    * Comprueba la configuración de una sección (para quien administra y para las pruebas): columnas que faltan, un precio
    * cuyo cálculo no lleva el envío, una vista para clientes que enseñaría algo privado, columnas con datos que no se
@@ -245,6 +332,13 @@
     var cols = columnasTabla ? columnasTabla(ap.tabla) : null, calc = Object.keys(ap.campos).filter(function (c) { return ap.campos[c].calculo; });
     function hay(c, que, t, cs) {
       if (!t && calc.indexOf(c) >= 0) return;
+      if (!t && ap.campos[c] && (ap.campos[c].de || ap.campos[c].primero)) return;
+      if (!t && String(c).indexOf('.') > 0) { // una ruta: su primer paso tiene que apuntar a otra tabla
+        var p0 = String(c).split('.')[0];
+        if (cols && cols.indexOf(p0) < 0) errores.push(donde + que + ' «' + c + '»: ' + p0 + ' no es una columna de ' + ap.tabla + '.');
+        else if (cols && ap.refs && ap.refs[ap.tabla] && !refDe(ap, ap.tabla, p0)) errores.push(donde + que + ' «' + c + '»: ' + p0 + ' no apunta a otra tabla.');
+        return;
+      }
       var en = t ? cs : cols;
       if (en && en.indexOf(c) < 0) errores.push(donde + que + ' «' + c + '» no es una columna de ' + (t || ap.tabla) + '.');
     }
@@ -269,6 +363,7 @@
         else if (!env.some(function (e) { return usa(d.calculo).indexOf(e) >= 0; })) errores.push(donde + 'el precio «' + c + '» no suma su envío (' + env.join(' o ') + '): se vería un precio sin envío.');
       }
     });
+    lista(ap.filtro).forEach(function (cnd) { if (cnd.campo) hay(cnd.campo, 'el FILTRO usa'); });
     var vids = {};
     vistasDe(ap).forEach(function (v) {
       if (vids[v.id]) errores.push(donde + 'la vista «' + v.id + '» está dos veces.');
@@ -372,6 +467,7 @@
     var q = norm(o.q), fuera = ocultas(ap, vista);
     var dondeBuscar = (ap.buscar || [ap.nombre, ap.codigo].concat(columnasDe(ap, vista), ap.detalle || [])).filter(function (c) { return c && fuera.indexOf(c) < 0; });
     var r = filas.filter(function (f) {
+      if (ap.filtro && ap.filtro.length && !cumple(f, ap.filtro, { hoy: o.hoy })) return false; // FILTRO: las filas de esta sección
       if (vista && vista.filtro && !cumple(f, vista.filtro, { hoy: o.hoy })) return false;
       if (o.aviso) { var a = (ap.avisos || []).filter(function (x) { return x.id === o.aviso; })[0]; if (a && !cumple(f, a.si, { hoy: o.hoy, dias: a.dias === undefined ? 7 : a.dias })) return false; }
       if (q && !dondeBuscar.some(function (c) { return norm(f[c]).indexOf(q) >= 0; })) return false;
@@ -430,9 +526,9 @@
   }
   /** Las filas de otro apartado que van con esta (el seguimiento de un cliente: CON_QUIEN = CLIENTE). */
   function relacionadas(r, f, filasOtro) {
-    var v = norm(f[r.con]);
+    var v = norm((f.__crudo || f)[r.con]);
     if (!v) return [];
-    return filasOtro.filter(function (x) { return r.contiene ? norm(x[r.campo]).indexOf(v) >= 0 : norm(x[r.campo]) === v; });
+    return filasOtro.filter(function (x) { var y = norm((x.__crudo || x)[r.campo]); return r.contiene ? y.indexOf(v) >= 0 : y === v; });
   }
 
   /* ---------- valores en la pantalla ---------- */
@@ -471,7 +567,7 @@
 
   var CALC = { titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, campo: campo,
-    ocultas: ocultas, vistasDe: vistasDe, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, mover: mover, paraClaude: paraClaude,
+    ocultas: ocultas, vistasDe: vistasDe, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, mover: mover, paraClaude: paraClaude,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
     relacionadas: relacionadas, verTexto: verTexto, cuando: cuando, comparar: comparar };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
@@ -506,14 +602,21 @@
       BASE.relacionados.forEach(function (r) { if (r.tabla && tablas.indexOf(r.tabla) < 0) tablas.push(r.tabla); });
       Object.keys(cfg.VALORES || {}).forEach(function (k) { var v = cfg.VALORES[k]; if (v && v.tabla && tablas.indexOf(v.tabla) < 0) tablas.push(v.tabla); });
       if (PREF && tablas.indexOf(PREF) < 0) tablas.push(PREF);
+      // Las tablas a las que apuntan (los nombres de las fases, de las marcas…) y las de los campos con «de».
+      Object.keys(BASE.refs).forEach(function (t) { if (tablas.indexOf(t) < 0) tablas.push(t); });
+      Object.keys(BASE.campos).forEach(function (c) { var de = BASE.campos[c].de; if (de && de.tabla && tablas.indexOf(de.tabla) < 0) tablas.push(de.tabla); });
       function filas(t) { return T.filas(t) || []; }
       function filaDe(t, id) { return T.fila ? T.fila(t, id) : null; }
+      var D = { filas: filas, fila: filaDe };
       /** Lo personalizado: de la tabla PREFERENCIAS (para todos) o, sin ella, del dispositivo. */
       function prefDe(clave) {
         var f = PREF ? filaDe(PREF, clave) : null;
         return json(f ? f.VALOR : guardado('li_pref_' + clave));
       }
-      function ap() { return aplicar(BASE, prefDe(ctx.id)); }
+      function ap() { return enriquecer(aplicar(BASE, prefDe(ctx.id)), D); }
+      /** Las filas como se ven (nombres en vez de códigos, rutas, «de»); cada una con la de verdad en __crudo. */
+      function vistas(a) { return preparar(a, filas(a.tabla), D); }
+      function filaVista(a, id) { return vistas(a).filter(function (f) { return String(f[a.clave]) === String(id); })[0] || null; }
       function vistaActual(a) { var vs = vistasDe(a); return vs.filter(function (v) { return v.id === S.vista; })[0] || vs[0]; }
       var VAL = {};
       // Las secciones a las que se puede ir (las que ve quien ha entrado), para los enlaces de lo relacionado.
@@ -552,7 +655,7 @@
         if (!S.leido) return;
         VAL = valoresDe(cfg.VALORES, filaDe);
         if (errores === null) errores = ctx.admin ? comprobar(cfg, function (t) { var c = T.columnas && T.columnas(t); return c && c.length ? c : null; }, '') : [];
-        var a = ap(), vista = vistaActual(a), hoy = hoyIso(), todas = filas(a.tabla);
+        var a = ap(), vista = vistaActual(a), hoy = hoyIso(), todas = vistas(a);
         S.vista = vista.id;
         var html = '';
         if (errores.length) html += '<div class="u-bloque li-errores"><strong>La configuración de esta sección tiene cosas que no cuadran (solo lo ve quien administra):</strong><ul>' + errores.map(function (e) { return '<li>' + texto(e) + '</li>'; }).join('') + '</ul></div>';
@@ -649,6 +752,13 @@
       function entrada(a, c, f) {
         var cp = campo(a, c), v = f ? f[c] : '', id = 'li-c-' + c;
         var et = '<label class="u-etiqueta" for="' + id + '">' + texto(cp.titulo) + '</label>';
+        if (cp.ids) {
+          // Una columna que apunta a otra tabla: se elige por el nombre y se guarda el código.
+          var ns = Object.keys(cp.ids);
+          return '<div class="u-campo">' + et + '<select id="' + id + '" data-c="' + texto(c) + '"><option value=""></option>' +
+            ns.map(function (n) { return '<option value="' + texto(cp.ids[n]) + '"' + (String(v) === String(cp.ids[n]) ? ' selected' : '') + '>' + texto(n) + '</option>'; }).join('') +
+            (!vacio(v) && !ns.some(function (n) { return String(cp.ids[n]) === String(v); }) ? '<option value="' + texto(v) + '" selected>' + texto(v) + '</option>' : '') + '</select></div>';
+        }
         if (cp.opciones) {
           var ops = cp.opciones.slice(); if (!vacio(v) && ops.indexOf(String(v)) < 0) ops.unshift(String(v));
           return '<div class="u-campo">' + et + '<select id="' + id + '" data-c="' + texto(c) + '"><option value=""></option>' +
@@ -662,8 +772,9 @@
       }
       var abierta = null; // { id } de la ficha abierta, para «Copiar para Claude»
       function ficha(id, nueva) {
-        var a = ap(), vista = vistaActual(a), fuera = ocultas(a, vista), f = nueva ? {} : filaDe(a.tabla, id), hoy = hoyIso(), cli = !!vista.cliente;
+        var a = ap(), vista = vistaActual(a), fuera = ocultas(a, vista), f = nueva ? {} : filaVista(a, id), hoy = hoyIso(), cli = !!vista.cliente;
         if (!f) { ctx.aviso('Esa fila ya no está.'); return; }
+        var crudo = f.__crudo || {}; // lo que de verdad hay (los códigos), para editar
         abierta = nueva ? null : { id: id };
         var ed = cli ? [] : editables(a).filter(function (c) { return fuera.indexOf(c) < 0; });
         var grupos = a.ficha.length ? a.ficha : [{ titulo: '', campos: columnasDe(a, vista) }];
@@ -680,7 +791,7 @@
           if (!cs.length) return '';
           var cuerpo = cs.map(function (c) {
             puestos.push(c);
-            if (ed.indexOf(c) >= 0) return entrada(a, c, f);
+            if (ed.indexOf(c) >= 0) return entrada(a, c, crudo);
             var cp = campo(a, c);
             return '<div class="li-dato' + (cp.tipo === 'nota' || cp.tipo === 'foto' ? ' u-ancho' : '') + '"><span class="u-etiqueta">' + texto(cp.titulo) + '</span><span class="li-valor">' + celda(a, c, f, true, cli) + '</span>' +
               (cp.ayuda ? '<span class="u-nota">' + texto(cp.ayuda) + '</span>' : '') + '</div>';
@@ -689,20 +800,20 @@
         }).join('');
         // Lo que se edita y no está en ningún apartado de la ficha, al final.
         var resto = ed.filter(function (c) { return puestos.indexOf(c) < 0; });
-        if (resto.length) h += '<section class="li-fgrupo"><div class="u-campos">' + resto.map(function (c) { return entrada(a, c, f); }).join('') + '</div></section>';
+        if (resto.length) h += '<section class="li-fgrupo"><div class="u-campos">' + resto.map(function (c) { return entrada(a, c, crudo); }).join('') + '</div></section>';
         h += '<p class="u-error" id="li-err" role="alert" hidden></p>';
         if (ed.length) h += '<div class="n-botones"><button type="submit" class="u-btn u-btn-accion">' + (nueva ? 'Añadir' : 'Guardar') + '</button></div>';
         h += '</form>';
         // Lo relacionado (el seguimiento de un cliente): cada fila lleva a su sección, con su ficha abierta.
         if (!nueva && !cli) a.relacionados.forEach(function (r) {
-          var rs = relacionadas(r, f, filas(r.tabla)), sec = String(r.seccion || '').toUpperCase(), va = sec && veo[sec];
+          var rs = relacionadas(r, f, filas(r.tabla).map(function (x) { return conNombres(a, D, r.tabla, x); })), sec = String(r.seccion || '').toUpperCase(), va = sec && veo[sec];
           if (r.orden) rs = rs.slice().sort(comparar(r.orden));
-          var otro = { id: sec, titulo: r.titulo, clave: r.clave || 'ID', codigo: r.codigo || '', nombre: r.nombre || (r.columnas || [r.clave || 'ID'])[0], campos: r.campos || {} };
+          var otro = { id: sec, titulo: r.titulo, tabla: r.tabla, refs: a.refs, clave: r.clave || 'ID', codigo: r.codigo || '', nombre: r.nombre || (r.columnas || [r.clave || 'ID'])[0], campos: r.campos || {} };
           var cols = (r.columnas || [otro.nombre]).filter(function (c) { return c !== otro.codigo; });
           h += '<section class="li-fgrupo"><h3 class="li-fg-t">' + texto(r.titulo || r.tabla) + ' <span class="u-cifra">' + rs.length + '</span></h3>' +
             (rs.length ? '<ul class="li-rel">' + rs.slice(0, r.max || 20).map(function (x) {
               var dentro = (otro.codigo && !vacio(x[otro.codigo]) ? '<span class="li-cod">' + texto(x[otro.codigo]) + '</span>' : '') + cols.map(function (c) { return '<span>' + celda(otro, c, x, false) + '</span>'; }).join('');
-              return '<li>' + (va ? '<a class="li-rel-f" href="?s=' + encodeURIComponent(sec.toLowerCase()) + '&ficha=' + encodeURIComponent(x[otro.clave]) + '" data-sx="' + texto(sec) + '">' + dentro + '<span class="li-ir">' + texto(va) + ' ›</span></a>' : '<div class="li-rel-f">' + dentro + '</div>') + '</li>';
+              return '<li>' + (va ? '<a class="li-rel-f" href="?s=' + encodeURIComponent(sec.toLowerCase()) + '&ficha=' + encodeURIComponent((x.__crudo || x)[otro.clave]) + '" data-sx="' + texto(sec) + '">' + dentro + '<span class="li-ir">' + texto(va) + ' ›</span></a>' : '<div class="li-rel-f">' + dentro + '</div>') + '</li>';
             }).join('') + '</ul>' : '<p class="u-vacio">' + texto(r.vacio || 'Nada todavía.') + '</p>') + '</section>';
         });
         abrirVentana(h);
@@ -713,7 +824,7 @@
           [].forEach.call(form.querySelectorAll('[data-c]'), function (i) {
             var c = i.getAttribute('data-c'), v = i.value.trim(), cp = campo(a, c);
             var p = prohibido(v, PROHIB); if (p.length) { malos = malos.concat(p); i.setAttribute('aria-invalid', 'true'); } else i.removeAttribute('aria-invalid');
-            var antes = vacio(f[c]) ? '' : (cp.tipo === 'fecha' && aFecha(f[c]) ? i.defaultValue : String(f[c]));
+            var antes = vacio(crudo[c]) ? '' : (cp.tipo === 'fecha' && aFecha(crudo[c]) ? i.defaultValue : String(crudo[c]));
             if (v !== antes) cambios[c] = cp.tipo === 'importe' || cp.tipo === 'numero' ? (v === '' ? '' : (isNaN(aNumero(v)) ? v : aNumero(v))) : v;
           });
           if (malos.length) { err.textContent = textoProhibido(malos.filter(function (k, i) { return malos.indexOf(k) === i; })); err.hidden = false; return; }
@@ -724,7 +835,7 @@
         });
       }
       function copiarClaude() {
-        var a = ap(), f = abierta && filaDe(a.tabla, abierta.id);
+        var a = ap(), f = abierta && filaVista(a, abierta.id);
         if (!f) return;
         var t = paraClaude(a, f, VAL, PROHIB, '');
         var hecho = function () { ctx.aviso('Copiado: pégalo en Claude al empezar la sesión.'); };
@@ -834,9 +945,9 @@
         ev.preventDefault();
         var a = ap(), c = cont.querySelector('.li-tablero').getAttribute('data-campo'), v = col.getAttribute('data-valor'), id = arrastrada;
         arrastrada = null;
-        var f = filaDe(a.tabla, id);
+        var f = filaVista(a, id), cp = campo(a, c);
         if (!f || norm(f[c]) === norm(v)) { pintar(); return; }
-        var cambios = {}; cambios[c] = v;
+        var cambios = {}; cambios[c] = cp.ids && v in cp.ids ? cp.ids[v] : v; // una columna que apunta a otra tabla guarda el código
         Promise.resolve(T.actualizar(a.tabla, id, cambios)).then(function () { ctx.aviso('Movida a «' + (v || 'sin ' + campo(a, c).titulo.toLowerCase()) + '».'); }, function (e) { ctx.aviso('No se ha movido: ' + ((e && e.message) || e)); });
       });
       velo.addEventListener('click', function (ev) {

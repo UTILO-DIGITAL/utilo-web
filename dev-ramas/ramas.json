@@ -770,12 +770,12 @@
   },
   "T0599-seccion-listado-ficha": {
    "tarea": "T0599",
-   "titulo": "Sección de listado con ficha, tablero y avisos que se monta solo con configuración",
+   "titulo": "Sección de listado con ficha, tablero y avisos, una por tabla en el menú",
    "pr": 317,
-   "commit": "ab2bc7a",
-   "ultimo": "T0599: Cada apartado de Listado es una sección del menú, con el código de cada fila y «Copiar para Claude»",
+   "commit": "cb8c423",
+   "ultimo": "T0599: Listado sobre tablas normalizadas y en apps con motor (Excel), como la de Marta",
    "quien": "Javi Canela",
-   "fecha": "2026-11-17T14:33:50.419Z",
+   "fecha": "2026-11-17T15:32:37.352Z",
    "toca": [
     "konamigas",
     "utilo"

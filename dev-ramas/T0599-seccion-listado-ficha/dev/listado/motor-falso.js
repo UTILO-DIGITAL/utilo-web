@@ -23,7 +23,7 @@
     return Object.keys(E.nucleo.secciones).map(function (n) {
       var s = E.nucleo.secciones[n];
       return { id: n.toUpperCase(), base: 'LISTADO', modulo: 'listado', titulo: s.titulo, icono: s.icono || '', web: 'nucleo/secciones/listado.js', version: 'ejemplo',
-        perfiles: s.perfiles, config: s.config, api: [] };
+        perfiles: s.perfiles || 'todos', config: s.config, api: [] };
     }).filter(function (s) { return yo.admin || s.perfiles === 'todos' || s.perfiles.indexOf(yo.perfil) >= 0; });
   }
   function cred() {
