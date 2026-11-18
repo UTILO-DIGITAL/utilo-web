@@ -557,11 +557,11 @@
   "T0608-economia-telas": {
    "tarea": "T0608",
    "titulo": "La app de Marta tiene su economía: movimientos, facturas y presupuesto",
-   "pr": null,
-   "commit": "1d51a87",
-   "ultimo": "T0608: La app de Marta tiene su economía: movimientos, facturas y presupuesto",
+   "pr": 329,
+   "commit": "ede1c57",
+   "ultimo": "T0608: Lo que paga Marta de su bolsillo, en su propia cuenta; la tarjeta va con el banco",
    "quien": "Javi Canela",
-   "fecha": "2026-11-18T18:32:58.383Z",
+   "fecha": "2026-11-18T18:51:23.756Z",
    "toca": [],
    "comun": false,
    "paginas": [
