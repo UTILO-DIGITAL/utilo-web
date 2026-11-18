@@ -126,7 +126,7 @@
   'use strict';
   var CLAVE = 'dev_app';                 // lo que recuerda la app en este dispositivo (lo comparte con marco.js)
   var NOMBRES = { utilo: 'Utilo', konamigas: 'Konamigas' };
-  var VERSION = '6c40c15a12';          // la pone dev-ramas.js selector; ramas.json dice la publicada
+  var VERSION = '8eb3468b93';          // la pone dev-ramas.js selector; ramas.json dice la publicada
   var ACCION = 'https://github.com/UTILO-DIGITAL/utilo-apps/actions/workflows/supabase.yml';
   var PROBAR = /[?&]probar\b/.test(location.search); // se ha venido a elegir (la línea DEV): no se vuelve sola a la última
   /** T0450 · Lo que pide el enlace «Verlo en DEV»: { tarea, web, como } o null. */
@@ -660,7 +660,9 @@
       h = '<span class="tt">' + texto(t.id + ' · ' + t.titulo) + '</span><span class="etiqueta">' + texto(t.estado === 'Aprobada' ? 'Por publicar' : t.estado) + (t.cambios_pedidos ? ' · con cambios pedidos sin coger' : '') + '</span>';
       if (t.que_mirar) h += '<span class="etiqueta">Qué mirar</span><span class="mirar">' + texto(t.que_mirar) + '</span>';
       if (st.aprobada) h += '<p class="hecho">' + texto(t.id) + ' aprobada' + (st.aprobada.fusionadas ? ' y ' + (st.aprobada.fusionadas === 1 ? 'su PR, fusionada' : 'sus PR, fusionadas') : '') +
-        (t.estado === 'Entregada' ? ': no lleva nada que publicar, queda Entregada.' : ': queda Por publicar.') + (st.aprobada.fusionadas ? ' La rama sale de DEV en un par de minutos.' : '') + '</p>';
+        (t.estado === 'Entregada' ? ': no lleva nada que publicar, queda Entregada.' : ': queda Por publicar.') +
+        (t.estado === 'Aprobada' && st.aprobada.comprobar === 'lanzada' ? ' Si ya está publicada, pasa a Entregada en un par de minutos.' : '') +
+        (st.aprobada.fusionadas ? ' La rama sale de DEV en un par de minutos.' : '') + '</p>';
       if (t.estado === 'Para revisar') h += htmlAprobar(t, st);
       if (st.hecho) h += '<p class="hecho">Cambios pedidos: ' + texto(t.id) + ' vuelve a ' + texto(t.estado === 'Esperando' ? 'esperar' : 'la cola') + '. ' +
         (t.autonoma ? 'Es autónoma: <a href="' + texto(d.ficha + encodeURIComponent(t.id)) + '">«Que lo haga Claude»</a> en su ficha para que la rehaga.' : 'Quien la coja verá lo pedido lo primero.') + '</p>';
