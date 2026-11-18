@@ -567,8 +567,16 @@
     if (d === -1) return 'ayer';
     return d < 0 ? 'hace ' + (-d) + ' días' : 'en ' + d + ' días';
   }
+  /** T0602 · La imagen de un campo foto: un enlace de Drive a un archivo («…/file/d/ID/view», «open?id=ID») se ve con su
+   *  miniatura; otra dirección o una imagen «data:», tal cual; lo demás, '' (no es una imagen). */
+  function imagen(v) {
+    v = String(v === undefined || v === null ? '' : v).trim();
+    var d = /^https?:\/\/(?:drive|docs)\.google\.com\/(?:file\/d\/|open\?(?:[^#]*&)?id=|uc\?(?:[^#]*&)?id=)([\w-]{10,})/i.exec(v);
+    if (d) return 'https://drive.google.com/thumbnail?id=' + d[1] + '&sz=w800';
+    return /^(https?:|data:image\/)/i.test(v) ? v : '';
+  }
 
-  var CALC = { titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, cumple: cumple, calcular: calcular, usa: usa,
+  var CALC = { imagen: imagen, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, mover: mover, paraClaude: paraClaude,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
@@ -599,6 +607,8 @@
       el.innerHTML = '<div id="li-cont"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div>' +
         '<div class="u-velo" id="li-velo"><div class="u-ventana li-ventana" role="dialog" aria-modal="true" aria-labelledby="li-vt"><div class="n-ventana" id="li-vent"></div></div></div>';
       var cont = el.querySelector('#li-cont'), velo = el.querySelector('#li-velo'), vent = el.querySelector('#li-vent');
+      // T0602: una foto que no se puede ver (un archivo de Drive que no es público ni de quien mira) no sale rota.
+      el.addEventListener('error', function (e) { var t = e.target; if (t && t.hasAttribute && t.hasAttribute('data-li-foto')) t.hidden = true; }, true);
 
       /* ---------- datos ---------- */
       var tablas = [BASE.tabla];
@@ -637,9 +647,10 @@
           if (cp.tipo === 'enlace' && /^https?:\/\//i.test(String(v))) return '<a href="' + texto(v) + '" target="_blank" rel="noopener">Abrir ↗</a>';
           if (cp.tipo === 'email' && /@/.test(String(v))) return '<a href="mailto:' + texto(v) + '">' + texto(v) + '</a>';
           if (cp.tipo === 'telefono') return '<a href="tel:' + texto(String(v).replace(/[^\d+]/g, '')) + '">' + texto(v) + '</a>';
-          if (cp.tipo === 'foto' && /^(https?:|data:image\/)/i.test(String(v))) return '<img class="li-foto" src="' + texto(v) + '" alt="">';
+          if (cp.tipo === 'foto' && imagen(v)) return '<img class="li-foto" src="' + texto(imagen(v)) + '" alt="" referrerpolicy="no-referrer" data-li-foto>' +
+            (/^https?:/i.test(String(v)) ? ' <a class="u-nota" href="' + texto(v) + '" target="_blank" rel="noopener">Abrir ↗</a>' : '');
         }
-        if (cp.tipo === 'foto') return /^(https?:|data:image\/)/i.test(String(v)) ? '<img class="li-mini" src="' + texto(v) + '" alt="">' : texto(t);
+        if (cp.tipo === 'foto') return imagen(v) ? '<img class="li-mini" src="' + texto(imagen(v)) + '" alt="" referrerpolicy="no-referrer" data-li-foto>' : texto(t);
         if (cp.tipo === 'estado' || cp.colores) {
           var col = (cp.colores || {})[String(v)] || '';
           return '<span class="u-chip li-estado' + (col ? ' li-' + texto(col) : '') + '">' + texto(t) + '</span>';
@@ -695,9 +706,11 @@
       }
       function tarjeta(a, f, det, cli, hoy, arrastrar) {
         var avs = cli ? [] : avisosDe(a, f, hoy);
+        // T0601: en la tarjeta, lo vacío no sale (una prospección sin estado ni nota no enseña «— —»).
+        var dets = det.map(function (x) { return celda(a, x, f, false, cli); }).filter(function (h) { return h.indexOf('class="li-nada"') < 0; });
         return '<li><button type="button" class="li-tarjeta' + (avs.length ? ' li-f-' + texto(avs[0].nivel || 'medio') : '') + '" data-id="' + texto(f[a.clave]) + '"' + (arrastrar ? ' data-mover' : '') + '>' +
           '<strong>' + titulo2(a, f, cli) + '</strong>' +
-          (det.length ? '<span class="li-det">' + det.map(function (x) { return '<span>' + celda(a, x, f, false, cli) + '</span>'; }).join('') + '</span>' : '') +
+          (dets.length ? '<span class="li-det">' + dets.map(function (h) { return '<span>' + h + '</span>'; }).join('') + '</span>' : '') +
           (avs.length ? '<span class="li-marcas">' + marcas(avs) + '</span>' : '') + '</button></li>';
       }
       function pintarGrupo(a, vista, g, hoy) {
@@ -835,6 +848,7 @@
         if (!nueva && !cli) a.relacionados.forEach(function (r) {
           var rs = relacionadas(r, f, filas(r.tabla).map(function (x) { return conNombres(a, D, r.tabla, x); })), sec = String(r.seccion || '').toUpperCase(), va = sec && veo[sec];
           if (r.orden) rs = rs.slice().sort(comparar(r.orden));
+          if (!rs.length && r.siHay) return; // T0602: lo que casi nunca hay (a quién se compra a través de este), solo si hay
           var otro = { id: sec, titulo: r.titulo, tabla: r.tabla, refs: a.refs, clave: r.clave || 'ID', codigo: r.codigo || '', nombre: r.nombre || (r.columnas || [r.clave || 'ID'])[0], campos: r.campos || {} };
           var cols = (r.columnas || [otro.nombre]).filter(function (c) { return c !== otro.codigo; });
           h += '<section class="li-fgrupo"><h3 class="li-fg-t">' + texto(r.titulo || r.tabla) + ' <span class="u-cifra">' + rs.length + '</span></h3>' +
