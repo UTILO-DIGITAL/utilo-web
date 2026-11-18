@@ -558,10 +558,10 @@
    "tarea": "T0627",
    "titulo": "Marta hace sus facturas desde la app: por líneas, con su documento y su PDF",
    "pr": 333,
-   "commit": "763f7e9",
-   "ultimo": "T0627: El número de una factura emitida ya no se puede cambiar",
+   "commit": "9d08511",
+   "ultimo": "T0627: Los precios de las líneas se pueden escribir con el IVA incluido",
    "quien": "Javi Canela",
-   "fecha": "2026-11-18T20:26:55.218Z",
+   "fecha": "2026-11-18T20:39:03.386Z",
    "toca": [
     "konamigas",
     "utilo"

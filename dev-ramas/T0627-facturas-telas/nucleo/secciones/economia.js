@@ -66,12 +66,25 @@
     var n = typeof v === 'number' ? v : Number(String(v).replace(/\s/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'));
     return isFinite(n) ? n : 0;
   }
+  /** T0627 · Un precio escrito («22,5», «18,595») → euros, sin redondear (el de sin IVA puede llevar hasta 4 decimales). */
+  function precio(v) {
+    if (v === '' || v == null) return 0;
+    var n = typeof v === 'number' ? v : Number(String(v).replace(/\s|€/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'));
+    return isFinite(n) ? n : 0;
+  }
+  /**
+   * T0627 · El precio sin IVA de uno con el IVA incluido (como lo sabe Marta), con 4 decimales: así cantidad × precio, con
+   * su IVA, da lo que ella cuenta (20 m a 22,50 € con IVA → 18,595 € sin IVA → 371,90 € + 78,10 € = 450,00 €).
+   */
+  function sinIva(conIva, tipo) { return Math.round(precio(conIva) * 1000000 / (100 + pct(tipo))) / 10000; }
+  /** T0627 · El precio con IVA (2 decimales) de uno sin IVA: para enseñarlo cuando se escriben con IVA. */
+  function conIvaPrecio(sin, tipo) { return Math.round(precio(sin) * (100 + pct(tipo))) / 100; }
   /** T0627 · El importe (céntimos) de una línea de factura: cantidad × precio, redondeado al céntimo (como el documento). */
-  function importeLinea(l) { return Math.round(cantidad(l.CANTIDAD) * cts(l.PRECIO)); }
+  function importeLinea(l) { return Math.round(cantidad(l.CANTIDAD) * precio(l.PRECIO) * 100); }
   /** T0627 · La base (céntimos) de unas líneas: la suma de sus importes; las vacías (sin concepto ni precio) no cuentan. */
   function baseLineas(ls) {
     var b = 0;
-    (ls || []).forEach(function (l) { if (l && (String(l.CONCEPTO || '').trim() || cts(l.PRECIO))) b += importeLinea(l); });
+    (ls || []).forEach(function (l) { if (l && (String(l.CONCEPTO || '').trim() || precio(l.PRECIO))) b += importeLinea(l); });
     return b;
   }
   /** T0627 · Las líneas de una factura, en su orden (por ID: se crean una tras otra). */
@@ -374,7 +387,7 @@
     anteriores: anteriores, movDe: movDe, facDe: facDe, preDe: preDe, resumen: resumen, saldos: saldos, cuenta: cuenta, pendientes: pendientes,
     sinFactura: sinFactura, presupuesto: presupuesto, grupos: grupos, estadoLinea: estadoLinea, avisos: avisos, cruzados: cruzados,
     desglose: desglose, recomendar: recomendar, esReparto: esReparto, problemasMov: problemasMov,
-    cantidad: cantidad, importeLinea: importeLinea, baseLineas: baseLineas, lineasDe: lineasDe };
+    cantidad: cantidad, precio: precio, sinIva: sinIva, conIvaPrecio: conIvaPrecio, importeLinea: importeLinea, baseLineas: baseLineas, lineasDe: lineasDe };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -998,9 +1011,10 @@
           (datosCli ? '<div class="u-campos u-ancho" id="f-cli">' + campo('CIF o NIF del cliente', '<input type="text" id="f-NIF" maxlength="20" autocomplete="off">') +
             campo('Dirección del cliente', '<textarea id="f-DIRECCION" rows="2" placeholder="Calle y número&#10;Código postal y ciudad"></textarea>', 'u-ancho') +
             '<p class="u-nota u-ancho">Salen en su factura. Se guardan en el cliente: la próxima vez ya están.</p></div>' : '') +
-          (LINEAS ? '<div class="u-ancho" id="f-lin"><span class="u-etiqueta">Qué se vende</span><div id="f-lineas"></div>' +
+          (LINEAS ? '<div class="u-ancho" id="f-lin"><span class="u-etiqueta">Qué se vende</span>' +
+            '<label class="u-check"><input type="checkbox" id="f-liniva"' + (guardado(CLAVE + 'liniva') === '1' ? ' checked' : '') + '> Precios con IVA incluido</label><div id="f-lineas"></div>' +
             '<button type="button" class="u-btn u-btn-texto" id="f-mas">+ Añadir línea</button>' +
-            '<p class="u-nota">Precio sin IVA, por unidad (metro, pieza…). La base de la factura es la suma.</p></div>' : '') +
+            '<p class="u-nota" id="f-lin-nota"></p></div>' : '') +
           campo('<span id="f-imp-et">Base imponible</span>', '<input type="text" inputmode="decimal" id="f-BASE" value="' + texto(verImporte(v)) + '" placeholder="0,00">', 'eco-base') +
           campo('IVA', '<select id="f-TIPO_IVA">' + opciones(ivas().map(function (x) { return [x, x]; }), v.TIPO_IVA) + '</select>') +
           casillaIva('f') +
@@ -1020,9 +1034,12 @@
           var cajaLin = vent.querySelector('#f-lineas');
           function tipoAhora() { return f ? f.TIPO : val('f-TIPO'); }
           function porLineas() { return LINEAS && tipoAhora() === 'Emitida'; }
+          /** T0627 · ¿Los precios de las líneas se escriben con el IVA incluido? (la casilla, que se recuerda en este navegador) */
+          function linIva() { var c = vent.querySelector('#f-liniva'); return !!(c && c.checked); }
           /** Una línea en pantalla (l: { ID, CONCEPTO, DETALLE, CANTIDAD, UNIDAD, PRECIO }). */
           function filaLin(l) {
             var n = function (x) { return x === '' || x == null ? '' : String(x).replace('.', ','); };
+            var pv = l.PRECIO === '' || l.PRECIO == null ? '' : linIva() ? conIvaPrecio(l.PRECIO, val('f-TIPO_IVA')) : l.PRECIO;
             var div = document.createElement('div');
             div.className = 'eco-lin';
             if (l.ID) div.setAttribute('data-id', l.ID);
@@ -1030,7 +1047,7 @@
               '<input type="text" class="eco-lin-d" aria-label="Detalle" placeholder="Detalle (opcional)" value="' + texto(l.DETALLE) + '">' +
               '<input type="text" inputmode="decimal" class="eco-lin-n" aria-label="Cantidad" placeholder="Cant." value="' + texto(n(l.CANTIDAD)) + '">' +
               '<input type="text" class="eco-lin-u" aria-label="Unidad" placeholder="m" maxlength="8" value="' + texto(l.UNIDAD) + '">' +
-              '<input type="text" inputmode="decimal" class="eco-lin-p" aria-label="Precio sin IVA" placeholder="Precio" value="' + texto(n(l.PRECIO)) + '">' +
+              '<input type="text" inputmode="decimal" class="eco-lin-p" aria-label="Precio" placeholder="Precio" value="' + texto(n(pv)) + '">' +
               '<span class="eco-lin-t u-cifra"></span><button type="button" class="u-btn u-btn-texto eco-lin-x" aria-label="Quitar la línea">Quitar</button>';
             cajaLin.appendChild(div);
           }
@@ -1038,8 +1055,9 @@
           function lineasAhora() {
             return cajaLin ? Array.prototype.map.call(cajaLin.querySelectorAll('.eco-lin'), function (r) {
               var q = function (c) { return String(r.querySelector(c).value).trim(); };
+              var p = q('.eco-lin-p');
               return { ID: r.getAttribute('data-id') || '', CONCEPTO: q('.eco-lin-c'), DETALLE: q('.eco-lin-d'), CANTIDAD: q('.eco-lin-n') === '' ? '' : cantidad(q('.eco-lin-n')),
-                UNIDAD: q('.eco-lin-u'), PRECIO: q('.eco-lin-p') === '' ? '' : cts(q('.eco-lin-p')) / 100 };
+                UNIDAD: q('.eco-lin-u'), PRECIO: p === '' ? '' : linIva() ? sinIva(p, val('f-TIPO_IVA')) : precio(p) };
             }).filter(function (l) { return l.CONCEPTO || l.PRECIO !== ''; }) : [];
           }
           function pintaLineas() {
@@ -1047,8 +1065,13 @@
             Array.prototype.forEach.call(cajaLin.querySelectorAll('.eco-lin'), function (r) {
               var q = function (c) { return r.querySelector(c).value; };
               var vacia = !String(q('.eco-lin-c')).trim() && !String(q('.eco-lin-p')).trim();
+              // Con el IVA incluido, cada línea enseña lo que lleva con IVA (lo que ella cuenta); sin él, su importe sin IVA.
               r.querySelector('.eco-lin-t').textContent = vacia ? '' : eur(importeLinea({ CANTIDAD: q('.eco-lin-n'), PRECIO: q('.eco-lin-p') }));
+              r.querySelector('.eco-lin-p').placeholder = linIva() ? 'Con IVA' : 'Sin IVA';
             });
+            vent.querySelector('#f-lin-nota').textContent = linIva() ?
+              'Pon cada precio con el IVA incluido, por unidad (metro, pieza…): la factura lo lleva sin IVA, calculado, y el total cuadra con lo que pones.' :
+              'Precio sin IVA, por unidad (metro, pieza…). La base de la factura es la suma.';
             var b = vent.querySelector('#f-BASE');
             b.value = (baseLineas(lineasAhora()) / 100).toFixed(2).replace('.', ',');
           }
@@ -1090,6 +1113,8 @@
               if (!cajaLin.children.length) filaLin({ CANTIDAD: '', UNIDAD: 'm' });
               pintaLineas(); pintaImporte('f', 'Base imponible');
             });
+            // La casilla cambia cómo se leen los precios escritos (no los convierte): se marca y se escriben como se saben.
+            vent.querySelector('#f-liniva').addEventListener('change', function (e) { guardado(CLAVE + 'liniva', e.target.checked ? '1' : ''); pintaLineas(); pintaImporte('f', 'Base imponible'); });
             vent.querySelector('#f-mas').onclick = function () { filaLin({ CANTIDAD: '', UNIDAD: 'm' }); var u = cajaLin.lastChild.querySelector('.eco-lin-c'); if (u) u.focus(); };
           }
           refrescar();
