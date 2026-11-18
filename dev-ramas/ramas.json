@@ -556,12 +556,12 @@
   },
   "T0627-facturas-telas": {
    "tarea": "T0627",
-   "titulo": "Facturas de Marta con su documento: líneas, datos del cliente y PDF en Drive",
-   "pr": null,
-   "commit": "7545a4f",
-   "ultimo": "T0627: Los datos de la empresa para las facturas, en el Excel y editables desde la app",
+   "titulo": "Marta hace sus facturas desde la app: por líneas, con su documento y su PDF",
+   "pr": 333,
+   "commit": "da743c2",
+   "ultimo": "T0627: base.css a la 97 (las líneas de la factura)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-18T20:05:03.721Z",
+   "fecha": "2026-11-18T20:11:43.168Z",
    "toca": [
     "konamigas",
     "utilo"
