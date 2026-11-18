@@ -774,11 +774,11 @@
   "T0630-textos-ficha-listado": {
    "tarea": "T0630",
    "titulo": "Cada vista dice qué es en una línea, se cuenta con su nombre y la ficha va con lo importante arriba",
-   "pr": null,
-   "commit": "d2a0c42",
-   "ultimo": "T0630: Cada vista dice qué es en una línea, se cuenta con su nombre y la ficha va con lo importante arriba",
+   "pr": 336,
+   "commit": "e920477",
+   "ultimo": "T0630: Junta main (T0624, avisos con la marca) y sube base.css a ?v=99",
    "quien": "Javi Canela",
-   "fecha": "2026-11-18T21:20:34.716Z",
+   "fecha": "2026-11-18T21:21:39.258Z",
    "toca": [
     "konamigas",
     "utilo"
