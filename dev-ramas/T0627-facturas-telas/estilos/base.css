@@ -1050,23 +1050,31 @@ body.u-con-barra .rp-toast { bottom: calc(var(--alto-barra, 64px) + var(--e2) + 
 /* Abrir una factura en Drive (enlace que se abre en otra pestaña) */
 .u .eco-drive { font-weight: 700; white-space: nowrap; }
 /* T0627 · Las líneas de una factura emitida (FACTURA_LINEAS): arriba, qué se vende, a lo ancho; debajo, el detalle,
-   la cantidad, la unidad, el precio, el importe y quitar. En el móvil, el detalle también va a lo ancho. */
-.u .eco-lin-cab { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--e2) var(--e4); margin-bottom: var(--e1); }
-.u .eco-lin-cab .u-etiqueta { margin: 0; }
-.u .eco-lin { display: grid; grid-template-columns: minmax(0, 1fr) 4.5em 3.2em 5.5em 6.5em auto; gap: var(--e2); align-items: center; padding: var(--e2) 0 var(--e3); border-bottom: 1px solid var(--color-linea); }
+   la cantidad, la unidad, el precio, «IVA incl.» (su precio ya lleva el IVA), el importe y quitar. En el móvil, el detalle
+   también va a lo ancho. */
+.u .eco-lin { display: grid; grid-template-columns: minmax(0, 1fr) 4.5em 3.2em 5.5em auto 7.5em auto; gap: var(--e2); align-items: center; padding: var(--e2) 0 var(--e3); border-bottom: 1px solid var(--color-linea); }
 .u .eco-lin input { min-width: 0; }
 .u .eco-lin-c { grid-column: 1 / -1; font-weight: 600; }
-.u .eco-lin-t { text-align: right; font-weight: 600; white-space: nowrap; }
+.u .eco-lin-iva { display: flex; align-items: center; gap: var(--e1); font-size: 13px; white-space: nowrap; cursor: pointer; }
+.u .eco-lin-t { text-align: right; font-weight: 600; white-space: nowrap; font-size: 14px; }
 .u .eco-lin-x { min-height: 0; padding: 0 var(--e1); }
 .u .eco-calculada input { background: var(--color-bloque); }
+@media (max-width: 640px) {
+  .u .eco-lin { grid-template-columns: 4.5em 3.2em minmax(0, 1fr) auto; }
+  .u .eco-lin-d { grid-column: 1 / -1; }
+  .u .eco-lin-t { grid-column: 1 / 3; text-align: left; }
+}
+/* T0627 · La vista previa de una factura: flotante, encima de todo, con la hoja (que lleva la marca BORRADOR) a la vista. */
+.u .eco-previa { position: fixed; inset: 0; z-index: 1000; background: rgba(0, 0, 0, .55); display: flex; align-items: center; justify-content: center; padding: var(--e3); }
+.u .eco-previa-caja { background: var(--color-superficie); border-radius: var(--radio); width: min(860px, 100%); height: min(94vh, 1180px); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px rgba(0, 0, 0, .3); }
+.u .eco-previa-cab { display: flex; justify-content: space-between; align-items: center; gap: var(--e3); padding: var(--e2) var(--e3); border-bottom: 1px solid var(--color-linea); }
+.u .eco-previa-hoja { flex: 1; background: #e8e5df; overflow: auto; display: flex; justify-content: center; }
+.u .eco-previa-hoja { align-items: flex-start; }
+.u .eco-previa-hoja iframe { border: 0; width: 794px; height: 1123px; flex: none; background: #fff; margin: var(--e2) 0; box-shadow: 0 2px 12px rgba(0, 0, 0, .15); }
 .u .eco-falta { color: var(--color-vencido); font-weight: 600; }
 /* T0627 · El número de una factura emitida, que pone la app: como texto, sin caja (no parece que se pueda escribir). */
 .u .eco-numero input:disabled { border-color: transparent; background: transparent; padding-left: 0; opacity: 1; color: var(--color-texto); -webkit-text-fill-color: var(--color-texto); font-weight: 600; box-shadow: none; }
 .u .eco-numero input:disabled::placeholder { color: var(--color-suave); -webkit-text-fill-color: var(--color-suave); font-weight: 400; font-style: italic; }
-@media (max-width: 640px) {
-  .u .eco-lin { grid-template-columns: 4.5em 3.2em minmax(0, 1fr) auto auto; }
-  .u .eco-lin-d { grid-column: 1 / -1; }
-}
 /* Añadir movimiento: lo único que flota en la sección, abajo a la derecha, encima de la barra de secciones del móvil */
 .u .eco-fab { position: fixed; right: var(--e4); bottom: calc(var(--e4) + env(safe-area-inset-bottom, 0px)); z-index: 44; min-height: 52px; padding: 0 var(--e5);
   border: 0; border-radius: var(--radio); background: var(--color-accion); color: var(--color-sobre-accion); font: 800 17px/1 var(--fuente-texto); box-shadow: var(--sombra-flota); cursor: pointer; }
@@ -2000,8 +2008,9 @@ html .u .u-velo, html .u .gs5 .gs-velo, html .u #alta-velo, html .u .ver-velo, h
 body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 
 /* ---------- T0599 · Sección Listado (nucleo/secciones/listado.js): listado con ficha y avisos, configurable ----------
- * Los niveles de los avisos y de los estados usan los colores funcionales de los estados del kanban:
- * alto = Bloqueada (rojo), medio = Pendiente de revisión (ámbar), info = En curso (azul), bien = Completada, apagado = suave. */
+ * T0624 · Una señal por cosa. El color de un aviso sale solo en la franja de la fila, en su fecha y en el número de su botón:
+ * alto = vencido (--color-vencido: rojo; en Telas, teja), medio = pendiente (--color-pendiente: ámbar; en Telas, ocre),
+ * info = azul de En curso (sin franja). Los botones de aviso, las etiquetas de estado y las marcas de cada fila, neutros. */
 .u .li-arriba { display: flex; align-items: flex-end; gap: var(--e2); margin: 0 0 var(--e3); }
 .u .li-pers { flex: none; text-decoration: none; }
 .u .li-n { display: inline-block; min-width: 20px; padding: 0 var(--e1); margin-left: var(--e1); border-radius: 999px; text-align: center;
@@ -2012,11 +2021,13 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
   background: color-mix(in srgb, var(--estado-ec) 10%, var(--color-superficie)); border-left: 4px solid var(--estado-ec); }
 .u .li-avisos { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); margin: 0 0 var(--e3); }
 .u .li-av { min-height: 36px; padding: 0 var(--e3); border-radius: var(--radio); cursor: pointer; text-align: left;
-  border: 1.5px solid var(--li-c, var(--estado-pr)); background: color-mix(in srgb, var(--li-c, var(--estado-pr)) 9%, var(--color-superficie)); color: var(--color-texto); font: 600 14px/1.2 var(--fuente-texto); }
-.u .li-av b { color: var(--li-c, var(--estado-pr)); font-variant-numeric: tabular-nums; }
-.u .li-av[aria-pressed=true] { background: var(--li-c, var(--estado-pr)); color: #fff; }
-.u .li-av[aria-pressed=true] b { color: #fff; }
-.u .li-alto { --li-c: var(--estado-bl); } .u .li-medio { --li-c: var(--estado-pr); } .u .li-info { --li-c: var(--estado-ec); }
+  border: 1px solid var(--color-borde-campo); background: var(--color-superficie); color: var(--color-texto); font: 600 14px/1.2 var(--fuente-texto); }
+.u .li-av b { color: var(--li-c, var(--color-pendiente)); font-variant-numeric: tabular-nums; }
+.u .li-av:hover { border-color: var(--li-c, var(--color-pendiente)); }
+.u .li-av[aria-pressed=true] { background: var(--li-fondo, var(--color-pendiente-fondo)); border: 1.5px solid var(--li-c, var(--color-pendiente)); }
+.u .li-alto { --li-c: var(--color-vencido); --li-fondo: var(--color-vencido-fondo); }
+.u .li-medio { --li-c: var(--color-pendiente); --li-fondo: var(--color-pendiente-fondo); }
+.u .li-info { --li-c: var(--estado-ec); --li-fondo: color-mix(in srgb, var(--estado-ec) 9%, #FFFFFF); }
 .u .li-bien { --li-c: var(--color-bien); } .u .li-apagado { --li-c: var(--color-suave); }
 .u .li-grupo { margin: 0 0 var(--e4); }
 .u .li-grupo .n-grupo { margin-top: var(--e3); }
@@ -2030,15 +2041,17 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-tabla tbody tr:last-child td { border-bottom: 0; }
 .u .li-tabla tbody:not(:last-child) tr:last-child td { border-bottom: 1px solid var(--color-linea); }
 .u .li-nada { color: var(--color-suave); }
-.u .li-estado { background: color-mix(in srgb, var(--li-c, var(--color-texto)) 12%, var(--color-superficie)); color: var(--color-texto);
-  border: 1px solid color-mix(in srgb, var(--li-c, var(--color-texto)) 45%, var(--color-superficie)); }
+.u .li-estado { background: var(--color-superficie); color: var(--color-texto); border: 1px solid color-mix(in srgb, var(--color-borde-campo) 45%, var(--color-superficie)); font-weight: 600; }
 .u .li-estado.li-apagado { color: var(--color-suave); }
-.u .li-aviso { display: inline-flex; align-items: center; gap: var(--e1); font: 700 12px/1.4 var(--fuente-texto); color: var(--li-c, var(--estado-pr)); margin-right: var(--e2); }
-.u .li-aviso::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--li-c, var(--estado-pr)); flex: none; }
+/* Los demás avisos de una fila, en palabras y sin color (la franja ya dice el más importante); en la ficha, con el suyo. */
+.u .li-aviso { display: inline-flex; align-items: center; font: 600 12px/1.4 var(--fuente-texto); color: var(--color-suave); margin-right: var(--e2); }
+.u .li-aviso + .li-aviso::before { content: "·"; margin-right: var(--e2); }
+.u .li-ficha-avisos .li-aviso { font-weight: 700; font-size: 13px; color: var(--li-c, var(--color-pendiente)); }
+.u .li-ficha-avisos .li-aviso + .li-aviso::before { color: var(--color-suave); }
 .u .li-marcas { margin-top: var(--e1); font-weight: 400; }
-.u .u-tabla tr.li-con-aviso td:first-child { box-shadow: inset 4px 0 0 var(--li-c, var(--estado-pr)); }
-.u .li-f-alto { --li-c: var(--estado-bl); --li-barra: var(--estado-bl); } .u .li-f-medio { --li-c: var(--estado-pr); --li-barra: var(--estado-pr); }
-.u .li-f-info { --li-c: var(--estado-ec); --li-barra: var(--estado-ec); }
+.u .li-fecha, .u .li-fecha .u-nota { color: var(--li-c); font-weight: 700; }
+.u .u-tabla tr.li-con-aviso td:first-child { box-shadow: inset 4px 0 0 var(--li-barra, transparent); }
+.u .li-f-alto { --li-barra: var(--color-vencido); } .u .li-f-medio { --li-barra: var(--color-pendiente); }
 .u .li-mini { width: 40px; height: 40px; border-radius: var(--radio-peq); object-fit: cover; display: block; border: 1px solid var(--color-linea); }
 .u .li-foto { width: 100%; max-width: 240px; aspect-ratio: 1; border-radius: var(--radio); object-fit: cover; display: block; border: 1px solid var(--color-linea); }
 .u .li-tarjetas { list-style: none; margin: 0; padding: 0; }

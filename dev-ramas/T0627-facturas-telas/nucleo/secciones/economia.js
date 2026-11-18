@@ -1013,8 +1013,7 @@
           (datosCli ? '<div class="u-campos u-ancho" id="f-cli">' + campo('CIF o NIF del cliente', '<input type="text" id="f-NIF" maxlength="20" autocomplete="off">') +
             campo('Dirección del cliente', '<textarea id="f-DIRECCION" rows="2" placeholder="Calle y número&#10;Código postal y ciudad"></textarea>', 'u-ancho') +
             '<p class="u-nota u-ancho">Salen en su factura. Se guardan en el cliente: la próxima vez ya están.</p></div>' : '') +
-          (LINEAS ? '<div class="u-ancho" id="f-lin"><div class="eco-lin-cab"><span class="u-etiqueta">Qué se vende</span>' +
-            '<label class="u-check"><input type="checkbox" id="f-liniva"' + (guardado(CLAVE + 'liniva') === '1' ? ' checked' : '') + '> Los precios llevan el IVA incluido</label></div><div id="f-lineas"></div>' +
+          (LINEAS ? '<div class="u-ancho" id="f-lin"><span class="u-etiqueta">Qué se vende</span><div id="f-lineas"></div>' +
             '<button type="button" class="u-btn u-btn-texto" id="f-mas">+ Añadir línea</button>' +
             '<p class="u-nota" id="f-lin-nota"></p></div>' : '') +
           campo('<span id="f-imp-et">Base imponible</span>', '<input type="text" inputmode="decimal" id="f-BASE" value="' + texto(verImporte(v)) + '" placeholder="0,00">', 'eco-base') +
@@ -1036,12 +1035,13 @@
           var cajaLin = vent.querySelector('#f-lineas');
           function tipoAhora() { return f ? f.TIPO : val('f-TIPO'); }
           function porLineas() { return LINEAS && tipoAhora() === 'Emitida'; }
-          /** T0627 · ¿Los precios de las líneas se escriben con el IVA incluido? (la casilla, que se recuerda en este navegador) */
-          function linIva() { var c = vent.querySelector('#f-liniva'); return !!(c && c.checked); }
+          /** T0627 · ¿El precio de esta línea (la fila o algo dentro de ella) se escribió con el IVA incluido? (su casilla «IVA incl.») */
+          function linIva(x) { var r = x && x.closest ? x.closest('.eco-lin') : null, c = r && r.querySelector('.eco-lin-ci'); return !!(c && c.checked); }
+          function siBool(v) { return v === true || /^(true|sí|si|1|x)$/i.test(String(v == null ? '' : v)); }
           /** Una línea en pantalla (l: { ID, CONCEPTO, DETALLE, CANTIDAD, UNIDAD, PRECIO }). */
           function filaLin(l) {
             var n = function (x) { return x === '' || x == null ? '' : String(x).replace('.', ','); };
-            var pv = l.PRECIO === '' || l.PRECIO == null ? '' : verPrecio(l.PRECIO);
+            var ci = siBool(l.IVA_INCLUIDO), pv = l.PRECIO === '' || l.PRECIO == null ? '' : ci ? conIvaPrecio(l.PRECIO, val('f-TIPO_IVA')) : precio(l.PRECIO);
             var div = document.createElement('div');
             div.className = 'eco-lin';
             if (l.ID) div.setAttribute('data-id', l.ID);
@@ -1050,25 +1050,18 @@
               '<input type="text" inputmode="decimal" class="eco-lin-n" aria-label="Cantidad" placeholder="Cant." value="' + texto(n(l.CANTIDAD)) + '">' +
               '<input type="text" class="eco-lin-u" aria-label="Unidad" placeholder="m" maxlength="8" value="' + texto(l.UNIDAD) + '">' +
               '<input type="text" inputmode="decimal" class="eco-lin-p" aria-label="Precio" placeholder="Precio" value="' + texto(n(pv)) + '" data-precio="' + texto(l.PRECIO == null ? '' : l.PRECIO) + '">' +
+              '<label class="eco-lin-iva" title="El precio que has puesto ya lleva el IVA"><input type="checkbox" class="eco-lin-ci"' + (ci ? ' checked' : '') + '> IVA incl.</label>' +
               '<span class="eco-lin-t u-cifra"></span><button type="button" class="u-btn u-btn-texto eco-lin-x" aria-label="Quitar la línea">Quitar</button>';
             cajaLin.appendChild(div);
           }
           /**
-           * T0627 · Cada precio guarda en data-precio el de sin IVA exacto: lo que se escribe se lee según la casilla en ese
-           * momento, y lo que no se toca se queda como estaba (abrir y guardar no cambia ni un céntimo). La casilla y el IVA
-           * solo cambian cómo se enseña.
+           * T0627 · Cada precio guarda en data-precio el sin IVA exacto. Lo escrito se queda tal cual en pantalla: la casilla
+           * «IVA incl.» de su línea solo dice cómo se lee (100 con IVA → 82,6446 sin IVA). Lo que no se toca se queda como
+           * estaba: abrir y guardar no cambia ni un céntimo.
            */
-          function verPrecio(sin) { return linIva() ? conIvaPrecio(sin, val('f-TIPO_IVA')) : precio(sin); }
           function leerPrecio(inp) {
             var x = String(inp.value).trim();
-            inp.setAttribute('data-precio', x === '' ? '' : String(linIva() ? sinIva(x, val('f-TIPO_IVA')) : precio(x)));
-          }
-          function reverPrecios() {
-            if (!cajaLin) return;
-            Array.prototype.forEach.call(cajaLin.querySelectorAll('.eco-lin-p'), function (inp) {
-              var dp = inp.getAttribute('data-precio');
-              if (dp !== '' && dp != null) inp.value = String(verPrecio(Number(dp))).replace('.', ',');
-            });
+            inp.setAttribute('data-precio', x === '' ? '' : String(linIva(inp) ? sinIva(x, val('f-TIPO_IVA')) : precio(x)));
           }
           /** Las líneas de la pantalla, como filas de FACTURA_LINEAS (sin las vacías). */
           function lineasAhora() {
@@ -1076,7 +1069,7 @@
               var q = function (c) { return String(r.querySelector(c).value).trim(); };
               var dp = r.querySelector('.eco-lin-p').getAttribute('data-precio');
               return { ID: r.getAttribute('data-id') || '', CONCEPTO: q('.eco-lin-c'), DETALLE: q('.eco-lin-d'), CANTIDAD: q('.eco-lin-n') === '' ? '' : cantidad(q('.eco-lin-n')),
-                UNIDAD: q('.eco-lin-u'), PRECIO: dp === '' || dp == null ? '' : Number(dp) };
+                UNIDAD: q('.eco-lin-u'), PRECIO: dp === '' || dp == null ? '' : Number(dp), IVA_INCLUIDO: r.querySelector('.eco-lin-ci').checked };
             }).filter(function (l) { return l.CONCEPTO || l.PRECIO !== ''; }) : [];
           }
           function pintaLineas() {
@@ -1084,13 +1077,11 @@
             Array.prototype.forEach.call(cajaLin.querySelectorAll('.eco-lin'), function (r) {
               var q = function (c) { return r.querySelector(c).value; };
               var vacia = !String(q('.eco-lin-c')).trim() && !String(q('.eco-lin-p')).trim();
-              // Con el IVA incluido, cada línea enseña lo que lleva con IVA (lo que ella cuenta); sin él, su importe sin IVA.
-              r.querySelector('.eco-lin-t').textContent = vacia ? '' : eur(importeLinea({ CANTIDAD: q('.eco-lin-n'), PRECIO: q('.eco-lin-p') }));
-              r.querySelector('.eco-lin-p').placeholder = linIva() ? 'Con IVA' : 'Sin IVA';
+              // El importe de cada línea, como su precio: con IVA si su casilla está marcada, sin IVA si no.
+              var ci = linIva(r);
+              r.querySelector('.eco-lin-t').textContent = vacia ? '' : eur(importeLinea({ CANTIDAD: q('.eco-lin-n'), PRECIO: q('.eco-lin-p') })) + (ci ? ' con IVA' : '');
             });
-            vent.querySelector('#f-lin-nota').textContent = linIva() ?
-              'Precio con el IVA incluido, por unidad (metro, pieza…): la factura lo lleva sin IVA, calculado, y el total cuadra con lo que pones.' :
-              'Precio sin IVA, por unidad (metro, pieza…). La base de la factura es la suma.';
+            vent.querySelector('#f-lin-nota').textContent = 'Precio por unidad (metro, pieza…), sin IVA. Si el que sabes ya lleva el IVA, ponlo tal cual y marca «IVA incl.» en esa línea: la factura lo pone sin IVA y el total cuadra.';
             var b = vent.querySelector('#f-BASE');
             b.value = (baseLineas(lineasAhora()) / 100).toFixed(2).replace('.', ',');
           }
@@ -1132,23 +1123,27 @@
             lin0.forEach(filaLin);
             if (!lin0.length && f && f.TIPO === 'Emitida' && cts(f.BASE)) filaLin({ CONCEPTO: '', CANTIDAD: 1, PRECIO: f.BASE }); // una de antes, sin líneas
             cajaLin.addEventListener('input', function (e) { if (e.target.classList.contains('eco-lin-p')) leerPrecio(e.target); pintaLineas(); pintaImporte('f', 'Base imponible'); });
+            // Marcar «IVA incl.» en una línea cambia cómo se lee su precio (el número escrito no cambia); las demás, igual.
+            cajaLin.addEventListener('change', function (e) {
+              if (!e.target.classList.contains('eco-lin-ci')) return;
+              leerPrecio(e.target.closest('.eco-lin').querySelector('.eco-lin-p'));
+              pintaLineas(); pintaImporte('f', 'Base imponible');
+            });
             cajaLin.addEventListener('click', function (e) {
               var x = e.target.closest('.eco-lin-x'); if (!x) return;
               x.closest('.eco-lin').remove();
               if (!cajaLin.children.length) filaLin({ CANTIDAD: '', UNIDAD: 'm' });
               pintaLineas(); pintaImporte('f', 'Base imponible');
             });
-            // La casilla cambia cómo se enseñan los precios (27,50 sin IVA ↔ 33,28 con IVA), sin cambiar la factura.
-            vent.querySelector('#f-liniva').addEventListener('change', function (e) { guardado(CLAVE + 'liniva', e.target.checked ? '1' : ''); reverPrecios(); pintaLineas(); pintaImporte('f', 'Base imponible'); });
             vent.querySelector('#f-mas').onclick = function () { filaLin({ CANTIDAD: '', UNIDAD: 'm' }); var u = cajaLin.lastChild.querySelector('.eco-lin-c'); if (u) u.focus(); };
           }
           refrescar();
           pintaCliente();
           ['f-TIPO', 'f-TIPO_IVA'].forEach(function (id) { var e = vent.querySelector('#' + id); if (e) e.addEventListener('change', function () { refrescar(); pintaCliente(); }); });
-          // Con los precios con IVA, cambiar el tipo de IVA deja lo escrito (lo que cobra) y cambia el sin IVA.
+          // En las líneas con el IVA incluido, cambiar el tipo de IVA deja lo escrito (lo que cobra) y cambia el sin IVA.
           vent.querySelector('#f-TIPO_IVA').addEventListener('change', function () {
-            if (!cajaLin || !linIva()) return;
-            Array.prototype.forEach.call(cajaLin.querySelectorAll('.eco-lin-p'), leerPrecio);
+            if (!cajaLin) return;
+            Array.prototype.forEach.call(cajaLin.querySelectorAll('.eco-lin-p'), function (inp) { if (linIva(inp)) leerPrecio(inp); });
             pintaLineas(); pintaImporte('f', 'Base imponible');
           });
           vent.querySelector('#f-ID_CONTRAPARTE').addEventListener('change', pintaCliente);
@@ -1196,7 +1191,7 @@
           function guardarLineas(id, ls) {
             var antes = lineasDe(d.lin, id), vistas = {};
             ls.forEach(function (l) {
-              var fila = { ID_FACTURA: id, CONCEPTO: l.CONCEPTO, DETALLE: l.DETALLE, CANTIDAD: l.CANTIDAD, UNIDAD: l.UNIDAD, PRECIO: l.PRECIO };
+              var fila = { ID_FACTURA: id, CONCEPTO: l.CONCEPTO, DETALLE: l.DETALLE, CANTIDAD: l.CANTIDAD, UNIDAD: l.UNIDAD, PRECIO: l.PRECIO, IVA_INCLUIDO: !!l.IVA_INCLUIDO };
               var a = l.ID && antes.filter(function (x) { return String(x.ID) === String(l.ID); })[0];
               if (a) { vistas[a.ID] = 1; var c = cambios(a, fila); if (Object.keys(c).length) T.actualizar('FACTURA_LINEAS', a.ID, c).then(function () {}, function () {}); }
               else T.crear('FACTURA_LINEAS', fila).then(function () {}, function () {});
@@ -1210,13 +1205,32 @@
           };
           var bver = vent.querySelector('#f-ver');
           if (bver) bver.onclick = function () {
-            // La ventana se abre ya (al tocar), para que el navegador no la bloquee; el documento llega después.
-            var w = window.open('', '_blank');
-            if (w) w.document.write('<p style="font-family:sans-serif;padding:2em">Preparando la factura…</p>');
+            // T0627: flotante, encima de la factura, y con la marca BORRADOR (la pone el motor): nunca se confunde con el PDF.
+            var o = document.createElement('div');
+            o.className = 'eco-previa';
+            o.innerHTML = '<div class="eco-previa-caja" role="dialog" aria-modal="true" aria-label="Vista previa de la factura">' +
+              '<div class="eco-previa-cab"><span><b>Vista previa</b> · borrador, sin guardar</span><button type="button" class="u-btn" data-previa-cerrar>Cerrar</button></div>' +
+              '<div class="eco-previa-hoja"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div></div>';
+            el.appendChild(o);
+            function quitar() { o.remove(); document.removeEventListener('keydown', esc, true); }
+            function esc(e) { if (e.key === 'Escape') { e.stopPropagation(); quitar(); } }
+            document.addEventListener('keydown', esc, true);
+            o.addEventListener('click', function (e) { if (e.target === o || e.target.closest('[data-previa-cerrar]')) quitar(); });
+            o.querySelector('[data-previa-cerrar]').focus();
             ctx.llamar('economiaFacturaVer', [documento(f ? '' : '(se numera al guardar)')]).then(function (r) {
-              if (w) { w.document.open(); w.document.write(r.html); w.document.close(); }
-              verError(r.faltan && r.faltan.length ? ['Le falta ' + r.faltan.join(', ') + ': sale en rojo en la factura.'] : []);
-            }, function (e) { if (w) w.close(); verError([String((e && e.message) || e)]); });
+              var hoja = o.querySelector('.eco-previa-hoja');
+              hoja.innerHTML = '<iframe title="Factura en borrador"></iframe>';
+              var ifr = hoja.querySelector('iframe');
+              // La hoja A4 (794 px) se encoge para caber entera a lo ancho (en el móvil, como un PDF).
+              ifr.onload = function () {
+                var k = Math.min(1, (hoja.clientWidth - 16) / 794);
+                ifr.style.width = Math.round(794 * k) + 'px';
+                ifr.style.height = Math.round(1123 * k) + 'px';
+                try { ifr.contentDocument.documentElement.style.zoom = k; } catch (e) {}
+              };
+              ifr.srcdoc = r.html;
+              verError(r.faltan && r.faltan.length ? ['Le falta ' + r.faltan.join(', ') + ': sale en rojo en el borrador.'] : []);
+            }, function (e) { quitar(); verError([String((e && e.message) || e)]); });
           };
           var bpdf = vent.querySelector('#f-pdf');
           if (bpdf) bpdf.onclick = function () {

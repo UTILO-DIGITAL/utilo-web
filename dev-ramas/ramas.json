@@ -558,10 +558,10 @@
    "tarea": "T0627",
    "titulo": "Marta hace sus facturas desde la app: por líneas, con su documento y su PDF",
    "pr": 333,
-   "commit": "bda7eab",
-   "ultimo": "Merge origin/main en T0627-facturas-telas (base.css a la 98)",
+   "commit": "42b911f",
+   "ultimo": "T0627: La vista previa cabe entera en el móvil; IVA_INCLUIDO en el Excel",
    "quien": "Javi Canela",
-   "fecha": "2026-11-18T21:14:13.161Z",
+   "fecha": "2026-11-18T21:39:25.154Z",
    "toca": [
     "konamigas",
     "utilo"
