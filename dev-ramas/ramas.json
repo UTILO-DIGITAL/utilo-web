@@ -1015,9 +1015,9 @@
    ]
   },
   "utilo": {
-   "rama": "main y las ramas abiertas",
-   "commit": "f69ac0b",
-   "fecha": "2026-11-18T12:14:16.907Z",
+   "rama": "T0617-entregar-al-aprobar",
+   "commit": "c263945",
+   "fecha": "2026-11-18T12:27:40.827Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
