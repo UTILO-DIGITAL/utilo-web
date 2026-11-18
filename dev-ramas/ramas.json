@@ -1017,7 +1017,7 @@
   "utilo": {
    "rama": "T0617-entregar-al-aprobar",
    "commit": "c263945",
-   "fecha": "2026-11-18T12:27:40.827Z",
+   "fecha": "2026-11-18T15:09:38.716Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
