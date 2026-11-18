@@ -178,16 +178,16 @@
 
   var SECCIONES = {
     seguimiento: { modulo: 'listado', titulo: 'Seguimiento', icono: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9l2 2 4-4M8 15h8"/>', config: mezcla(COMUN, {
-      TABLA: 'SEGUIMIENTO', CODIGO: 'ID', NOMBRE: 'DETALLE', ORDEN: 'FECHA', TEXTO: 'Tareas y reuniones en una sola lista.',
+      TABLA: 'SEGUIMIENTO', CODIGO: 'ID', NOMBRE: 'DETALLE', ORDEN: 'FECHA', TEXTO: 'Tus tareas, reuniones y notas.', FILAS: ['tarea', 'tareas'],
       COLUMNAS: ['FECHA', 'ID_TIPO', 'CON_QUIEN', 'DETALLE', 'ID_ESTADO'], DETALLE: ['CON_QUIEN', 'FECHA', 'ID_ESTADO'],
       CAMPOS: { CON_QUIEN: { titulo: 'Con quién', primero: ['ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO'] }, ID_TIPO: { titulo: 'Tipo' }, ID_TEMA: { titulo: 'Área' }, ID_FORMATO: { titulo: 'Formato' },
         ID_MARCA: { titulo: 'Marca' }, ID_PROVEEDOR: { titulo: 'Proveedor' }, ID_OTRO: { titulo: 'Otro contacto' }, DETALLE: { titulo: 'Qué hay que hacer / qué pasó' },
         ID_ESTADO: { titulo: 'Estado', colores: COLORES_TAREA }, NOTAS: { titulo: 'Notas / enlace', tipo: 'nota' } },
-      FICHA: [{ titulo: '', campos: ['FECHA', 'ID_TIPO', 'ID_ESTADO', 'ID_TEMA', 'ID_FORMATO', 'DETALLE', 'NOTAS'] }, { titulo: 'Con quién', campos: ['ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO'] }],
+      FICHA: [{ titulo: '', campos: ['ID_ESTADO', 'FECHA', 'DETALLE', 'ID_TIPO', 'ID_TEMA', 'ID_FORMATO', 'NOTAS'] }, { titulo: 'Con quién', campos: ['ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO'] }],
       VISTAS: [
-        { id: 'HOY', titulo: 'Hoy', filtro: [NO_HECHAS], agrupar: { campo: 'FECHA', por: 'plazo' }, orden: 'FECHA' },
-        { id: 'TABLERO', titulo: 'Tablero', filtro: [{ campo: 'ID_ESTADO', no: ['Descartada'] }], tablero: { campo: 'ID_ESTADO', columnas: ['Pendiente', 'En curso', 'Esperando respuesta', 'Hecha'] }, orden: 'FECHA' },
-        { id: 'REUNIONES', titulo: 'Reuniones', filtro: [{ campo: 'ID_TIPO', es: 'Reunión' }], orden: '-FECHA' },
+        { id: 'HOY', titulo: 'Hoy', texto: 'Lo que tienes por hacer, de lo más retrasado a lo de los próximos días.', filtro: [NO_HECHAS], agrupar: { campo: 'FECHA', por: 'plazo' }, orden: 'FECHA' },
+        { id: 'TABLERO', titulo: 'Tablero', texto: 'Tus tareas y reuniones, en columnas según cómo van.', filtro: [{ campo: 'ID_ESTADO', no: ['Descartada'] }], tablero: { campo: 'ID_ESTADO', columnas: ['Pendiente', 'En curso', 'Esperando respuesta', 'Hecha'] }, orden: 'FECHA' },
+        { id: 'REUNIONES', titulo: 'Reuniones', texto: 'Las reuniones: con quién y cuándo.', filas: ['reunión', 'reuniones'], filtro: [{ campo: 'ID_TIPO', es: 'Reunión' }], orden: '-FECHA' },
         { id: 'HECHO', titulo: 'Hecho', filtro: [{ campo: 'ID_ESTADO', es: ['Hecha', 'Descartada'] }], orden: '-FECHA' },
         { id: 'TODO', titulo: 'Todo', orden: '-FECHA', agrupar: 'ID_TEMA' }
       ],
@@ -200,7 +200,7 @@
       NUEVA: { ID_ESTADO: 'Pendiente', ID_TIPO: 'Tarea', FECHA: 'hoy' }, OBLIGATORIAS: ['DETALLE', 'ID_ESTADO'], _refs: refsDesde('SEGUIMIENTO') }) },
 
     clientes: { modulo: 'listado', titulo: 'Clientes', icono: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.6.9 2.6 2.6 3 5.2"/>', config: mezcla(COMUN, {
-      TABLA: 'MARCAS', CODIGO: 'ID', NOMBRE: 'NOMBRE', ORDEN: 'NOMBRE', TEXTO: 'Las marcas: las que ya son clientes y las de prospección, según su fase.',
+      TABLA: 'MARCAS', CODIGO: 'ID', NOMBRE: 'NOMBRE', ORDEN: 'NOMBRE', TEXTO: 'Las marcas: las que ya son clientes y las de prospección, según su fase.', FILAS: ['cliente', 'clientes'],
       COLUMNAS: ['NOMBRE', 'ID_FASE', 'CIUDAD', 'PROXIMO_PASO', 'FECHA_PASO'], DETALLE: ['ID_FASE', 'PROXIMO_PASO'],
       CAMPOS: { NOMBRE: { titulo: 'Marca' }, ID_FASE: { titulo: 'Fase', tipo: 'estado', colores: { '8 Primer pedido': 'bien', '9 Cliente habitual': 'bien', 'En pausa': 'apagado', 'Descartado': 'apagado', 'Por contactar': 'medio' } },
         ID_TIPO_MARCA: { titulo: 'Tipo' }, ID_PRIORIDAD: { titulo: 'Prioridad', colores: { 'Alta': 'alto' } }, ID_VIA: { titulo: 'Vía' }, WEB: { tipo: 'enlace' }, DIRECCION: { titulo: 'Dirección (envíos)' },
@@ -231,7 +231,7 @@
       EDITAR: ['ID_FASE', 'ID_PRIORIDAD', 'NOTA', 'NOTAS'], _refs: refsDesde('MARCAS') }) },
 
     proveedores: { modulo: 'listado', titulo: 'Proveedores', perfiles: ['Dueña'], icono: '<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>', config: mezcla(COMUN, {
-      TABLA: 'PROVEEDORES', CODIGO: 'ID', NOMBRE: 'NOMBRE', ORDEN: 'NOMBRE',
+      TABLA: 'PROVEEDORES', CODIGO: 'ID', NOMBRE: 'NOMBRE', ORDEN: 'NOMBRE', FILAS: ['proveedor', 'proveedores'],
       COLUMNAS: ['NOMBRE', 'ID_ESTADO', 'ID_PRIORIDAD', 'ZONA', 'ID_TIPO', 'N_DISENOS', 'PROXIMO_PASO'], DETALLE: ['ID_ESTADO', 'ZONA', 'PROXIMO_PASO'],
       CAMPOS: { NOMBRE: { titulo: 'Proveedor', privado: true }, ID_ESTADO: { titulo: 'Estado', colores: { 'Aprobado': 'bien', 'Muestras pedidas': 'medio', 'En pausa': 'apagado', 'Descartado': 'apagado' } },
         ID_PRIORIDAD: { titulo: 'Prioridad', colores: { 'Alta': 'alto' } }, ID_TIPO: { titulo: 'Tipo' }, ID_REGION: { titulo: 'Estado (India)' }, ID_VIA: { titulo: 'Vía' }, ZONA: { titulo: 'Ciudad / zona' },
@@ -263,7 +263,7 @@
       EDITAR: ['ID_ESTADO', 'ID_PRIORIDAD', 'OJO', 'NOTAS'], _refs: refsDesde('PROVEEDORES') }) },
 
     telas: { modulo: 'listado', titulo: 'Mis telas', perfiles: ['Dueña'], icono: '<path d="M4 5h12a3 3 0 0 1 0 6H8a3 3 0 0 0 0 6h12"/><path d="M4 5v14"/>', config: mezcla(COMUN, {
-      TABLA: 'TELAS', CODIGO: 'ID', NOMBRE: 'COLOR', ORDEN: 'ID',
+      TABLA: 'TELAS', CODIGO: 'ID', NOMBRE: 'COLOR', ORDEN: 'ID', FILAS: ['tela', 'telas'],
       COLUMNAS: ['ENLACE_FOTO', 'ID_DISENO.ID_TECNICA', 'COLOR', 'ID_DISENO.ANCHO', 'ID_DISENO.GSM', 'ID_DISENO.ID_PROVEEDOR', 'PRECIO_TALLER', 'ID_ESTADO'],
       DETALLE: ['ID_DISENO.ID_TECNICA', 'PRECIO_TALLER', 'ID_ESTADO'],
       CAMPOS: {
@@ -288,7 +288,7 @@
       RELACIONADOS: [{ titulo: 'Marcas interesadas', tabla: 'INTERESES', campo: 'ID_TELA', con: 'ID', seccion: 'clientes', clave: 'ID_MARCA', columnas: ['ID_MARCA'], nombre: 'ID_MARCA', campos: { ID_MARCA: { titulo: 'Marca' } } }],
       VISTAS: [
         { id: 'CATALOGO', titulo: 'Mi catálogo', filtro: [{ campo: 'ID_ESTADO', no: ['Descartada'] }] },
-        { id: 'ENSENAR', titulo: 'Para enseñar', cliente: true, filtro: [{ campo: 'ID_ESTADO', no: ['Descartada'] }],
+        { id: 'ENSENAR', titulo: 'Para enseñar', texto: '', cliente: true, filtro: [{ campo: 'ID_ESTADO', no: ['Descartada'] }],
           columnas: ['ENLACE_FOTO', 'ID_DISENO.ID_TECNICA', 'COLOR', 'ID_DISENO.ANCHO', 'ID_DISENO.GSM', 'ID_DISENO.MARTINDALE', 'PRECIO_TALLER'] },
         { id: 'MUESTRAS', titulo: 'Muestras', filtro: [{ campo: 'ID_ESTADO', es: ['Muestra pedida', 'Muestra recibida'] }] },
         { id: 'TODAS', titulo: 'Todas', agrupar: 'ID_DISENO.ID_TECNICA' }
@@ -305,11 +305,11 @@
   var SEG = SECCIONES.seguimiento.config, MAR = SECCIONES.clientes.config;
   SECCIONES = {
     hoy: { modulo: 'listado', titulo: 'Hoy', icono: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
-      config: mezcla(SEG, { TEXTO: 'Lo que tienes por hacer: lo retrasado, lo de hoy y lo de los próximos días.', VISTAS: SEG.VISTAS.filter(function (v) { return v.id === 'HOY'; }), _refs: refsDesde('SEGUIMIENTO') }) },
+      config: mezcla(SEG, { TEXTO: 'Lo que tienes por hacer.', VISTAS: SEG.VISTAS.filter(function (v) { return v.id === 'HOY'; }), _refs: refsDesde('SEGUIMIENTO') }) },
     seguimiento: SECCIONES.seguimiento,
     clientes: SECCIONES.clientes,
     prospeccion: { modulo: 'listado', titulo: 'Prospección', icono: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5M11 8v6M8 11h6"/>',
-      config: mezcla(MAR, { TEXTO: 'Marcas, tiendas y editores a los que escribir o que ya has contactado.', VACIO: 'No hay marcas en prospección.',
+      config: mezcla(MAR, { TEXTO: 'Marcas, tiendas y editores a los que escribir o que ya has contactado.', FILAS: ['marca', 'marcas'], VACIO: 'No hay marcas en prospección.',
         VISTAS: MAR.VISTAS.filter(function (v) { return v.id === 'PROSPECCION' || v.id === 'TODAS'; }), _refs: refsDesde('MARCAS') }) },
     proveedores: SECCIONES.proveedores,
     telas: SECCIONES.telas

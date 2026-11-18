@@ -2106,7 +2106,15 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .u-tabla td.li-td-cod { width: 1%; white-space: nowrap; }
 .u .u-tabla td.li-td-corta { white-space: nowrap; }
 .u .li-ficha-cab h2 .li-cod { font-size: 14px; vertical-align: 3px; }
-.u .li-claude { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e3); margin-top: calc(var(--e2) * -1); }
+.u .li-claude { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e3); padding-top: var(--e3); border-top: 1px solid var(--color-linea); }
+/* T0630 · En la ficha, lo vacío de un apartado, junto en una línea («Sin rellenar: Formato · Notas»); lo que se edita se abre al tocarlo. */
+.u .li-vacios { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e1) var(--e2); margin: 0; font-size: 14px; color: var(--color-suave); }
+.u .li-vacios .u-etiqueta { color: var(--color-suave); margin-right: var(--e1); }
+.u .li-vacios .li-vacio:not(:last-child)::after { content: ' ·'; }
+.u .li-rellenar { min-height: 32px; padding: 0 var(--e2); border: 1px dashed var(--color-linea); border-radius: var(--radio-peq); background: none;
+  color: var(--color-principal-oscuro); font: 400 14px/1 var(--fuente-texto); cursor: pointer; }
+.u .li-rellenar::before { content: '+ '; }
+.u .li-rellenar:hover, .u .li-rellenar:focus-visible { border-style: solid; background: var(--color-superficie); }
 .u .li-claude .u-btn { min-height: 36px; font-size: 14px; padding: 0 var(--e3); }
 .u .li-volver { align-self: flex-start; padding-left: 0; text-decoration: none; margin-bottom: calc(var(--e3) * -1); }
 .u a.li-rel-f { text-decoration: none; }
