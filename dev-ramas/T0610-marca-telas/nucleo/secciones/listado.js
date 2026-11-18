@@ -576,7 +576,20 @@
     return /^(https?:|data:image\/)/i.test(v) ? v : '';
   }
 
-  var CALC = { imagen: imagen, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, cumple: cumple, calcular: calcular, usa: usa,
+  /** T0610 · El ancho de cada columna de la tabla (en %, suman 100), por su tipo y no por lo que lleva: así las tablas de
+   *  todos los grupos de una vista (Con la fecha pasada, Hoy, Próximos 7 días…) tienen las columnas a la misma altura. */
+  var PESO = { fecha: 15, estado: 13, sino: 7, numero: 9, importe: 10, porcentaje: 8, foto: 9, nota: 24, email: 16, telefono: 12, enlace: 12 };
+  function anchos(ap, cols) {
+    var p = cols.map(function (c) {
+      if (c === ap.codigo) return 8;
+      if (c === ap.nombre) return 32;
+      return PESO[campo(ap, c).tipo] || 14;
+    });
+    var total = p.reduce(function (x, y) { return x + y; }, 0) || 1;
+    return p.map(function (x) { return Math.round(x * 1000 / total) / 10; });
+  }
+
+  var CALC = { imagen: imagen, anchos: anchos, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, mover: mover, paraClaude: paraClaude,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
@@ -723,7 +736,9 @@
         var cab = g.titulo ? '<h2 class="n-grupo">' + texto(g.titulo) + ' <span class="u-cifra">' + g.filas.length + '</span></h2>' : '';
         var num = function (cp) { return /importe|numero|porcentaje/.test(cp.tipo); };
         // Ordenador: tabla (con el código delante del nombre). Móvil: una tarjeta por fila.
-        var tabla = '<div class="u-solo-ancho li-tabla"><table class="u-tabla"><thead><tr>' + conCod.map(function (c) {
+        // T0610: anchos fijos por tipo de columna, iguales en todos los grupos (las columnas no bailan de un grupo a otro).
+        var tabla = '<div class="u-solo-ancho li-tabla"><table class="u-tabla li-fija" style="min-width:' + (conCod.length * 110) + 'px"><colgroup>' +
+          anchos(a, conCod).map(function (w) { return '<col style="width:' + w + '%">'; }).join('') + '</colgroup><thead><tr>' + conCod.map(function (c) {
           var cp = campo(a, c); return '<th' + (num(cp) ? ' class="num"' : '') + '>' + texto(cp.titulo) + '</th>';
         }).join('') + '</tr></thead><tbody>' + g.filas.map(function (f) {
           var avs = cli ? [] : avisosDe(a, f, hoy);

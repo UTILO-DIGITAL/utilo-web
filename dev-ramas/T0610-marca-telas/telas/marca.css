@@ -28,12 +28,12 @@
   --color-pendiente: #7A5A1C;        /* ocre · vence esta semana */
   --color-pendiente-fondo: #FAF3E3;
 
-  /* Menú del ordenador, claro: lino oscuro con letra tinta y una línea a la derecha; la sección abierta, en oliva claro */
-  --color-menu: #ECE6DB;
-  --color-sobre-menu: #2F2A25;
-  --color-linea-menu: #D9D1C3;
-  --color-menu-elegido: #E2E6D6;
-  --color-sobre-menu-elegido: #3F4A2E;
+  /* Menú del ordenador, macizo para que se distinga del contenido (Javi, al revisar T0610: el claro se perdía):
+     oliva oscuro con letra papel; la sección abierta, en arena con letra tinta */
+  --color-menu: #3F4A2E;
+  --color-sobre-menu: #FFFDF9;
+  --color-menu-elegido: #D9C3A0;
+  --color-sobre-menu-elegido: #2F2A25;
 
   /* Letras: Jost en todo (400 y 500; 600 en etiquetas); Cormorant solo como firma (el nombre de la app) */
   --fuente-titulos: 'Jost', sans-serif;

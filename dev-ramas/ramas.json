@@ -556,12 +556,12 @@
   },
   "T0610-marca-telas": {
    "tarea": "T0610",
-   "titulo": "La app de Marta lleva su marca: lino, tinta, oliva, Jost y Cormorant",
-   "pr": null,
-   "commit": "f676f20",
-   "ultimo": "T0610: La app de Marta lleva su marca: lino, tinta, oliva, Jost y Cormorant",
+   "titulo": "La app de Marta lleva su marca",
+   "pr": 327,
+   "commit": "84a6526",
+   "ultimo": "T0610: Menú de Telas en oliva macizo y tablas de Listado con las columnas alineadas entre grupos",
    "quien": "Javi Canela",
-   "fecha": "2026-11-18T16:49:39.395Z",
+   "fecha": "2026-11-18T17:18:15.927Z",
    "toca": [
     "konamigas",
     "utilo"

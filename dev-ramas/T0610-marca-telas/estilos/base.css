@@ -1981,6 +1981,11 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-grupo .n-grupo { margin-top: var(--e3); }
 .u .li-tabla { overflow-x: auto; border: 1px solid var(--color-linea); border-radius: var(--radio); }
 .u .li-tabla .u-tabla th { position: static; }
+/* T0610: anchos fijos (los pone listado.js en su <colgroup>), para que las columnas caigan igual en cada grupo */
+.u .li-tabla .u-tabla.li-fija { table-layout: fixed; }
+.u .li-tabla .u-tabla.li-fija td, .u .li-tabla .u-tabla.li-fija th { overflow-wrap: anywhere; }
+.u .li-tabla .u-tabla.li-fija th { white-space: normal; }
+.u .li-tabla .u-tabla.li-fija td.li-td-cod { width: auto; }
 .u .li-nada { color: var(--color-suave); }
 .u .li-estado { background: color-mix(in srgb, var(--li-c, var(--color-texto)) 12%, var(--color-superficie)); color: var(--color-texto);
   border: 1px solid color-mix(in srgb, var(--li-c, var(--color-texto)) 45%, var(--color-superficie)); }
