@@ -1,35 +1,49 @@
 /*
- * Marca de Telas en pantalla · PROVISIONAL (T0620)
- * T0620 crea la página de la app de Marta con esta copia tal cual de utilo/marca.css (los colores de Utilo), para que la
- * página cargue entera. T0610 pone aquí los valores de su guía de marca (T0609): lino, tinta, oliva, Jost y Cormorant.
- * Lo de abajo es el texto de utilo/marca.css:
- *
- * Marca de Utilo en pantalla · T0150
- * Variables de la ficha de marca (brand book, apartado 7) y de su ficha de estilo (PROTOCOLO DISEÑO UTILO, apartado 7).
- * Es el único sitio con los colores de Utilo: las vistas solo usan var(--…). Cambiar aquí cambia todas.
+ * Marca de Telas (la app de Marta Canela) en pantalla · T0610
+ * Variables de su guía de marca (T0609, «Guía de marca · App de Marta Canela», apartado 01) y de «Su estilo» de su
+ * ficha de cliente: la plataforma Utilo con la piel de su portfolio Bordados (lino, tinta, oliva y tonos tierra).
+ * Es el único sitio con los colores de Telas: las vistas solo usan var(--…). Cambiar aquí cambia todas.
  * Orden de carga: marca.css → ../estilos/base.css → ../estilos/kanban.css
+ * El contraste de cada texto con su fondo (mínimo 4,5:1) lo comprueba herramientas/probar-marcas.js.
+ * El gris #8A7F72 del PDF no se usa en texto (3,5:1).
  */
-@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Jost:wght@400;500;600&display=swap');
 
 :root {
-  /* Paleta del brand book */
-  --color-fondo: #FFFCF7;            /* marfil · fondo general (60 %) */
-  --color-principal: #0E8A7A;        /* verde azulado · cabeceras y titulares (25 %) */
-  --color-principal-oscuro: #0B6E61; /* verde oscuro · enlaces y texto verde pequeño */
-  --color-accion: #FF5A3C;           /* coral · solo el botón principal y la o del logo */
-  --color-destacado: #FFC845;        /* amarillo sol · subrayado de una cifra clave por pantalla */
-  --color-bloque: #FFE9D2;           /* melocotón · bloques y etiquetas suaves */
-  --color-texto: #1C2B26;            /* verde noche · texto corrido */
-  --color-sobre-principal: #FFFCF7;  /* texto sobre verde azulado: solo grande y en negrita */
-  --color-sobre-accion: #FFFFFF;     /* texto sobre coral: solo grande y en negrita (botones) */
-  --color-superficie: #FFFFFF;       /* tarjetas y campos sobre el marfil */
+  /* Paleta de la guía */
+  --color-fondo: #F5F1E9;            /* lino · fondo general */
+  --color-principal: #2F2A25;        /* tinta · titulares y cabeceras */
+  --color-principal-oscuro: #3F4A2E; /* oliva oscuro · enlaces, etiquetas, contornos y foco */
+  --color-accion: #55613B;           /* oliva · solo el botón principal */
+  --color-destacado: #D9C3A0;        /* arena · subrayado de una cifra clave */
+  --color-bloque: #ECE6DB;           /* lino oscuro · bloques, etiquetas suaves y menú */
+  --color-texto: #2F2A25;            /* tinta · texto corrido */
+  --color-sobre-principal: #FFFDF9;  /* papel sobre la tinta */
+  --color-sobre-accion: #FFFDF9;     /* papel sobre el oliva */
+  --color-superficie: #FFFDF9;       /* papel · paneles, tablas y campos */
 
-  /* Letras */
-  --fuente-titulos: 'Fredoka', 'Nunito', sans-serif;
-  --fuente-texto: 'Nunito', sans-serif;
-  --peso-titulos: 600;
+  /* Avisos de fecha, en tonos tierra: en la cabecera del grupo y en la fecha, siempre con palabra */
+  --color-vencido: #9A3F28;          /* teja · ya pasó de fecha */
+  --color-vencido-fondo: #FBEEE8;
+  --color-pendiente: #7A5A1C;        /* ocre · vence esta semana */
+  --color-pendiente-fondo: #FAF3E3;
 
-  /* Forma: esquinas redondeadas de 10 px (las del botón del brand book) */
-  --radio: 10px;
-  --radio-peq: 5px;
+  /* Menú del ordenador, macizo para que se distinga del contenido (Javi, al revisar T0610: el claro se perdía):
+     oliva oscuro con letra papel; la sección abierta, en arena con letra tinta */
+  --color-menu: #3F4A2E;
+  --color-sobre-menu: #FFFDF9;
+  --color-menu-elegido: #D9C3A0;
+  --color-sobre-menu-elegido: #2F2A25;
+
+  /* Letras: Jost en todo (400 y 500; 600 en etiquetas); Cormorant solo como firma (el nombre de la app) */
+  --fuente-titulos: 'Jost', sans-serif;
+  --fuente-texto: 'Jost', sans-serif;
+  --peso-titulos: 500;
+  --fuente-marca: 'Cormorant Garamond', 'Jost', serif;
+  --peso-marca: 500;
+  --fuente-destacar: 'Cormorant Garamond', 'Jost', serif;
+
+  /* Forma: esquinas de 4 px (2 px en chips y casillas) */
+  --radio: 4px;
+  --radio-peq: 2px;
 }

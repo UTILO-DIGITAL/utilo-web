@@ -576,7 +576,22 @@
     return /^(https?:|data:image\/)/i.test(v) ? v : '';
   }
 
-  var CALC = { imagen: imagen, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, cumple: cumple, calcular: calcular, usa: usa,
+  /** T0610 · Los avisos de una fila sin el que ya dice el título de su grupo: en «Con la fecha pasada», cada fila no repite
+   *  «Con la fecha pasada» (la franja de color de la fila sigue). Sin grupo, todos. */
+  function sinRepetir(avs, tituloGrupo) {
+    var t = String(tituloGrupo || '').trim().toLowerCase();
+    return t ? avs.filter(function (x) { return String(x.titulo || '').trim().toLowerCase() !== t; }) : avs;
+  }
+
+  /** T0610 · La columna que ya dicen los títulos de los grupos (agrupar por FASE: cada grupo es una fase), que en la tabla
+   *  y en las tarjetas sobra; '' si no hay (sin agrupar, o por plazo de una fecha: la fecha exacta sí dice algo). */
+  function columnaDelGrupo(vista) {
+    var g = vista && vista.agrupar;
+    if (!g || g.por === 'plazo') return '';
+    return String(g.campo || g);
+  }
+
+  var CALC = { imagen: imagen, sinRepetir: sinRepetir, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, mover: mover, paraClaude: paraClaude,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
@@ -696,7 +711,7 @@
         if (!todas.length) html += '<p class="u-vacio">' + texto(a.vacio || 'Todavía no hay nada en ' + (a.titulo || '').toLowerCase() + '.') + '</p>';
         else if (!fs.length) html += '<p class="u-vacio">' + (S.q ? 'Nada con «' + texto(S.q) + '».' : 'Nada en esta vista.') + '</p>';
         else if (vista.tablero) html += pintarTablero(a, vista, fs, hoy);
-        else html += agrupar(a, vista, fs, hoy).map(function (g) { return pintarGrupo(a, vista, g, hoy); }).join('');
+        else html += pintarGrupos(a, vista, agrupar(a, vista, fs, hoy), hoy);
         // Si no ha cambiado nada (un refresco por detrás con lo mismo), no se rehace: un toque a medias en una fila no se pierde.
         if (html === pintado) return;
         pintado = html;
@@ -704,37 +719,50 @@
         cont.innerHTML = html;
         if (foco !== null) { var q = cont.querySelector('#li-q'); q.focus(); try { q.setSelectionRange(foco, foco); } catch (e) {} }
       }
-      function tarjeta(a, f, det, cli, hoy, arrastrar) {
-        var avs = cli ? [] : avisosDe(a, f, hoy);
+      function tarjeta(a, f, det, cli, hoy, arrastrar, tituloGrupo) {
+        var avs = cli ? [] : avisosDe(a, f, hoy), mar = sinRepetir(avs, tituloGrupo);
         // T0601: en la tarjeta, lo vacío no sale (una prospección sin estado ni nota no enseña «— —»).
         var dets = det.map(function (x) { return celda(a, x, f, false, cli); }).filter(function (h) { return h.indexOf('class="li-nada"') < 0; });
         return '<li><button type="button" class="li-tarjeta' + (avs.length ? ' li-f-' + texto(avs[0].nivel || 'medio') : '') + '" data-id="' + texto(f[a.clave]) + '"' + (arrastrar ? ' data-mover' : '') + '>' +
           '<strong>' + titulo2(a, f, cli) + '</strong>' +
           (dets.length ? '<span class="li-det">' + dets.map(function (h) { return '<span>' + h + '</span>'; }).join('') + '</span>' : '') +
-          (avs.length ? '<span class="li-marcas">' + marcas(avs) + '</span>' : '') + '</button></li>';
+          (mar.length ? '<span class="li-marcas">' + marcas(mar) + '</span>' : '') + '</button></li>';
       }
-      function pintarGrupo(a, vista, g, hoy) {
+      /** T0610 · Los grupos de una vista. En el ordenador, UNA tabla: la cabecera una vez y cada grupo como una fila con su
+       *  título, así las columnas caen igual en todos y se ajustan a lo que llevan. En el móvil, una lista de tarjetas por grupo. */
+      function pintarGrupos(a, vista, gs, hoy) {
         // En una vista para clientes no salen los avisos (son para quien trabaja) y un precio que falta es «a consultar».
         var cli = !!vista.cliente, fuera = ocultas(a, vista), nom = a.nombre;
+        // La columna por la que se agrupa ya la dice el título de cada grupo: no se repite en cada fila (salvo que sea el nombre).
+        var delGrupo = columnaDelGrupo(vista);
+        if (delGrupo && delGrupo !== nom && gs.length > 1) fuera = fuera.concat([delGrupo]);
         var cols = columnasDe(a, vista).filter(function (c) { return fuera.indexOf(c) < 0 && c !== a.codigo; });
         // En la tabla, el código va en su columna, la primera (en las tarjetas, delante del nombre).
         var conCod = a.codigo && a.codigo !== nom ? [a.codigo].concat(cols) : cols;
         var det = (a.detalle.length ? a.detalle : cols.filter(function (c) { return c !== nom; }).slice(0, 2)).filter(function (c) { return fuera.indexOf(c) < 0 && c !== nom && (!cli || cols.indexOf(c) >= 0); });
-        var cab = g.titulo ? '<h2 class="n-grupo">' + texto(g.titulo) + ' <span class="u-cifra">' + g.filas.length + '</span></h2>' : '';
         var num = function (cp) { return /importe|numero|porcentaje/.test(cp.tipo); };
-        // Ordenador: tabla (con el código delante del nombre). Móvil: una tarjeta por fila.
-        var tabla = '<div class="u-solo-ancho li-tabla"><table class="u-tabla"><thead><tr>' + conCod.map(function (c) {
-          var cp = campo(a, c); return '<th' + (num(cp) ? ' class="num"' : '') + '>' + texto(cp.titulo) + '</th>';
-        }).join('') + '</tr></thead><tbody>' + g.filas.map(function (f) {
-          var avs = cli ? [] : avisosDe(a, f, hoy);
+        var cabG = function (g) { return '<h2 class="n-grupo">' + texto(g.titulo) + ' <span class="u-cifra">' + g.filas.length + '</span></h2>'; };
+        var fila = function (f, g) {
+          var avs = cli ? [] : avisosDe(a, f, hoy), mar = sinRepetir(avs, g.titulo);
           return '<tr tabindex="0" data-id="' + texto(f[a.clave]) + '"' + (avs.length ? ' class="li-con-aviso li-f-' + texto(avs[0].nivel || 'medio') + '"' : '') + '>' + conCod.map(function (c) {
             var cp = campo(a, c), principal = c === nom;
-            return '<td class="' + (num(cp) ? 'num' : '') + (principal ? ' u-tabla-t' : '') + (c === a.codigo ? ' li-td-cod' : '') + '">' + celda(a, c, f, false, cli) +
-              (principal && avs.length ? '<div class="li-marcas">' + marcas(avs) + '</div>' : '') + '</td>';
+            // Fechas, cifras, estados y lo corto no se parten («273 / g/m²», «hace 9 / días»): lo que se estrecha es el texto largo.
+            var h = celda(a, c, f, false, cli), corta = !principal && (num(cp) || /^(fecha|estado|sino)$/.test(cp.tipo) || h.replace(/<[^>]*>/g, '').length <= 14);
+            return '<td class="' + (num(cp) ? 'num' : '') + (corta ? ' li-td-corta' : '') + (principal ? ' u-tabla-t' : '') + (c === a.codigo ? ' li-td-cod' : '') + '">' + h +
+              (principal && mar.length ? '<div class="li-marcas">' + marcas(mar) + '</div>' : '') + '</td>';
           }).join('') + '</tr>';
-        }).join('') + '</tbody></table></div>';
-        var tarjetas = '<ul class="u-solo-movil li-tarjetas">' + g.filas.map(function (f) { return tarjeta(a, f, det, cli, hoy, false); }).join('') + '</ul>';
-        return '<section class="li-grupo">' + cab + tabla + tarjetas + '</section>';
+        };
+        var tabla = '<div class="u-solo-ancho li-tabla"><table class="u-tabla"><thead><tr>' + conCod.map(function (c) {
+          var cp = campo(a, c); return '<th scope="col"' + (num(cp) ? ' class="num"' : '') + '>' + texto(cp.titulo) + '</th>';
+        }).join('') + '</tr></thead>' + gs.map(function (g) {
+          return '<tbody>' + (g.titulo ? '<tr class="li-g-cab"><th scope="colgroup" colspan="' + conCod.length + '">' + cabG(g) + '</th></tr>' : '') +
+            g.filas.map(function (f) { return fila(f, g); }).join('') + '</tbody>';
+        }).join('') + '</table></div>';
+        var tarjetas = '<div class="u-solo-movil">' + gs.map(function (g) {
+          return '<section class="li-grupo">' + (g.titulo ? cabG(g) : '') + '<ul class="li-tarjetas">' +
+            g.filas.map(function (f) { return tarjeta(a, f, det, cli, hoy, false, g.titulo); }).join('') + '</ul></section>';
+        }).join('') + '</div>';
+        return tabla + tarjetas;
       }
       /** Tablero: una columna por valor, con sus tarjetas; se arrastra de una a otra si ese campo se edita (y no es para clientes). */
       function pintarTablero(a, vista, fs, hoy) {
