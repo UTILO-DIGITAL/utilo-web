@@ -558,10 +558,10 @@
    "tarea": "T0629",
    "titulo": "En el móvil, la barra de abajo lleva como mucho 5 secciones y «Más» con las demás",
    "pr": 331,
-   "commit": "ee20b05",
-   "ultimo": "T0629: En el móvil, la barra de abajo lleva como mucho 5 secciones y «Más» con las demás",
+   "commit": "930e066",
+   "ultimo": "T0629: El ejemplo de Telas de DEV, con Hoy y Prospección como la app de Marta (la barra con «Más»)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-18T19:46:36.989Z",
+   "fecha": "2026-11-18T19:48:22.067Z",
    "toca": [
     "konamigas",
     "utilo"

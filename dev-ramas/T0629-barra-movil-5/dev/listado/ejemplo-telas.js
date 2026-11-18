@@ -299,6 +299,21 @@
       ],
       EDITAR: ['ID_ESTADO', 'MUESTRA_EN_MANO', 'NOTAS'], _refs: refsDesde('TELAS') }) }
   };
+  // T0629: como la app de Marta, con Hoy y Prospección (sobre las mismas tablas) y en su orden. Con Perfil, la dueña y quien
+  // administra tienen 7 en el menú (en el móvil, 4 abajo y «Más»); la ayudante, Hoy, Seguimiento, Clientes, Prospección y
+  // Perfil: 5 justas, la barra sin «Más».
+  var SEG = SECCIONES.seguimiento.config, MAR = SECCIONES.clientes.config;
+  SECCIONES = {
+    hoy: { modulo: 'listado', titulo: 'Hoy', icono: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+      config: mezcla(SEG, { TEXTO: 'Lo que tienes por hacer: lo retrasado, lo de hoy y lo de los próximos días.', VISTAS: SEG.VISTAS.filter(function (v) { return v.id === 'HOY'; }), _refs: refsDesde('SEGUIMIENTO') }) },
+    seguimiento: SECCIONES.seguimiento,
+    clientes: SECCIONES.clientes,
+    prospeccion: { modulo: 'listado', titulo: 'Prospección', icono: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5M11 8v6M8 11h6"/>',
+      config: mezcla(MAR, { TEXTO: 'Marcas, tiendas y editores a los que escribir o que ya has contactado.', VACIO: 'No hay marcas en prospección.',
+        VISTAS: MAR.VISTAS.filter(function (v) { return v.id === 'PROSPECCION' || v.id === 'TODAS'; }), _refs: refsDesde('MARCAS') }) },
+    proveedores: SECCIONES.proveedores,
+    telas: SECCIONES.telas
+  };
   // Las tablas de lo relacionado y de los «de», con sus referencias (como montar.js: lo que se lee, dos saltos).
   Object.keys(SECCIONES).forEach(function (n) {
     var c = SECCIONES[n].config;
