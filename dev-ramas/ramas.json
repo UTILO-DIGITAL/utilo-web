@@ -558,10 +558,10 @@
    "tarea": "T0617",
    "titulo": "Al aprobar una tarea ya publicada, pasa a Entregada en un par de minutos",
    "pr": 325,
-   "commit": "8e7e4bf",
-   "ultimo": "T0617: Sin PR no se lanza «Por publicar» (entregar.js no la mira)",
+   "commit": "c263945",
+   "ultimo": "Merge remote-tracking branch 'origin/main' into T0617-entregar-al-aprobar",
    "quien": "Javi Canela",
-   "fecha": "2026-11-18T12:14:53.756Z",
+   "fecha": "2026-11-18T12:24:08.564Z",
    "toca": [
     "utilo"
    ],
