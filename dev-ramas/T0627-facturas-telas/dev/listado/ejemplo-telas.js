@@ -134,7 +134,7 @@
   var TELAS = tabla(['ID', 'ID_DISENO', 'COLOR', 'REF_PROVEEDOR', 'ID_ESTADO', 'MUESTRA_EN_MANO', 'ENLACE_FOTO', 'ENLACE_ETIQUETA', 'NOTAS', 'SIMULAR'], [
     { ID: 'BP-001-01', ID_DISENO: 'BP-001', COLOR: 'Índigo', REF_PROVEEDOR: 'JHB-221', ID_ESTADO: es('Propuesta a marca'), MUESTRA_EN_MANO: 'Sí', ENLACE_FOTO: muestra('flores', '#25406b', '#e9e2cf') },
     { ID: 'BP-001-02', ID_DISENO: 'BP-001', COLOR: 'Verde salvia', REF_PROVEEDOR: 'JHB-222', ID_ESTADO: es('Muestra pedida'), ENLACE_FOTO: muestra('flores', '#8aa58c', '#f5f1e8') },
-    { ID: 'BP-004-01', ID_DISENO: 'BP-004', COLOR: 'Terracota', REF_PROVEEDOR: 'JHB-240', ID_ESTADO: es('Muestra pedida'), ENLACE_FOTO: muestra('puntos', '#b65a3a', '#f3e6d6') },
+    { ID: 'BP-004-01', ID_DISENO: 'BP-004', COLOR: 'Terracota', REF_PROVEEDOR: 'JHB-240', ID_ESTADO: es('Muestra pedida'), ENLACE_FOTO: 'https://drive.google.com/file/d/1EjemploDeFotoSinCompartir00/view' }, // T0633: una de Drive que no se puede ver
     { ID: 'FL-011-01', ID_DISENO: 'FL-011', COLOR: 'Rosa empolvado', ID_ESTADO: es('Descartada'), ENLACE_FOTO: muestra('flores', '#e4b9b0', '#8c4a52'), NOTAS: 'A ninguna marca le ha gustado.' },
     { ID: 'IK-002-01', ID_DISENO: 'IK-002', COLOR: 'Mostaza y crudo', REF_PROVEEDOR: 'VL-IK9', ID_ESTADO: es('Candidata'), ENLACE_FOTO: muestra('cuadros', '#d4a73a', '#f6efe0') },
     { ID: 'LI-010-01', ID_DISENO: 'LI-010', COLOR: 'Lino natural', ID_ESTADO: es('Candidata'), ENLACE_FOTO: muestra('liso', '#d8ccb4', '#8f8166'), NOTAS: 'Sin precio todavía: el proveedor no ha contestado.' },
@@ -298,6 +298,21 @@
         { id: 'SIN_FOTO', titulo: 'Sin foto', nivel: 'info', si: [{ campo: 'ENLACE_FOTO', vacio: true }, { campo: 'ID_ESTADO', no: ['Descartada'] }] }
       ],
       EDITAR: ['ID_ESTADO', 'MUESTRA_EN_MANO', 'NOTAS'], _refs: refsDesde('TELAS') }) }
+  };
+  // T0629: como la app de Marta, con Hoy y Prospección (sobre las mismas tablas) y en su orden. Con Perfil, la dueña y quien
+  // administra tienen 7 en el menú (en el móvil, 4 abajo y «Más»); la ayudante, Hoy, Seguimiento, Clientes, Prospección y
+  // Perfil: 5 justas, la barra sin «Más».
+  var SEG = SECCIONES.seguimiento.config, MAR = SECCIONES.clientes.config;
+  SECCIONES = {
+    hoy: { modulo: 'listado', titulo: 'Hoy', icono: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+      config: mezcla(SEG, { TEXTO: 'Lo que tienes por hacer: lo retrasado, lo de hoy y lo de los próximos días.', VISTAS: SEG.VISTAS.filter(function (v) { return v.id === 'HOY'; }), _refs: refsDesde('SEGUIMIENTO') }) },
+    seguimiento: SECCIONES.seguimiento,
+    clientes: SECCIONES.clientes,
+    prospeccion: { modulo: 'listado', titulo: 'Prospección', icono: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5M11 8v6M8 11h6"/>',
+      config: mezcla(MAR, { TEXTO: 'Marcas, tiendas y editores a los que escribir o que ya has contactado.', VACIO: 'No hay marcas en prospección.',
+        VISTAS: MAR.VISTAS.filter(function (v) { return v.id === 'PROSPECCION' || v.id === 'TODAS'; }), _refs: refsDesde('MARCAS') }) },
+    proveedores: SECCIONES.proveedores,
+    telas: SECCIONES.telas
   };
   // Las tablas de lo relacionado y de los «de», con sus referencias (como montar.js: lo que se lee, dos saltos).
   Object.keys(SECCIONES).forEach(function (n) {

@@ -1000,19 +1000,21 @@
         var datosCli = LINEAS && d.colsCtr.indexOf('NIF') >= 0 && d.colsCtr.indexOf('DIRECCION') >= 0;
         var pdf = LINEAS && !!String(cfg.FACTURA_CARPETA || '').trim();
         var html = '<h2 id="eco-vt">' + (f ? 'Factura ' + texto(numFac(f)) : movId ? (v.TIPO === 'Emitida' ? 'Hacer la factura' : 'Añadir su factura') : 'Añadir factura') + '</h2>' +
-          (f ? '<p>' + enlaceDrive(f) + '</p>' : '') +
+          // T0627: en una emitida por líneas, arriba, su PDF guardado (el que se manda al cliente) o que aún no tiene.
+          (f && LINEAS && f.TIPO === 'Emitida' ? '<p>' + (f.ARCHIVO_URL ? '<a class="eco-drive" href="' + texto(f.ARCHIVO_URL) + '" target="_blank" rel="noopener" data-fuera>Abrir el PDF ↗</a>' : '<span class="u-nota">Todavía sin PDF' + (pdf ? ': «Guardar y sacar el PDF» lo hace.' : '.') + '</span>') + '</p>'
+            : f ? '<p>' + enlaceDrive(f) + '</p>' : '') +
           (movId ? '<p class="u-nota">Con los datos del movimiento. ' + (v.TIPO === 'Emitida' ? 'La fecha es la de hoy, que es cuando se emite; el número lo pone el Excel al guardarla.' : 'Pon el número que trae la factura.') + ' Al guardarla queda enlazada al movimiento.</p>' : '') +
           '<div class="u-campos">' +
           (f ? '' : campo('Tipo', '<select id="f-TIPO">' + opciones([['Emitida', 'Emitida (la hacemos nosotros)'], ['Recibida', 'Recibida'], ['Ticket', 'Ticket']], v.TIPO) + '</select>')) +
           campo('Número', '<input type="text" id="f-NUMERO" value="' + texto(v.NUMERO) + '" maxlength="40">', 'eco-numero') +
-          (f && f.TIPO === 'Emitida' ? '<p class="u-nota u-ancho">El número de una factura emitida no se cambia: va seguido y sin huecos. Si hay un error, ponla en Anulada y haz otra.</p>' : '') +
+          '<p class="u-nota u-ancho" id="f-num-nota" hidden></p>' +
           campo('Fecha', '<input type="date" id="f-FECHA" value="' + texto(v.FECHA) + '">') +
           campo('<span id="f-ctr-et">' + (v.TIPO === 'Emitida' ? 'Cliente (a quién se la hacemos)' : 'Proveedor (quién nos la hace)') + '</span>', '<select id="f-ID_CONTRAPARTE">' + opciones(d.ctr.map(function (c) { return [c.ID, c.NOMBRE]; }).sort(function (a, b) { return String(a[1]).localeCompare(String(b[1]), 'es'); }), v.ID_CONTRAPARTE, 'Elige') + '</select>') +
           (datosCli ? '<div class="u-campos u-ancho" id="f-cli">' + campo('CIF o NIF del cliente', '<input type="text" id="f-NIF" maxlength="20" autocomplete="off">') +
             campo('Dirección del cliente', '<textarea id="f-DIRECCION" rows="2" placeholder="Calle y número&#10;Código postal y ciudad"></textarea>', 'u-ancho') +
             '<p class="u-nota u-ancho">Salen en su factura. Se guardan en el cliente: la próxima vez ya están.</p></div>' : '') +
-          (LINEAS ? '<div class="u-ancho" id="f-lin"><span class="u-etiqueta">Qué se vende</span>' +
-            '<label class="u-check"><input type="checkbox" id="f-liniva"' + (guardado(CLAVE + 'liniva') === '1' ? ' checked' : '') + '> Precios con IVA incluido</label><div id="f-lineas"></div>' +
+          (LINEAS ? '<div class="u-ancho" id="f-lin"><div class="eco-lin-cab"><span class="u-etiqueta">Qué se vende</span>' +
+            '<label class="u-check"><input type="checkbox" id="f-liniva"' + (guardado(CLAVE + 'liniva') === '1' ? ' checked' : '') + '> Los precios llevan el IVA incluido</label></div><div id="f-lineas"></div>' +
             '<button type="button" class="u-btn u-btn-texto" id="f-mas">+ Añadir línea</button>' +
             '<p class="u-nota" id="f-lin-nota"></p></div>' : '') +
           campo('<span id="f-imp-et">Base imponible</span>', '<input type="text" inputmode="decimal" id="f-BASE" value="' + texto(verImporte(v)) + '" placeholder="0,00">', 'eco-base') +
@@ -1020,13 +1022,13 @@
           casillaIva('f') +
           '<p class="u-nota u-ancho" id="f-total"></p>' +
           campo('Estado', '<select id="f-ESTADO">' + opciones([['Pendiente', 'Pendiente'], ['Pagada', 'Pagada'], ['Anulada', 'Anulada']], v.ESTADO, 'Sin estado') + '</select>') +
-          campo('Enlace en Drive', '<input type="url" id="f-ARCHIVO_URL" value="' + texto(v.ARCHIVO_URL) + '" placeholder="https://drive.google.com/…">', 'u-ancho') +
+          campo('Enlace en Drive', '<input type="url" id="f-ARCHIVO_URL" value="' + texto(v.ARCHIVO_URL) + '" placeholder="https://drive.google.com/…">', 'u-ancho eco-url') +
           '<p class="u-nota u-ancho" id="f-url-nota">El del PDF o la foto de la factura: en Drive, Compartir › Copiar enlace.</p>' +
           campo('Notas', '<textarea id="f-NOTAS" rows="2">' + texto(v.NOTAS) + '</textarea>', 'u-ancho') + '</div>' +
           (f ? '<p class="u-nota">' + (movs.length ? movs.length + (movs.length === 1 ? ' movimiento' : ' movimientos') + ' con esta factura: ' + eur(pagado) + ' de ' + eur(importe(f).total) + '.' : 'Ningún movimiento lleva todavía esta factura.') + '</p>' : '') +
           '<p class="u-error" role="alert" hidden></p><div class="n-botones">' +
           '<button type="button" class="u-btn u-btn-accion" id="f-guardar">Guardar factura</button>' +
-          (LINEAS ? '<button type="button" class="u-btn" id="f-ver" hidden>Ver la factura</button>' : '') +
+          (LINEAS ? '<button type="button" class="u-btn" id="f-ver" hidden title="Cómo queda con lo que hay ahora en pantalla, sin guardar">Vista previa</button>' : '') +
           (pdf && f ? '<button type="button" class="u-btn" id="f-pdf" hidden>Guardar y sacar el PDF</button>' : '') +
           '<button type="button" class="u-btn" data-cerrar>Cancelar</button>' +
           (f && f.ESTADO === 'Pendiente' ? '<button type="button" class="u-btn" id="f-apuntar">' + (f.TIPO === 'Emitida' ? 'Apuntar el cobro' : 'Apuntar el pago') + '</button>' : '') + '</div>';
@@ -1039,7 +1041,7 @@
           /** Una línea en pantalla (l: { ID, CONCEPTO, DETALLE, CANTIDAD, UNIDAD, PRECIO }). */
           function filaLin(l) {
             var n = function (x) { return x === '' || x == null ? '' : String(x).replace('.', ','); };
-            var pv = l.PRECIO === '' || l.PRECIO == null ? '' : linIva() ? conIvaPrecio(l.PRECIO, val('f-TIPO_IVA')) : l.PRECIO;
+            var pv = l.PRECIO === '' || l.PRECIO == null ? '' : verPrecio(l.PRECIO);
             var div = document.createElement('div');
             div.className = 'eco-lin';
             if (l.ID) div.setAttribute('data-id', l.ID);
@@ -1047,17 +1049,34 @@
               '<input type="text" class="eco-lin-d" aria-label="Detalle" placeholder="Detalle (opcional)" value="' + texto(l.DETALLE) + '">' +
               '<input type="text" inputmode="decimal" class="eco-lin-n" aria-label="Cantidad" placeholder="Cant." value="' + texto(n(l.CANTIDAD)) + '">' +
               '<input type="text" class="eco-lin-u" aria-label="Unidad" placeholder="m" maxlength="8" value="' + texto(l.UNIDAD) + '">' +
-              '<input type="text" inputmode="decimal" class="eco-lin-p" aria-label="Precio" placeholder="Precio" value="' + texto(n(pv)) + '">' +
+              '<input type="text" inputmode="decimal" class="eco-lin-p" aria-label="Precio" placeholder="Precio" value="' + texto(n(pv)) + '" data-precio="' + texto(l.PRECIO == null ? '' : l.PRECIO) + '">' +
               '<span class="eco-lin-t u-cifra"></span><button type="button" class="u-btn u-btn-texto eco-lin-x" aria-label="Quitar la línea">Quitar</button>';
             cajaLin.appendChild(div);
+          }
+          /**
+           * T0627 · Cada precio guarda en data-precio el de sin IVA exacto: lo que se escribe se lee según la casilla en ese
+           * momento, y lo que no se toca se queda como estaba (abrir y guardar no cambia ni un céntimo). La casilla y el IVA
+           * solo cambian cómo se enseña.
+           */
+          function verPrecio(sin) { return linIva() ? conIvaPrecio(sin, val('f-TIPO_IVA')) : precio(sin); }
+          function leerPrecio(inp) {
+            var x = String(inp.value).trim();
+            inp.setAttribute('data-precio', x === '' ? '' : String(linIva() ? sinIva(x, val('f-TIPO_IVA')) : precio(x)));
+          }
+          function reverPrecios() {
+            if (!cajaLin) return;
+            Array.prototype.forEach.call(cajaLin.querySelectorAll('.eco-lin-p'), function (inp) {
+              var dp = inp.getAttribute('data-precio');
+              if (dp !== '' && dp != null) inp.value = String(verPrecio(Number(dp))).replace('.', ',');
+            });
           }
           /** Las líneas de la pantalla, como filas de FACTURA_LINEAS (sin las vacías). */
           function lineasAhora() {
             return cajaLin ? Array.prototype.map.call(cajaLin.querySelectorAll('.eco-lin'), function (r) {
               var q = function (c) { return String(r.querySelector(c).value).trim(); };
-              var p = q('.eco-lin-p');
+              var dp = r.querySelector('.eco-lin-p').getAttribute('data-precio');
               return { ID: r.getAttribute('data-id') || '', CONCEPTO: q('.eco-lin-c'), DETALLE: q('.eco-lin-d'), CANTIDAD: q('.eco-lin-n') === '' ? '' : cantidad(q('.eco-lin-n')),
-                UNIDAD: q('.eco-lin-u'), PRECIO: p === '' ? '' : linIva() ? sinIva(p, val('f-TIPO_IVA')) : precio(p) };
+                UNIDAD: q('.eco-lin-u'), PRECIO: dp === '' || dp == null ? '' : Number(dp) };
             }).filter(function (l) { return l.CONCEPTO || l.PRECIO !== ''; }) : [];
           }
           function pintaLineas() {
@@ -1070,7 +1089,7 @@
               r.querySelector('.eco-lin-p').placeholder = linIva() ? 'Con IVA' : 'Sin IVA';
             });
             vent.querySelector('#f-lin-nota').textContent = linIva() ?
-              'Pon cada precio con el IVA incluido, por unidad (metro, pieza…): la factura lo lleva sin IVA, calculado, y el total cuadra con lo que pones.' :
+              'Precio con el IVA incluido, por unidad (metro, pieza…): la factura lo lleva sin IVA, calculado, y el total cuadra con lo que pones.' :
               'Precio sin IVA, por unidad (metro, pieza…). La base de la factura es la suma.';
             var b = vent.querySelector('#f-BASE');
             b.value = (baseLineas(lineasAhora()) / 100).toFixed(2).replace('.', ',');
@@ -1088,7 +1107,11 @@
             // T0627: el número de una emitida lo pone el motor al guardarla y ya no se cambia (correlativo y sin huecos).
             vent.querySelector('#f-ctr-et').textContent = tipo === 'Emitida' ? 'Cliente (a quién se la hacemos)' : 'Proveedor (quién nos la hace)';
             var n = vent.querySelector('#f-NUMERO');
-            n.disabled = tipo === 'Emitida'; if (em) n.value = ''; n.placeholder = em ? 'Se numera sola al guardar (' + String(cfg.SERIE_EMITIDAS || '') + '…)' : '';
+            // Bloqueado se ve como texto, sin caja (no parece que se pueda escribir), con su porqué debajo.
+            n.disabled = tipo === 'Emitida'; if (em) n.value = ''; n.placeholder = em ? 'Se pone sola al guardar' : '';
+            var nn = vent.querySelector('#f-num-nota');
+            nn.hidden = tipo !== 'Emitida';
+            nn.textContent = em ? 'La siguiente de la serie ' + String(cfg.SERIE_EMITIDAS || '') + ', seguida y sin huecos.' : 'No se cambia: si hay un error, ponla en Anulada y haz otra.';
             if (LINEAS) {
               vent.querySelector('#f-lin').hidden = !lin;
               var ci = vent.querySelector('#f-coniva');
@@ -1099,27 +1122,35 @@
               if (lin) { if (!cajaLin.children.length) filaLin({ CANTIDAD: '', UNIDAD: 'm' }); pintaLineas(); }
               var bv = vent.querySelector('#f-ver'); if (bv) bv.hidden = !lin;
               var bp = vent.querySelector('#f-pdf'); if (bp) bp.hidden = !lin;
-              if (pdf) vent.querySelector('#f-url-nota').textContent = lin ? 'Con «Guardar y sacar el PDF» se guarda en Drive y se enlaza solo.' : 'El del PDF o la foto de la factura: en Drive, Compartir › Copiar enlace.';
+              // Por líneas, el enlace al PDF lo pone la app: no se enseña el campo (sale arriba, «Abrir el PDF»).
+              vent.querySelector('.eco-url').hidden = lin && pdf;
+              vent.querySelector('#f-url-nota').hidden = lin && pdf;
             }
             pintaImporte('f', 'Base imponible');
           }
           if (cajaLin) {
             lin0.forEach(filaLin);
             if (!lin0.length && f && f.TIPO === 'Emitida' && cts(f.BASE)) filaLin({ CONCEPTO: '', CANTIDAD: 1, PRECIO: f.BASE }); // una de antes, sin líneas
-            cajaLin.addEventListener('input', function () { pintaLineas(); pintaImporte('f', 'Base imponible'); });
+            cajaLin.addEventListener('input', function (e) { if (e.target.classList.contains('eco-lin-p')) leerPrecio(e.target); pintaLineas(); pintaImporte('f', 'Base imponible'); });
             cajaLin.addEventListener('click', function (e) {
               var x = e.target.closest('.eco-lin-x'); if (!x) return;
               x.closest('.eco-lin').remove();
               if (!cajaLin.children.length) filaLin({ CANTIDAD: '', UNIDAD: 'm' });
               pintaLineas(); pintaImporte('f', 'Base imponible');
             });
-            // La casilla cambia cómo se leen los precios escritos (no los convierte): se marca y se escriben como se saben.
-            vent.querySelector('#f-liniva').addEventListener('change', function (e) { guardado(CLAVE + 'liniva', e.target.checked ? '1' : ''); pintaLineas(); pintaImporte('f', 'Base imponible'); });
+            // La casilla cambia cómo se enseñan los precios (27,50 sin IVA ↔ 33,28 con IVA), sin cambiar la factura.
+            vent.querySelector('#f-liniva').addEventListener('change', function (e) { guardado(CLAVE + 'liniva', e.target.checked ? '1' : ''); reverPrecios(); pintaLineas(); pintaImporte('f', 'Base imponible'); });
             vent.querySelector('#f-mas').onclick = function () { filaLin({ CANTIDAD: '', UNIDAD: 'm' }); var u = cajaLin.lastChild.querySelector('.eco-lin-c'); if (u) u.focus(); };
           }
           refrescar();
           pintaCliente();
           ['f-TIPO', 'f-TIPO_IVA'].forEach(function (id) { var e = vent.querySelector('#' + id); if (e) e.addEventListener('change', function () { refrescar(); pintaCliente(); }); });
+          // Con los precios con IVA, cambiar el tipo de IVA deja lo escrito (lo que cobra) y cambia el sin IVA.
+          vent.querySelector('#f-TIPO_IVA').addEventListener('change', function () {
+            if (!cajaLin || !linIva()) return;
+            Array.prototype.forEach.call(cajaLin.querySelectorAll('.eco-lin-p'), leerPrecio);
+            pintaLineas(); pintaImporte('f', 'Base imponible');
+          });
           vent.querySelector('#f-ID_CONTRAPARTE').addEventListener('change', pintaCliente);
           vent.querySelector('#f-BASE').addEventListener('input', refrescar);
           oirImporte('f', refrescar);

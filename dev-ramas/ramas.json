@@ -558,10 +558,10 @@
    "tarea": "T0627",
    "titulo": "Marta hace sus facturas desde la app: por líneas, con su documento y su PDF",
    "pr": 333,
-   "commit": "9d08511",
-   "ultimo": "T0627: Los precios de las líneas se pueden escribir con el IVA incluido",
+   "commit": "bda7eab",
+   "ultimo": "Merge origin/main en T0627-facturas-telas (base.css a la 98)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-18T20:39:03.386Z",
+   "fecha": "2026-11-18T21:14:13.161Z",
    "toca": [
     "konamigas",
     "utilo"
