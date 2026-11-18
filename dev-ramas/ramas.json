@@ -558,10 +558,10 @@
    "tarea": "T0617",
    "titulo": "Al aprobar una tarea ya publicada, pasa a Entregada en un par de minutos",
    "pr": 325,
-   "commit": "67e291e",
-   "ultimo": "T0617: Al aprobar lo que ya está publicado, pasa a Entregada en un par de minutos",
+   "commit": "8e7e4bf",
+   "ultimo": "T0617: Sin PR no se lanza «Por publicar» (entregar.js no la mira)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-18T12:03:25.636Z",
+   "fecha": "2026-11-18T12:14:53.756Z",
    "toca": [
     "utilo"
    ],
