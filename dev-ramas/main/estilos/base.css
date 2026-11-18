@@ -203,6 +203,29 @@ body.u { margin: 0; background: var(--color-fondo); color: var(--color-texto);
 .sx.u-sx a[data-sx=BANDEJA] { position: relative; }
 .sx.u-sx a .bj-n { position: absolute; top: 4px; left: calc(50% + 6px); min-width: 18px; margin: 0; padding: 0 5px; font-size: 11px; line-height: 18px; }
 body.u-con-barra { padding-bottom: calc(var(--alto-barra) + var(--e1) + env(safe-area-inset-bottom, 0px)) !important; }
+/* T0629: en el móvil, como mucho 5 botones abajo. Con más secciones, «Más» (.sx-mas) abre las demás (.sx-resto) en una lista
+   encima de la barra; marcado (.sx-dentro) si la sección abierta está dentro. Los nombres van en una línea. */
+@media (max-width: 899px) {
+  .sx.u-sx a, .sx.u-sx .sx-mas { min-width: 0; }
+  .sx.u-sx a > span, .sx.u-sx .sx-mas > span:not(.bj-n) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sx.u-sx .sx-mas { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; position: relative;
+    min-height: 56px; padding: var(--e1) 2px; border: 0; border-top: 3px solid transparent; background: transparent; color: var(--color-suave);
+    font: 700 12px/1.2 var(--fuente-texto); cursor: pointer; }
+  .sx.u-sx .sx-mas.sx-dentro, .sx.u-sx .sx-mas[aria-expanded=true] { color: var(--color-principal-oscuro); }
+  .sx.u-sx .sx-mas.sx-dentro { border-top-color: var(--color-principal); }
+  .sx.u-sx .sx-mas:focus-visible { outline: 3px solid var(--color-principal-oscuro); outline-offset: -3px; }
+  .sx.u-sx .sx-mas svg { fill: currentColor; stroke: none; }
+  .sx.u-sx .sx-mas .bj-n { position: absolute; top: 4px; left: calc(50% + 6px); min-width: 18px; margin: 0; padding: 0 5px; font-size: 11px; line-height: 18px; }
+  .sx.u-sx .sx-resto { display: none; position: absolute; left: 0; right: 0; bottom: 100%; max-height: calc(100vh - var(--alto-barra) - 96px); overflow-y: auto;
+    padding: var(--e2) env(safe-area-inset-right, 0px) var(--e2) env(safe-area-inset-left, 0px); background: var(--color-fondo);
+    border-top: 1px solid var(--color-linea); box-shadow: 0 -8px 24px rgba(0, 0, 0, .12); }
+  .sx.u-sx.sx-abierto .sx-resto { display: block; }
+  .sx.u-sx .sx-resto a { flex-direction: row; justify-content: flex-start; gap: var(--e3); max-width: 640px; min-height: 48px; margin: 0 auto;
+    padding: 0 var(--e4); border-top: 0; border-left: 3px solid transparent; font-size: 15px; color: var(--color-texto); }
+  .sx.u-sx .sx-resto a[aria-current=page] { color: var(--color-principal-oscuro); border-left-color: var(--color-principal); background: var(--color-bloque); }
+  .sx.u-sx .sx-resto a .bj-n { position: static; margin-left: auto; }
+}
+@media (min-width: 900px) { .sx.u-sx .sx-resto { display: contents; } .sx.u-sx .sx-mas { display: none; } }
 /* T0224: en el móvil la página (html) no se mueve y el scroll lo hace el body. Así iOS no desplaza la barra fija con el
    rebote ni al esconder sus barras, y lo que va debajo de la barra nunca se queda a la vista. */
 @media (max-width: 899px) {
