@@ -558,10 +558,10 @@
    "tarea": "T0627",
    "titulo": "Marta hace sus facturas desde la app: por líneas, con su documento y su PDF",
    "pr": 333,
-   "commit": "42b911f",
-   "ultimo": "T0627: La vista previa cabe entera en el móvil; IVA_INCLUIDO en el Excel",
+   "commit": "85181e0",
+   "ultimo": "T0627: El total de la factura a la vista mientras se hace, y el detalle de cada línea a lo ancho",
    "quien": "Javi Canela",
-   "fecha": "2026-11-18T21:39:25.154Z",
+   "fecha": "2026-11-18T22:04:28.009Z",
    "toca": [
     "konamigas",
     "utilo"

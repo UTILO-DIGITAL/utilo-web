@@ -1019,7 +1019,7 @@
           campo('<span id="f-imp-et">Base imponible</span>', '<input type="text" inputmode="decimal" id="f-BASE" value="' + texto(verImporte(v)) + '" placeholder="0,00">', 'eco-base') +
           campo('IVA', '<select id="f-TIPO_IVA">' + opciones(ivas().map(function (x) { return [x, x]; }), v.TIPO_IVA) + '</select>') +
           casillaIva('f') +
-          '<p class="u-nota u-ancho" id="f-total"></p>' +
+          '<div class="u-nota u-ancho" id="f-total"></div>' +
           campo('Estado', '<select id="f-ESTADO">' + opciones([['Pendiente', 'Pendiente'], ['Pagada', 'Pagada'], ['Anulada', 'Anulada']], v.ESTADO, 'Sin estado') + '</select>') +
           campo('Enlace en Drive', '<input type="url" id="f-ARCHIVO_URL" value="' + texto(v.ARCHIVO_URL) + '" placeholder="https://drive.google.com/…">', 'u-ancho eco-url') +
           '<p class="u-nota u-ancho" id="f-url-nota">El del PDF o la foto de la factura: en Drive, Compartir › Copiar enlace.</p>' +
@@ -1085,6 +1085,21 @@
             var b = vent.querySelector('#f-BASE');
             b.value = (baseLineas(lineasAhora()) / 100).toFixed(2).replace('.', ',');
           }
+          /**
+           * T0627 · El importe debajo del IVA; por líneas, un resumen a la vista mientras se escribe: base, IVA y el total
+           * de la factura en grande (la casilla de la base no sale: ya está aquí).
+           */
+          function pintaTot() {
+            pintaImporte('f', 'Base imponible');
+            var lin = porLineas(), b = vent.querySelector('.eco-base');
+            if (b) b.hidden = lin;
+            if (!lin) return;
+            var t = importe({ BASE: baseEn('f') / 100, TIPO_IVA: val('f-TIPO_IVA') });
+            vent.querySelector('#f-total').innerHTML = '<div class="eco-tot">' +
+              '<div><span>Base imponible</span><span>' + eur(t.base) + '</span></div>' +
+              '<div><span>IVA ' + texto(val('f-TIPO_IVA')) + '</span><span>' + eur(t.iva) + '</span></div>' +
+              '<div class="eco-tot-total"><span>Total de la factura</span><span>' + eur(t.total) + '</span></div></div>';
+          }
           function clienteElegido() { return ix.ctr[val('f-ID_CONTRAPARTE')] || null; }
           function pintaCliente() {
             if (!datosCli) return;
@@ -1117,23 +1132,23 @@
               vent.querySelector('.eco-url').hidden = lin && pdf;
               vent.querySelector('#f-url-nota').hidden = lin && pdf;
             }
-            pintaImporte('f', 'Base imponible');
+            pintaTot();
           }
           if (cajaLin) {
             lin0.forEach(filaLin);
             if (!lin0.length && f && f.TIPO === 'Emitida' && cts(f.BASE)) filaLin({ CONCEPTO: '', CANTIDAD: 1, PRECIO: f.BASE }); // una de antes, sin líneas
-            cajaLin.addEventListener('input', function (e) { if (e.target.classList.contains('eco-lin-p')) leerPrecio(e.target); pintaLineas(); pintaImporte('f', 'Base imponible'); });
+            cajaLin.addEventListener('input', function (e) { if (e.target.classList.contains('eco-lin-p')) leerPrecio(e.target); pintaLineas(); pintaTot(); });
             // Marcar «IVA incl.» en una línea cambia cómo se lee su precio (el número escrito no cambia); las demás, igual.
             cajaLin.addEventListener('change', function (e) {
               if (!e.target.classList.contains('eco-lin-ci')) return;
               leerPrecio(e.target.closest('.eco-lin').querySelector('.eco-lin-p'));
-              pintaLineas(); pintaImporte('f', 'Base imponible');
+              pintaLineas(); pintaTot();
             });
             cajaLin.addEventListener('click', function (e) {
               var x = e.target.closest('.eco-lin-x'); if (!x) return;
               x.closest('.eco-lin').remove();
               if (!cajaLin.children.length) filaLin({ CANTIDAD: '', UNIDAD: 'm' });
-              pintaLineas(); pintaImporte('f', 'Base imponible');
+              pintaLineas(); pintaTot();
             });
             vent.querySelector('#f-mas').onclick = function () { filaLin({ CANTIDAD: '', UNIDAD: 'm' }); var u = cajaLin.lastChild.querySelector('.eco-lin-c'); if (u) u.focus(); };
           }
@@ -1144,7 +1159,7 @@
           vent.querySelector('#f-TIPO_IVA').addEventListener('change', function () {
             if (!cajaLin) return;
             Array.prototype.forEach.call(cajaLin.querySelectorAll('.eco-lin-p'), function (inp) { if (linIva(inp)) leerPrecio(inp); });
-            pintaLineas(); pintaImporte('f', 'Base imponible');
+            pintaLineas(); pintaTot();
           });
           vent.querySelector('#f-ID_CONTRAPARTE').addEventListener('change', pintaCliente);
           vent.querySelector('#f-BASE').addEventListener('input', refrescar);

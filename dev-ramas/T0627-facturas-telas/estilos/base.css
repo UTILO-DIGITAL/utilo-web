@@ -1049,19 +1049,18 @@ body.u-con-barra .rp-toast { bottom: calc(var(--alto-barra, 64px) + var(--e2) + 
 .u #p-lista input { text-align: right; font-variant-numeric: tabular-nums; }
 /* Abrir una factura en Drive (enlace que se abre en otra pestaña) */
 .u .eco-drive { font-weight: 700; white-space: nowrap; }
-/* T0627 · Las líneas de una factura emitida (FACTURA_LINEAS): arriba, qué se vende, a lo ancho; debajo, el detalle,
-   la cantidad, la unidad, el precio, «IVA incl.» (su precio ya lleva el IVA), el importe y quitar. En el móvil, el detalle
-   también va a lo ancho. */
-.u .eco-lin { display: grid; grid-template-columns: minmax(0, 1fr) 4.5em 3.2em 5.5em auto 7.5em auto; gap: var(--e2); align-items: center; padding: var(--e2) 0 var(--e3); border-bottom: 1px solid var(--color-linea); }
+/* T0627 · Las líneas de una factura emitida (FACTURA_LINEAS): qué se vende y su detalle, a lo ancho; debajo, la
+   cantidad, la unidad, el precio, «IVA incl.» (su precio ya lleva el IVA), el importe y quitar. */
+.u .eco-lin { display: grid; grid-template-columns: 4.5em 3.2em minmax(5em, 1fr) auto auto auto; gap: var(--e2); align-items: center; padding: var(--e2) 0 var(--e3); border-bottom: 1px solid var(--color-linea); }
 .u .eco-lin input { min-width: 0; }
 .u .eco-lin-c { grid-column: 1 / -1; font-weight: 600; }
+.u .eco-lin-d { grid-column: 1 / -1; }
 .u .eco-lin-iva { display: flex; align-items: center; gap: var(--e1); font-size: 13px; white-space: nowrap; cursor: pointer; }
-.u .eco-lin-t { text-align: right; font-weight: 600; white-space: nowrap; font-size: 14px; }
+.u .eco-lin-t { text-align: right; font-weight: 600; white-space: nowrap; font-size: 14px; min-width: 6.5em; }
 .u .eco-lin-x { min-height: 0; padding: 0 var(--e1); }
 .u .eco-calculada input { background: var(--color-bloque); }
 @media (max-width: 640px) {
   .u .eco-lin { grid-template-columns: 4.5em 3.2em minmax(0, 1fr) auto; }
-  .u .eco-lin-d { grid-column: 1 / -1; }
   .u .eco-lin-t { grid-column: 1 / 3; text-align: left; }
 }
 /* T0627 · La vista previa de una factura: flotante, encima de todo, con la hoja (que lleva la marca BORRADOR) a la vista. */
@@ -1072,6 +1071,11 @@ body.u-con-barra .rp-toast { bottom: calc(var(--alto-barra, 64px) + var(--e2) + 
 .u .eco-previa-hoja { align-items: flex-start; }
 .u .eco-previa-hoja iframe { border: 0; width: 794px; height: 1123px; flex: none; background: #fff; margin: var(--e2) 0; box-shadow: 0 2px 12px rgba(0, 0, 0, .15); }
 .u .eco-falta { color: var(--color-vencido); font-weight: 600; }
+/* T0627 · El total de la factura a la vista mientras se hace: base, IVA y el total en grande. */
+.u .eco-tot { margin-top: var(--e2); border: 1px solid var(--color-linea); border-radius: var(--radio); overflow: hidden; color: var(--color-texto); font-size: 15px; }
+.u .eco-tot > div { display: flex; justify-content: space-between; gap: var(--e3); padding: var(--e2) var(--e3); }
+.u .eco-tot > div > span:last-child { font-variant-numeric: tabular-nums; }
+.u .eco-tot .eco-tot-total { background: var(--color-principal); color: var(--color-sobre-principal); font-size: 19px; font-weight: 700; }
 /* T0627 · El número de una factura emitida, que pone la app: como texto, sin caja (no parece que se pueda escribir). */
 .u .eco-numero input:disabled { border-color: transparent; background: transparent; padding-left: 0; opacity: 1; color: var(--color-texto); -webkit-text-fill-color: var(--color-texto); font-weight: 600; box-shadow: none; }
 .u .eco-numero input:disabled::placeholder { color: var(--color-suave); -webkit-text-fill-color: var(--color-suave); font-weight: 400; font-style: italic; }
