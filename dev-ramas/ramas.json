@@ -775,10 +775,10 @@
    "tarea": "T0626",
    "titulo": "Marta entra con la cuenta de su negocio y quien la ayuda ve solo sus apartados",
    "pr": 328,
-   "commit": "e09dc02",
-   "ultimo": "T0626: La app de Marta se abre con la cuenta de su negocio y tiene el perfil Ayuda",
+   "commit": "e297ec2",
+   "ultimo": "T0626: ACCESOS de GESTION ya con Ayuda",
    "quien": "Javi Canela",
-   "fecha": "2026-11-18T18:14:23.379Z",
+   "fecha": "2026-11-18T18:28:07.391Z",
    "toca": [],
    "comun": false,
    "paginas": [
