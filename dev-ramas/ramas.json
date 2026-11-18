@@ -1015,9 +1015,9 @@
    ]
   },
   "utilo": {
-   "rama": "main y las ramas abiertas",
-   "commit": "246e79e",
-   "fecha": "2026-11-17T12:29:22.299Z",
+   "rama": "T0613-botones-por-publicar",
+   "commit": "4670f17",
+   "fecha": "2026-11-18T10:18:26.333Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
