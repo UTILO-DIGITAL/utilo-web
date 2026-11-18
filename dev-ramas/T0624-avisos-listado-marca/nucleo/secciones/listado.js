@@ -704,7 +704,16 @@
     return String(g.campo || g);
   }
 
-  var CALC = { imagen: imagen, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, cumple: cumple, calcular: calcular, usa: usa,
+  /** T0633 · La columna de foto que lleva la tarjeta del móvil: la primera de tipo foto entre las que se ven en la vista
+   *  (aunque no esté en DETALLE: en el móvil, una tela se reconoce por su foto); '' si la vista no tiene ninguna. */
+  function fotoDeTarjeta(a, cols) {
+    return (cols || []).filter(function (c) { return campo(a, c).tipo === 'foto'; })[0] || '';
+  }
+  /** T0633 · Lo que sale en lugar de una foto que no se puede ver (la de Drive no compartida «con el enlace»: en la app del
+   *  móvil no hay sesión de Google, o quien mira no tiene permiso). En la ficha, el porqué entero; en una miniatura, corto. */
+  var SIN_FOTO = { corto: 'No se ve', largo: 'No se puede ver la foto aquí. Para que se vea en la app (también en el móvil), su carpeta de Drive tiene que estar compartida como «Cualquier persona con el enlace».' };
+
+  var CALC = { imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, mover: mover, paraClaude: paraClaude,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
@@ -739,7 +748,15 @@
         '<div class="u-velo" id="li-velo"><div class="u-ventana li-ventana" role="dialog" aria-modal="true" aria-labelledby="li-vt"><div class="n-ventana" id="li-vent"></div></div></div>';
       var cont = el.querySelector('#li-cont'), velo = el.querySelector('#li-velo'), vent = el.querySelector('#li-vent');
       // T0602: una foto que no se puede ver (un archivo de Drive que no es público ni de quien mira) no sale rota.
-      el.addEventListener('error', function (e) { var t = e.target; if (t && t.hasAttribute && t.hasAttribute('data-li-foto')) t.hidden = true; }, true);
+      // T0633: en su lugar, un aviso (en la ficha, con el porqué; el enlace «Ver foto ↗» sigue al lado), no un hueco.
+      el.addEventListener('error', function (e) {
+        var t = e.target; if (!t || !t.hasAttribute || !t.hasAttribute('data-li-foto') || !t.parentNode) return;
+        var grande = /\bli-foto\b/.test(t.className), s = document.createElement('span');
+        s.className = 'li-nofoto' + (grande ? ' li-nofoto-g' : '') + (/\bli-t-img\b/.test(t.className) ? ' li-t-img' : '');
+        s.textContent = grande ? SIN_FOTO.largo : SIN_FOTO.corto;
+        if (!grande) s.title = SIN_FOTO.largo;
+        t.parentNode.replaceChild(s, t);
+      }, true);
 
       /* ---------- datos ---------- */
       var tablas = [BASE.tabla];
@@ -779,7 +796,7 @@
           if (cp.tipo === 'email' && /@/.test(String(v))) return '<a href="mailto:' + texto(v) + '">' + texto(v) + '</a>';
           if (cp.tipo === 'telefono') return '<a href="tel:' + texto(String(v).replace(/[^\d+]/g, '')) + '">' + texto(v) + '</a>';
           if (cp.tipo === 'foto' && imagen(v)) return '<img class="li-foto" src="' + texto(imagen(v)) + '" alt="" referrerpolicy="no-referrer" data-li-foto>' +
-            (/^https?:/i.test(String(v)) ? ' <a class="u-nota" href="' + texto(v) + '" target="_blank" rel="noopener">Abrir ↗</a>' : '');
+            (/^https?:/i.test(String(v)) ? ' <a class="u-nota li-verfoto" href="' + texto(v) + '" target="_blank" rel="noopener">Ver foto ↗</a>' : '');
         }
         if (cp.tipo === 'foto') return imagen(v) ? '<img class="li-mini" src="' + texto(imagen(v)) + '" alt="" referrerpolicy="no-referrer" data-li-foto>' : texto(t);
         if (cp.tipo === 'estado' || cp.colores) {
@@ -850,14 +867,18 @@
         cont.innerHTML = html;
         if (foco !== null) { var q = cont.querySelector('#li-q'); q.focus(); try { q.setSelectionRange(foco, foco); } catch (e) {} }
       }
-      function tarjeta(a, f, det, cli, hoy, arrastrar, tituloGrupo) {
+      function tarjeta(a, f, det, cli, hoy, arrastrar, tituloGrupo, foto) {
         var avs = cli ? [] : avisosDe(a, f, hoy), mar = sinRepetir(avs, tituloGrupo);
         // T0601: en la tarjeta, lo vacío no sale (una prospección sin estado ni nota no enseña «— —»).
-        var dets = det.map(function (x) { return fechaAviso(a, x, celda(a, x, f, false, cli), avs); }).filter(function (h) { return h.indexOf('class="li-nada"') < 0; });
-        return '<li><button type="button" class="li-tarjeta' + (avs.length ? ' li-f-' + texto(avs[0].nivel || 'medio') : '') + '" data-id="' + texto(f[a.clave]) + '"' + (arrastrar ? ' data-mover' : '') + '>' +
-          '<strong>' + titulo2(a, f, cli) + '</strong>' +
+        var dets = det.filter(function (x) { return x !== foto; }).map(function (x) { return fechaAviso(a, x, celda(a, x, f, false, cli), avs); }).filter(function (h) { return h.indexOf('class="li-nada"') < 0; });
+        // T0633: con foto, a la izquierda (sin foto, un hueco igual, para que los nombres caigan en línea).
+        var src = foto && !prohibido(f[foto], PROHIB).length ? imagen(f[foto]) : '';
+        var img = !foto ? '' : (src ? '<img class="li-mini li-t-img" src="' + texto(src) + '" alt="" referrerpolicy="no-referrer" loading="lazy" data-li-foto>' : '<span class="li-t-img li-t-vacia" aria-hidden="true"></span>');
+        var cuerpo = '<strong>' + titulo2(a, f, cli) + '</strong>' +
           (dets.length ? '<span class="li-det">' + dets.map(function (h) { return '<span>' + h + '</span>'; }).join('') + '</span>' : '') +
-          (mar.length ? '<span class="li-marcas">' + marcas(mar) + '</span>' : '') + '</button></li>';
+          (mar.length ? '<span class="li-marcas">' + marcas(mar) + '</span>' : '');
+        return '<li><button type="button" class="li-tarjeta' + (foto ? ' li-con-foto' : '') + (avs.length ? ' li-f-' + texto(avs[0].nivel || 'medio') : '') + '" data-id="' + texto(f[a.clave]) + '"' + (arrastrar ? ' data-mover' : '') + '>' +
+          (foto ? img + '<span class="li-t-txt">' + cuerpo + '</span>' : cuerpo) + '</button></li>';
       }
       /** T0610 · Los grupos de una vista. En el ordenador, UNA tabla: la cabecera una vez y cada grupo como una fila con su
        *  título, así las columnas caen igual en todos y se ajustan a lo que llevan. En el móvil, una lista de tarjetas por grupo. */
@@ -889,9 +910,10 @@
           return '<tbody>' + (g.titulo ? '<tr class="li-g-cab"><th scope="colgroup" colspan="' + conCod.length + '">' + cabG(g) + '</th></tr>' : '') +
             g.filas.map(function (f) { return fila(f, g); }).join('') + '</tbody>';
         }).join('') + '</table></div>';
+        var foto = fotoDeTarjeta(a, cols);
         var tarjetas = '<div class="u-solo-movil">' + gs.map(function (g) {
           return '<section class="li-grupo">' + (g.titulo ? cabG(g) : '') + '<ul class="li-tarjetas">' +
-            g.filas.map(function (f) { return tarjeta(a, f, det, cli, hoy, false, g.titulo); }).join('') + '</ul></section>';
+            g.filas.map(function (f) { return tarjeta(a, f, det, cli, hoy, false, g.titulo, foto); }).join('') + '</ul></section>';
         }).join('') + '</div>';
         return tabla + tarjetas;
       }

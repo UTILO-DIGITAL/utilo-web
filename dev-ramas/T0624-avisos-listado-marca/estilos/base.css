@@ -2036,6 +2036,19 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-tarjeta strong { font-weight: 700; display: flex; flex-direction: column; align-items: flex-start; gap: 0; } /* T0610: el código, encima del nombre */
 .u .li-det { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e3); font-size: 14px; color: var(--color-suave); }
 .u .li-det .li-mini { width: 32px; height: 32px; }
+/* T0633: en el móvil, la tarjeta con foto la lleva a la izquierda; sin foto, el hueco igual para que los nombres caigan en línea. */
+.u .li-tarjeta.li-con-foto { flex-direction: row; align-items: flex-start; gap: var(--e3); }
+.u .li-t-img { flex: none; width: 64px; height: 64px; border-radius: var(--radio-peq); }
+.u .li-t-vacia { background: var(--color-fondo); border: 1px solid var(--color-linea); }
+.u .li-t-txt { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: var(--e1); }
+/* T0633: una foto que no se puede ver (de Drive, sin compartir «con el enlace») dice por qué, en vez de dejar un hueco. */
+.u .li-nofoto { display: flex; align-items: center; justify-content: center; text-align: center; width: 40px; height: 40px;
+  border-radius: var(--radio-peq); border: 1px dashed var(--color-linea); background: var(--color-fondo); color: var(--color-suave);
+  font: 400 11px/1.15 var(--fuente-texto); white-space: normal; }
+.u .li-det .li-nofoto, .u .li-rel-f .li-nofoto { width: 32px; height: 32px; font-size: 9px; }
+.u .li-nofoto.li-t-img { width: 64px; height: 64px; font-size: 12px; }
+.u .li-nofoto.li-nofoto-g { width: auto; height: auto; max-width: 420px; justify-content: flex-start; text-align: left; padding: var(--e2) var(--e3);
+  border-radius: var(--radio); font-size: 14px; line-height: 1.4; margin-bottom: var(--e1); }
 .u .li-errores { margin: 0 0 var(--e3); border-left: 4px solid var(--estado-bl); font-size: 14px; }
 .u .li-errores ul { margin: var(--e1) 0 0; padding-left: var(--e4); }
 /* Ficha */

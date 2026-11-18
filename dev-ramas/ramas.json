@@ -775,10 +775,10 @@
    "tarea": "T0624",
    "titulo": "Los avisos de las listas, con los colores de la marca y un solo color por tarea",
    "pr": 335,
-   "commit": "eb9f25e",
-   "ultimo": "T0624: Los avisos de Listado, con los colores de la marca y una señal por cosa",
+   "commit": "22d9cd0",
+   "ultimo": "T0624: Junta main (fotos de las telas en el móvil, T0633) y sube base.css a ?v=98",
    "quien": "Javi Canela",
-   "fecha": "2026-11-18T20:37:49.636Z",
+   "fecha": "2026-11-18T21:07:48.480Z",
    "toca": [
     "konamigas",
     "utilo"

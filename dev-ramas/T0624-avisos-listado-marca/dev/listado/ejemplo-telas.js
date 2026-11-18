@@ -134,7 +134,7 @@
   var TELAS = tabla(['ID', 'ID_DISENO', 'COLOR', 'REF_PROVEEDOR', 'ID_ESTADO', 'MUESTRA_EN_MANO', 'ENLACE_FOTO', 'ENLACE_ETIQUETA', 'NOTAS', 'SIMULAR'], [
     { ID: 'BP-001-01', ID_DISENO: 'BP-001', COLOR: 'Índigo', REF_PROVEEDOR: 'JHB-221', ID_ESTADO: es('Propuesta a marca'), MUESTRA_EN_MANO: 'Sí', ENLACE_FOTO: muestra('flores', '#25406b', '#e9e2cf') },
     { ID: 'BP-001-02', ID_DISENO: 'BP-001', COLOR: 'Verde salvia', REF_PROVEEDOR: 'JHB-222', ID_ESTADO: es('Muestra pedida'), ENLACE_FOTO: muestra('flores', '#8aa58c', '#f5f1e8') },
-    { ID: 'BP-004-01', ID_DISENO: 'BP-004', COLOR: 'Terracota', REF_PROVEEDOR: 'JHB-240', ID_ESTADO: es('Muestra pedida'), ENLACE_FOTO: muestra('puntos', '#b65a3a', '#f3e6d6') },
+    { ID: 'BP-004-01', ID_DISENO: 'BP-004', COLOR: 'Terracota', REF_PROVEEDOR: 'JHB-240', ID_ESTADO: es('Muestra pedida'), ENLACE_FOTO: 'https://drive.google.com/file/d/1EjemploDeFotoSinCompartir00/view' }, // T0633: una de Drive que no se puede ver
     { ID: 'FL-011-01', ID_DISENO: 'FL-011', COLOR: 'Rosa empolvado', ID_ESTADO: es('Descartada'), ENLACE_FOTO: muestra('flores', '#e4b9b0', '#8c4a52'), NOTAS: 'A ninguna marca le ha gustado.' },
     { ID: 'IK-002-01', ID_DISENO: 'IK-002', COLOR: 'Mostaza y crudo', REF_PROVEEDOR: 'VL-IK9', ID_ESTADO: es('Candidata'), ENLACE_FOTO: muestra('cuadros', '#d4a73a', '#f6efe0') },
     { ID: 'LI-010-01', ID_DISENO: 'LI-010', COLOR: 'Lino natural', ID_ESTADO: es('Candidata'), ENLACE_FOTO: muestra('liso', '#d8ccb4', '#8f8166'), NOTAS: 'Sin precio todavía: el proveedor no ha contestado.' },
