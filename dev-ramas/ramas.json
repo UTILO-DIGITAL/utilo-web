@@ -558,10 +558,10 @@
    "tarea": "T0610",
    "titulo": "La app de Marta lleva su marca",
    "pr": 327,
-   "commit": "3d4b9c9",
-   "ultimo": "T0610: La app de ejemplo de Telas en DEV, con su marca",
+   "commit": "0803ee3",
+   "ultimo": "T0610: Listado en una sola tabla por vista, sin repetir lo que dice el grupo, y el código discreto",
    "quien": "Javi Canela",
-   "fecha": "2026-11-18T17:29:24.651Z",
+   "fecha": "2026-11-18T18:26:49.020Z",
    "toca": [
     "konamigas",
     "utilo"

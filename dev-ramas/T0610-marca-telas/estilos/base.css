@@ -1981,11 +1981,13 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-grupo .n-grupo { margin-top: var(--e3); }
 .u .li-tabla { overflow-x: auto; border: 1px solid var(--color-linea); border-radius: var(--radio); }
 .u .li-tabla .u-tabla th { position: static; }
-/* T0610: anchos fijos (los pone listado.js en su <colgroup>), para que las columnas caigan igual en cada grupo */
-.u .li-tabla .u-tabla.li-fija { table-layout: fixed; }
-.u .li-tabla .u-tabla.li-fija td, .u .li-tabla .u-tabla.li-fija th { overflow-wrap: anywhere; }
-.u .li-tabla .u-tabla.li-fija th { white-space: normal; }
-.u .li-tabla .u-tabla.li-fija td.li-td-cod { width: auto; }
+/* T0610: todos los grupos en una tabla; el título de cada grupo, una fila sobre fondo de bloque que separa sin repetir la cabecera */
+.u .li-tabla .li-g-cab th { position: static; padding: var(--e3) var(--e3) var(--e2); background: var(--color-fondo); border-bottom: 1px solid var(--color-borde-campo);
+  text-transform: none; letter-spacing: 0; white-space: normal; }
+.u .li-tabla tbody + tbody .li-g-cab th { border-top: 1px solid var(--color-linea); }
+.u .li-tabla .li-g-cab .n-grupo { margin: 0; font-size: 16px; }
+.u .li-tabla tbody tr:last-child td { border-bottom: 0; }
+.u .li-tabla tbody:not(:last-child) tr:last-child td { border-bottom: 1px solid var(--color-linea); }
 .u .li-nada { color: var(--color-suave); }
 .u .li-estado { background: color-mix(in srgb, var(--li-c, var(--color-texto)) 12%, var(--color-superficie)); color: var(--color-texto);
   border: 1px solid color-mix(in srgb, var(--li-c, var(--color-texto)) 45%, var(--color-superficie)); }
@@ -2003,7 +2005,7 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-tarjeta { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: var(--e1); text-align: left; cursor: pointer;
   padding: var(--e3); border-radius: var(--radio); border: 1px solid var(--color-linea); background: var(--color-superficie); color: var(--color-texto);
   font: 400 15px/1.35 var(--fuente-texto); box-shadow: inset 4px 0 0 var(--li-barra, transparent); }
-.u .li-tarjeta strong { font-weight: 700; display: flex; gap: var(--e2); align-items: center; }
+.u .li-tarjeta strong { font-weight: 700; display: flex; flex-direction: column; align-items: flex-start; gap: 0; } /* T0610: el código, encima del nombre */
 .u .li-det { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e3); font-size: 14px; color: var(--color-suave); }
 .u .li-det .li-mini { width: 32px; height: 32px; }
 .u .li-errores { margin: 0 0 var(--e3); border-left: 4px solid var(--estado-bl); font-size: 14px; }
@@ -2057,10 +2059,11 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-barra .li-cuenta { margin: 0; white-space: nowrap; }
 .u .li-barra .li-nueva { font-size: 15px; padding: 0 var(--e4); }
 .u .li-arriba .li-vistas { flex: 1; min-width: 0; }
-.u .li-cod { display: inline-block; padding: 0 var(--e1); border-radius: var(--radio-peq); font: 700 12px/1.6 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  letter-spacing: .02em; color: var(--color-principal-oscuro); background: color-mix(in srgb, var(--color-principal) 10%, var(--color-superficie));
-  border: 1px solid color-mix(in srgb, var(--color-principal) 30%, var(--color-superficie)); white-space: nowrap; vertical-align: 1px; }
+/* T0610: el código, discreto (antes una caja con letra de máquina que pesaba más que el nombre): gris, pequeño y con cifras de ancho fijo */
+.u .li-cod { display: inline-block; font: 600 12px/1.6 var(--fuente-texto); font-variant-numeric: tabular-nums; letter-spacing: .02em;
+  color: var(--color-suave); white-space: nowrap; }
 .u .u-tabla td.li-td-cod { width: 1%; white-space: nowrap; }
+.u .u-tabla td.li-td-corta { white-space: nowrap; }
 .u .li-ficha-cab h2 .li-cod { font-size: 14px; vertical-align: 3px; }
 .u .li-claude { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e3); margin-top: calc(var(--e2) * -1); }
 .u .li-claude .u-btn { min-height: 36px; font-size: 14px; padding: 0 var(--e3); }
