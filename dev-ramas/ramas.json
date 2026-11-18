@@ -558,10 +558,10 @@
    "tarea": "T0610",
    "titulo": "La app de Marta lleva su marca",
    "pr": 327,
-   "commit": "84a6526",
-   "ultimo": "T0610: Menú de Telas en oliva macizo y tablas de Listado con las columnas alineadas entre grupos",
+   "commit": "3d4b9c9",
+   "ultimo": "T0610: La app de ejemplo de Telas en DEV, con su marca",
    "quien": "Javi Canela",
-   "fecha": "2026-11-18T17:18:15.927Z",
+   "fecha": "2026-11-18T17:29:24.651Z",
    "toca": [
     "konamigas",
     "utilo"
