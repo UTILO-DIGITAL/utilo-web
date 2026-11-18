@@ -992,6 +992,7 @@
           '<div class="u-campos">' +
           (f ? '' : campo('Tipo', '<select id="f-TIPO">' + opciones([['Emitida', 'Emitida (la hacemos nosotros)'], ['Recibida', 'Recibida'], ['Ticket', 'Ticket']], v.TIPO) + '</select>')) +
           campo('Número', '<input type="text" id="f-NUMERO" value="' + texto(v.NUMERO) + '" maxlength="40">', 'eco-numero') +
+          (f && f.TIPO === 'Emitida' ? '<p class="u-nota u-ancho">El número de una factura emitida no se cambia: va seguido y sin huecos. Si hay un error, ponla en Anulada y haz otra.</p>' : '') +
           campo('Fecha', '<input type="date" id="f-FECHA" value="' + texto(v.FECHA) + '">') +
           campo('<span id="f-ctr-et">' + (v.TIPO === 'Emitida' ? 'Cliente (a quién se la hacemos)' : 'Proveedor (quién nos la hace)') + '</span>', '<select id="f-ID_CONTRAPARTE">' + opciones(d.ctr.map(function (c) { return [c.ID, c.NOMBRE]; }).sort(function (a, b) { return String(a[1]).localeCompare(String(b[1]), 'es'); }), v.ID_CONTRAPARTE, 'Elige') + '</select>') +
           (datosCli ? '<div class="u-campos u-ancho" id="f-cli">' + campo('CIF o NIF del cliente', '<input type="text" id="f-NIF" maxlength="20" autocomplete="off">') +
@@ -1061,9 +1062,10 @@
           }
           function refrescar() {
             var tipo = tipoAhora(), em = tipo === 'Emitida' && !f, lin = porLineas();
+            // T0627: el número de una emitida lo pone el motor al guardarla y ya no se cambia (correlativo y sin huecos).
             vent.querySelector('#f-ctr-et').textContent = tipo === 'Emitida' ? 'Cliente (a quién se la hacemos)' : 'Proveedor (quién nos la hace)';
             var n = vent.querySelector('#f-NUMERO');
-            n.disabled = em; if (em) n.value = ''; n.placeholder = em ? 'Se numera sola al guardar (' + String(cfg.SERIE_EMITIDAS || '') + '…)' : '';
+            n.disabled = tipo === 'Emitida'; if (em) n.value = ''; n.placeholder = em ? 'Se numera sola al guardar (' + String(cfg.SERIE_EMITIDAS || '') + '…)' : '';
             if (LINEAS) {
               vent.querySelector('#f-lin').hidden = !lin;
               var ci = vent.querySelector('#f-coniva');
@@ -1107,18 +1109,18 @@
           }
           /** Guarda la factura (y sus líneas y los datos del cliente) → promesa con { id, numero }. */
           function guardar() {
-            var tipo = tipoAhora(), em = tipo === 'Emitida' && !f, lin = porLineas();
+            var tipo = tipoAhora(), em = tipo === 'Emitida' && !f, lin = porLineas(), conNumero = tipo !== 'Emitida';
             var nv = { FECHA: val('f-FECHA'), ID_CONTRAPARTE: val('f-ID_CONTRAPARTE'), BASE: baseEn('f') / 100, TIPO_IVA: val('f-TIPO_IVA'),
               ESTADO: val('f-ESTADO'), ARCHIVO_URL: val('f-ARCHIVO_URL'), NOTAS: val('f-NOTAS') };
-            if (!em) nv.NUMERO = val('f-NUMERO');
+            if (conNumero) nv.NUMERO = val('f-NUMERO');
             var mal = [], ls = lin ? lineasAhora() : [];
-            if (!em && !nv.NUMERO) mal.push('Falta el número.');
+            if (conNumero && !nv.NUMERO) mal.push('Falta el número.');
             if (!nv.FECHA) mal.push('Falta la fecha.');
             if (!nv.ID_CONTRAPARTE) mal.push('Falta ' + (tipo === 'Emitida' ? 'el cliente.' : 'el proveedor.'));
             if (lin && ls.some(function (l) { return !l.CONCEPTO; })) mal.push('Cada línea necesita qué se vende.');
             if (lin && ls.some(function (l) { return l.PRECIO === ''; })) mal.push('Cada línea necesita su precio.');
             if (!(cts(val('f-BASE')) > 0)) mal.push(lin ? 'Añade lo que se vende, con su precio.' : 'La base tiene que ser mayor que 0.');
-            if (!em && nv.NUMERO && d.fac.some(function (x) { return x !== f && x.TIPO === tipo && String(x.NUMERO).trim() === nv.NUMERO; })) mal.push('Ya hay una ' + tipo.toLowerCase() + ' con el número ' + nv.NUMERO + '.');
+            if (conNumero && nv.NUMERO && d.fac.some(function (x) { return x !== f && x.TIPO === tipo && String(x.NUMERO).trim() === nv.NUMERO; })) mal.push('Ya hay una ' + tipo.toLowerCase() + ' con el número ' + nv.NUMERO + '.');
             if (mal.length) { verError(mal); return null; }
             var cli = clienteElegido(), cliNuevo = datosCli && lin && cli ? { NIF: val('f-NIF'), DIRECCION: val('f-DIRECCION') } : null;
             if (cliNuevo && String(cli.NIF || '') === cliNuevo.NIF && String(cli.DIRECCION || '') === cliNuevo.DIRECCION) cliNuevo = null;
