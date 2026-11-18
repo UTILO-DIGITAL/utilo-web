@@ -387,7 +387,7 @@
     if (!v || typeof v !== 'object' || Array.isArray(v)) return { que: 'sin-calcular' };
     var l = function (x) { return Array.isArray(x) ? x : []; };
     return { que: 'calculado', el: v.el || '', ya: l(v.ya).map(String), dudas: l(v.dudas).map(String),
-      faltan: l(v.faltan).filter(function (f) { return f && l(f.con).length; }).map(function (f) { return { donde: String(f.donde || ''), con: l(f.con).map(String) }; }) };
+      faltan: l(v.faltan).filter(function (f) { return f && l(f.con).length; }).map(function (f) { return { donde: String(f.donde || ''), con: l(f.con).map(String), por: String(f.por || '') }; }) };
   }
   /** Un instante ISO, como dd/mm/aaaa hh:mm en la hora de quien mira ('' si no se entiende). */
   function horaLocal(iso) {
@@ -401,8 +401,44 @@
     if (!a && (m = /^Supabase · ([a-z0-9_-]+) · Producción$/.exec(b))) a = 'boton-supabase-' + m[1] + '.yml';
     return a ? 'https://github.com/UTILO-DIGITAL/utilo-apps/actions/workflows/' + a : '';
   }
-  /** Un sitio que falta, como se lee: «Publicar · konamigas/nucleo», o «… o …» si vale cualquiera de sus botones. */
-  function botonTexto(f) { return f.con.join(' o '); }
+  /**
+   * T0613 · Los botones que hay que pulsar: los menos que cubren todo lo que falta (un sitio que sale con cualquiera de varios,
+   * como UTILO_CORE, no suma uno más). A igual número, los que tienen botón antes que los de «A mano». Por botón, lo que solo
+   * lleva él (propios); los sitios que sale con cualquiera de los elegidos, en comunes.
+   * → { botones: [{ boton, propios: [falta] }] (por nombre), comunes: [falta] }
+   */
+  function botonesQuePulsar(faltan) {
+    var cand = [];
+    faltan.forEach(function (f) { f.con.forEach(function (b) { if (cand.indexOf(b) < 0) cand.push(b); }); });
+    var aMano = function (b) { return /^A mano/.test(b) ? 1 : 0; };
+    var cubre = function (sel) { return faltan.every(function (f) { return f.con.some(function (b) { return sel.indexOf(b) >= 0; }); }); };
+    var mejor = null;
+    if (cand.length <= 12) {
+      for (var k = 1; k <= cand.length && !mejor; k++) {
+        (function elegir(desde, sel) {
+          if (sel.length === k) {
+            var n = sel.filter(aMano).length;
+            if (cubre(sel) && (!mejor || n < mejor.n)) mejor = { sel: sel.slice(), n: n };
+            return;
+          }
+          for (var i = desde; i < cand.length; i++) { sel.push(cand[i]); elegir(i + 1, sel); sel.pop(); }
+        })(0, []);
+      }
+    }
+    var sel = mejor ? mejor.sel : []; // muchos (no pasa): uno a uno, el primero de cada sitio que aún no está cubierto
+    if (!mejor) faltan.forEach(function (f) { if (!f.con.some(function (b) { return sel.indexOf(b) >= 0; })) sel.push(f.con[0]); });
+    sel.sort();
+    var cuantos = function (f) { return f.con.filter(function (b) { return sel.indexOf(b) >= 0; }).length; };
+    return {
+      botones: sel.map(function (b) { return { boton: b, propios: faltan.filter(function (f) { return cuantos(f) === 1 && f.con.indexOf(b) >= 0; }) }; }),
+      comunes: faltan.filter(function (f) { return cuantos(f) > 1; })
+    };
+  }
+  /** T0613 · Un sitio y su porqué, en palabras: «un proyecto de konamigas: solo cambia la versión de base.css…». */
+  function sitioTexto(f, boton) {
+    var donde = f.donde && String(boton || '').indexOf(f.donde) < 0 ? f.donde : '';
+    return donde && f.por ? donde + ': ' + f.por : donde || f.por || '';
+  }
   /**
    * La columna «Por publicar», agrupada por lo que les falta (T0466, Javi: de un vistazo, qué saldría con cada botón):
    * [{ clave, titulo, nota, ts }], primero las que salen con un solo botón; cada tarea, en un grupo. ts en el orden recibido.
@@ -416,9 +452,9 @@
       else if (!p.faltan.length && p.dudas.length) { k = '~dudas'; tit = 'Algo no cuadra con su PR'; nota = 'Lo dice su ficha.'; peso = 70; }
       else if (!p.faltan.length) { k = '~ya'; tit = 'Ya están en su sitio'; nota = 'Pasan solas a Entregada con la próxima publicación.'; peso = 60; }
       else {
-        var bs = p.faltan.map(botonTexto).sort();
-        k = bs.join(' + '); tit = 'Con ' + bs.join(' y '); peso = bs.length;
-        nota = bs.length > 1 ? 'Hacen falta las ' + (bs.length === 2 ? 'dos' : bs.length) + '; con la última, pasan a Entregada.' : 'Al acabar, pasan solas a Entregada.';
+        var bs = botonesQuePulsar(p.faltan).botones.map(function (x) { return x.boton; });
+        k = bs.join(' + '); tit = 'Con ' + bs.join(', ').replace(/, (?=[^,]*$)/, ' y '); peso = bs.length;
+        nota = bs.length > 1 ? 'Hacen falta los ' + (bs.length === 2 ? 'dos' : bs.length) + ' botones; con el último, pasan a Entregada.' : 'Al acabar, pasan solas a Entregada.';
         if (bs.some(function (b) { return /^A mano/.test(b); })) { nota = 'Lo de «A mano» se le pide a Claude.'; peso += 10; } // después de las de botón
       }
       if (!g[k]) { g[k] = { clave: k, titulo: tit, nota: nota, peso: peso, ts: [] }; orden.push(g[k]); }
@@ -429,7 +465,7 @@
 
   var CALC = { frases: frases, numerada: numerada, partesTexto: partesTexto, htmlTexto: htmlTexto, conEnlaces: conEnlaces, motivoClaude: motivoClaude, ANTES_DE_EMPEZAR: ANTES_DE_EMPEZAR,
     enlaceDev: enlaceDev, textoParaChrome: textoParaChrome, COMPROBAR: COMPROBAR, EN_REVISION: EN_REVISION, VER_EN_DEV: VER_EN_DEV, SIN_CODIGO: SIN_CODIGO,
-    porPublicar: porPublicar, gruposPorPublicar: gruposPorPublicar, enlaceBoton: enlaceBoton };
+    porPublicar: porPublicar, gruposPorPublicar: gruposPorPublicar, enlaceBoton: enlaceBoton, botonesQuePulsar: botonesQuePulsar, sitioTexto: sitioTexto };
   // En las pruebas (node, sin navegador), solo las cuentas.
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
@@ -1530,18 +1566,21 @@
         if (p.que === 'sin-pr') h = '<p>No tiene PR: falta enviarla o publicarla a mano. Cuando esté, pásala a Entregada.</p>';
         else if (p.que === 'sin-calcular') h = '<p>Calculando qué le falta: sale en un minuto, al fusionar su PR.</p>';
         else {
-          if (p.faltan.length) h += '<p>Falta:</p><ul class="fpp-lista">' + p.faltan.map(function (f) {
-            var bs = f.con.map(function (b) {
-              var u = enlaceBoton(b);
-              return u ? '<a href="' + texto(u) + '" target="_blank" rel="noopener" title="Abre la acción en GitHub con todo puesto: pulsa «Run workflow»"><b>' + texto(b) + '</b></a>' : '<b>' + texto(b) + '</b>';
-            }).join(' o ');
-            return '<li>' + bs + (f.donde && botonTexto(f).indexOf(f.donde) < 0 ? ' <span>(' + texto(f.donde) + ')</span>' : '') + '</li>';
+          // T0613 · Los botones que hay que pulsar (los menos), cada uno con lo que solo lleva él y por qué.
+          var q = botonesQuePulsar(p.faltan), nb = q.botones.length;
+          if (nb) h += '<p>' + (nb === 1 ? 'Falta pulsar:' : 'Faltan ' + (nb === 2 ? 'dos' : nb) + ' botones:') + '</p><ul class="fpp-lista">' + q.botones.map(function (x) {
+            var u = enlaceBoton(x.boton), b = '<b>' + texto(x.boton) + '</b>';
+            var por = x.propios.map(function (f) { return sitioTexto(f, x.boton); }).filter(Boolean).join('; ');
+            return '<li>' + (u ? '<a href="' + texto(u) + '" target="_blank" rel="noopener" title="Abre la acción en GitHub con todo puesto: pulsa «Run workflow»">' + b + '</a>' : b) +
+              (por ? ' <span>— ' + texto(por) + '</span>' : '') + '</li>';
           }).join('') + '</ul>';
+          if (q.comunes.length) h += '<p>' + (nb === 2 ? 'Con cualquiera de los dos' : 'Con cualquiera de ellos') + ' sale también ' +
+            texto(q.comunes.map(function (f) { return sitioTexto(f, ''); }).join('; ')) + '.</p>';
           if (p.ya.length) h += '<p><b>Ya está:</b> ' + texto(p.ya.join(', ')) + '</p>';
           if (p.dudas.length) h += p.dudas.map(function (d) { return '<p class="fpp-duda"><b>Ojo:</b> ' + texto(d) + '</p>'; }).join('');
           if (!p.faltan.length && !p.dudas.length) h += '<p>Ya está en todos sus sitios: pasa sola a Entregada con la próxima publicación.</p>';
-          else if (p.faltan.length) h += '<p class="u-nota">' + (p.faltan.some(function (f) { return /^A mano/.test(f.con[0]); })
-            ? 'Lo de «A mano» se le pide a Claude. ' : '') + (p.faltan.some(function (f) { return f.con.some(enlaceBoton); })
+          else if (p.faltan.length) h += '<p class="u-nota">' + (q.botones.some(function (x) { return /^A mano/.test(x.boton); })
+            ? 'Lo de «A mano» se le pide a Claude. ' : '') + (q.botones.some(function (x) { return enlaceBoton(x.boton); })
             ? 'Cada botón abre su acción en GitHub con todo puesto: pulsa «Run workflow». ' : '') + 'Cuando esté todo, pasa sola a Entregada.' + (horaLocal(p.el) ? ' Mirado el ' + texto(horaLocal(p.el)) + '.' : '') + '</p>';
         }
         return '<div class="bloque fpp"><h3>Para entregarla</h3>' + h + '</div>';
