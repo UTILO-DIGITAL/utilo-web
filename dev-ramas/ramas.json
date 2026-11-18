@@ -775,10 +775,10 @@
    "tarea": "T0630",
    "titulo": "Cada vista dice qué es en una línea, se cuenta con su nombre y la ficha va con lo importante arriba",
    "pr": 336,
-   "commit": "e920477",
-   "ultimo": "T0630: Junta main (T0624, avisos con la marca) y sube base.css a ?v=99",
+   "commit": "cf73381",
+   "ultimo": "T0630: En el ejemplo de DEV, Clientes cuenta clientes y Prospección, marcas",
    "quien": "Javi Canela",
-   "fecha": "2026-11-18T21:21:39.258Z",
+   "fecha": "2026-11-18T21:22:50.130Z",
    "toca": [
     "konamigas",
     "utilo"

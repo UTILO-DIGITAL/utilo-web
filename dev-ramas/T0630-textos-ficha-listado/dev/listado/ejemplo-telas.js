@@ -200,7 +200,7 @@
       NUEVA: { ID_ESTADO: 'Pendiente', ID_TIPO: 'Tarea', FECHA: 'hoy' }, OBLIGATORIAS: ['DETALLE', 'ID_ESTADO'], _refs: refsDesde('SEGUIMIENTO') }) },
 
     clientes: { modulo: 'listado', titulo: 'Clientes', icono: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.6.9 2.6 2.6 3 5.2"/>', config: mezcla(COMUN, {
-      TABLA: 'MARCAS', CODIGO: 'ID', NOMBRE: 'NOMBRE', ORDEN: 'NOMBRE', TEXTO: 'Las marcas: las que ya son clientes y las de prospección, según su fase.', FILAS: ['marca', 'marcas'],
+      TABLA: 'MARCAS', CODIGO: 'ID', NOMBRE: 'NOMBRE', ORDEN: 'NOMBRE', TEXTO: 'Las marcas: las que ya son clientes y las de prospección, según su fase.', FILAS: ['cliente', 'clientes'],
       COLUMNAS: ['NOMBRE', 'ID_FASE', 'CIUDAD', 'PROXIMO_PASO', 'FECHA_PASO'], DETALLE: ['ID_FASE', 'PROXIMO_PASO'],
       CAMPOS: { NOMBRE: { titulo: 'Marca' }, ID_FASE: { titulo: 'Fase', tipo: 'estado', colores: { '8 Primer pedido': 'bien', '9 Cliente habitual': 'bien', 'En pausa': 'apagado', 'Descartado': 'apagado', 'Por contactar': 'medio' } },
         ID_TIPO_MARCA: { titulo: 'Tipo' }, ID_PRIORIDAD: { titulo: 'Prioridad', colores: { 'Alta': 'alto' } }, ID_VIA: { titulo: 'Vía' }, WEB: { tipo: 'enlace' }, DIRECCION: { titulo: 'Dirección (envíos)' },
@@ -309,7 +309,7 @@
     seguimiento: SECCIONES.seguimiento,
     clientes: SECCIONES.clientes,
     prospeccion: { modulo: 'listado', titulo: 'Prospección', icono: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5M11 8v6M8 11h6"/>',
-      config: mezcla(MAR, { TEXTO: 'Marcas, tiendas y editores a los que escribir o que ya has contactado.', VACIO: 'No hay marcas en prospección.',
+      config: mezcla(MAR, { TEXTO: 'Marcas, tiendas y editores a los que escribir o que ya has contactado.', FILAS: ['marca', 'marcas'], VACIO: 'No hay marcas en prospección.',
         VISTAS: MAR.VISTAS.filter(function (v) { return v.id === 'PROSPECCION' || v.id === 'TODAS'; }), _refs: refsDesde('MARCAS') }) },
     proveedores: SECCIONES.proveedores,
     telas: SECCIONES.telas
