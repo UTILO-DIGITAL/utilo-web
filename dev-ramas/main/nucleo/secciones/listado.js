@@ -215,7 +215,7 @@
       buscar: cfg.BUSCAR && cfg.BUSCAR.length ? cfg.BUSCAR : null, campos: cfg.CAMPOS || {}, ficha: cfg.FICHA || [],
       relacionados: cfg.RELACIONADOS || [], vistas: cfg.VISTAS || [], avisos: cfg.AVISOS || [], editar: cfg.EDITAR || [],
       crear: !!cfg.CREAR, texto: cfg.TEXTO || '', vacio: cfg.VACIO || '', refs: cfg._refs || {}, filtro: cfg.FILTRO || [],
-      nueva: cfg.NUEVA || {}, obligatorias: cfg.OBLIGATORIAS || [] };
+      nueva: cfg.NUEVA || {}, obligatorias: cfg.OBLIGATORIAS || [], filtros: cfg.FILTROS || [] };
   }
   /** El campo de un apartado, con su título y tipo por defecto (una columna FECHA… es una fecha; ESTADO, un estado). */
   function campo(ap, c) {
@@ -273,7 +273,7 @@
   }
   /** Todas las columnas que nombra la configuración (para saber qué rutas preparar). */
   function nombradas(ap) {
-    var t = [ap.nombre, ap.codigo, ap.orden].concat(ap.columnas, ap.detalle, ap.buscar || []);
+    var t = [ap.nombre, ap.codigo, ap.orden].concat(ap.columnas, ap.detalle, ap.buscar || [], ap.filtros || []);
     ap.ficha.forEach(function (g) { t = t.concat(g.campos || []); });
     vistasDe(ap).forEach(function (v) {
       t = t.concat(v.columnas || [], [v.orden, v.agrupar && (v.agrupar.campo || v.agrupar), v.tablero && v.tablero.campo]);
@@ -367,6 +367,7 @@
     lista(ap.filtro).forEach(function (cnd) { if (cnd.campo) hay(cnd.campo, 'el FILTRO usa'); });
     Object.keys(ap.nueva).forEach(function (c) { hay(c, 'NUEVA pone'); });
     ap.obligatorias.forEach(function (c) { hay(c, 'OBLIGATORIAS nombra'); });
+    lista(ap.filtros).forEach(function (c) { hay(c, 'FILTROS nombra'); });
     var vids = {};
     vistasDe(ap).forEach(function (v) {
       if (vids[v.id]) errores.push(donde + 'la vista «' + v.id + '» está dos veces.');
@@ -474,11 +475,112 @@
       if (vista && vista.filtro && !cumple(f, vista.filtro, { hoy: o.hoy })) return false;
       if (o.aviso) { var a = (ap.avisos || []).filter(function (x) { return x.id === o.aviso; })[0]; if (a && !cumple(f, a.si, { hoy: o.hoy, dias: a.dias === undefined ? 7 : a.dias })) return false; }
       if (q && !dondeBuscar.some(function (c) { return norm(f[c]).indexOf(q) >= 0; })) return false;
+      if (o.filtros && !cumpleFiltros(ap, f, o.filtros, o.valores)) return false; // T0625: lo de «Filtrar»
       return true;
     });
     var ord = (vista && vista.orden) || ap.orden;
     return ord ? r.slice().sort(comparar(ord)) : r;
   }
+
+  /* ---------- T0625 · filtros por columna («Filtrar») ----------
+   * Lo que se elige en «Filtrar», encima de la vista, del buscador y del aviso elegido. Cada columna que se ve en la vista
+   * (o las de FILTROS) se filtra según lo que lleva: una lista (un estado, sus opciones, lo que apunta a otra tabla, Sí o
+   * No, o un texto con pocos valores distintos, como el proveedor), un rango (números, importes, porcentajes, calculados o
+   * un texto que siempre es un número, como el gramaje «273») o unas fechas (desde y hasta). El texto libre, las notas, las
+   * fotos y los enlaces, no: para eso está el buscador. Lo oculto de la vista (lo privado en la de clientes), tampoco.
+   * filtros: { COLUMNA: { es: 'valor' } | { vacio: true } | { min, max } | { desde, hasta } } (fechas aaaa-mm-dd). */
+  var MAX_LISTA = 40; // más valores distintos que esto es un texto libre: se busca, no se elige de una lista
+  function nada(v) { return vacio(v) || (typeof v === 'number' && isNaN(v)); }
+  /** Un número o un intervalo escrito como texto («273», «1.020 ₹», «400–500», «400 - 500») → [mínimo, máximo]; null si no lo es. */
+  function aIntervalo(v) {
+    var n = aNumero(v);
+    if (!isNaN(n)) return [n, n];
+    if (typeof v !== 'string') return null;
+    var m = /^\s*(.+?)\s*(?:[–—]|\s-\s|(?<=\d)-(?=\d))\s*(.+?)\s*$/.exec(v);
+    if (!m) return null;
+    var a = aNumero(m[1]), b = aNumero(m[2]);
+    return isNaN(a) || isNaN(b) ? null : [Math.min(a, b), Math.max(a, b)];
+  }
+  function valorDe(ap, c, f, valores) { var cp = campo(ap, c); return cp.calculo ? calcular(cp.calculo, f, valores) : f[c]; }
+  /** Las columnas que se pueden filtrar en esta vista con estas filas: [{ campo, titulo, tipo: lista|rango|fecha, opciones, vacios, unidad }]. */
+  function filtrables(ap, vista, filas, valores) {
+    var fuera = ocultas(ap, vista), r = [];
+    var cs = ap.filtros && ap.filtros.length ? ap.filtros : columnasDe(ap, vista).concat(ap.detalle || []);
+    cs.forEach(function (c) {
+      // El código y el nombre de cada fila se buscan: no se eligen de una lista (salvo que FILTROS los pida).
+      var pedido = !!(ap.filtros && ap.filtros.length);
+      if (!c || fuera.indexOf(c) >= 0 || r.some(function (x) { return x.campo === c; }) || (!pedido && (c === ap.codigo || c === ap.nombre))) return;
+      var cp = campo(ap, c);
+      if (/^(nota|foto|enlace|email|telefono)$/.test(cp.tipo)) return;
+      var vs = filas.map(function (f) { return valorDe(ap, c, f, valores); }), llenos = vs.filter(function (v) { return !nada(v); });
+      var hayVacios = llenos.length < vs.length, base = { campo: c, titulo: cp.titulo, vacios: hayVacios };
+      if (!llenos.length) return;
+      if (cp.tipo === 'fecha') { if (llenos.some(aFecha)) r.push(Object.assign(base, { tipo: 'fecha' })); return; }
+      var distintos = [];
+      llenos.forEach(function (v) { var s = String(v).trim(); if (distintos.map(norm).indexOf(norm(s)) < 0) distintos.push(s); });
+      var esLista = cp.ids || cp.opciones || /^(estado|sino)$/.test(cp.tipo);
+      var numeros = llenos.every(function (v) { return aIntervalo(v) !== null; });
+      if (!esLista && (/^(importe|numero|porcentaje)$/.test(cp.tipo) || cp.calculo || numeros)) {
+        if (distintos.length > 1 && numeros) r.push(Object.assign(base, { tipo: 'rango', unidad: cp.tipo === 'porcentaje' ? '%' : (cp.unidad || (cp.tipo === 'importe' ? '€' : '')) }));
+        return;
+      }
+      if (distintos.length > MAX_LISTA || distintos.length + (hayVacios ? 1 : 0) < 2) return;
+      // Un texto sin opciones solo es una lista si se repite (la ciudad, con quién): si cada fila dice una cosa, es texto libre.
+      if (!esLista && !pedido && distintos.length === llenos.length) return;
+      var ops = (cp.opciones || []).filter(function (o) { return distintos.map(norm).indexOf(norm(o)) >= 0; });
+      distintos.slice().sort(function (a, b) { return a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' }); })
+        .forEach(function (v) { if (ops.map(norm).indexOf(norm(v)) < 0) ops.push(v); });
+      r.push(Object.assign(base, { tipo: 'lista', opciones: ops }));
+    });
+    return r;
+  }
+  /** Si una fila (como se ve) cumple los filtros puestos. */
+  function cumpleFiltros(ap, f, filtros, valores) {
+    return Object.keys(filtros || {}).every(function (c) {
+      var x = filtros[c], v = valorDe(ap, c, f, valores);
+      if (!x) return true;
+      if (x.vacio) return nada(v);
+      if (x.es !== undefined) return !nada(v) && norm(v) === norm(x.es);
+      if (x.min !== undefined || x.max !== undefined) {
+        // Un intervalo («400–500») entra si se cruza con lo pedido: «de 450 a 600» lo incluye.
+        var iv = aIntervalo(v);
+        if (!iv) return false;
+        if (campo(ap, c).tipo === 'porcentaje') iv = iv.map(function (n) { return Math.round(n * 100 * 1e6) / 1e6; }); // se escribe 30, no 0,3
+        if (typeof x.min === 'number' && iv[1] < x.min) return false;
+        if (typeof x.max === 'number' && iv[0] > x.max) return false;
+        return true;
+      }
+      if (x.desde || x.hasta) {
+        var d = aFecha(v);
+        if (!d) return false;
+        if (x.desde && aFecha(x.desde) && d < aFecha(x.desde)) return false;
+        if (x.hasta && aFecha(x.hasta) && d > aFecha(x.hasta)) return false;
+      }
+      return true;
+    });
+  }
+  /** Solo los filtros que valen en esta vista (de columnas que se pueden filtrar en ella) y que dicen algo. */
+  function filtrosQueValen(filtros, disponibles) {
+    var r = {}, ids = disponibles.map(function (x) { return x.campo; });
+    Object.keys(filtros || {}).forEach(function (c) {
+      var x = filtros[c];
+      if (!x || ids.indexOf(c) < 0) return;
+      if (x.vacio || (x.es !== undefined && x.es !== '') || typeof x.min === 'number' || typeof x.max === 'number' || x.desde || x.hasta) r[c] = x;
+    });
+    return r;
+  }
+  /** Lo que dice la etiqueta de un filtro puesto: «Proveedor: Ramesh», «Gramaje: de 120 a 180», «Fecha: desde el 01/11/2026». */
+  function textoFiltro(d, x) {
+    var u = d.unidad ? (d.unidad === '%' ? ' %' : ' ' + d.unidad) : '';
+    var n = function (v) { return num(v, v % 1 === 0 ? 0 : (Math.round(v * 10) / 10 === v ? 1 : 2)); }; // la unidad, una vez, al final
+    if (x.vacio) return 'Sin ' + d.titulo.toLowerCase();
+    if (x.es !== undefined) return d.titulo + ': ' + x.es;
+    var hayMin = typeof x.min === 'number', hayMax = typeof x.max === 'number';
+    if (hayMin || hayMax) return d.titulo + ': ' + (hayMin && hayMax ? (x.min === x.max ? n(x.min) : 'de ' + n(x.min) + ' a ' + n(x.max)) : (hayMin ? 'desde ' + n(x.min) : 'hasta ' + n(x.max))) + u;
+    if (x.desde && x.hasta) return d.titulo + ': ' + (x.desde === x.hasta ? 'el ' + fechaCorta(x.desde) : 'del ' + fechaCorta(x.desde) + ' al ' + fechaCorta(x.hasta));
+    return d.titulo + ': ' + (x.desde ? 'desde el ' + fechaCorta(x.desde) : 'hasta el ' + fechaCorta(x.hasta));
+  }
+
   var PLAZOS = [
     { id: 'pasado', titulo: 'Con la fecha pasada', hasta: -1 },
     { id: 'hoy', titulo: 'Hoy', desde: 0, hasta: 0 },
@@ -595,7 +697,8 @@
     valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, mover: mover, paraClaude: paraClaude,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
-    relacionadas: relacionadas, verTexto: verTexto, cuando: cuando, comparar: comparar };
+    relacionadas: relacionadas, verTexto: verTexto, cuando: cuando, comparar: comparar,
+    filtrables: filtrables, aIntervalo: aIntervalo, cumpleFiltros: cumpleFiltros, filtrosQueValen: filtrosQueValen, textoFiltro: textoFiltro };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -606,6 +709,7 @@
   function json(t) { try { return JSON.parse(t || 'null'); } catch (e) { return null; } }
   var ICONO_AJUSTAR = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>';
   var ICONO_X = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  var ICONO_FILTRO = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8L4 5z"/></svg>';
   var ICONO_COPIAR = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>';
   var MENU = 'MENU'; // la fila de PREFERENCIAS con el orden del menú
   var teclaEsc = null, alMover = null, alSoltar = null, alCancelar = null; // oyentes del documento, para quitarlos al cerrar
@@ -616,7 +720,8 @@
       var BASE = apartado(cfg, ctx.id, ctx.titulo), PREF = cfg.PREFERENCIAS || '';
       var puedePersonalizar = !!ctx.admin || (cfg.PERSONALIZAN || []).indexOf(ctx.perfil) >= 0;
       var K = 'li_' + ctx.id + '_';
-      var S = { vista: guardado(K + 'vista'), q: '', aviso: '', leido: false };
+      // T0625: los filtros (S.filtros) no se recuerdan: al volver a la sección, se ve todo.
+      var S = { vista: guardado(K + 'vista'), q: '', aviso: '', filtros: {}, leido: false };
       var url = new URLSearchParams(location.search), pedida = url.get('ficha');
 
       el.innerHTML = '<div id="li-cont"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div>' +
@@ -701,15 +806,25 @@
         var deVista = filtrar(a, vista, todas, { hoy: hoy });
         var avs = vista.cliente ? [] : avisosActivos(a).map(function (x) { return { a: x, n: filtrar(a, vista, todas, { hoy: hoy, aviso: x.id }).length }; }).filter(function (x) { return x.n; });
         if (S.aviso && !avs.some(function (x) { return x.a.id === S.aviso; })) S.aviso = '';
-        var fs = filtrar(a, vista, todas, { hoy: hoy, q: S.q, aviso: S.aviso });
+        // T0625: los filtros que no valen en esta vista (una columna que no se ve, lo privado en la de clientes) se quitan.
+        var disp = filtrables(a, vista, deVista, VAL);
+        S.filtros = filtrosQueValen(S.filtros, disp);
+        var nf = Object.keys(S.filtros).length;
+        var fs = filtrar(a, vista, todas, { hoy: hoy, q: S.q, aviso: S.aviso, filtros: S.filtros, valores: VAL });
         html += '<div class="li-barra"><div class="li-buscar"><label class="u-oculto" for="li-q">Buscar</label><input id="li-q" type="search" placeholder="Buscar en ' + texto((a.titulo || '').toLowerCase()) + '" value="' + texto(S.q) + '" autocomplete="off"></div>' +
+          (disp.length ? '<button type="button" class="u-btn li-filtrar" data-filtrar aria-haspopup="dialog"' + (nf ? ' aria-pressed="true"' : '') + '>' + ICONO_FILTRO + 'Filtrar' + (nf ? ' <span class="li-nf" aria-label="' + nf + (nf === 1 ? ' puesto' : ' puestos') + '">' + nf + '</span>' : '') + '</button>' : '') +
           '<span class="u-nota li-cuenta">' + (fs.length === deVista.length ? fs.length + (fs.length === 1 ? ' fila' : ' filas') : fs.length + ' de ' + deVista.length) + '</span>' +
           (a.crear && editables(a).length && !vista.cliente ? '<button type="button" class="u-btn u-btn-accion li-nueva" data-nueva>Añadir</button>' : '') + '</div>';
+        // Los filtros puestos, a la vista: cada uno se quita con su ✕, o todos a la vez.
+        if (nf) html += '<div class="li-filtros" role="group" aria-label="Filtros puestos">' + disp.filter(function (d) { return S.filtros[d.campo]; }).map(function (d) {
+          var t = textoFiltro(d, S.filtros[d.campo]);
+          return '<button type="button" class="li-fchip" data-quitar="' + texto(d.campo) + '" aria-label="Quitar el filtro ' + texto(t) + '">' + texto(t) + ICONO_X + '</button>';
+        }).join('') + '<button type="button" class="u-btn u-btn-texto li-fquitar" data-quitar="">Quitar filtros</button></div>';
         if (avs.length) html += '<div class="li-avisos" role="group" aria-label="Avisos">' + avs.map(function (x) {
           return '<button type="button" class="li-av li-' + texto(x.a.nivel || 'medio') + '" data-aviso="' + texto(x.a.id) + '" aria-pressed="' + (S.aviso === x.a.id) + '"><b>' + x.n + '</b> ' + texto(x.a.titulo) + '</button>';
         }).join('') + (S.aviso ? '<button type="button" class="u-btn u-btn-texto" data-aviso="">Ver todas</button>' : '') + '</div>';
         if (!todas.length) html += '<p class="u-vacio">' + texto(a.vacio || 'Todavía no hay nada en ' + (a.titulo || '').toLowerCase() + '.') + '</p>';
-        else if (!fs.length) html += '<p class="u-vacio">' + (S.q ? 'Nada con «' + texto(S.q) + '».' : 'Nada en esta vista.') + '</p>';
+        else if (!fs.length) html += '<p class="u-vacio">' + (S.q ? 'Nada con «' + texto(S.q) + '»' + (nf ? ' y estos filtros.' : '.') : (nf ? 'Nada con estos filtros.' : 'Nada en esta vista.')) + '</p>';
         else if (vista.tablero) html += pintarTablero(a, vista, fs, hoy);
         else html += pintarGrupos(a, vista, agrupar(a, vista, fs, hoy), hoy);
         // Si no ha cambiado nada (un refresco por detrás con lo mismo), no se rehace: un toque a medias en una fila no se pierde.
@@ -920,6 +1035,74 @@
         if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(hecho, aMano); else aMano();
       }
 
+      /* ---------- T0625 · Filtrar ----------
+       * Un campo por cada columna que se puede filtrar en la vista: una lista, «de … a …» o «desde … hasta …» (fechas). El
+       * botón dice cuántas filas quedan mientras se elige; nada cambia en la lista hasta que se pulsa. */
+      function panelFiltros() {
+        var a = ap(), vista = vistaActual(a), hoy = hoyIso(), todas = vistas(a);
+        var disp = filtrables(a, vista, filtrar(a, vista, todas, { hoy: hoy }), VAL), F = S.filtros;
+        var h = '<div class="li-ficha-cab"><h2 id="li-vt">Filtrar · ' + texto(a.titulo || '') + '</h2><button type="button" class="u-btn u-btn-icono" data-cerrar aria-label="Cerrar">' + ICONO_X + '</button></div>' +
+          '<form id="li-ff" class="li-form" novalidate><div class="u-campos">' + disp.map(function (d, i) {
+            var x = F[d.campo] || {}, id = 'li-f' + i, et = function (para) { return '<label class="u-etiqueta" for="' + para + '">' + texto(d.titulo) + '</label>'; };
+            if (d.tipo === 'lista') {
+              return '<div class="u-campo">' + et(id) + '<select id="' + id + '" data-f="' + texto(d.campo) + '"><option value="">Cualquiera</option>' +
+                d.opciones.map(function (o) { return '<option value="=' + texto(o) + '"' + (x.es !== undefined && norm(x.es) === norm(o) ? ' selected' : '') + '>' + texto(o) + '</option>'; }).join('') +
+                (d.vacios ? '<option value="!"' + (x.vacio ? ' selected' : '') + '>Sin ' + texto(d.titulo.toLowerCase()) + '</option>' : '') + '</select></div>';
+            }
+            var fecha = d.tipo === 'fecha', t = fecha ? 'date' : 'text', k1 = fecha ? 'desde' : 'min', k2 = fecha ? 'hasta' : 'max';
+            var v1 = x[k1] === undefined ? '' : (fecha ? x[k1] : String(x[k1]).replace('.', ',')), v2 = x[k2] === undefined ? '' : (fecha ? x[k2] : String(x[k2]).replace('.', ','));
+            var extra = fecha ? '' : ' inputmode="decimal" autocomplete="off"', u = d.unidad ? '<span class="u-nota">' + texto(d.unidad) + '</span>' : '';
+            return '<fieldset class="u-campo li-rango"><legend class="u-etiqueta">' + texto(d.titulo) + '</legend><div class="li-rango-c">' +
+              '<label class="u-oculto" for="' + id + 'a">' + texto(d.titulo) + (fecha ? ' desde' : ' desde (mínimo)') + '</label><span class="u-nota">' + (fecha ? 'Desde' : 'De') + '</span>' +
+              '<input id="' + id + 'a" type="' + t + '"' + extra + ' data-f="' + texto(d.campo) + '" data-k="' + k1 + '" value="' + texto(v1) + '">' +
+              '<label class="u-oculto" for="' + id + 'b">' + texto(d.titulo) + (fecha ? ' hasta' : ' hasta (máximo)') + '</label><span class="u-nota">' + (fecha ? 'hasta' : 'a') + '</span>' +
+              '<input id="' + id + 'b" type="' + t + '"' + extra + ' data-f="' + texto(d.campo) + '" data-k="' + k2 + '" value="' + texto(v2) + '">' + u + '</div></fieldset>';
+          }).join('') + '</div><p class="u-error" id="li-ferr" role="alert" hidden></p>' +
+          '<div class="n-botones"><button type="submit" class="u-btn u-btn-accion" data-ver></button><button type="button" class="u-btn u-btn-texto" data-fquitar>Quitar filtros</button></div></form>';
+        abrirVentana(h);
+        var form = vent.querySelector('#li-ff'), boton = form.querySelector('[data-ver]'), err = vent.querySelector('#li-ferr');
+        /** Lo elegido en el panel: { filtros } o { error } (un número que no lo es). */
+        function leer() {
+          var r = {}, mal = '';
+          [].forEach.call(form.querySelectorAll('[data-f]'), function (i) {
+            var c = i.getAttribute('data-f'), k = i.getAttribute('data-k'), v = i.value.trim();
+            i.removeAttribute('aria-invalid');
+            if (!v) return;
+            if (!k) { r[c] = v === '!' ? { vacio: true } : { es: v.slice(1) }; return; }
+            if (k === 'min' || k === 'max') {
+              var n = aNumero(v);
+              if (isNaN(n)) { i.setAttribute('aria-invalid', 'true'); mal = mal || 'Escribe solo un número en ' + campo(a, c).titulo.toLowerCase() + '.'; return; }
+              v = /%$/.test(v) ? n * 100 : n; // «30 %» es 30, como se ve
+            }
+            (r[c] = r[c] || {})[k] = v;
+          });
+          // Al revés («de 300 a 100», «del 15 al 1»): se entiende y se da la vuelta.
+          Object.keys(r).forEach(function (c) {
+            var x = r[c];
+            if (typeof x.min === 'number' && typeof x.max === 'number' && x.min > x.max) { var t1 = x.min; x.min = x.max; x.max = t1; }
+            if (x.desde && x.hasta && x.desde > x.hasta) { var t2 = x.desde; x.desde = x.hasta; x.hasta = t2; }
+          });
+          return { filtros: r, error: mal };
+        }
+        function contar() {
+          var l = leer(), n = filtrar(a, vista, todas, { hoy: hoy, q: S.q, aviso: S.aviso, filtros: l.filtros, valores: VAL }).length;
+          err.textContent = l.error; err.hidden = !l.error;
+          boton.textContent = n ? 'Ver ' + n + (n === 1 ? ' fila' : ' filas') : 'Ninguna fila así';
+          return l;
+        }
+        contar();
+        form.addEventListener('input', contar);
+        form.addEventListener('change', contar);
+        form.addEventListener('submit', function (ev) {
+          ev.preventDefault();
+          var l = contar();
+          if (l.error) return;
+          S.filtros = l.filtros;
+          cerrarVentana(); pintar();
+        });
+        vent.querySelector('[data-fquitar]').addEventListener('click', function () { S.filtros = {}; cerrarVentana(); pintar(); });
+      }
+
       /* ---------- personalizar ---------- */
       function guardarPref(clave, valor, otraVez) {
         var txt = JSON.stringify(valor);
@@ -990,8 +1173,17 @@
 
       /* ---------- eventos ---------- */
       cont.addEventListener('click', function (ev) {
-        var t = ev.target.closest('[data-vista],[data-aviso],[data-id],[data-pers],[data-nueva]');
+        var t = ev.target.closest('[data-vista],[data-aviso],[data-id],[data-pers],[data-nueva],[data-filtrar],[data-quitar]');
         if (!t) return;
+        if (t.hasAttribute('data-filtrar')) { panelFiltros(); return; }
+        if (t.hasAttribute('data-quitar')) {
+          var qc = t.getAttribute('data-quitar');
+          if (qc) delete S.filtros[qc]; else S.filtros = {};
+          pintar();
+          // El foco no se pierde: a la siguiente etiqueta o, si ya no queda ninguna, al botón Filtrar.
+          var sig = cont.querySelector('.li-fchip') || cont.querySelector('[data-filtrar]'); if (sig) sig.focus();
+          return;
+        }
         if (t.hasAttribute('data-vista')) { S.vista = t.getAttribute('data-vista'); S.aviso = ''; guardado(K + 'vista', S.vista); pintar(); return; }
         if (t.hasAttribute('data-aviso')) { var x = t.getAttribute('data-aviso'); S.aviso = S.aviso === x ? '' : x; pintar(); return; }
         if (t.hasAttribute('data-pers')) { personalizar(); return; }

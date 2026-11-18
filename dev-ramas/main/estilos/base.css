@@ -2071,3 +2071,22 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u a.li-rel-f { text-decoration: none; }
 .u .li-rel-f .li-ir { margin-left: auto; font-weight: 700; color: var(--color-principal-oscuro); white-space: nowrap; }
 .u div.li-rel-f { cursor: default; }
+/* T0625 · Filtrar en la sección Listado: el botón (con cuántos hay puestos), las etiquetas de los puestos, que se quitan con
+   su ✕ o todas con «Quitar filtros», y en el panel los rangos «de … a …» y «desde … hasta …». */
+.u .li-barra .li-filtrar { font-size: 15px; padding: 0 var(--e3); gap: var(--e1); }
+.u .li-filtrar[aria-pressed=true] { border-color: var(--color-principal-oscuro); color: var(--color-principal-oscuro); }
+.u .li-nf { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px;
+  background: var(--color-principal-oscuro); color: #fff; font: 700 13px/1 var(--fuente-texto); font-variant-numeric: tabular-nums; }
+.u .li-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); margin: calc(var(--e1) * -1) 0 var(--e3); }
+.u .li-fchip { display: inline-flex; align-items: center; gap: var(--e1); min-height: 36px; padding: 0 var(--e2) 0 var(--e3); border-radius: 18px; cursor: pointer;
+  border: 1.5px solid var(--color-principal-oscuro); background: color-mix(in srgb, var(--color-principal-oscuro) 8%, var(--color-superficie));
+  color: var(--color-texto); font: 600 14px/1.2 var(--fuente-texto); text-align: left; }
+.u .li-fchip .u-icono { width: 16px; height: 16px; flex: none; }
+.u .li-fchip:hover .u-icono { color: var(--color-principal-oscuro); }
+.u .li-filtros .li-fquitar { min-height: 36px; font-size: 14px; }
+.u fieldset.li-rango { border: 0; padding: 0; margin: 0; }
+.u .li-rango legend { padding: 0; margin-bottom: var(--e1); }
+.u .li-rango-c { display: flex; align-items: center; gap: var(--e2); }
+.u .li-rango-c input { flex: 1 1 0; min-width: 0; width: auto; }
+.u .li-rango-c .u-nota { margin: 0; white-space: nowrap; }
+@media (max-width: 639px) { .u .li-barra .li-filtrar { order: 2; } }
