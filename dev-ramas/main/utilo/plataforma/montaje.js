@@ -32,7 +32,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Tareas",
    "icono": "<rect x=\"3\" y=\"4\" width=\"5\" height=\"16\" rx=\"1\"/><rect x=\"10\" y=\"4\" width=\"5\" height=\"11\" rx=\"1\"/><rect x=\"17\" y=\"4\" width=\"4\" height=\"7\" rx=\"1\"/>",
    "web": "utilo/secciones/tablero.js",
-   "version": "37b68ce505",
+   "version": "c61eed98e2",
    "perfiles": "todos",
    "config": {
     "VISTA": "ocho",

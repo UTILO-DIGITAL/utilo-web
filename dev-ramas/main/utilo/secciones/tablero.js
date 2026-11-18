@@ -1351,6 +1351,10 @@
         };
         if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(bien, aMano); else aMano();
       }
+      /** T0617 · Si, al quedar Por publicar, la función ha lanzado «Por publicar» para ver si ya está publicada. */
+      function porPublicarYa(r) {
+        return r.estado === 'Aprobada' && r.comprobar === 'lanzada' ? ' Si ya está publicada, pasa a Entregada en un par de minutos.' : '';
+      }
       function pedirAprobar(id, probar) {
         var a = aprob[id] = { paso: probar ? 'mirando' : 'aprobando', r: (aprob[id] || {}).r };
         if (abiertaId === id) pintarFicha();
@@ -1361,7 +1365,7 @@
           delete aprob[id];
           var n = r.fusionadas || 0;
           if (ctx.abierta()) ctx.aviso(id + ' aprobada' + (n ? ' y ' + (n === 1 ? 'su PR, fusionada' : 'sus ' + n + ' PR, fusionadas') : '') +
-            (r.estado === 'Entregada' ? ': no lleva nada que publicar, queda Entregada.' : ': queda Por publicar.') + (r.simulada ? ' (En local no sale nada hacia GitHub.)' : ''));
+            (r.estado === 'Entregada' ? ': no lleva nada que publicar, queda Entregada.' : ': queda Por publicar.') + porPublicarYa(r) + (r.simulada ? ' (En local no sale nada hacia GitHub.)' : ''));
           return alDia(id);
         }, function (e) {
           if (aprob[id] !== a) return;
