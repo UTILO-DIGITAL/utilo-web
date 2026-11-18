@@ -10,8 +10,13 @@
      inventados de ejemplo-telas.js (con el modelo del Excel GESTION de Marta, T0598) y un motor de mentira en memoria (motor-falso.js):
      sin Google ni Supabase, y lo que se cambia se pierde al recargar. npm run local → http://localhost:8080/dev/listado/
      (#duena, #ayudante o #admin: quién entra). La app de Marta de verdad, sobre su Excel GESTION (T0598), llega con T0600 a T0602. -->
-<link rel="stylesheet" href="../../telas/marca.css?v=3"> <!-- T0610: con la marca de Telas, como la app de Marta -->
-<link rel="stylesheet" href="../../estilos/base.css?v=97">
+<!-- T0610: con la marca de Telas, como la app de Marta. T0624: ?marca=utilo o ?marca=konamigas, con la de otra marca
+     (para ver que los avisos se ven igual que siempre fuera de Telas). -->
+<script>
+  window.LI_MARCA = (/[?&]marca=(utilo|konamigas|telas)\b/.exec(location.search) || [])[1] || 'telas';
+  document.write('<link rel="stylesheet" href="../../' + window.LI_MARCA + '/marca.css?v=3">');
+</script>
+<link rel="stylesheet" href="../../estilos/base.css?v=98">
 <style>
   /* El selector de quién entra: fuera del marco (que rehace el body), abajo a la derecha, encima de la barra del móvil. */
   #mf-quien { position: fixed; right: max(12px, env(safe-area-inset-right, 0px)); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 90;
