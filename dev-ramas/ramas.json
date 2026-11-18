@@ -1017,9 +1017,9 @@
    ]
   },
   "utilo": {
-   "rama": "T0613-botones-por-publicar",
-   "commit": "4670f17",
-   "fecha": "2026-11-18T10:18:26.333Z",
+   "rama": "T0617-entregar-al-aprobar",
+   "commit": "67e291e",
+   "fecha": "2026-11-18T12:06:30.092Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
