@@ -170,7 +170,9 @@
   function presPorDes(d) { return !!d.cfg.DESGLOSE && d.colsPre.indexOf(d.cfg.DESGLOSE) >= 0; }
   function preDe(d, p, des) {
     var xs = !presPorPeriodo(d) ? d.pre : p ? d.pre.filter(function (r) { return String(r[d.cfg.PERIODO] || '') === p.id; }) : [];
-    return des && presPorDes(d) ? xs.filter(function (r) { return deDes(d, r, des); }) : xs;
+    // T0628: mirando una sola parte del desglose (una venta) sin presupuesto por desglose, no hay previsto que comparar.
+    if (des && !presPorDes(d)) return [];
+    return des ? xs.filter(function (r) { return deDes(d, r, des); }) : xs;
   }
   /** ¿Es una categoría del reparto del beneficio (config REPARTO)? */
   function esReparto(d, c) { return !!d.cfg.REPARTO && !!c && String(c.GRUPO || '') === String(d.cfg.REPARTO); }
@@ -795,6 +797,8 @@
         var r = resumen(d, per, S.des), ps = presupuesto(d, per, S.des), gs = grupos(d, ps);
         var pi = 0, pg = 0; gs.forEach(function (g) { if (g.tipo === 'Ingreso') pi += g.previsto; else pg += g.previsto; });
         var pb = pi - pg, desv = r.resultado - pb, ds = desglose(d, per), h = '';
+        // T0628: cada venta, con su marca, como en Ventas.
+        if (VEN && ds) ds.forEach(function (x) { var f = x.id ? ix.des[String(x.id)] : null; if (f) x.nombre = nombreVenta(f); });
         if (ds && ds.length) {
           h += '<div class="u-filtros eco-filtro-des"><label class="u-campo"><span class="u-etiqueta">' + texto(nomDes) + '</span><select id="eco-des">' +
             opciones(ds.map(function (x) { return [x.id || '-', x.nombre]; }), S.des, 'Todas') + '</select></label></div>';
@@ -1938,7 +1942,7 @@
             if (v) {
               T.actualizar(VEN, v.ID, cambios(v, nv)).then(function () { if (ctx.abierta()) ctx.aviso('Venta guardada en el Excel.'); }, function () {});
             } else {
-              T.crear(VEN, nv).then(function (r) { if (r && r.id) { S.ven.id = String(r.id); pintar(); window.scrollTo(0, 0); } if (ctx.abierta()) ctx.aviso('Venta creada. Apunta sus pagos y cobros eligiéndola.'); }, function () {});
+              T.crear(VEN, nv).then(function (r) { if (r && r.id) { S.ven.id = String(r.id); pintar(); arriba(); } if (ctx.abierta()) ctx.aviso('Venta creada. Apunta sus pagos y cobros eligiéndola.'); }, function () {});
             }
           };
         });
@@ -1946,7 +1950,9 @@
 
       /* ---------- eventos ---------- */
 
-      function irA(tab) { S.tab = tab; guardado(CLAVE + 'tab', tab); pintar(); window.scrollTo(0, 0); }
+      /** Arriba del todo: en el móvil se desplaza el cuerpo de la página, no la ventana (como en el marco del núcleo). */
+      function arriba() { window.scrollTo(0, 0); document.body.scrollTop = 0; }
+      function irA(tab) { S.tab = tab; guardado(CLAVE + 'tab', tab); pintar(); arriba(); }
       function verMovs(f, desde) { S.mov = Object.assign(movVacio(), f, { desde: desde || '' }); irA('MOVIMIENTOS'); }
       el.addEventListener('click', function (e) {
         var t = e.target;
@@ -1974,7 +1980,7 @@
           else if (ac === 'vermascaja') { S.caja.ver = (S.caja.ver || VER) + VER; pintar(); }
           else if (ac === 'ceros') { S.ceros = !S.ceros; pintar(); }
           else if (ac === 'ceroscaja') { S.caja.ceros = !S.caja.ceros; pintar(); }
-          else if (ac === 'todascuentas') { S.caja.cue = ''; pintar(); window.scrollTo(0, 0); }
+          else if (ac === 'todascuentas') { S.caja.cue = ''; pintar(); arriba(); }
           else if (ac === 'todasdes') { S.des = ''; pintar(); }
           else if (ac === 'volver') { var dd = S.mov.desde; S.mov.desde = ''; irA(dd || 'RESUMEN'); }
           else if (ac === 'cruzados') verMovs({ cruz: true }, S.tab);
@@ -1982,7 +1988,7 @@
           else if (ac === 'nuevaventa') formVenta(null);
           else if (ac === 'editarventa') { var ve = ix.des[S.ven.id]; if (ve && !ve._nueva) formVenta(ve); }
           else if (ac === 'movventa') { var pv = {}; pv[DS] = S.ven.id; formMov(null, pv); }
-          else if (ac === 'todasventas') { S.ven.id = ''; pintar(); window.scrollTo(0, 0); }
+          else if (ac === 'todasventas') { S.ven.id = ''; pintar(); arriba(); }
           else if (ac === 'cerrardes') { S.ven.des = ''; pintar(); }
           return;
         }
@@ -1992,9 +1998,9 @@
         else if (tr.hasAttribute('data-fac')) { var f = T.fila('FACTURAS', tr.getAttribute('data-fac')); if (f && !f._nueva) formFac(f); }
         else if (tr.hasAttribute('data-precat')) formPresCat(tr.getAttribute('data-precat'));
         else if (tr.hasAttribute('data-vercat')) { if (pest.indexOf('MOVIMIENTOS') >= 0) verMovs({ cat: tr.getAttribute('data-vercat') }, S.tab); }
-        else if (tr.hasAttribute('data-verdes')) { S.des = tr.getAttribute('data-verdes'); pintar(); window.scrollTo(0, 0); }
-        else if (tr.hasAttribute('data-venta')) { S.ven.id = tr.getAttribute('data-venta'); pintar(); window.scrollTo(0, 0); }
-        else if (tr.hasAttribute('data-cuenta')) { S.caja.cue = tr.getAttribute('data-cuenta'); S.caja.ver = VER; pintar(); window.scrollTo(0, 0); }
+        else if (tr.hasAttribute('data-verdes')) { S.des = tr.getAttribute('data-verdes'); pintar(); arriba(); }
+        else if (tr.hasAttribute('data-venta')) { S.ven.id = tr.getAttribute('data-venta'); pintar(); arriba(); }
+        else if (tr.hasAttribute('data-cuenta')) { S.caja.cue = tr.getAttribute('data-cuenta'); S.caja.ver = VER; pintar(); arriba(); }
       });
       el.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && velo.classList.contains('abierto')) { cerrar(); return; }

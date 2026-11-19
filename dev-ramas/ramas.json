@@ -1085,12 +1085,12 @@
   },
   "T0628-invierte-arriesga": {
    "tarea": "T0628",
-   "titulo": "Ventas en Economía: lo que Marta tiene en juego, lo que gana y lo que le falta por recuperar",
-   "pr": null,
-   "commit": "f0adba7",
-   "ultimo": "T0628: Ventas en Economía: lo que Marta tiene en juego, lo que gana y lo que le falta por recuperar",
+   "titulo": "Ventas en la Economía de Marta: lo que tiene en juego, lo que gana y lo que le falta por recuperar",
+   "pr": 352,
+   "commit": "11be3b6",
+   "ultimo": "T0628: El Resumen pone la marca de cada venta y no compara una venta con lo previsto del año; en el móvil, una venta se abre arriba",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T11:26:03.773Z",
+   "fecha": "2026-11-19T12:26:03.667Z",
    "toca": [
     "konamigas",
     "telas",
