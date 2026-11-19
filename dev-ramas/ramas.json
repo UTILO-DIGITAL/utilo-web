@@ -775,10 +775,10 @@
    "tarea": "T0652",
    "titulo": "Ver lo último con cada cliente desde Hoy",
    "pr": 344,
-   "commit": "3cc4afd",
-   "ultimo": "T0652: Ver lo último con cada cliente desde Hoy, sin salir de la lista",
+   "commit": "a8c27e7",
+   "ultimo": "T0652: al día con la T0643 (y esta con main); base.css a la versión 103",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T08:04:21.026Z",
+   "fecha": "2026-11-19T09:07:44.356Z",
    "toca": [
     "konamigas",
     "utilo"
