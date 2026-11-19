@@ -204,7 +204,7 @@
   var EUROS = ['/', 'ID_DISENO.COSTE_INR', '$RUPIAS'], COSTE = ['redondear', ['+', EUROS, '$ENVIO'], 2];
   var COMP_DE = { tabla: 'COMPOSICION', campo: 'ID_DISENO', con: 'ID_DISENO', orden: '-PARTE', columnas: ['PARTE', 'ID_FIBRA'], campos: { PARTE: { tipo: 'porcentaje' } } };
   var COMPARATIVA_REL = {
-    titulo: 'Comparativa', tabla: 'COMPARATIVA', campo: 'ID_MARCA', con: 'ID', nombre: 'SU_TELA', siHay: true,
+    titulo: 'Comparativa', tabla: 'COMPARATIVA', campo: 'ID_MARCA', con: 'ID', nombre: 'SU_TELA', siHay: true, perfiles: ['Dueña'], // lo que le cuesta: no para la ayudante
     tarjeta: { titulo: 'SU_TELA', linea: ['HOY', 'PROPUESTA', 'HUECO'], debajo: ['ID_ESTADO'],
       comparar: { titulos: ['Su tela', 'Tu alternativa'], filas: [
         { titulo: 'Composición', campos: ['COMPOSICION', 'ALT_COMPOSICION'] }, { titulo: 'Ancho', campos: ['ANCHO', 'ID_DISENO.ANCHO'] },

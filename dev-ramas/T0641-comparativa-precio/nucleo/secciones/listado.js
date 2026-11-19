@@ -483,6 +483,9 @@
     return errores;
   }
 
+  /** T0641 · Si quien ha entrado ve lo relacionado: sin «perfiles», todos; con ellos, esos perfiles y quien administra (la
+   *  comparativa de una marca lleva lo que le cuesta a Marta: no para el perfil Ayuda, que no ve costes). */
+  function veRelacionado(r, quien) { return !r.perfiles || !!(quien && quien.admin) || lista(r.perfiles).indexOf(quien && quien.perfil) >= 0; }
   /** T0641 · Lo que enseña la tarjeta de lo relacionado: la línea, lo de debajo, el cara a cara y el detalle. */
   function camposTarjeta(r) {
     var t = r.tarjeta || {}, cs = [].concat(lista(t.titulo), t.linea || [], t.debajo || [], t.detalle || []);
@@ -888,7 +891,7 @@
     valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
-    relacionadas: relacionadas, verTexto: verTexto, rellenar: rellenar, enPlantilla: enPlantilla, expandir: expandir, camposTarjeta: camposTarjeta, desglose: desglose, cuando: cuando, comparar: comparar,
+    relacionadas: relacionadas, verTexto: verTexto, rellenar: rellenar, enPlantilla: enPlantilla, veRelacionado: veRelacionado, expandir: expandir, camposTarjeta: camposTarjeta, desglose: desglose, cuando: cuando, comparar: comparar,
     filtrables: filtrables, aIntervalo: aIntervalo, cumpleFiltros: cumpleFiltros, filtrosQueValen: filtrosQueValen, textoFiltro: textoFiltro };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
@@ -1260,7 +1263,7 @@
           acc.filter(function (x) { return x.texto; }).map(function (x) { return '<p class="u-nota li-accion-t">' + texto(x.texto) + '</p>'; }).join('');
         h += '</form>';
         // Lo relacionado (el seguimiento de un cliente): cada fila lleva a su sección, con su ficha abierta.
-        if (!nueva && !cli) a.relacionados.forEach(function (r) {
+        if (!nueva && !cli) a.relacionados.filter(function (r) { return veRelacionado(r, ctx); }).forEach(function (r) {
           // T0641: con «tarjeta», sus filas se preparan como las de una sección (rutas, calculados, «de» y plantillas de sus «campos»).
           var otroAp = r.tarjeta ? apartado({ TABLA: r.tabla, CAMPOS: r.campos || {}, COLUMNAS: (r.columnas || []).concat(camposTarjeta(r)), _refs: a.refs }) : null;
           var rs = relacionadas(r, f, otroAp ? preparar(otroAp, filas(r.tabla), D, VAL) : filas(r.tabla).map(function (x) {
