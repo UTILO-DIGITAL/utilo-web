@@ -1754,27 +1754,38 @@
             }).then(function (r) {
               var x = r && r.fila ? r.fila : null, id = (f && f.ID) || (r && r.id) || (x && x.ID), numero = (x && x.NUMERO) || nv.NUMERO || (f && f.NUMERO) || '';
               if (movId && id) T.actualizar('MOVIMIENTOS', movId, { ID_FACTURA: id }).then(function () {}, function () {});
-              if (lin && id) guardarLineas(id, ls);
               if (cliNuevo && cli.ID) ctx.llamar('economiaClienteDatos', [cli.ID, cliNuevo]).then(function () { T.refrescar(['CONTRAPARTES'], true); }, function (e) { ctx.aviso(String((e && e.message) || e)); });
-              return { id: id, numero: numero, nueva: !f && em };
+              var res = { id: id, numero: numero, nueva: !f && em };
+              // T0681: la factura no está guardada hasta que lo están sus líneas (reabierta antes, salía a medias).
+              return lin && id ? guardarLineas(id, ls).then(function () { return res; }) : res;
             });
           }
-          /** Las líneas de la factura en FACTURA_LINEAS: las nuevas se crean, las cambiadas se actualizan y las quitadas se borran. */
+          /**
+           * Las líneas de la factura en FACTURA_LINEAS: las cambiadas se actualizan, las quitadas se borran y las nuevas se
+           * crean todas en una llamada, en su orden (T0681: economiaLineasCrear; una a una, reabierta antes de acabar, la
+           * factura salía a medias). Devuelve una promesa que acaba cuando está todo.
+           */
           function guardarLineas(id, ls) {
-            var antes = lineasDe(d.lin, id), vistas = {}, altas = Promise.resolve();
+            var antes = lineasDe(d.lin, id), vistas = {}, nuevas = [], va = [];
             ls.forEach(function (l) {
               var fila = { ID_FACTURA: id, CONCEPTO: l.CONCEPTO, DETALLE: l.DETALLE, CANTIDAD: l.CANTIDAD, UNIDAD: l.UNIDAD, PRECIO: l.PRECIO, IVA_INCLUIDO: !!l.IVA_INCLUIDO };
               var a = l.ID && antes.filter(function (x) { return String(x.ID) === String(l.ID); })[0];
-              if (a) { vistas[a.ID] = 1; var c = cambios(a, fila); if (Object.keys(c).length) T.actualizar('FACTURA_LINEAS', a.ID, c).then(function () {}, function () {}); }
-              // T0669: las nuevas, una tras otra: a la vez, el ID (que da el orden) salía según llegaban y la factura las ponía al revés.
-              else altas = altas.then(function () { return T.crear('FACTURA_LINEAS', fila); }).then(function () {}, function () {});
+              if (a) { vistas[a.ID] = 1; var c = cambios(a, fila); if (Object.keys(c).length) va.push(T.actualizar('FACTURA_LINEAS', a.ID, c)); }
+              else nuevas.push(fila);
             });
-            antes.forEach(function (a) { if (!vistas[a.ID]) T.borrar('FACTURA_LINEAS', a.ID).then(function () {}, function () {}); });
+            antes.forEach(function (a) { if (!vistas[a.ID]) va.push(T.borrar('FACTURA_LINEAS', a.ID)); });
+            if (nuevas.length) va.push(ctx.llamar('economiaLineasCrear', [id, nuevas]).then(function () { return T.refrescar(['FACTURA_LINEAS'], true); }));
+            return Promise.all(va.map(function (p) { return Promise.resolve(p).then(null, function (e) { ctx.aviso('Alguna línea no se ha guardado: ' + String((e && e.message) || e)); }); }));
           }
           vent.querySelector('#f-guardar').onclick = function () {
-            var p = guardar(); if (!p) return;
-            cerrar();
-            p.then(function (r) { if (ctx.abierta()) ctx.aviso(r.nueva ? 'Factura ' + r.numero + ' guardada en el Excel.' : 'Factura guardada en el Excel.'); }, function () {});
+            var lin = porLineas(), p = guardar(); if (!p) return;
+            // T0681: con líneas, la ventana espera a que estén guardadas (si se cerrara antes, se podría reabrir a medias).
+            var bg = vent.querySelector('#f-guardar');
+            if (lin) { bg.disabled = true; bg.textContent = 'Guardando…'; } else cerrar();
+            p.then(function (r) {
+              if (lin) cerrar();
+              if (ctx.abierta()) ctx.aviso(r.nueva ? 'Factura ' + r.numero + ' guardada en el Excel.' : 'Factura guardada en el Excel.');
+            }, function () { if (lin) { bg.disabled = false; bg.textContent = 'Guardar factura'; } });
           };
           var bver = vent.querySelector('#f-ver');
           if (bver) bver.onclick = function () {
@@ -1812,11 +1823,14 @@
             ctx.llamar('economiaFacturaVer', [doc]).then(function (r) {
               if (r.faltan && r.faltan.length) { bpdf.disabled = false; bpdf.textContent = 'Guardar y sacar el PDF'; verError(['Antes de sacar el PDF falta ' + r.faltan.join(', ') + '.']); return; }
               var p = guardar(); if (!p) { bpdf.disabled = false; bpdf.textContent = 'Guardar y sacar el PDF'; return; }
-              cerrar();
-              ctx.aviso('Sacando el PDF de la factura ' + numFac(f) + '…');
-              p.then(function () { return ctx.llamar('economiaFacturaPdf', [doc]); }).then(function (x) {
+              // T0681: la ventana se cierra cuando la factura y sus líneas están guardadas (antes, se podía reabrir a medias).
+              p.then(function () {
+                cerrar();
+                ctx.aviso('Sacando el PDF de la factura ' + numFac(f) + '…');
+                return ctx.llamar('economiaFacturaPdf', [doc]);
+              }).then(function (x) {
                 return T.actualizar('FACTURAS', f.ID, { ARCHIVO_URL: x.url }).then(function () { if (ctx.abierta()) ctx.aviso('PDF de la factura ' + numFac(f) + ' guardado en Drive y enlazado.'); });
-              }, function (e) { if (ctx.abierta()) ctx.aviso(String((e && e.message) || e).replace(/^[A-Z]+: /, '')); });
+              }, function (e) { bpdf.disabled = false; bpdf.textContent = 'Guardar y sacar el PDF'; if (ctx.abierta()) ctx.aviso(String((e && e.message) || e).replace(/^[A-Z]+: /, '')); });
             }, function (e) { bpdf.disabled = false; bpdf.textContent = 'Guardar y sacar el PDF'; verError([String((e && e.message) || e)]); });
           };
           var ba = vent.querySelector('#f-apuntar');
