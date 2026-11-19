@@ -298,6 +298,15 @@
       if (v.tablero && !vale(v.tablero.campo)) delete v.tablero;
     });
     if (c.RELACIONADOS) c.RELACIONADOS = c.RELACIONADOS.filter(function (r) { return !oculta(r.tabla); });
+    // T0669: el resumen de con quién es cada fila (CONTEXTO, T0652), sin lo de una tabla oculta (el proveedor y sus personas).
+    if (c.CONTEXTO && c.CONTEXTO.de && typeof c.CONTEXTO.de === 'object') {
+      Object.keys(c.CONTEXTO.de).forEach(function (k) {
+        var x = c.CONTEXTO.de[k] || {};
+        if (oculta(x.tabla) || fuera.indexOf(k) >= 0) { delete c.CONTEXTO.de[k]; return; }
+        if (Array.isArray(x.lineas)) x.lineas = x.lineas.filter(function (l) { return !(l && oculta(l.tabla)); });
+      });
+      if (!Object.keys(c.CONTEXTO.de).length) delete c.CONTEXTO;
+    }
     Object.keys(c.VALORES || {}).forEach(function (k) { var v = c.VALORES[k]; if (v && typeof v === 'object' && oculta(v.tabla)) delete c.VALORES[k]; });
     var r = c._refs || {};
     Object.keys(r).forEach(function (t) {
@@ -305,6 +314,27 @@
       Object.keys(r[t]).forEach(function (k) { if (oculta(r[t][k])) delete r[t][k]; });
     });
     return c;
+  }
+  /**
+   * Las tablas que lee una sección (T0669: aparte, para que las pruebas usen la misma lista): la suya, lo relacionado, VALORES,
+   * PREFERENCIAS, a las que apuntan (los nombres de las fases, de las marcas…), las de los campos con «de» (también de lo
+   * relacionado, T0641) y las del resumen de con quién es cada fila (la marca, sus necesidades, sus personas; T0652).
+   */
+  function tablasQueLee(ap, cfg) {
+    var tablas = [];
+    var mas = function (t) { if (t && tablas.indexOf(t) < 0) tablas.push(t); };
+    mas(ap.tabla);
+    ap.relacionados.forEach(function (r) { mas(r.tabla); });
+    Object.keys(cfg.VALORES || {}).forEach(function (k) { var v = cfg.VALORES[k]; if (v && v.tabla) mas(v.tabla); });
+    mas(cfg.PREFERENCIAS || '');
+    Object.keys(ap.refs).forEach(mas);
+    Object.keys(ap.campos).forEach(function (c) { var de = ap.campos[c].de; if (de) mas(de.tabla); });
+    ap.relacionados.forEach(function (r) { Object.keys(r.campos || {}).forEach(function (c) { var de = r.campos[c].de; if (de) mas(de.tabla); }); });
+    if (ap.contexto) Object.keys(ap.contexto.de).forEach(function (c) {
+      var d = ap.contexto.de[c];
+      [d.tabla].concat(d.lineas.map(function (l) { return l && l.tabla; })).forEach(mas);
+    });
+    return tablas;
   }
   /** El campo de un apartado, con su título y tipo por defecto (una columna FECHA… es una fecha; ESTADO, un estado). */
   function campo(ap, c) {
@@ -1162,7 +1192,7 @@
 
   var CALC = { contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
     textoVuelta: textoVuelta, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
-    valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
+    valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, tablasQueLee: tablasQueLee, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
     relacionadas: relacionadas, verTexto: verTexto, rellenar: rellenar, enPlantilla: enPlantilla, veRelacionado: veRelacionado, expandir: expandir, camposTarjeta: camposTarjeta, desglose: desglose, cuando: cuando, comparar: comparar,
@@ -1215,20 +1245,7 @@
       }, true);
 
       /* ---------- datos ---------- */
-      var tablas = [BASE.tabla];
-      BASE.relacionados.forEach(function (r) { if (r.tabla && tablas.indexOf(r.tabla) < 0) tablas.push(r.tabla); });
-      Object.keys(cfg.VALORES || {}).forEach(function (k) { var v = cfg.VALORES[k]; if (v && v.tabla && tablas.indexOf(v.tabla) < 0) tablas.push(v.tabla); });
-      if (PREF && tablas.indexOf(PREF) < 0) tablas.push(PREF);
-      // Las tablas a las que apuntan (los nombres de las fases, de las marcas…) y las de los campos con «de».
-      Object.keys(BASE.refs).forEach(function (t) { if (tablas.indexOf(t) < 0) tablas.push(t); });
-      Object.keys(BASE.campos).forEach(function (c) { var de = BASE.campos[c].de; if (de && de.tabla && tablas.indexOf(de.tabla) < 0) tablas.push(de.tabla); });
-      // T0641: y las de los campos con «de» de lo relacionado (la composición de la alternativa de una comparativa).
-      BASE.relacionados.forEach(function (r) { Object.keys(r.campos || {}).forEach(function (c) { var de = r.campos[c].de; if (de && de.tabla && tablas.indexOf(de.tabla) < 0) tablas.push(de.tabla); }); });
-      // T0652: las del resumen de con quién es cada fila (la marca, sus necesidades, sus personas).
-      if (BASE.contexto) Object.keys(BASE.contexto.de).forEach(function (c) {
-        var d = BASE.contexto.de[c];
-        [d.tabla].concat(d.lineas.map(function (l) { return l && l.tabla; })).forEach(function (t) { if (t && tablas.indexOf(t) < 0) tablas.push(t); });
-      });
+      var tablas = tablasQueLee(BASE, cfg);
       function filas(t) { return T.filas(t) || []; }
       function filaDe(t, id) { return T.fila ? T.fila(t, id) : null; }
       var D = { filas: filas, fila: filaDe };
