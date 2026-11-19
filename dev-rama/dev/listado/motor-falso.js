@@ -23,11 +23,11 @@
     return Object.keys(E.nucleo.secciones).map(function (n) {
       var s = E.nucleo.secciones[n];
       return { id: n.toUpperCase(), base: 'LISTADO', modulo: 'listado', titulo: s.titulo, icono: s.icono || '', web: 'nucleo/secciones/listado.js', version: 'ejemplo',
-        perfiles: s.perfiles || 'todos', config: s.config, api: [] };
+        perfiles: s.perfiles || 'todos', config: s.config, api: [], aviso: s.aviso }; // T0672: el aviso de esa sección, si lo tiene
     }).filter(function (s) { return yo.admin || s.perfiles === 'todos' || s.perfiles.indexOf(yo.perfil) >= 0; });
   }
   function cred() {
-    return { persona: yo.persona, correo: yo.correo, perfil: yo.perfil, admin: yo.admin, negocio: 'Telas Marta Canela', dev: '', secciones: secciones(), version: '', versiones: [] };
+    return { persona: yo.persona, correo: yo.correo, perfil: yo.perfil, admin: yo.admin, negocio: 'Telas Marta Canela', dev: '', secciones: secciones(), version: '', versiones: [], aviso: E.nucleo.aviso || '' }; // T0672: el aviso de arriba, como Telas
   }
   // Se entra ya: la sesión de esta persona, guardada como la guarda el marco (si el navegador deja guardar).
   try { localStorage.setItem('nucleo_' + C.clave, JSON.stringify(cred())); } catch (e) {}
