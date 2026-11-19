@@ -26,8 +26,11 @@
         perfiles: s.perfiles || 'todos', config: s.config, api: [], aviso: s.aviso }; // T0672: el aviso de esa sección, si lo tiene
     }).filter(function (s) { return yo.admin || s.perfiles === 'todos' || s.perfiles.indexOf(yo.perfil) >= 0; });
   }
+  // T0682: su uso va al Supabase de Utilo de DEV (clientes/utilo/config.json · supabase.dev), como la app «telas»; en localhost
+  // no sale (nucleo/uso.js lo deja en NUCLEO_USO.local). Lo comprueba herramientas/probar-uso.js.
+  var USO = { app: 'telas', url: 'https://wpjcdszlkzxbmqkqyjsn.supabase.co', clave: 'sb_publishable_bKp5qCd6Gk5NaToFOz0Wig_dKxkLaKV' };
   function cred() {
-    return { persona: yo.persona, correo: yo.correo, perfil: yo.perfil, admin: yo.admin, negocio: 'Telas Marta Canela', dev: '', secciones: secciones(), version: '', versiones: [], aviso: E.nucleo.aviso || '' }; // T0672: el aviso de arriba, como Telas
+    return { persona: yo.persona, correo: yo.correo, perfil: yo.perfil, admin: yo.admin, negocio: 'Telas Marta Canela', dev: '', secciones: secciones(), version: '', versiones: [], uso: USO, aviso: E.nucleo.aviso || '' }; // T0672: el aviso de arriba, como Telas
   }
   // Se entra ya: la sesión de esta persona, guardada como la guarda el marco (si el navegador deja guardar).
   try { localStorage.setItem('nucleo_' + C.clave, JSON.stringify(cred())); } catch (e) {}

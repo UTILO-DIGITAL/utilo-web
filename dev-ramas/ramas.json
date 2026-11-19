@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "bf056b8d",
-   "ultimo": "Merge pull request #364 from UTILO-DIGITAL/T0673-pulir-economia",
+   "commit": "0276ebf8",
+   "ultimo": "Merge pull request #368 from UTILO-DIGITAL/T0682-registro-uso",
    "quien": "",
-   "fecha": "2026-11-19T18:16:09.403Z",
+   "fecha": "2026-11-19T20:25:56.046Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -64,7 +64,8 @@
       "web/utilo/secciones/bandeja.js",
       "web/utilo/secciones/entregas.js",
       "web/utilo/secciones/parami.js",
-      "web/utilo/secciones/tablero.js"
+      "web/utilo/secciones/tablero.js",
+      "web/utilo/secciones/uso.js"
      ],
      "clave": "dev-plataforma",
      "supabase": {
@@ -255,7 +256,8 @@
      "20261112170000_avisos_sin_telegram.sql",
      "20261112182957_plan_pruebas_tablas.sql",
      "20261112183000_plan_pruebas.sql",
-     "20261112190000_avisos_prueba_diaria.sql"
+     "20261112190000_avisos_prueba_diaria.sql",
+     "20261119200000_uso.sql"
     ]
    },
    "rama": "main"
