@@ -253,6 +253,7 @@
     if (r.aviso) o.aviso = String(r.aviso); // T0639: el aviso de arriba (config.json · nucleo.aviso)
     if (r.perfilEnMenu === false) o.perfilEnMenu = false; // T0415: Perfil fuera del menú (se abre con el nombre de la cabecera)
     if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
+    if (r.ocultar && Array.isArray(r.ocultar.tablas)) o.ocultar = { tablas: r.ocultar.tablas, refs: r.ocultar.refs || {}, filas: r.ocultar.filas || {} }; // T0650
     return o;
   }
 
@@ -726,6 +727,8 @@
    * - personaId (T0387, solo con Supabase; si no, ''): el id de quien ha entrado, el de las columnas persona (ASIGNADO…).
    * - roles (T0417, solo con Supabase; si no, []): sus roles, [{ rol, ambito, ambito_id }], para no ofrecer lo que la base no le
    *   deja (en qué iniciativas es responsable). La que manda sigue siendo la base.
+   * - ocultar (T0650): lo que su perfil no ve (config.json · nucleo.ocultar): { tablas, refs: { TABLA: [columnas] }, filas: { TABLA:
+   *   { COLUMNA: [valores] } } } o null. La sección no pide esas tablas, no enseña esas columnas ni ofrece esos valores; el motor no las da.
    * - desde y volver() (T0420): la sección de la que se viene con un enlace ({ id, titulo } o null) y volver a ella como estaba.
    */
   function ctxDe(s) {
@@ -738,10 +741,17 @@
       autor: cred.como ? cred.como.persona + ' como ' + cred.persona : cred.persona,
       personaId: cred.persona_id || '', // T0387
       roles: cred.roles || [], // T0417
+      // T0650: lo que su perfil no ve (nucleo.ocultar del motor): { tablas, refs: { TABLA: [columnas que apuntan a una oculta] },
+      // filas: { TABLA: { COLUMNA: [valores que no ve] } } } o null.
+      ocultar: cred.ocultar || null,
       // T0420: la sección de la que vienes ({ id, titulo }, o null si se ha entrado directo) y volver a ella como estaba.
       desde: (function () { var d = history.state && history.state.desde, x = d && seccion(d); return x ? { id: x.id, titulo: x.titulo } : null; })(),
       volver: function () { history.back(); },
-      correo: cred.correo || '', secciones: todas().map(function (x) { return x.enPerfil ? { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true } : { id: x.id, titulo: x.titulo }; }),
+      correo: cred.correo || '', secciones: todas().map(function (x) {
+        if (x.enPerfil) return { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true };
+        // T0644: las que esta persona personaliza (Listado: quien administra o su perfil en PERSONALIZAN) salen en su Perfil.
+        return personaliza(x) ? { id: x.id, titulo: x.titulo, personaliza: true } : { id: x.id, titulo: x.titulo };
+      }),
       tablas: tablas(),
       alCambiar: function (f) { (oyentes[s.id] = oyentes[s.id] || []).push(f); },
       llamar: llamar,
@@ -762,6 +772,21 @@
     tAviso = setTimeout(function () { a.hidden = true; }, 5000);
   }
 
+  /** T0644 · Si quien ha entrado personaliza esta sección (Listado: quien administra o su perfil en PERSONALIZAN). Lo usan el
+   *  Perfil del marco y, por ctx.secciones (personaliza), la sección Perfil. */
+  function personaliza(x) {
+    return (x.base || x.id) === 'LISTADO' && !x.enPerfil && (!!cred.admin || ((x.config || {}).PERSONALIZAN || []).indexOf(cred.perfil) >= 0);
+  }
+  /** T0644 · Personalizar en el Perfil del marco (sin sección PERFIL), como en la sección Perfil: una línea por sección. */
+  function htmlPersonalizar() {
+    var ss = todas().filter(personaliza);
+    if (!ss.length) return '';
+    return '<section class="pf-pers"><h2 class="n-grupo">Personalizar</h2><p class="u-nota">El orden del menú, qué vistas ve cada sección y con cuántos días avisa.</p>' +
+      '<ul class="pf-pers-l">' + ss.map(function (x) {
+        return '<li><a href="?s=' + encodeURIComponent(x.id.toLowerCase()) + '&personalizar=1" data-sx="' + texto(x.id) + '"><span>' + texto(x.titulo) + '</span><span aria-hidden="true">›</span></a></li>';
+      }).join('') + '</ul></section>';
+  }
+
   /** Perfil del marco, mientras el cliente no tenga la sección PERFIL: quién eres, tu perfil, las de dentro de Perfil y cerrar sesión. */
   function htmlPerfil() {
     var ves = menu().filter(function (s) { return s.id !== 'PERFIL'; }).map(function (s) { return s.titulo; }).join(', ');
@@ -780,7 +805,7 @@
       (window.UG.avisos && !cred.como ? '<div class="n-avisos" id="n-avisos"></div>' : '') +
       (dentro.length ? '<div class="n-botones">' + dentro.map(function (s) {
         return '<a class="u-btn" href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '">' + texto(s.titulo) + '</a>';
-      }).join('') + '</div>' : '') + '</div>' + htmlVersion();
+      }).join('') + '</div>' : '') + htmlPersonalizar() + '</div>' + htmlVersion();
   }
 
   function conCodigo() { return !!(window.UG.formas && window.UG.formas().indexOf('codigo') >= 0); }
@@ -1034,6 +1059,32 @@
       comprobar();      // y por detrás, con el motor
     } else { borrarComo(); acceso(''); }
   }
+  /* T0644 · Un solo patrón de pestañas (.u-pestanas) en toda la app: una línea que se desliza de lado, con la activa a la
+     vista (sin mover la página arriba o abajo) y el borde difuminado donde hay más. Vale para cualquier sección, que solo
+     pinta sus pestañas. */
+  function pestanasAVista() {
+    [].forEach.call(document.querySelectorAll('.u-pestanas'), function (p) {
+      var a = p.querySelector('[aria-selected=true]');
+      if (a && p.scrollWidth > p.clientWidth && p._activa !== a) {
+        p._activa = a;
+        var izq = a.getBoundingClientRect().left - p.getBoundingClientRect().left + p.scrollLeft, der = izq + a.offsetWidth;
+        if (izq < p.scrollLeft + 24) p.scrollLeft = Math.max(0, izq - 24);
+        else if (der > p.scrollLeft + p.clientWidth - 40) p.scrollLeft = der - p.clientWidth + 40;
+      }
+      bordes(p);
+      if (!p._conBordes) { p._conBordes = true; p.addEventListener('scroll', function () { bordes(p); }, { passive: true }); }
+    });
+  }
+  function bordes(p) {
+    var hay = p.scrollWidth > p.clientWidth + 1;
+    p.classList.toggle('u-mas-izda', hay && p.scrollLeft > 1);
+    p.classList.toggle('u-mas-dcha', hay && p.scrollLeft + p.clientWidth < p.scrollWidth - 1);
+  }
+  var tPest = 0;
+  function pestanasLuego() { cancelAnimationFrame(tPest); tPest = requestAnimationFrame(pestanasAVista); }
+  if (window.MutationObserver) new MutationObserver(pestanasLuego).observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('resize', pestanasLuego);
+
   // Con la página ya leída: así, una sección que va en la misma página (después de este archivo) ya se ha registrado.
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arrancar); else arrancar();
 })();

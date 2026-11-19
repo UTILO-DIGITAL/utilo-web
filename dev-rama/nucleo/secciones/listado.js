@@ -58,17 +58,31 @@
     var f = aFecha(v), h = aFecha(hoy);
     return f && h ? Math.round((f - h) / DIA) : null;
   }
-  /** Un número de la tabla: 12.5, «12,5», «1.234,50 €», «50 %» (0,5). NaN si no lo es. */
+  /**
+   * Un número de la tabla: 12.5, «12,5», «1.234,50 €», «50 %» (0,5). NaN si no lo es. Una coma con grupos de tres cifras
+   * detrás («1,020», «1,020.50»: como se escribe en la India y en inglés) es de miles: 1020 (T0645).
+   */
   function aNumero(v) {
     if (typeof v === 'number') return v;
     if (vacio(v)) return NaN;
     var s = String(v).trim(), pc = /%$/.test(s);
     s = s.replace(/[€₹%\s]/g, '');
-    if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, '');
+    if (/^-?[1-9]\d{0,2}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g, '');
+    else if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, '');
     s = s.replace(',', '.');
     var n = /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : NaN;
     return pc ? n / 100 : n;
   }
+
+  /**
+   * ¿Es un teléfono («+91 98200 12345», «(93) 555-12-34», «+91 78699 57726 (WhatsApp)», «619 060 112 / 670 943 907»)? Lo
+   * que va entre paréntesis con letras es una nota y no cuenta (T0656). «Formulario en la web» no: sale como texto, sin
+   * enlace (T0645).
+   */
+  function sinNotas(v) { return String(v == null ? '' : v).replace(/\([^)]*[A-Za-zÀ-ÿ][^)]*\)/g, ' ').trim(); }
+  function esTelefono(v) { var s = sinNotas(v); return /^\+?[\d\s().\-\/+]+$/.test(s) && s.replace(/\D/g, '').length >= 6; }
+  /** El número al que llama el enlace: el primero si hay varios («… / …»), solo con sus cifras y el «+». */
+  function telDe(v) { return sinNotas(v).split('/')[0].replace(/[^\d+]/g, ''); }
 
   /* ---------- condiciones (filtros de las vistas y avisos) ----------
    * Una lista de condiciones que se cumplen todas: { campo, es | no | vacio | contiene | desde | hasta | mayor | menor }.
@@ -103,7 +117,8 @@
 
   /* ---------- campos calculados ----------
    * Una expresión en JSON: un número, el nombre de una columna de la fila, «$NOMBRE» (de VALORES) o [op, …] con op
-   * +, -, *, /, «o» (el primero que no está vacío) y «redondear» ([«redondear», x, decimales]). Un hueco da NaN. */
+   * +, -, *, /, «o» (el primero que no está vacío) y «redondear» ([«redondear», x, decimales]). Un campo calculado puede usar
+   * otro por su nombre (campo() lo cambia por su cálculo; T0641). Un hueco da NaN. */
   function calcular(expr, f, valores) {
     if (typeof expr === 'number') return expr;
     if (typeof expr === 'string') {
@@ -124,6 +139,16 @@
     if (op === '-') return ns.length === 1 ? -ns[0] : ns.slice(1).reduce(function (s, n) { return s - n; }, ns[0]);
     if (op === '/') return ns[1] === 0 ? NaN : ns[0] / ns[1];
     return NaN;
+  }
+  /** T0641 · Una expresión con los campos calculados que nombra cambiados por su cálculo (el ahorro usa «MI_PRECIO»). */
+  function expandir(expr, campos, vistos) {
+    vistos = vistos || [];
+    if (typeof expr === 'string') {
+      var d = (campos || {})[expr];
+      return d && d.calculo && vistos.indexOf(expr) < 0 ? expandir(d.calculo, campos, vistos.concat(expr)) : expr;
+    }
+    if (Array.isArray(expr)) return [expr[0]].concat(expr.slice(1).map(function (e) { return expandir(e, campos, vistos); }));
+    return expr;
   }
   /** Las columnas y valores ($…) que usa una expresión. */
   function usa(expr, acc) {
@@ -215,17 +240,89 @@
       buscar: cfg.BUSCAR && cfg.BUSCAR.length ? cfg.BUSCAR : null, campos: cfg.CAMPOS || {}, ficha: cfg.FICHA || [],
       relacionados: cfg.RELACIONADOS || [], vistas: cfg.VISTAS || [], avisos: cfg.AVISOS || [], editar: cfg.EDITAR || [],
       crear: !!cfg.CREAR, texto: cfg.TEXTO || '', vacio: cfg.VACIO || '', refs: cfg._refs || {}, filtro: cfg.FILTRO || [],
-      nueva: cfg.NUEVA || {}, obligatorias: cfg.OBLIGATORIAS || [], filtros: cfg.FILTROS || [], filas: cfg.FILAS && cfg.FILAS.length ? cfg.FILAS : null };
+      nueva: cfg.NUEVA || {}, obligatorias: cfg.OBLIGATORIAS || [], filtros: cfg.FILTROS || [], filas: cfg.FILAS && cfg.FILAS.length ? cfg.FILAS : null,
+      rapidas: rapidasDe(cfg.RAPIDAS), alta: cfg.ALTA && lista(cfg.ALTA.campos).length ? { campos: lista(cfg.ALTA.campos), mas: lista(cfg.ALTA.mas) } : null,
+      deducir: cfg.DEDUCIR || {}, acciones: cfg.ACCIONES || [], contexto: contextoDe(cfg.CONTEXTO) };
+  }
+  /** T0652 · CONTEXTO de la configuración, con sus claves por defecto; null sin ninguna tabla en «de». Cada sección de
+   *  «seccion» es un nombre o { id, si: [condiciones] } (la primera que cumple la fila de la otra tabla: Clientes o Prospección). */
+  function contextoDe(c) {
+    if (!c || !c.de || typeof c.de !== 'object' || !Object.keys(c.de).length) return null;
+    var de = {};
+    Object.keys(c.de).forEach(function (k) {
+      var x = c.de[k] || {};
+      de[k] = { tabla: x.tabla || '', sub: lista(x.sub), chips: lista(x.chips), nota: x.nota || '', lineas: lista(x.lineas),
+        secciones: lista(x.seccion).map(function (s) { return typeof s === 'string' ? { id: s, si: [] } : { id: (s && s.id) || '', si: (s && s.si) || [] }; }) };
+    });
+    return { campo: c.campo || '', de: de, hecho: c.hecho || null, notas: c.notas || '', fecha: c.fecha || '',
+      hechas: typeof c.hechas === 'number' ? c.hechas : 2, pendientes: typeof c.pendientes === 'number' ? c.pendientes : 3 };
+  }
+  /** T0643 · RAPIDAS de la configuración, con sus claves por defecto; null si no hay ninguna. */
+  function rapidasDe(r) {
+    if (!r || (!r.HECHA && !r.PASAR)) return null;
+    var s = r.SIGUIENTE;
+    return { hecha: r.HECHA && r.HECHA.campo ? { campo: r.HECHA.campo, valor: r.HECHA.valor } : null, pasar: r.PASAR || '', si: r.SI || [],
+      siguiente: s && lista(s.con).length ? { con: lista(s.con), copia: lista(s.copia).length ? lista(s.copia) : lista(s.con), pone: s.pone || {} } : null };
+  }
+  /**
+   * T0650 · La configuración sin lo que el perfil de quien mira no ve (ctx.ocultar, de config.json · nucleo.ocultar): ni las
+   * tablas ocultas (lo que se lee de ellas: VALORES, lo relacionado, los campos con «de», sus referencias) ni, en las demás, las
+   * columnas que apuntan a ellas (Con quién = proveedor). Así la sección no las pide, que el motor diría «no tienes permiso», ni
+   * enseña esos campos. Con «filas» ({ TABLA: { COLUMNA: [valores] } }), esos valores no salen en los desplegables de su tabla.
+   * No cambia cfg. Sin nada que ocultar, la misma.
+   */
+  function quitada(vs, n) { var k = String(n).trim().toLowerCase(); return vs.some(function (v) { return String(v).trim().toLowerCase() === k; }); }
+  function sinOcultas(cfg, oc) {
+    var ts = (oc && oc.tablas) || [], fs = ((oc && oc.filas) || {})[cfg && cfg.TABLA] || {};
+    if ((!ts.length && !Object.keys(fs).length) || !cfg) return cfg;
+    var c = JSON.parse(JSON.stringify(cfg)), refs = (oc && oc.refs) || {}, fuera = (refs[c.TABLA] || []).slice();
+    // Las opciones con las que dejaría de ver la fila (el área «Proveedores»), fuera de los desplegables: el motor no dejaría guardarla.
+    Object.keys(fs).forEach(function (k) {
+      var d = (c.CAMPOS = c.CAMPOS || {})[k] = c.CAMPOS[k] || {};
+      d._quitar = fs[k].slice();
+      if (Array.isArray(d.opciones)) d.opciones = d.opciones.filter(function (n) { return !quitada(fs[k], n); });
+    });
+    var oculta = function (t) { return ts.indexOf(t) >= 0; };
+    Object.keys(c.CAMPOS || {}).forEach(function (k) { var d = c.CAMPOS[k]; if (d && d.de && oculta(d.de.tabla)) fuera.push(k); });
+    var vale = function (x) { return typeof x !== 'string' || fuera.indexOf(x.replace(/^-/, '').split('.')[0]) < 0; };
+    var limpiar = function (a) { return Array.isArray(a) ? a.filter(vale) : a; };
+    fuera.forEach(function (k) { if (c.CAMPOS) delete c.CAMPOS[k]; if (c.NUEVA) delete c.NUEVA[k]; });
+    Object.keys(c.CAMPOS || {}).forEach(function (k) { if (c.CAMPOS[k].primero) c.CAMPOS[k].primero = limpiar(c.CAMPOS[k].primero); });
+    ['COLUMNAS', 'DETALLE', 'BUSCAR', 'EDITAR', 'OBLIGATORIAS', 'FILTROS'].forEach(function (k) { if (k in c) c[k] = limpiar(c[k]); });
+    if (!vale(c.ORDEN)) c.ORDEN = '';
+    if (c.FICHA) c.FICHA = c.FICHA.map(function (g) { if (g.campos) g.campos = limpiar(g.campos); return g; }).filter(function (g) { return !g.campos || g.campos.length; });
+    (c.VISTAS || []).forEach(function (v) {
+      if (v.columnas) v.columnas = limpiar(v.columnas);
+      if (v.orden && !vale(v.orden)) delete v.orden;
+      if (v.agrupar && !vale(v.agrupar.campo || v.agrupar)) delete v.agrupar;
+      if (v.tablero && !vale(v.tablero.campo)) delete v.tablero;
+    });
+    if (c.RELACIONADOS) c.RELACIONADOS = c.RELACIONADOS.filter(function (r) { return !oculta(r.tabla); });
+    Object.keys(c.VALORES || {}).forEach(function (k) { var v = c.VALORES[k]; if (v && typeof v === 'object' && oculta(v.tabla)) delete c.VALORES[k]; });
+    var r = c._refs || {};
+    Object.keys(r).forEach(function (t) {
+      if (oculta(t)) { delete r[t]; return; }
+      Object.keys(r[t]).forEach(function (k) { if (oculta(r[t][k])) delete r[t][k]; });
+    });
+    return c;
   }
   /** El campo de un apartado, con su título y tipo por defecto (una columna FECHA… es una fecha; ESTADO, un estado). */
   function campo(ap, c) {
     var d = (ap.campos || {})[c] || {};
     var base = String(c).split('.').pop();
-    var tipo = d.tipo || (d.calculo ? 'importe' : (d.de && !d.de.columna ? 'numero' : (/^FECHA/.test(base) ? 'fecha' : (/^(ID_)?ESTADO$/.test(base) ? 'estado' : 'texto'))));
+    var tipo = d.tipo || (d.calculo ? 'importe' : (d.de && !d.de.columna && !d.de.columnas ? 'numero' : (/^FECHA/.test(base) ? 'fecha' : (/^(ID_)?ESTADO$/.test(base) ? 'estado' : 'texto'))));
     return { n: c, titulo: d.titulo || (c === ap.codigo ? 'Código' : titulo(base)), tipo: tipo, opciones: d.opciones || null, ref: d.ref || refDe(ap, ap.tabla, c), ids: d._ids || null,
       de: d.de || null, primero: d.primero || null,
-      unidad: d.unidad || '', calculo: d.calculo || null, precio: d.precio || null, privado: !!d.privado, colores: d.colores || null,
-      ayuda: d.ayuda || '' };
+      unidad: d.unidad || '', calculo: d.calculo ? expandir(d.calculo, ap.campos, [c]) : null, precio: d.precio || null, privado: !!d.privado, colores: d.colores || null,
+      ayuda: d.ayuda || '', sinNumero: !!d.sinNumero, nombres: d.nombres || null, signo: d.signo || null, desglose: d.desglose || null, plantilla: d.plantilla || '' };
+  }
+  /** T0642 · Un valor como se enseña: sin el número de delante («1 Contactado» → «Contactado», con «sinNumero») y con su
+   *  nombre en palabras («IG» → «Instagram», con «nombres»). Lo guardado, los filtros y los colores siguen con el valor de verdad. */
+  function mostrar(cp, v) {
+    var s = String(v === undefined || v === null ? '' : v);
+    if (cp && cp.nombres) { var k = Object.keys(cp.nombres).filter(function (x) { return norm(x) === norm(s); })[0]; if (k !== undefined) s = cp.nombres[k]; }
+    if (cp && cp.sinNumero) s = s.replace(/^\s*\d+[.)]?\s+(?=\S)/, '');
+    return s;
   }
   function columnasDe(ap, vista) { return (vista && vista.columnas) || (ap.columnas && ap.columnas.length ? ap.columnas : [ap.nombre]); }
   /** Lo que una vista no enseña: lo que dice ocultar y, si es para enseñar a un cliente, todos los campos privados. */
@@ -281,7 +378,12 @@
     });
     lista(ap.filtro).forEach(function (c) { t.push(c.campo); });
     ap.avisos.forEach(function (a) { lista(a.si).forEach(function (c) { t.push(c.campo); }); });
-    Object.keys(ap.campos).forEach(function (c) { t.push(c); if (ap.campos[c].calculo) t = t.concat(usa(ap.campos[c].calculo)); t = t.concat(ap.campos[c].primero || []); });
+    Object.keys(ap.campos).forEach(function (c) {
+      var d = ap.campos[c]; t.push(c);
+      if (d.calculo) t = t.concat(usa(expandir(d.calculo, ap.campos, [c])));
+      t = t.concat(d.primero || [], d.plantilla ? enPlantilla(d.plantilla) : []);
+      lista(d.desglose).forEach(function (p) { if (p && p.calculo) t = t.concat(usa(expandir(p.calculo, ap.campos))); });
+    });
     return t.filter(function (c, i) { return c && typeof c === 'string' && c.charAt(0) !== '$' && t.indexOf(c) === i; }).map(function (c) { return c.replace(/^-/, ''); });
   }
   /**
@@ -297,14 +399,48 @@
       d._ids = {};
       var ops = fs.map(function (x) { var n = nombreDe(D, t, x.ID !== undefined ? x.ID : x[Object.keys(x)[0]]); d._ids[n] = x.ID !== undefined ? x.ID : x[Object.keys(x)[0]]; return n; });
       if (!d.opciones) d.opciones = ops;
+      // T0650: lo que dejaría sin ver la fila (nucleo.ocultar · filas), fuera de las opciones y del desplegable del formulario.
+      if (d._quitar) {
+        d.opciones = d.opciones.filter(function (n) { return !quitada(d._quitar, n); });
+        Object.keys(d._ids).forEach(function (n) { if (quitada(d._quitar, n)) delete d._ids[n]; });
+      }
       d.ref = t;
     });
     return a;
   }
-  /** Las filas como se ven: con nombres, rutas, «de» y «primero». Cada una guarda la de verdad en __crudo. */
-  function preparar(a, filas, D) {
+  /** T0641 · Los campos que nombra una plantilla («Hoy {PRECIO_A_BATIR}[ ({ID_COMPETIDOR})]»). */
+  function enPlantilla(p) { var r = [], m, re = /\{([^{}]+)\}/g; while ((m = re.exec(String(p)))) r.push(m[1]); return r; }
+  /**
+   * T0641 · Una plantilla rellenada: cada {CAMPO}, como se ve (con su unidad; un calculado que no da número, vacío). Lo que va
+   * entre [corchetes] solo sale si todo lo de dentro tiene algo; si algo de fuera está vacío, toda la plantilla queda vacía.
+   */
+  function rellenar(ap, p, f, valores) {
+    var hueco = false;
+    function poner(t) {
+      return t.replace(/\{([^{}]+)\}/g, function (x, c) {
+        var cp = campo(ap, c), v = cp.calculo && isNaN(calcular(cp.calculo, f, valores)) ? '' : (cp.plantilla ? '' : verTexto(cp, f, valores, []));
+        if (v === '') hueco = true;
+        return v;
+      });
+    }
+    var r = String(p).replace(/\[([^\[\]]*)\]/g, function (x, dentro) { hueco = false; var t = poner(dentro); return hueco ? '' : t; });
+    hueco = false;
+    r = poner(r);
+    return hueco ? '' : r.trim();
+  }
+  /**
+   * T0641 · Las filas de otra tabla de un campo con «de» y «columnas», en una línea: cada fila, sus columnas como se ven
+   * (con su tipo en «campos»: la parte, en porcentaje) separadas por un espacio; las filas, por « · » («52 % Poliéster · 48 % Algodón»).
+   */
+  function enLinea(de, xs) {
+    var sub = { campos: de.campos || {}, refs: {}, tabla: de.tabla };
+    return xs.map(function (x) { return de.columnas.map(function (c) { return verTexto(campo(sub, c), x, {}, []); }).filter(String).join(' '); }).filter(String).join(' · ');
+  }
+  /** Las filas como se ven: con nombres, rutas, «de», «primero» y, con valores, las plantillas. Cada una guarda la de verdad en __crudo. */
+  function preparar(a, filas, D, valores) {
     var rs = (a.refs || {})[a.tabla] || {}, rutas = nombradas(a).filter(function (c) { return c.indexOf('.') > 0; });
     var conDe = Object.keys(a.campos).filter(function (c) { return a.campos[c].de; }), conPrimero = Object.keys(a.campos).filter(function (c) { return a.campos[c].primero; });
+    var conPlantilla = Object.keys(a.campos).filter(function (c) { return a.campos[c].plantilla; });
     return filas.map(function (f) {
       var r = {};
       Object.keys(f).forEach(function (k) { r[k] = rs[k] ? nombreDe(D, rs[k], f[k]) : f[k]; });
@@ -314,9 +450,10 @@
         var xs = vacio(clave) ? [] : (D.filas(de.tabla) || []).filter(function (x) { return norm(x[de.campo]) === norm(clave); }).map(function (x) { return conNombres(a, D, de.tabla, x); });
         if (de.filtro) xs = xs.filter(function (x) { return cumple(x, de.filtro, { hoy: de.hoy }); });
         if (de.orden) xs.sort(comparar(de.orden));
-        r[c] = de.columna ? (xs.length ? xs[0][de.columna] : '') : xs.length;
+        r[c] = de.columnas ? enLinea(de, xs) : (de.columna ? (xs.length ? xs[0][de.columna] : '') : xs.length);
       });
       conPrimero.forEach(function (c) { r[c] = a.campos[c].primero.map(function (x) { return r[x]; }).filter(function (v) { return !vacio(v); })[0] || ''; });
+      conPlantilla.forEach(function (c) { r[c] = rellenar(a, a.campos[c].plantilla, r, valores || {}); });
       r.__crudo = f;
       return r;
     });
@@ -333,7 +470,7 @@
     var cols = columnasTabla ? columnasTabla(ap.tabla) : null, calc = Object.keys(ap.campos).filter(function (c) { return ap.campos[c].calculo; });
     function hay(c, que, t, cs) {
       if (!t && calc.indexOf(c) >= 0) return;
-      if (!t && ap.campos[c] && (ap.campos[c].de || ap.campos[c].primero)) return;
+      if (!t && ap.campos[c] && (ap.campos[c].de || ap.campos[c].primero || ap.campos[c].plantilla)) return;
       if (!t && String(c).indexOf('.') > 0) { // una ruta: su primer paso tiene que apuntar a otra tabla
         var p0 = String(c).split('.')[0];
         if (cols && cols.indexOf(p0) < 0) errores.push(donde + que + ' «' + c + '»: ' + p0 + ' no es una columna de ' + ap.tabla + '.');
@@ -364,6 +501,14 @@
         else if (!env.some(function (e) { return usa(d.calculo).indexOf(e) >= 0; })) errores.push(donde + 'el precio «' + c + '» no suma su envío (' + env.join(' o ') + '): se vería un precio sin envío.');
       }
     });
+    // T0656: los calculados de lo relacionado (la Comparativa en la ficha de una marca) también sacan sus $ de VALORES.
+    lista(ap.relacionados).forEach(function (r) {
+      Object.keys(r.campos || {}).forEach(function (c) {
+        usa((r.campos[c] || {}).calculo).forEach(function (u) {
+          if (u.charAt(0) === '$' && (!cfg.VALORES || !(u.slice(1) in cfg.VALORES))) errores.push(donde + '«' + c + '» de «' + (r.titulo || r.tabla) + '» usa ' + u + ', que no está en VALORES.');
+        });
+      });
+    });
     lista(ap.filtro).forEach(function (cnd) { if (cnd.campo) hay(cnd.campo, 'el FILTRO usa'); });
     Object.keys(ap.nueva).forEach(function (c) { hay(c, 'NUEVA pone'); });
     ap.obligatorias.forEach(function (c) { hay(c, 'OBLIGATORIAS nombra'); });
@@ -371,6 +516,11 @@
     // T0630: cómo se llama cada fila al contarlas, [singular, plural] («tarea», «tareas»).
     var malFilas = function (x) { return x !== null && x !== undefined && !(Array.isArray(x) && !x.length) && !(Array.isArray(x) && x.length === 2 && x.every(function (t) { return typeof t === 'string' && t.trim(); })); };
     if (malFilas(cfg.FILAS)) errores.push(donde + 'FILAS tiene que ser [singular, plural], como ["tarea", "tareas"].');
+    // T0642: lo que cambia un botón de ACCIONES se tiene que poder editar (si no, la tabla no deja guardarlo).
+    lista(ap.acciones).forEach(function (x) {
+      if (!x.titulo) errores.push(donde + 'un botón de ACCIONES sin título.');
+      Object.keys(x.poner || {}).forEach(function (c) { if (ap.editar !== true && ed.indexOf(c) < 0) errores.push(donde + 'el botón «' + (x.titulo || '') + '» cambia ' + c + ', que no está en EDITAR.'); });
+    });
     var vids = {};
     vistasDe(ap).forEach(function (v) {
       if (vids[v.id]) errores.push(donde + 'la vista «' + v.id + '» está dos veces.');
@@ -398,15 +548,95 @@
       aids[a.id] = true;
       lista(a.si).forEach(function (cnd) { if (cnd.campo) hay(cnd.campo, 'el aviso «' + a.id + '» usa'); });
     });
+    // T0643 · Lo de un toque (RAPIDAS), el alta (ALTA) y lo que se pone solo (DEDUCIR).
+    var edTodo = ap.editar === true, sePuede = function (c) { return edTodo || ed.indexOf(c) >= 0; };
+    // T0662: el motor pone {} a lo que la sección no dice (el defecto de modulo.json): eso no es un error, es que no lo usa.
+    var puesto = function (x) { return !!x && (typeof x !== 'object' || Object.keys(x).length > 0); };
+    var rp = ap.rapidas;
+    if (puesto(cfg.RAPIDAS) && !rp) errores.push(donde + 'RAPIDAS no dice ni HECHA ni PASAR.');
+    if (rp) {
+      if (cfg.RAPIDAS.HECHA && !rp.hecha) errores.push(donde + 'RAPIDAS.HECHA no dice su columna (campo).');
+      if (rp.hecha) {
+        hay(rp.hecha.campo, 'RAPIDAS.HECHA usa');
+        if (vacio(rp.hecha.valor)) errores.push(donde + 'RAPIDAS.HECHA no dice qué valor pone (valor).');
+        if (!sePuede(rp.hecha.campo)) errores.push(donde + 'RAPIDAS.HECHA cambia «' + rp.hecha.campo + '», que no está en EDITAR.');
+      }
+      if (rp.pasar) {
+        hay(rp.pasar, 'RAPIDAS.PASAR usa');
+        if (!sePuede(rp.pasar)) errores.push(donde + 'RAPIDAS.PASAR cambia «' + rp.pasar + '», que no está en EDITAR.');
+        if (campo(ap, rp.pasar).tipo !== 'fecha') errores.push(donde + 'RAPIDAS.PASAR tiene que ser una fecha («' + rp.pasar + '» no lo es).');
+      }
+      lista(rp.si).forEach(function (cnd) { if (cnd.campo) hay(cnd.campo, 'RAPIDAS.SI usa'); });
+      if (cfg.RAPIDAS.SIGUIENTE) {
+        if (!rp.siguiente) errores.push(donde + 'RAPIDAS.SIGUIENTE no dice con quién (con).');
+        else {
+          if (!rp.hecha) errores.push(donde + 'RAPIDAS.SIGUIENTE se pregunta al cerrar: hace falta RAPIDAS.HECHA.');
+          if (!ap.crear) errores.push(donde + 'RAPIDAS.SIGUIENTE crea una fila: hace falta CREAR.');
+          rp.siguiente.con.concat(rp.siguiente.copia, Object.keys(rp.siguiente.pone)).forEach(function (c) { hay(c, 'RAPIDAS.SIGUIENTE usa'); });
+        }
+      }
+    }
+    if (puesto(cfg.ALTA) && !ap.alta) errores.push(donde + 'ALTA no dice sus campos (campos).');
+    if (ap.alta) ap.alta.campos.concat(ap.alta.mas).forEach(function (c) {
+      var d = ap.campos[c];
+      if (d && d.primero) { d.primero.forEach(function (p) { hay(p, 'ALTA usa'); if (!sePuede(p)) errores.push(donde + 'ALTA pide «' + c + '», pero «' + p + '» no está en EDITAR.'); }); return; }
+      hay(c, 'ALTA usa');
+      if (!sePuede(c)) errores.push(donde + 'ALTA pide «' + c + '», que no está en EDITAR.');
+    });
+    Object.keys(ap.deducir).forEach(function (c) {
+      hay(c, 'DEDUCIR pone');
+      if (!sePuede(c)) errores.push(donde + 'DEDUCIR pone «' + c + '», que no está en EDITAR.');
+      Object.keys(ap.deducir[c] || {}).forEach(function (o) { hay(o, 'DEDUCIR mira'); });
+    });
+    // T0652: el resumen de con quién es la fila.
+    if (puesto(cfg.CONTEXTO) && !ap.contexto) errores.push(donde + 'CONTEXTO no dice en «de» de qué tablas sale el resumen.');
+    if (ap.contexto) {
+      var cx = ap.contexto, cn = function (p) { return typeof p === 'string' ? p : (p && p.campo); };
+      if (!cx.campo) errores.push(donde + 'CONTEXTO no dice en «campo» qué columna lleva al resumen.');
+      else if (!campo(ap, cx.campo).primero) hay(cx.campo, 'CONTEXTO.campo es');
+      if (cx.notas) hay(cx.notas, 'CONTEXTO.notas es');
+      if (cx.fecha) hay(cx.fecha, 'CONTEXTO.fecha es');
+      lista(cx.hecho).forEach(function (cnd) { if (cnd && cnd.campo) hay(cnd.campo, 'CONTEXTO.hecho usa'); });
+      if (!cx.hecho && !(ap.rapidas && ap.rapidas.hecha)) errores.push(donde + 'CONTEXTO no sabe qué está hecho: falta «hecho» (o RAPIDAS.HECHA).');
+      Object.keys(cx.de).forEach(function (c) {
+        var d = cx.de[c], q = 'CONTEXTO.de.' + c;
+        hay(c, q + ' es');
+        if (!d.tabla) { errores.push(donde + q + ' no dice su tabla.'); return; }
+        var cs = columnasTabla ? columnasTabla(d.tabla) : null;
+        if (cs) d.sub.concat(d.chips, d.nota ? [d.nota] : []).map(cn).forEach(function (x) { hay(x, q + ' usa', d.tabla, cs); });
+        d.lineas.forEach(function (l, i) {
+          if (!l || !l.tabla || !l.campo) { errores.push(donde + q + '.lineas[' + i + '] necesita «tabla» y «campo».'); return; }
+          var cl = columnasTabla ? columnasTabla(l.tabla) : null;
+          if (cl) [l.campo].concat(lista(l.columnas).map(cn)).forEach(function (x) { hay(x, q + '.lineas «' + (l.titulo || l.tabla) + '» usa', l.tabla, cl); });
+        });
+      });
+    }
     ap.relacionados.forEach(function (r) {
       var q = 'lo relacionado «' + (r.titulo || r.tabla) + '»';
       if (!r.tabla) { errores.push(donde + q + ' no dice su tabla.'); return; }
       var cs = columnasTabla ? columnasTabla(r.tabla) : null;
       if (columnasTabla && !cs) errores.push(donde + q + ': la tabla ' + r.tabla + ' no está.');
       hay(r.con, q + ' usa');
-      if (cs) [r.campo].concat(r.columnas || []).forEach(function (c) { hay(c, q + ' usa', r.tabla, cs); });
+      // T0642: una columna con ruta («ID_TELA.COLOR»): su primer paso es una columna de esa tabla.
+      if (cs) [r.campo].concat(r.columnas || []).forEach(function (c) { hay(String(c).split('.')[0], q + ' usa', r.tabla, cs); });
+      if (r.nueva && !r.seccion) errores.push(donde + q + ': «nueva» necesita la sección a la que lleva (seccion).');
+      // T0641: en una «tarjeta», cada campo es una columna de esa tabla, una ruta o uno de sus «campos» (calculado, plantilla, «de»).
+      if (cs && r.tarjeta) camposTarjeta(r).forEach(function (c) {
+        var d = (r.campos || {})[c];
+        if (!(d && (d.calculo || d.plantilla || d.de || d.primero))) hay(String(c).split('.')[0], q + ' usa', r.tabla, cs);
+      });
     });
     return errores;
+  }
+
+  /** T0641 · Si quien ha entrado ve lo relacionado: sin «perfiles», todos; con ellos, esos perfiles y quien administra (la
+   *  comparativa de una marca lleva lo que le cuesta a Marta: no para el perfil Ayuda, que no ve costes). */
+  function veRelacionado(r, quien) { return !r.perfiles || !!(quien && quien.admin) || lista(r.perfiles).indexOf(quien && quien.perfil) >= 0; }
+  /** T0641 · Lo que enseña la tarjeta de lo relacionado: la línea, lo de debajo, el cara a cara y el detalle. */
+  function camposTarjeta(r) {
+    var t = r.tarjeta || {}, cs = [].concat(lista(t.titulo), t.linea || [], t.debajo || [], t.detalle || []);
+    ((t.comparar || {}).filas || []).forEach(function (x) { cs = cs.concat(x.campos || []); });
+    return cs.filter(function (c, i) { return c && cs.indexOf(c) === i; });
   }
 
   /* ---------- personalizar ----------
@@ -417,7 +647,7 @@
     var r = JSON.parse(JSON.stringify(ap));
     p = p || {};
     if (r.vistas && r.vistas.length) {
-      var ov = lista(p.vistas), fuera = lista(p.ocultas);
+      var ov = lista(p.vistas), fuera = ocultasDe(r, p);
       var vs = r.vistas.filter(function (v) { return ov.indexOf(v.id) >= 0; }).sort(function (a, b) { return ov.indexOf(a.id) - ov.indexOf(b.id); })
         .concat(r.vistas.filter(function (v) { return ov.indexOf(v.id) < 0; }));
       var quedan = vs.filter(function (v) { return fuera.indexOf(v.id) < 0; });
@@ -430,6 +660,20 @@
       if (typeof pa.dias === 'number' && isFinite(pa.dias)) a.dias = Math.max(0, Math.min(365, Math.round(pa.dias)));
     });
     return r;
+  }
+  /** T0642 · Los botones de ACCIONES que salen en la ficha de esta fila: los que la cambian (si ya está como dejan, no) y
+   *  cumplen su «si». Cada uno: { titulo, poner: { COLUMNA: valor }, hecho: 'Ha pasado a Clientes.', texto, si }. */
+  function accionesDe(ap, f, hoy) {
+    return (ap.acciones || []).filter(function (x) {
+      var ya = Object.keys(x.poner || {}).every(function (c) { return norm(f[c]) === norm(x.poner[c]); });
+      return !ya && (!x.si || cumple(f, x.si, { hoy: hoy }));
+    });
+  }
+  /** T0642 · Las vistas que no se ven: las que ha quitado quien personaliza o, si nadie ha tocado nada, las que vienen
+   *  quitadas («oculta»: true; de entrada, 2 o 3 por sección, y las demás se ponen en Personalizar). */
+  function ocultasDe(ap, p) {
+    if (p && p.ocultas !== undefined) return lista(p.ocultas);
+    return (ap.vistas || []).filter(function (v) { return v.oculta; }).map(function (v) { return v.id; });
   }
   /** El orden del menú con uno movido: ids en el orden de ahora, el que se mueve y hacia dónde (-1 sube, 1 baja). */
   function mover(ids, id, d) {
@@ -535,7 +779,7 @@
       var cp = campo(ap, c);
       if (/^(nota|foto|enlace|email|telefono)$/.test(cp.tipo)) return;
       var vs = filas.map(function (f) { return valorDe(ap, c, f, valores); }), llenos = vs.filter(function (v) { return !nada(v); });
-      var hayVacios = llenos.length < vs.length, base = { campo: c, titulo: cp.titulo, vacios: hayVacios };
+      var hayVacios = llenos.length < vs.length, base = { campo: c, titulo: cp.titulo, vacios: hayVacios, cp: cp };
       if (!llenos.length) return;
       if (cp.tipo === 'fecha') { if (llenos.some(aFecha)) r.push(Object.assign(base, { tipo: 'fecha' })); return; }
       var distintos = [];
@@ -596,7 +840,7 @@
     var u = d.unidad ? (d.unidad === '%' ? ' %' : ' ' + d.unidad) : '';
     var n = function (v) { return num(v, v % 1 === 0 ? 0 : (Math.round(v * 10) / 10 === v ? 1 : 2)); }; // la unidad, una vez, al final
     if (x.vacio) return 'Sin ' + d.titulo.toLowerCase();
-    if (x.es !== undefined) return d.titulo + ': ' + x.es;
+    if (x.es !== undefined) return d.titulo + ': ' + (d.cp ? mostrar(d.cp, x.es) : x.es);
     var hayMin = typeof x.min === 'number', hayMax = typeof x.max === 'number';
     if (hayMin || hayMax) return d.titulo + ': ' + (hayMin && hayMax ? (x.min === x.max ? n(x.min) : 'de ' + n(x.min) + ' a ' + n(x.max)) : (hayMin ? 'desde ' + n(x.min) : 'hasta ' + n(x.max))) + u;
     if (x.desde && x.hasta) return d.titulo + ': ' + (x.desde === x.hasta ? 'el ' + fechaCorta(x.desde) : 'del ' + fechaCorta(x.desde) + ' al ' + fechaCorta(x.hasta));
@@ -618,13 +862,16 @@
    */
   function columnasTablero(ap, vista, filas) {
     var t = vista.tablero, c = t.campo, cp = campo(ap, c), dichas = !!(t.columnas && t.columnas.length);
-    var valores = (dichas ? t.columnas : (cp.opciones || [])).slice();
-    if (!dichas) filas.forEach(function (f) { var v = vacio(f[c]) ? '' : String(f[c]); if (v && valores.indexOf(v) < 0) valores.push(v); });
-    var cols = valores.map(function (v) { return { id: v, titulo: v, filas: [] }; });
-    var sin = { id: '', titulo: 'Sin ' + cp.titulo.toLowerCase(), filas: [] };
+    // T0642: una columna puede juntar varios valores ({ titulo: 'Hablando', valores: [...] }): el embudo de 9 fases, en 3.
+    var cols = (dichas ? t.columnas : (cp.opciones || [])).map(function (v) {
+      return v && typeof v === 'object' ? { id: '', titulo: v.titulo || '', valores: lista(v.valores).map(String), junta: true, filas: [] } : { id: String(v), titulo: mostrar(cp, v), valores: [String(v)], filas: [] };
+    });
+    var hay = function (v) { return cols.some(function (x) { return x.valores.map(norm).indexOf(norm(v)) >= 0; }); };
+    if (!dichas) filas.forEach(function (f) { var v = vacio(f[c]) ? '' : String(f[c]); if (v && !hay(v)) cols.push({ id: v, titulo: mostrar(cp, v), valores: [v], filas: [] }); });
+    var sin = { id: '', titulo: 'Sin ' + cp.titulo.toLowerCase(), valores: [''], filas: [] };
     filas.forEach(function (f) {
-      var v = vacio(f[c]) ? '' : String(f[c]), k = valores.map(norm).indexOf(norm(v));
-      if (k >= 0) cols[k].filas.push(f); else if (!v && !dichas) sin.filas.push(f);
+      var v = vacio(f[c]) ? '' : String(f[c]), col = v ? cols.filter(function (x) { return x.valores.map(norm).indexOf(norm(v)) >= 0; })[0] : null;
+      if (col) col.filas.push(f); else if (!v && !dichas) sin.filas.push(f);
     });
     return sin.filas.length ? cols.concat([sin]) : cols;
   }
@@ -649,7 +896,7 @@
       if (ia >= 0 || ib >= 0) return (ia < 0 ? 1e6 : ia) - (ib < 0 ? 1e6 : ib);
       return a.localeCompare(b, 'es', { numeric: true });
     });
-    return orden.map(function (k) { return { id: k, titulo: k || 'Sin ' + campo(ap, c).titulo.toLowerCase(), filas: grupos[k] }; });
+    return orden.map(function (k) { return { id: k, titulo: k ? mostrar(campo(ap, c), k) : 'Sin ' + campo(ap, c).titulo.toLowerCase(), filas: grupos[k] }; });
   }
   /** Las filas de otro apartado que van con esta (el seguimiento de un cliente: CON_QUIEN = CLIENTE). */
   function relacionadas(r, f, filasOtro) {
@@ -669,7 +916,14 @@
   function verTexto(cp, f, valores, prohib) {
     var v = cp.calculo ? calcular(cp.calculo, f, valores) : f[cp.n];
     if (cp.calculo) {
+      // T0645: un envío a 0 no es un envío (en su Excel, una celda sin rellenar): el precio sin él no sale.
+      if (cp.precio && !lista(cp.precio.envio).some(function (e) { return calcular(e, f, valores) > 0; })) return 'Falta el envío';
       if (isNaN(v)) return cp.precio ? 'Falta el coste o el envío' : '';
+      // T0641: «signo» dice el número en palabras según sea positivo o negativo («Te quedan 17,04 €/m», «Tu coste ya pasa su precio en 2,27 €/m»).
+      if (cp.signo) {
+        var pl = v > 0.00001 ? cp.signo.mas : (v < -0.00001 ? cp.signo.menos : (cp.signo.cero || cp.signo.mas));
+        return String(pl || '{}').replace('{}', verTexto(Object.assign({}, cp, { calculo: ['+', Math.abs(v)], signo: null }), f, valores, prohib));
+      }
       v = Math.round(v * 100) / 100;
     }
     if (vacio(v)) return '';
@@ -680,7 +934,24 @@
     if (cp.tipo === 'porcentaje') { var p = aNumero(v); return isNaN(p) ? String(v) : num(p * 100, 0) + ' %'; }
     if (cp.tipo === 'numero') { var m = aNumero(v); return isNaN(m) ? String(v) : num(m, m % 1 ? 1 : 0) + u; }
     if (cp.tipo === 'sino') return v === true || norm(v) === 'si' || norm(v) === 'true' ? 'Sí' : (v === false || norm(v) === 'no' || norm(v) === 'false' ? 'No' : String(v));
-    return String(v) + u;
+    if (cp.tipo === 'instagram') return cuentaInstagram(v) || String(v);
+    return mostrar(cp, v) + u;
+  }
+  /**
+   * T0641 · Las cuentas de un calculado, en una línea: «1.020 ₹ → 9,27 € + envío 5,00 € + margen 50 % = 21,41 €/m». Cada parte
+   * de «desglose» es un texto («→», «+ envío») o { calculo, tipo, unidad }; al final, «=» y el valor. '' si a alguna parte le falta
+   * algo (sin coste no hay cuentas que enseñar).
+   */
+  function desglose(ap, cp, f, valores) {
+    if (!cp.desglose || !cp.calculo) return '';
+    var total = verTexto(cp, f, valores, []), falta = isNaN(calcular(cp.calculo, f, valores));
+    var partes = cp.desglose.map(function (p) {
+      if (typeof p === 'string') return p;
+      var x = { n: '', titulo: '', tipo: p.tipo || 'importe', unidad: p.unidad || '', calculo: expandir(p.calculo, ap.campos) };
+      if (isNaN(calcular(x.calculo, f, valores))) falta = true;
+      return verTexto(x, f, valores, []);
+    });
+    return falta ? '' : partes.join(' ') + ' = ' + total;
   }
   /** Cuándo es una fecha, en palabras: «hoy», «mañana», «hace 3 días», «en 5 días». */
   function cuando(v, hoy) {
@@ -700,11 +971,38 @@
     return /^(https?:|data:image\/)/i.test(v) ? v : '';
   }
 
+  /** T0642 · Una cuenta de Instagram como se escribe («@marca», «marca», «instagram.com/marca/», el enlace entero) →
+   *  «@marca»; '' si no lo parece. instagramUrl da su dirección. */
+  function cuentaInstagram(v) {
+    var s = String(v === undefined || v === null ? '' : v).trim(), m = /instagram\.com\/([\w.]+)/i.exec(s);
+    var u = m ? m[1] : s.replace(/^@/, '');
+    return /^[\w.]{1,30}$/.test(u) ? '@' + u : '';
+  }
+  function instagramUrl(v) { var c = cuentaInstagram(v); return c ? 'https://www.instagram.com/' + c.slice(1) + '/' : ''; }
+
+  /** T0642 · Volver de una ficha a la que se ha llegado desde otra: a esa ficha («‹ Volver a Casa Albero») si se viene de
+   *  una; si no, a la sección de la que se viene («‹ Volver a Clientes»); '' si no se viene de ninguna. */
+  function textoVuelta(deFicha, desde) { var t = deFicha || (desde && desde.titulo) || ''; return t ? '‹ Volver a ' + t : ''; }
+  /** T0642 · La dirección de ahora con la ficha abierta (?ficha=M-001) y sin lo de «+ Nueva …», para que «atrás» la vuelva a abrir. */
+  function conFicha(search, id, quitar) {
+    var u = new URLSearchParams(search);
+    ['nueva'].concat(quitar || []).forEach(function (k) { u.delete(k); });
+    u.set('ficha', id);
+    return '?' + u.toString();
+  }
+  // T0642: el nombre de la ficha desde la que se salta a otra (una tela, una tarea, «+ Nueva tarea»), hasta que la abre la
+  // sección a la que se va (todas las de Listado comparten este archivo).
+  var vueltaPendiente = null;
+
   /** T0610 · Los avisos de una fila sin el que ya dice el título de su grupo: en «Con la fecha pasada», cada fila no repite
    *  «Con la fecha pasada» (la franja de color de la fila sigue). Sin grupo, todos. */
-  function sinRepetir(avs, tituloGrupo) {
+  function sinRepetir(avs, tituloGrupo, campoPlazo) {
     var t = String(tituloGrupo || '').trim().toLowerCase();
-    return t ? avs.filter(function (x) { return String(x.titulo || '').trim().toLowerCase() !== t; }) : avs;
+    var r = t ? avs.filter(function (x) { return String(x.titulo || '').trim().toLowerCase() !== t; }) : avs;
+    // T0642: agrupado por el plazo de una fecha («Hoy», «Próximos 7 días»), un aviso que solo mira esa fecha («Es para
+    // hoy») ya lo dice su grupo. La franja de color de la fila sigue.
+    if (t && campoPlazo) r = r.filter(function (x) { var cs = lista(x.si); return !cs.length || !cs.every(function (c) { return c && c.campo === campoPlazo; }); });
+    return r;
   }
 
   /** T0624 · Una señal por cosa: la fecha que hace saltar un aviso de nivel alto (vencido) o medio (pendiente) se pinta con
@@ -735,11 +1033,139 @@
    *  móvil no hay sesión de Google, o quien mira no tiene permiso). En la ficha, el porqué entero; en una miniatura, corto. */
   var SIN_FOTO = { corto: 'No se ve', largo: 'No se puede ver la foto aquí. Para que se vea en la app (también en el móvil), su carpeta de Drive tiene que estar compartida como «Cualquier persona con el enlace».' };
 
-  var CALC = { imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, cumple: cumple, calcular: calcular, usa: usa,
-    valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, campo: campo,
-    ocultas: ocultas, vistasDe: vistasDe, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir,
+  /* ---------- T0643 · Cerrar, pasar y apuntar en un toque ----------
+   * RAPIDAS: { HECHA: { campo, valor }, PASAR: columna de fecha, SI: [condiciones], SIGUIENTE: { con, copia, pone } }.
+   * Las filas que cumplen SI (y no tienen ya el valor de HECHA) llevan un círculo que las cierra y «Pasar» (mañana, una
+   * semana u otro día); al cerrar una que es con alguien de SIGUIENTE.con, se pregunta el siguiente paso con él. */
+  var DIAS_SEMANA = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  function isoDe(d) { return d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()); }
+  function masDias(hoy, n) { var d = aFecha(hoy); d.setDate(d.getDate() + n); return isoDe(d); }
+  /** «jue 19»: el día de la semana y del mes, para que se vea a qué día va. */
+  function diaCorto(iso) { var d = aFecha(iso); return d ? DIAS_SEMANA[d.getDay()].slice(0, 3) + ' ' + d.getDate() : ''; }
+  /** A qué días se puede pasar algo, desde hoy (no desde la fecha que tenía). Si mañana es sábado o domingo, se ofrecen
+   *  los dos, mañana y el lunes (Javi, 18/11/2026): que elija. titulo, para el menú; corto, para los botones de la ficha. */
+  function opcionesPasar(hoy) {
+    var m = masDias(hoy, 1), dm = aFecha(m).getDay(), r = [];
+    if (dm === 6 || dm === 0) {
+      r.push({ fecha: m, titulo: 'Mañana, ' + DIAS_SEMANA[dm], corto: 'Pasar al ' + DIAS_SEMANA[dm] });
+      r.push({ fecha: masDias(hoy, dm === 6 ? 3 : 2), titulo: 'El lunes', corto: 'Pasar al lunes' });
+    } else r.push({ fecha: m, titulo: 'Mañana', corto: 'Pasar a mañana' });
+    r.push({ fecha: masDias(hoy, 7), titulo: 'En una semana', corto: '+1 semana' });
+    return r;
+  }
+  /** Para cuándo se apunta el siguiente paso: el primer día de trabajo, en 3 días o en una semana. */
+  function fechasSiguiente(hoy) {
+    var p = opcionesPasar(hoy), lab = p.length > 2 ? p[1] : p[0];
+    return [{ fecha: lab.fecha, titulo: lab.titulo }, { fecha: masDias(hoy, 3), titulo: 'En 3 días' }, { fecha: masDias(hoy, 7), titulo: 'En una semana' }];
+  }
+  /** Si una fila (como se ve, con nombres) lleva el círculo y «Pasar». */
+  function rapidaEn(ap, f, hoy) {
+    var r = ap.rapidas;
+    if (!r || !f) return false;
+    if (r.hecha && norm(f[r.hecha.campo]) === norm(r.hecha.valor)) return false;
+    return cumple(f, r.si, { hoy: hoy });
+  }
+  /** El código de un valor dicho por su nombre en una columna que apunta a otra tabla («Hecha» → EST04); si no, tal cual. */
+  function codigoDe(ap, c, v) { var cp = campo(ap, c); return cp.ids && v in cp.ids ? cp.ids[v] : v; }
+  /** Con quién se pregunta el siguiente paso al cerrar una fila (la de verdad, con códigos): la primera columna de
+   *  SIGUIENTE.con que tiene algo, o '' (no se pregunta). */
+  function siguienteCon(ap, crudo) {
+    var s = ap.rapidas && ap.rapidas.siguiente;
+    return s ? s.con.filter(function (c) { return !vacio((crudo || {})[c]); })[0] || '' : '';
+  }
+  /** DEDUCIR: { DESTINO: { ORIGEN: nombre } }. Lo que se pone solo en una fila (con códigos) que tiene vacío el destino y
+   *  algo en un origen: { ID_TEMA: 'TEM01' } (marca → Clientes). Lo que ya tiene algo no se toca. */
+  function deducidos(ap, crudo) {
+    var r = {};
+    Object.keys(ap.deducir || {}).forEach(function (c) {
+      if (!vacio((crudo || {})[c])) return;
+      var o = Object.keys(ap.deducir[c] || {}).filter(function (x) { return !vacio((crudo || {})[x]); })[0];
+      if (o) r[c] = codigoDe(ap, c, ap.deducir[c][o]);
+    });
+    return r;
+  }
+  /** La fila del siguiente paso, al cerrar crudo: lo de SIGUIENTE.copia de la que se cierra (con quién, el área), el texto
+   *  en el nombre, la fecha en PASAR, lo de SIGUIENTE.pone (por nombre) y, si falta, lo que se deduce. */
+  function filaSiguiente(ap, crudo, txt, fecha) {
+    var s = ap.rapidas.siguiente, r = {};
+    s.copia.forEach(function (c) { if (!vacio(crudo[c])) r[c] = crudo[c]; });
+    Object.keys(s.pone).forEach(function (c) { r[c] = codigoDe(ap, c, s.pone[c]); });
+    r[ap.nombre] = txt;
+    if (ap.rapidas.pasar && fecha) r[ap.rapidas.pasar] = fecha;
+    var d = deducidos(ap, r); Object.keys(d).forEach(function (c) { r[c] = d[c]; });
+    return r;
+  }
+
+  /* ---------- T0652 · el resumen de con quién es una fila ----------
+   * Desde una tarea con un cliente (o un proveedor), lo último que se hizo con él, lo que queda y unas líneas de su ficha,
+   * sin salir de la lista. Lo junta de lo apuntado: no escribe nada. */
+  /** La columna de CONTEXTO.de que tiene algo en la fila (la de verdad, con códigos): en el orden de «primero» del campo. */
+  function contextoCol(ap, crudo) {
+    var cx = ap.contexto;
+    if (!cx || !crudo) return '';
+    var orden = (campo(ap, cx.campo).primero || []).concat(Object.keys(cx.de));
+    return orden.filter(function (c) { return cx.de[c] && !vacio(crudo[c]); })[0] || '';
+  }
+  /** Un trozo de una línea: una columna o { campo, antes, despues } («pagan hoy 14 €/m»). Lo que no se guarda sale tapado;
+   *  «despues» solo va tras un número (una unidad no va detrás de «Ideal 8, aceptan 9»). */
+  function pieza(ap, t, fila, p, prohib) {
+    var q = typeof p === 'string' ? { campo: p } : (p || {}), v = fila[q.campo];
+    if (vacio(v)) return '';
+    var s = prohibido(v, prohib).length ? tapar(v, prohib) : String(v).trim();
+    if (q.despues && !isNaN(aNumero(v))) s += q.despues;
+    // «Prioridad alta»: el nombre de otra tabla, detrás de su «antes», en minúscula.
+    if (q.antes) s = q.antes + ' ' + (refDe(ap, t, q.campo) ? s.charAt(0).toLowerCase() + s.slice(1) : s);
+    return s;
+  }
+  function piezas(ap, t, fila, ps, prohib) { return lista(ps).map(function (p) { return pieza(ap, t, fila, p, prohib); }).filter(String).join(' · '); }
+  /** El resumen de la fila (crudo, con códigos) desde las filas de su tabla como se ven (preparar). o: { hoy, prohib, sin
+   *  (la clave de la fila que no sale: la de la ficha abierta) }. null si la fila no es con nadie de CONTEXTO.de. */
+  function resumenDe(ap, D, crudo, vistas, o) {
+    o = o || {};
+    var col = contextoCol(ap, crudo);
+    if (!col) return null;
+    var cx = ap.contexto, d = cx.de[col], id = crudo[col], hoy = o.hoy, prohib = o.prohib || [];
+    var otra = d.tabla ? D.fila(d.tabla, id) : null, x = otra ? conNombres(ap, D, d.tabla, otra) : {};
+    var nombre = otra ? nombreDe(D, d.tabla, id) : String(id);
+    var sec = d.secciones.filter(function (s) { return s.id && cumple(x, s.si, { hoy: hoy }); })[0];
+    var fc = cx.fecha || (ap.rapidas && ap.rapidas.pasar) || 'FECHA', h = ap.rapidas && ap.rapidas.hecha;
+    var esHecho = function (f) { return cx.hecho ? cumple(f, cx.hecho, { hoy: hoy }) : !!h && norm(f[h.campo]) === norm(h.valor); };
+    var esPend = function (f) { return ap.rapidas ? rapidaEn(ap, f, hoy) : !esHecho(f); };
+    var suyas = (vistas || []).filter(function (f) {
+      var c = f.__crudo || f;
+      return norm(c[col]) === norm(id) && (o.sin === undefined || o.sin === null || String(c[ap.clave]) !== String(o.sin));
+    });
+    var porFecha = function (desc) {
+      return function (a, b) {
+        var x1 = aFecha(a[fc]), x2 = aFecha(b[fc]);
+        if (!x1 || !x2) return x1 ? -1 : (x2 ? 1 : 0); // sin fecha, al final
+        return desc ? x2 - x1 : x1 - x2;
+      };
+    };
+    var item = function (f) {
+      var dd = aFecha(f[fc]), dh = diasHasta(f[fc], hoy);
+      return { id: (f.__crudo || f)[ap.clave], fecha: dd ? dos(dd.getDate()) + '/' + dos(dd.getMonth() + 1) : '', titulo: pieza(ap, ap.tabla, f, ap.nombre, prohib),
+        nota: cx.notas ? pieza(ap, ap.tabla, f, cx.notas, prohib) : '', cuando: cuando(f[fc], hoy), tarde: dh !== null && dh < 0 };
+    };
+    var hechas = suyas.filter(esHecho).sort(porFecha(true)), pend = suyas.filter(function (f) { return !esHecho(f) && esPend(f); }).sort(porFecha(false));
+    var lineas = d.lineas.map(function (l) {
+      var t = l.tabla || '';
+      var rs = (t ? D.filas(t) || [] : []).filter(function (r) { return !vacio(r[l.campo]) && norm(r[l.campo]) === norm(id); }).slice(0, l.max || 1);
+      var txt = rs.map(function (r) { return piezas(ap, t, conNombres(ap, D, t, r), l.columnas, prohib); }).filter(String).join('; ');
+      return { titulo: l.titulo || '', texto: txt };
+    }).filter(function (l) { return l.texto; });
+    return { col: col, id: id, nombre: nombre, seccion: sec ? sec.id : '', sub: piezas(ap, d.tabla, x, d.sub, prohib),
+      chips: d.chips.map(function (p) { return pieza(ap, d.tabla, x, p, prohib); }).filter(String), nota: d.nota ? pieza(ap, d.tabla, x, d.nota, prohib) : '',
+      ultimas: hechas.slice(0, cx.hechas).map(item), pendientes: pend.slice(0, cx.pendientes).map(item),
+      masPendientes: Math.max(0, pend.length - cx.pendientes), lineas: lineas };
+  }
+
+  var CALC = { contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
+    textoVuelta: textoVuelta, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
+    valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
+    ocultas: ocultas, vistasDe: vistasDe, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
-    relacionadas: relacionadas, verTexto: verTexto, cuando: cuando, comparar: comparar,
+    relacionadas: relacionadas, verTexto: verTexto, rellenar: rellenar, enPlantilla: enPlantilla, veRelacionado: veRelacionado, expandir: expandir, camposTarjeta: camposTarjeta, desglose: desglose, cuando: cuando, comparar: comparar,
     filtrables: filtrables, aIntervalo: aIntervalo, cumpleFiltros: cumpleFiltros, filtrosQueValen: filtrosQueValen, textoFiltro: textoFiltro };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
@@ -751,24 +1177,32 @@
   function json(t) { try { return JSON.parse(t || 'null'); } catch (e) { return null; } }
   var ICONO_AJUSTAR = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>';
   var ICONO_X = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  var ICONO_INFO = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>';
   var ICONO_FILTRO = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8L4 5z"/></svg>';
   var ICONO_COPIAR = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>';
+  var ICONO_OK = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>';
+  var ICONO_RELOJ = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>';
   var MENU = 'MENU'; // la fila de PREFERENCIAS con el orden del menú
-  var teclaEsc = null, alMover = null, alSoltar = null, alCancelar = null; // oyentes del documento, para quitarlos al cerrar
+  var teclaEsc = null, alMover = null, alSoltar = null, alCancelar = null, alDesplazar = null, alTocarFuera = null; // oyentes del documento, para quitarlos al cerrar
 
   window.UN.registrar('LISTADO', {
     abrir: function (el, ctx) {
-      var T = ctx.tablas, cfg = ctx.config || {}, PROHIB = cfg.PROHIBIDO === undefined ? PROHIB_DEFECTO : cfg.PROHIBIDO;
+      var T = ctx.tablas, cfg = sinOcultas(ctx.config || {}, ctx.ocultar), PROHIB = cfg.PROHIBIDO === undefined ? PROHIB_DEFECTO : cfg.PROHIBIDO;
       var BASE = apartado(cfg, ctx.id, ctx.titulo), PREF = cfg.PREFERENCIAS || '';
       var puedePersonalizar = !!ctx.admin || (cfg.PERSONALIZAN || []).indexOf(ctx.perfil) >= 0;
       var K = 'li_' + ctx.id + '_';
       // T0625: los filtros (S.filtros) no se recuerdan: al volver a la sección, se ve todo.
-      var S = { vista: guardado(K + 'vista'), q: '', aviso: '', filtros: {}, leido: false };
+      var S = { vista: guardado(K + 'vista'), q: '', aviso: '', filtros: {}, leido: false, menu: '', ctx: '' };
       var url = new URLSearchParams(location.search), pedida = url.get('ficha');
+      // T0642: si se llega desde otra ficha, su nombre se queda en esta entrada del historial: vale también al ir y volver.
+      if (vueltaPendiente !== null) { try { history.replaceState(Object.assign({}, history.state, { deFicha: vueltaPendiente }), ''); } catch (e) {} vueltaPendiente = null; }
+      var deFicha = (history.state && history.state.deFicha) || '';
 
       el.innerHTML = '<div id="li-cont"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div>' +
-        '<div class="u-velo" id="li-velo"><div class="u-ventana li-ventana" role="dialog" aria-modal="true" aria-labelledby="li-vt"><div class="n-ventana" id="li-vent"></div></div></div>';
-      var cont = el.querySelector('#li-cont'), velo = el.querySelector('#li-velo'), vent = el.querySelector('#li-vent');
+        '<div class="u-velo" id="li-velo"><div class="u-ventana li-ventana" role="dialog" aria-modal="true" aria-labelledby="li-vt"><div class="n-ventana" id="li-vent"></div></div></div>' +
+        '<div class="u-aviso li-deshacer" id="li-deshacer" role="status" hidden><span></span><button type="button" data-deshacer>Deshacer</button></div>' +
+        '<aside class="li-ctx" id="li-ctx" role="dialog" aria-labelledby="li-ctx-t" hidden></aside>';
+      var cont = el.querySelector('#li-cont'), velo = el.querySelector('#li-velo'), vent = el.querySelector('#li-vent'), avDes = el.querySelector('#li-deshacer'), pCtx = el.querySelector('#li-ctx');
       // T0602: una foto que no se puede ver (un archivo de Drive que no es público ni de quien mira) no sale rota.
       // T0633: en su lugar, un aviso (en la ficha, con el porqué; el enlace «Ver foto ↗» sigue al lado), no un hueco.
       el.addEventListener('error', function (e) {
@@ -788,6 +1222,13 @@
       // Las tablas a las que apuntan (los nombres de las fases, de las marcas…) y las de los campos con «de».
       Object.keys(BASE.refs).forEach(function (t) { if (tablas.indexOf(t) < 0) tablas.push(t); });
       Object.keys(BASE.campos).forEach(function (c) { var de = BASE.campos[c].de; if (de && de.tabla && tablas.indexOf(de.tabla) < 0) tablas.push(de.tabla); });
+      // T0641: y las de los campos con «de» de lo relacionado (la composición de la alternativa de una comparativa).
+      BASE.relacionados.forEach(function (r) { Object.keys(r.campos || {}).forEach(function (c) { var de = r.campos[c].de; if (de && de.tabla && tablas.indexOf(de.tabla) < 0) tablas.push(de.tabla); }); });
+      // T0652: las del resumen de con quién es cada fila (la marca, sus necesidades, sus personas).
+      if (BASE.contexto) Object.keys(BASE.contexto.de).forEach(function (c) {
+        var d = BASE.contexto.de[c];
+        [d.tabla].concat(d.lineas.map(function (l) { return l && l.tabla; })).forEach(function (t) { if (t && tablas.indexOf(t) < 0) tablas.push(t); });
+      });
       function filas(t) { return T.filas(t) || []; }
       function filaDe(t, id) { return T.fila ? T.fila(t, id) : null; }
       var D = { filas: filas, fila: filaDe };
@@ -798,7 +1239,7 @@
       }
       function ap() { return enriquecer(aplicar(BASE, prefDe(ctx.id)), D); }
       /** Las filas como se ven (nombres en vez de códigos, rutas, «de»); cada una con la de verdad en __crudo. */
-      function vistas(a) { return preparar(a, filas(a.tabla), D); }
+      function vistas(a) { return preparar(a, filas(a.tabla), D, VAL); }
       function filaVista(a, id) { return vistas(a).filter(function (f) { return String(f[a.clave]) === String(id); })[0] || null; }
       function vistaActual(a) { var vs = vistasDe(a); return vs.filter(function (v) { return v.id === S.vista; })[0] || vs[0]; }
       var VAL = {};
@@ -813,10 +1254,12 @@
         if (t === '') return '<span class="li-nada">—</span>';
         var v = f[c];
         if (cp.calculo && cp.precio && t.indexOf('Falta') === 0) return cliente ? 'Precio a consultar' : '<span class="u-mal">' + texto(t) + '</span>';
+        if (cp.signo) { var sv = calcular(cp.calculo, f, VAL); return '<span class="' + (sv > 0.00001 ? 'li-signo-mas' : (sv < -0.00001 ? 'li-signo-menos' : '')) + '">' + texto(t) + '</span>'; }
         if (conEnlaces && !cp.calculo && !prohibido(v, PROHIB).length) {
           if (cp.tipo === 'enlace' && /^https?:\/\//i.test(String(v))) return '<a href="' + texto(v) + '" target="_blank" rel="noopener">Abrir ↗</a>';
+          if (cp.tipo === 'instagram' && instagramUrl(v)) return '<a href="' + texto(instagramUrl(v)) + '" target="_blank" rel="noopener">' + texto(cuentaInstagram(v)) + ' ↗</a>';
           if (cp.tipo === 'email' && /@/.test(String(v))) return '<a href="mailto:' + texto(v) + '">' + texto(v) + '</a>';
-          if (cp.tipo === 'telefono') return '<a href="tel:' + texto(String(v).replace(/[^\d+]/g, '')) + '">' + texto(v) + '</a>';
+          if (cp.tipo === 'telefono' && esTelefono(v)) return '<a href="tel:' + texto(telDe(v)) + '">' + texto(v) + '</a>';
           if (cp.tipo === 'foto' && imagen(v)) return '<img class="li-foto" src="' + texto(imagen(v)) + '" alt="" referrerpolicy="no-referrer" data-li-foto>' +
             (/^https?:/i.test(String(v)) ? ' <a class="u-nota li-verfoto" href="' + texto(v) + '" target="_blank" rel="noopener">Ver foto ↗</a>' : '');
         }
@@ -828,9 +1271,37 @@
         if (cp.tipo === 'fecha') { var cu = cuando(v, hoyIso()); return texto(t) + (cu ? ' <span class="u-nota">· ' + texto(cu) + '</span>' : ''); }
         return texto(t);
       }
+      /**
+       * T0641 · Lo relacionado como tarjetas cortas (la comparativa de una marca): el título, una línea con lo que se decide
+       * («Hoy 32,00 €/m (Yutes) · BOR-004 a 21,41 €/m · Ahorra 32 %»), lo de debajo (el estado) y, al tocar «Ver detalle», el
+       * cara a cara (una fila por dato, una columna por lado; sin la fila si los dos están vacíos) y el resto de sus datos.
+       */
+      function tarjetas(r, otro, rs) {
+        var tj = r.tarjeta, cmp = tj.comparar || {}, tits = cmp.titulos || [];
+        var nada = function (t) { return t.indexOf('class="li-nada"') >= 0; };
+        return '<ul class="li-rt">' + rs.map(function (x) {
+          var trozos = function (cs, cls) {
+            var p = (cs || []).map(function (c) { var t = celda(otro, c, x, false); return nada(t) ? '' : '<span>' + t + '</span>'; }).join('');
+            return p ? '<div class="' + cls + '">' + p + '</div>' : '';
+          };
+          var cara = (cmp.filas || []).map(function (fl) {
+            var vs = (fl.campos || []).map(function (c) { return celda(otro, c, x, false); });
+            return vs.every(nada) ? '' : '<span class="u-etiqueta">' + texto(fl.titulo || '') + '</span>' + vs.map(function (v) { return '<span>' + v + '</span>'; }).join('');
+          }).join('');
+          if (cara) cara = '<div class="li-cara" style="grid-template-columns:auto' + new Array(tits.length + 1).join(' 1fr') + '"><span></span>' +
+            tits.map(function (t) { return '<span class="u-etiqueta li-cara-t">' + texto(t) + '</span>'; }).join('') + cara + '</div>';
+          var det = (tj.detalle || []).map(function (c) {
+            var cp = campo(otro, c), t = celda(otro, c, x, true);
+            return nada(t) ? '' : '<div class="li-dato' + (cp.tipo === 'nota' ? ' u-ancho' : '') + '"><span class="u-etiqueta">' + texto(cp.titulo) + '</span><span class="li-valor">' + t + '</span></div>';
+          }).join('');
+          var mas = cara || det ? '<details class="li-rt-mas"><summary>' + texto(tj.verMas || 'Ver detalle') + '</summary>' + cara + (det ? '<div class="u-campos">' + det + '</div>' : '') + '</details>' : '';
+          return '<li class="li-rt-f"><div class="li-rt-t">' + celda(otro, tj.titulo || otro.nombre, x, false) + '</div>' + trozos(tj.linea, 'li-rt-l') + trozos(tj.debajo, 'li-rt-d') + mas + '</li>';
+        }).join('') + '</ul>';
+      }
       /** El nombre de una fila con su código delante (el de la tarea, para trabajarla en Claude). */
-      function titulo2(a, f, cli) {
-        var cod = a.codigo && a.codigo !== a.nombre && !vacio(f[a.codigo]) ? '<span class="li-cod">' + texto(f[a.codigo]) + '</span> ' : '';
+      function titulo2(a, f, cli, conCodigo) {
+        // T0642: el código (S-0002, M-001) solo en la ficha, para trabajar esa fila en Claude; en la lista no dice nada a quien la usa (se sigue buscando por él).
+        var cod = conCodigo && a.codigo && a.codigo !== a.nombre && !vacio(f[a.codigo]) ? '<span class="li-cod">' + texto(f[a.codigo]) + '</span> ' : '';
         return cod + celda(a, a.nombre, f, false, cli);
       }
       /** T0624 · Una fecha que hace saltar un aviso de vencido o pendiente, con su color (y su palabra: «hace 3 días», «hoy»). */
@@ -851,10 +1322,13 @@
         var vs = vistasDe(a);
         html += '<div class="li-arriba">' + (vs.length > 1 ? '<div class="u-pestanas li-vistas" role="tablist" aria-label="Vistas">' + vs.map(function (v) {
           return '<button type="button" role="tab" data-vista="' + texto(v.id) + '" aria-selected="' + (v.id === vista.id) + '">' + texto(v.titulo) + (v.cliente ? ' <span class="li-cli">para clientes</span>' : '') + '</button>';
-        }).join('') + '</div>' : '<div class="li-vistas"></div>') +
-          (puedePersonalizar ? '<button type="button" class="u-btn u-btn-texto li-pers" data-pers>' + ICONO_AJUSTAR + 'Personalizar</button>' : '') + '</div>';
+        }).join('') + '</div>' : '<div class="li-vistas"></div>');
+        // T0644: Personalizar va al Perfil; lo que es la vista, a mano en el ordenador y tras «i» en el móvil.
         var ayuda = textoDe(a, vista);
-        if (ayuda) html += '<p class="u-nota li-texto">' + texto(ayuda) + '</p>';
+        html += '<span class="u-nota li-cuenta">@@CUENTA@@</span>';
+        if (ayuda) html += '<button type="button" class="u-btn u-btn-icono li-qes" data-qes aria-expanded="' + !!S.qes + '" aria-controls="li-texto" aria-label="Qué es esta vista">' + ICONO_INFO + '</button>';
+        html += '</div>';
+        if (ayuda) html += '<p class="u-nota li-texto' + (S.qes ? ' li-abierto' : '') + '" id="li-texto">' + texto(ayuda) + '</p>';
         if (vista.cliente) {
           var nombres = []; ocultas(a, vista).forEach(function (c) { var t = campo(a, c).titulo; if (nombres.indexOf(t) < 0) nombres.push(t); });
           html += '<p class="li-cliente">Vista para enseñar a un cliente: sin avisos y sin ' + (nombres.length ? nombres.map(function (t) { return t.toLowerCase(); }).join(', ').replace(/, ([^,]*)$/, ' ni $1') : 'los datos privados') + '.</p>';
@@ -867,9 +1341,9 @@
         S.filtros = filtrosQueValen(S.filtros, disp);
         var nf = Object.keys(S.filtros).length;
         var fs = filtrar(a, vista, todas, { hoy: hoy, q: S.q, aviso: S.aviso, filtros: S.filtros, valores: VAL });
+        html = html.replace('@@CUENTA@@', texto(cuenta(a, vista, fs.length, deVista.length)));
         html += '<div class="li-barra"><div class="li-buscar"><label class="u-oculto" for="li-q">Buscar</label><input id="li-q" type="search" placeholder="Buscar en ' + texto((a.titulo || '').toLowerCase()) + '" value="' + texto(S.q) + '" autocomplete="off"></div>' +
           (disp.length ? '<button type="button" class="u-btn li-filtrar" data-filtrar aria-haspopup="dialog"' + (nf ? ' aria-pressed="true"' : '') + '>' + ICONO_FILTRO + 'Filtrar' + (nf ? ' <span class="li-nf" aria-label="' + nf + (nf === 1 ? ' puesto' : ' puestos') + '">' + nf + '</span>' : '') + '</button>' : '') +
-          '<span class="u-nota li-cuenta">' + texto(cuenta(a, vista, fs.length, deVista.length)) + '</span>' +
           (a.crear && editables(a).length && !vista.cliente ? '<button type="button" class="u-btn u-btn-accion li-nueva" data-nueva>Añadir</button>' : '') + '</div>';
         // Los filtros puestos, a la vista: cada uno se quita con su ✕, o todos a la vez.
         if (nf) html += '<div class="li-filtros" role="group" aria-label="Filtros puestos">' + disp.filter(function (d) { return S.filtros[d.campo]; }).map(function (d) {
@@ -883,15 +1357,188 @@
         else if (!fs.length) html += '<p class="u-vacio">' + (S.q ? 'Nada con «' + texto(S.q) + '»' + (nf ? ' y estos filtros.' : '.') : (nf ? 'Nada con estos filtros.' : 'Nada en esta vista.')) + '</p>';
         else if (vista.tablero) html += pintarTablero(a, vista, fs, hoy);
         else html += pintarGrupos(a, vista, agrupar(a, vista, fs, hoy), hoy);
+        if (vista.tablero || !conRapidas(a, vista)) S.menu = '';
+        html += menuPasar(hoy);
+        if (S.ctx) pintarCtx(); // T0652: el resumen abierto, con lo nuevo
         // Si no ha cambiado nada (un refresco por detrás con lo mismo), no se rehace: un toque a medias en una fila no se pierde.
         if (html === pintado) return;
         pintado = html;
         var foco = document.activeElement && document.activeElement.id === 'li-q' ? document.activeElement.selectionStart : null;
         cont.innerHTML = html;
         if (foco !== null) { var q = cont.querySelector('#li-q'); q.focus(); try { q.setSelectionRange(foco, foco); } catch (e) {} }
+        colocarMenu();
       }
-      function tarjeta(a, f, det, cli, hoy, arrastrar, tituloGrupo, foto) {
-        var avs = cli ? [] : avisosDe(a, f, hoy), mar = sinRepetir(avs, tituloGrupo);
+
+      /* ---------- T0643 · cerrar, pasar y apuntar en un toque ---------- */
+      var tDes = 0;
+      /** Un aviso con «Deshacer» (8 segundos): lo que se acaba de hacer se puede volver atrás. */
+      function deshacible(txt, deshacer) {
+        avDes.querySelector('span').textContent = txt;
+        avDes.hidden = false; avDes._deshacer = deshacer;
+        clearTimeout(tDes);
+        tDes = setTimeout(function () { avDes.hidden = true; avDes._deshacer = null; }, 8000);
+      }
+      function sinDeshacer() { clearTimeout(tDes); avDes.hidden = true; avDes._deshacer = null; }
+      function mal(que) { return function (e) { ctx.aviso('No se ha ' + que + ': ' + ((e && e.message) || e)); }; }
+      /** El nombre corto de una fila para un aviso: su código o, sin él, su nombre (cortado). */
+      function quien(a, f) { var t = !vacio(f[a.codigo]) ? f[a.codigo] : String(f[a.nombre] || ''); return t.length > 40 ? t.slice(0, 38) + '…' : t; }
+      function marcarHecha(id) {
+        var a = ap(), r = a.rapidas, f = filaVista(a, id);
+        if (!f || !r || !r.hecha) return;
+        var crudo = f.__crudo || f, c = r.hecha.campo, antes = {}, cambios = {};
+        antes[c] = vacio(crudo[c]) ? '' : crudo[c];
+        cambios[c] = codigoDe(a, c, r.hecha.valor);
+        var volver = function () { return Promise.resolve(T.actualizar(a.tabla, id, antes)).then(null, mal('deshecho')); };
+        Promise.resolve(T.actualizar(a.tabla, id, cambios)).then(null, mal('guardado'));
+        var con = siguienteCon(a, crudo);
+        if (con) { sinDeshacer(); siguientePaso(a, f, con, volver); }
+        else deshacible(r.hecha.valor + ': ' + quien(a, f), volver);
+      }
+      function pasar(id, fecha) {
+        var a = ap(), c = a.rapidas && a.rapidas.pasar, f = filaVista(a, id);
+        if (!f || !c || !fecha) return;
+        var crudo = f.__crudo || f, antes = {}, cambios = {};
+        antes[c] = vacio(crudo[c]) ? '' : crudo[c]; cambios[c] = fecha;
+        Promise.resolve(T.actualizar(a.tabla, id, cambios)).then(null, mal('guardado'));
+        deshacible(quien(a, f) + ' pasa al ' + diaCorto(fecha), function () { return Promise.resolve(T.actualizar(a.tabla, id, antes)).then(null, mal('deshecho')); });
+      }
+      /** «Otro día…»: una ventana con el calendario. */
+      function pasarOtroDia(id) {
+        var a = ap(), f = filaVista(a, id); if (!f) return;
+        abrirVentana('<div class="li-ficha-cab"><h2 id="li-vt">Pasar a otro día</h2><button type="button" class="u-btn u-btn-icono" data-cerrar aria-label="Cerrar">' + ICONO_X + '</button></div>' +
+          '<p class="u-nota">' + texto(quien(a, f)) + '</p><form id="li-fotro" class="li-form" novalidate><div class="u-campo"><label class="u-etiqueta" for="li-otro">Día</label>' +
+          '<input id="li-otro" type="date" value="' + texto(masDias(hoyIso(), 1)) + '"></div><div class="n-botones"><button type="submit" class="u-btn u-btn-accion">Pasar</button></div></form>');
+        vent.querySelector('#li-fotro').addEventListener('submit', function (ev) {
+          ev.preventDefault();
+          var v = vent.querySelector('#li-otro').value; if (!v) return;
+          cerrarVentana(); pasar(id, v);
+        });
+      }
+      /** Al cerrar una fila que es con alguien (una marca, un proveedor): ¿cuál es el siguiente paso con él? La ✕, tocar fuera
+       *  o Esc vuelven atrás (la fila sigue sin cerrar); «No hay siguiente paso» la deja cerrada sin apuntar nada. */
+      function siguientePaso(a, f, con, volver) {
+        var hoy = hoyIso(), fs = fechasSiguiente(hoy), crudo = f.__crudo || f;
+        // Viene marcado «En 3 días»; si cae en fin de semana, el primer día de trabajo.
+        var d3 = aFecha(fs[1].fecha).getDay(), marcado = d3 === 0 || d3 === 6 ? 0 : 1;
+        var h = '<div class="li-ficha-cab"><p class="li-sig-ok">' + ICONO_OK + texto(a.rapidas.hecha.valor) + ': ' + texto(quien(a, f)) + '</p>' +
+          '<button type="button" class="u-btn u-btn-icono" data-cerrar aria-label="Volver sin cerrarla" title="Volver sin cerrarla">' + ICONO_X + '</button></div>' +
+          '<h2 id="li-vt">¿Cuál es el siguiente paso con ' + texto(f[con] || '') + '?</h2>' +
+          '<form id="li-fsig" class="li-form" novalidate><div class="u-campo u-ancho"><label class="u-etiqueta" for="li-sig">Siguiente paso</label>' +
+          '<input id="li-sig" type="text" autocomplete="off" aria-describedby="li-sig-err"></div>' +
+          (a.rapidas.pasar ? '<fieldset class="u-campo li-dias"><legend class="u-etiqueta">Cuándo</legend><div>' + fs.map(function (o, i) {
+            return '<button type="button" class="li-dia" data-dia="' + o.fecha + '" aria-pressed="' + (i === marcado) + '">' + texto(o.titulo) + ' <small>' + texto(diaCorto(o.fecha)) + '</small></button>';
+          }).join('') + '</div></fieldset>' : '') +
+          '<p class="u-error" id="li-sig-err" role="alert" hidden></p>' +
+          '<div class="n-botones"><button type="submit" class="u-btn u-btn-accion">Apuntar</button><button type="button" class="u-btn u-btn-texto" data-sig-no>No hay siguiente paso</button></div>' +
+          '<p class="u-nota">¿Te has equivocado? Con la ✕, tocando fuera o con Esc, vuelves atrás y sigue sin cerrar.</p></form>';
+        abrirVentana(h);
+        alCerrar = volver;
+        var form = vent.querySelector('#li-fsig'), inp = vent.querySelector('#li-sig');
+        inp.focus();
+        form.addEventListener('click', function (ev) {
+          var d = ev.target.closest('[data-dia]');
+          if (d) { [].forEach.call(form.querySelectorAll('[data-dia]'), function (x) { x.setAttribute('aria-pressed', String(x === d)); }); return; }
+          if (ev.target.closest('[data-sig-no]')) {
+            alCerrar = null; cerrarVentana();
+            deshacible(a.rapidas.hecha.valor + ': ' + quien(a, f), volver);
+          }
+        });
+        form.addEventListener('submit', function (ev) {
+          ev.preventDefault();
+          var t = inp.value.trim(), err = vent.querySelector('#li-sig-err'), p = prohibido(t, PROHIB);
+          if (!t) { err.textContent = 'Escribe el siguiente paso, o pulsa «No hay siguiente paso».'; err.hidden = false; inp.setAttribute('aria-invalid', 'true'); inp.focus(); return; }
+          if (p.length) { err.textContent = textoProhibido(p); err.hidden = false; inp.setAttribute('aria-invalid', 'true'); return; }
+          var d = form.querySelector('[data-dia][aria-pressed="true"]');
+          alCerrar = null; cerrarVentana();
+          Promise.resolve(T.crear(a.tabla, filaSiguiente(a, crudo, t, d ? d.getAttribute('data-dia') : ''))).then(function () {
+            ctx.aviso('Apuntado el siguiente paso con ' + (f[con] || '') + '.');
+          }, mal('apuntado el siguiente paso'));
+        });
+      }
+      /** T0643 · Si la sección cierra y pasa en un toque en esta vista (no en la de clientes; su columna se edita). */
+      function conRapidas(a, vista) {
+        var r = a.rapidas, ed = editables(a);
+        return !!r && !vista.cliente && ((r.hecha && ed.indexOf(r.hecha.campo) >= 0) || (r.pasar && ed.indexOf(r.pasar) >= 0));
+      }
+      function circulo(a, f) {
+        var r = a.rapidas, id = f[a.clave], cod = !vacio(f[a.codigo]) ? f[a.codigo] : f[a.nombre];
+        if (!r.hecha || editables(a).indexOf(r.hecha.campo) < 0) return '';
+        return '<button type="button" class="li-circ" data-hecha="' + texto(id) + '" aria-label="Marcar como ' + texto(String(r.hecha.valor).toLowerCase()) + ': ' + texto(cod) + '" title="Marcar como ' + texto(String(r.hecha.valor).toLowerCase()) + '">' + ICONO_OK + '</button>';
+      }
+      function botonPasar(a, f) {
+        if (!a.rapidas.pasar || editables(a).indexOf(a.rapidas.pasar) < 0) return '';
+        var id = String(f[a.clave]);
+        return '<button type="button" class="u-btn li-pasar" data-pasar-menu="' + texto(id) + '" aria-haspopup="menu" aria-expanded="' + (S.menu === id) + '">' + ICONO_RELOJ + 'Pasar</button>';
+      }
+      /* ---------- T0652 · el resumen de con quién es una fila ---------- */
+      /** El nombre de con quién es (h, ya pintado) como botón que abre su resumen; sin nadie de CONTEXTO.de, tal cual. */
+      function botonCtx(a, f, h) {
+        if (!contextoCol(a, f.__crudo) || h.indexOf('class="li-nada"') >= 0) return h;
+        var n = h.replace(/<[^>]*>/g, '');
+        return '<button type="button" class="li-ctx-b" data-ctx="' + texto(f[a.clave]) + '" aria-haspopup="dialog" aria-expanded="' + (S.ctx === String(f[a.clave])) + '" title="Lo último con ' + texto(n) + '">' + h + '<span aria-hidden="true"> ›</span></button>';
+      }
+      function resumenFila(a, id, sin) {
+        var f = filaVista(a, id);
+        return f ? resumenDe(a, D, f.__crudo, vistas(a), { hoy: hoyIso(), prohib: PROHIB, sin: sin }) : null;
+      }
+      /** El resumen en HTML: en el panel (con su cabecera y la ✕) o dentro de la ficha. */
+      function htmlResumen(r, enFicha) {
+        var ev = function (e, hecha) {
+          return '<li><button type="button" class="li-ctx-ev" data-ctx-fila="' + texto(e.id) + '"><span class="li-ctx-f">' + texto(e.fecha || 'Sin fecha') + '</span><span class="li-ctx-q">' +
+            (hecha ? '<span class="li-ctx-ok" aria-hidden="true">' + ICONO_OK + '</span>' : '') + texto(e.titulo) +
+            (!hecha && e.cuando ? '<small class="' + (e.tarde ? 'li-ctx-tarde' : '') + '">' + texto(e.cuando) + '</small>' : '') +
+            (e.nota ? '<small>' + texto(e.nota) + '</small>' : '') + '</span></button></li>';
+        };
+        var sec = r.seccion ? String(r.seccion).toUpperCase() : '', va = sec && veo[sec];
+        var h = enFicha ? '<h3 class="li-fg-t">Con ' + texto(r.nombre) + '</h3>' + (r.sub ? '<p class="li-ctx-sub">' + texto(r.sub) + '</p>' : '')
+          : '<div class="li-ctx-cab"><div><h2 id="li-ctx-t" tabindex="-1">' + texto(r.nombre) + '</h2>' + (r.sub ? '<p class="li-ctx-sub">' + texto(r.sub) + '</p>' : '') + '</div>' +
+            '<button type="button" class="u-btn u-btn-icono" data-ctx-cerrar aria-label="Cerrar">' + ICONO_X + '</button></div>';
+        if (r.chips.length) h += '<p class="li-ctx-chips">' + r.chips.map(function (c) { return '<span class="u-chip">' + texto(c) + '</span>'; }).join('') + '</p>';
+        if (r.nota) h += '<p class="li-ctx-nota">' + texto(r.nota) + '</p>';
+        h += '<section class="li-ctx-bl"><h4 class="u-etiqueta">Lo último que hicimos</h4>' + (r.ultimas.length ? '<ul class="li-ctx-l">' + r.ultimas.map(function (e) { return ev(e, true); }).join('') + '</ul>' : '<p class="u-nota">Todavía no hay nada hecho con ellos.</p>') + '</section>';
+        h += '<section class="li-ctx-bl"><h4 class="u-etiqueta">' + (enFicha ? 'Lo demás pendiente' : 'Lo que tenemos pendiente') + '</h4>' + (r.pendientes.length ? '<ul class="li-ctx-l">' + r.pendientes.map(function (e) { return ev(e, false); }).join('') + '</ul>' +
+          (r.masPendientes ? '<p class="u-nota">Y ' + r.masPendientes + ' más.</p>' : '') : '<p class="u-nota">Nada ' + (enFicha ? 'más ' : '') + 'pendiente con ellos.</p>') + '</section>';
+        r.lineas.forEach(function (l) { h += '<p class="li-ctx-lin"><span class="u-etiqueta">' + texto(l.titulo) + '</span> ' + texto(l.texto) + '</p>'; });
+        if (va) h += '<p><a class="u-btn li-ctx-ir" href="?s=' + encodeURIComponent(sec.toLowerCase()) + '&ficha=' + encodeURIComponent(r.id) + '" data-sx="' + texto(sec) + '">Abrir en ' + texto(va) + ' ›</a></p>';
+        return enFicha ? '<section class="li-fgrupo li-ctx-ficha">' + h + '</section>' : h;
+      }
+      /** El panel: al lado en el ordenador, desde abajo en el móvil. Se pinta otra vez si cambian los datos. */
+      function pintarCtx(foco) {
+        var r = S.ctx ? resumenFila(ap(), S.ctx) : null;
+        if (!r) { pCtx.hidden = true; pCtx.innerHTML = ''; pCtx._html = ''; S.ctx = ''; return; }
+        var h = htmlResumen(r, false);
+        if (h !== pCtx._html) { pCtx.innerHTML = h; pCtx._html = h; } // un refresco con lo mismo no le quita el foco
+        pCtx.hidden = false;
+        if (foco) { var t = pCtx.querySelector('#li-ctx-t'); if (t) t.focus(); }
+      }
+      function abrirCtx(id) { S.ctx = String(id); S.menu = ''; pintar(); pintarCtx(true); }
+      function cerrarCtx(sinFoco) {
+        if (!S.ctx) return;
+        var id = S.ctx; S.ctx = ''; pintarCtx(); pintar();
+        if (sinFoco) return;
+        var b = [].filter.call(cont.querySelectorAll('[data-ctx]'), function (x) { return x.getAttribute('data-ctx') === id && x.offsetParent; })[0];
+        if (b) b.focus();
+      }
+      /** El menú de «Pasar», fuera de la tabla (no lo corta su desplazamiento); se coloca junto a su botón al pintar. */
+      function menuPasar(hoy) {
+        if (!S.menu) return '';
+        return '<div class="li-menu" role="menu" aria-label="Pasar a otro día">' + opcionesPasar(hoy).map(function (o) {
+          return '<button type="button" role="menuitem" data-pasar-a="' + o.fecha + '" data-fila="' + texto(S.menu) + '">' + texto(o.titulo) + ' <small>' + texto(diaCorto(o.fecha)) + '</small></button>';
+        }).join('') + '<button type="button" role="menuitem" data-pasar-otro="' + texto(S.menu) + '">Otro día…</button></div>';
+      }
+      function colocarMenu() {
+        var m = cont.querySelector('.li-menu'); if (!m) return;
+        var b = [].filter.call(cont.querySelectorAll('[data-pasar-menu]'), function (x) { return x.getAttribute('data-pasar-menu') === S.menu && x.offsetParent; })[0];
+        if (!b) { S.menu = ''; m.remove(); pintado = ''; return; }
+        var r = b.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
+        m.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px';
+        m.style.top = (r.bottom + 4 + h > window.innerHeight - 8 ? r.top - h - 4 : r.bottom + 4) + 'px';
+      }
+      function tarjeta(a, f, det, cli, hoy, arrastrar, tituloGrupo, foto, plazo, rap) {
+        var avs = cli ? [] : avisosDe(a, f, hoy), mar = sinRepetir(avs, tituloGrupo, plazo);
+        // T0652: con quién es, debajo de la tarjeta y aparte, para abrir su resumen (en el tablero, no: ahí se arrastra).
+        var cx = !cli && !arrastrar && a.contexto && contextoCol(a, f.__crudo) ? a.contexto.campo : '';
+        if (cx) det = det.filter(function (x) { return x !== cx; });
         // T0601: en la tarjeta, lo vacío no sale (una prospección sin estado ni nota no enseña «— —»).
         var dets = det.filter(function (x) { return x !== foto; }).map(function (x) { return fechaAviso(a, x, celda(a, x, f, false, cli), avs); }).filter(function (h) { return h.indexOf('class="li-nada"') < 0; });
         // T0633: con foto, a la izquierda (sin foto, un hueco igual, para que los nombres caigan en línea).
@@ -900,43 +1547,54 @@
         var cuerpo = '<strong>' + titulo2(a, f, cli) + '</strong>' +
           (dets.length ? '<span class="li-det">' + dets.map(function (h) { return '<span>' + h + '</span>'; }).join('') + '</span>' : '') +
           (mar.length ? '<span class="li-marcas">' + marcas(mar) + '</span>' : '');
-        return '<li><button type="button" class="li-tarjeta' + (foto ? ' li-con-foto' : '') + (avs.length ? ' li-f-' + texto(avs[0].nivel || 'medio') : '') + '" data-id="' + texto(f[a.clave]) + '"' + (arrastrar ? ' data-mover' : '') + '>' +
-          (foto ? img + '<span class="li-t-txt">' + cuerpo + '</span>' : cuerpo) + '</button></li>';
+        // T0643: con lo de un toque, el círculo a la izquierda y «Pasar» a la derecha, encima de la tarjeta (no dentro: un botón no va dentro de otro).
+        var r = rap && rapidaEn(a, f, hoy), ci = r ? circulo(a, f) : '', pa = r ? botonPasar(a, f) : '';
+        var bc = cx ? botonCtx(a, f, celda(a, cx, f, false, cli)) : '';
+        return '<li' + (ci || pa || bc ? ' class="li-t-rap' + (ci ? ' li-t-ci' : '') + (pa ? ' li-t-pa' : '') + (bc ? ' li-t-ctx' : '') + '"' : '') + '>' + ci + '<button type="button" class="li-tarjeta' + (foto ? ' li-con-foto' : '') + (avs.length ? ' li-f-' + texto(avs[0].nivel || 'medio') : '') + '" data-id="' + texto(f[a.clave]) + '"' + (arrastrar ? ' data-mover' : '') + '>' +
+          (foto ? img + '<span class="li-t-txt">' + cuerpo + '</span>' : cuerpo) + '</button>' + pa + bc + '</li>';
       }
       /** T0610 · Los grupos de una vista. En el ordenador, UNA tabla: la cabecera una vez y cada grupo como una fila con su
        *  título, así las columnas caen igual en todos y se ajustan a lo que llevan. En el móvil, una lista de tarjetas por grupo. */
       function pintarGrupos(a, vista, gs, hoy) {
         // En una vista para clientes no salen los avisos (son para quien trabaja) y un precio que falta es «a consultar».
         var cli = !!vista.cliente, fuera = ocultas(a, vista), nom = a.nombre;
+        var plazo = vista.agrupar && vista.agrupar.por === 'plazo' ? vista.agrupar.campo : '';
         // La columna por la que se agrupa ya la dice el título de cada grupo: no se repite en cada fila (salvo que sea el nombre).
         var delGrupo = columnaDelGrupo(vista);
         if (delGrupo && delGrupo !== nom && gs.length > 1) fuera = fuera.concat([delGrupo]);
         var cols = columnasDe(a, vista).filter(function (c) { return fuera.indexOf(c) < 0 && c !== a.codigo; });
         // En la tabla, el código va en su columna, la primera (en las tarjetas, delante del nombre).
-        var conCod = a.codigo && a.codigo !== nom ? [a.codigo].concat(cols) : cols;
+        var conCod = cols; // T0642: sin la columna del código
         var det = (a.detalle.length ? a.detalle : cols.filter(function (c) { return c !== nom; }).slice(0, 2)).filter(function (c) { return fuera.indexOf(c) < 0 && c !== nom && (!cli || cols.indexOf(c) >= 0); });
         var num = function (cp) { return /importe|numero|porcentaje/.test(cp.tipo); };
         var cabG = function (g) { return '<h2 class="n-grupo">' + texto(g.titulo) + ' <span class="u-cifra">' + g.filas.length + '</span></h2>'; };
+        // T0643: el círculo, delante del código; «Pasar», al final. Solo si alguna fila de la vista los lleva.
+        var rap = conRapidas(a, vista), conCi = rap && !!a.rapidas.hecha, conPa = rap && !!a.rapidas.pasar;
+        if (rap && !gs.some(function (g) { return g.filas.some(function (f) { return rapidaEn(a, f, hoy); }); })) conCi = conPa = false;
+        var nCols = conCod.length + (conCi ? 1 : 0) + (conPa ? 1 : 0);
         var fila = function (f, g) {
-          var avs = cli ? [] : avisosDe(a, f, hoy), mar = sinRepetir(avs, g.titulo);
-          return '<tr tabindex="0" data-id="' + texto(f[a.clave]) + '"' + (avs.length ? ' class="li-con-aviso li-f-' + texto(avs[0].nivel || 'medio') + '"' : '') + '>' + conCod.map(function (c) {
+          var avs = cli ? [] : avisosDe(a, f, hoy), mar = sinRepetir(avs, g.titulo, plazo), r = (conCi || conPa) && rapidaEn(a, f, hoy);
+          return '<tr tabindex="0" data-id="' + texto(f[a.clave]) + '"' + (avs.length ? ' class="li-con-aviso li-f-' + texto(avs[0].nivel || 'medio') + '"' : '') + '>' +
+            (conCi ? '<td class="li-td-ci">' + (r ? circulo(a, f) : '') + '</td>' : '') + conCod.map(function (c) {
             var cp = campo(a, c), principal = c === nom;
             // Fechas, cifras, estados y lo corto no se parten («273 / g/m²», «hace 9 / días»): lo que se estrecha es el texto largo.
-            var h = fechaAviso(a, c, celda(a, c, f, false, cli), avs), corta = !principal && (num(cp) || /^(fecha|estado|sino)$/.test(cp.tipo) || h.replace(/<[^>]*>/g, '').length <= 14);
+            var h = fechaAviso(a, c, celda(a, c, f, false, cli), avs);
+            if (!cli && a.contexto && c === a.contexto.campo) h = botonCtx(a, f, h);
+            var corta = !principal && (num(cp) || /^(fecha|estado|sino)$/.test(cp.tipo) || h.replace(/<[^>]*>/g, '').length <= 14);
             return '<td class="' + (num(cp) ? 'num' : '') + (corta ? ' li-td-corta' : '') + (principal ? ' u-tabla-t' : '') + (c === a.codigo ? ' li-td-cod' : '') + '">' + h +
               (principal && mar.length ? '<div class="li-marcas">' + marcas(mar) + '</div>' : '') + '</td>';
-          }).join('') + '</tr>';
+          }).join('') + (conPa ? '<td class="li-td-pa">' + (r ? botonPasar(a, f) : '') + '</td>' : '') + '</tr>';
         };
-        var tabla = '<div class="u-solo-ancho li-tabla"><table class="u-tabla"><thead><tr>' + conCod.map(function (c) {
+        var tabla = '<div class="u-solo-ancho li-tabla"><table class="u-tabla"><thead><tr>' + (conCi ? '<th scope="col" class="li-td-ci"><span class="u-oculto">' + texto(a.rapidas.hecha.valor) + '</span></th>' : '') + conCod.map(function (c) {
           var cp = campo(a, c); return '<th scope="col"' + (num(cp) ? ' class="num"' : '') + '>' + texto(cp.titulo) + '</th>';
-        }).join('') + '</tr></thead>' + gs.map(function (g) {
-          return '<tbody>' + (g.titulo ? '<tr class="li-g-cab"><th scope="colgroup" colspan="' + conCod.length + '">' + cabG(g) + '</th></tr>' : '') +
+        }).join('') + (conPa ? '<th scope="col" class="li-td-pa"><span class="u-oculto">Pasar a otro día</span></th>' : '') + '</tr></thead>' + gs.map(function (g) {
+          return '<tbody>' + (g.titulo ? '<tr class="li-g-cab"><th scope="colgroup" colspan="' + nCols + '">' + cabG(g) + '</th></tr>' : '') +
             g.filas.map(function (f) { return fila(f, g); }).join('') + '</tbody>';
         }).join('') + '</table></div>';
         var foto = fotoDeTarjeta(a, cols);
         var tarjetas = '<div class="u-solo-movil">' + gs.map(function (g) {
           return '<section class="li-grupo">' + (g.titulo ? cabG(g) : '') + '<ul class="li-tarjetas">' +
-            g.filas.map(function (f) { return tarjeta(a, f, det, cli, hoy, false, g.titulo, foto); }).join('') + '</ul></section>';
+            g.filas.map(function (f) { return tarjeta(a, f, det, cli, hoy, false, g.titulo, foto, plazo, rap); }).join('') + '</ul></section>';
         }).join('') + '</div>';
         return tabla + tarjetas;
       }
@@ -944,10 +1602,13 @@
       function pintarTablero(a, vista, fs, hoy) {
         var cli = !!vista.cliente, fuera = ocultas(a, vista), c = vista.tablero.campo, nom = a.nombre;
         var mueve = !cli && editables(a).indexOf(c) >= 0;
-        var det = (a.detalle.length ? a.detalle : columnasDe(a, vista)).filter(function (x) { return fuera.indexOf(x) < 0 && x !== nom && x !== c && x !== a.codigo; }).slice(0, 3);
-        var cp = campo(a, c);
-        return '<div class="li-tablero" data-campo="' + texto(c) + '">' + columnasTablero(a, vista, fs).map(function (col) {
-          var color = (cp.colores || {})[col.id] || '';
+        var cp = campo(a, c), cols = columnasTablero(a, vista, fs), junta = cols.some(function (x) { return x.junta; });
+        // T0642: en un tablero con columnas que juntan varios valores (el embudo), cada tarjeta dice el suyo (su fase); se
+        // cambia en la ficha (a una columna así no se arrastra: no se sabría cuál de sus valores poner).
+        var det = (a.detalle.length ? a.detalle : columnasDe(a, vista)).filter(function (x) { return fuera.indexOf(x) < 0 && x !== nom && (x !== c || junta) && x !== a.codigo; }).slice(0, 3);
+        if (junta) mueve = false;
+        return '<div class="li-tablero" data-campo="' + texto(c) + '">' + cols.map(function (col) {
+          var color = col.junta ? '' : (cp.colores || {})[col.id] || '';
           return '<section class="li-col' + (color ? ' li-' + texto(color) : '') + '" data-valor="' + texto(col.id) + '"' + (mueve ? ' data-soltar' : '') + '>' +
             '<h2 class="li-col-t">' + texto(col.titulo) + ' <span class="u-cifra">' + col.filas.length + '</span></h2>' +
             (col.filas.length ? '<ul class="li-tarjetas li-col-l">' + col.filas.map(function (f) { return tarjeta(a, f, det, cli, hoy, mueve); }).join('') + '</ul>' : '<p class="u-nota li-col-vacia">Nada</p>') + '</section>';
@@ -956,14 +1617,19 @@
 
       /* ---------- ficha ---------- */
       function abrirVentana(html) {
+        alCerrar = null; S.menu = '';
         vent.innerHTML = html;
         velo.classList.add('abierto');
         var h = vent.querySelector('h2'); if (h) { h.setAttribute('tabindex', '-1'); h.focus(); }
       }
+      var alCerrar = null; // T0643: lo que se hace si la ventana se cierra sin terminar (el siguiente paso: volver atrás)
       function cerrarVentana() {
+        var al = alCerrar; alCerrar = null;
+        if (al) al();
         velo.classList.remove('abierto'); vent.innerHTML = '';
         // Si se llegó con ?ficha=…, se quita de la dirección para que al volver no se abra otra vez.
-        if (new URLSearchParams(location.search).get('ficha')) { var u = new URL(location.href); u.searchParams.delete('ficha'); history.replaceState(history.state, '', u.pathname + u.search + u.hash); }
+        var us = new URLSearchParams(location.search);
+        if (us.get('ficha') || us.get('nueva')) { var u = new URL(location.href); ['ficha', 'nueva'].concat(editables(BASE)).forEach(function (k) { u.searchParams.delete(k); }); history.replaceState(history.state, '', u.pathname + u.search + u.hash); }
       }
       /** Una fila nueva con lo que pone NUEVA (por el nombre en una columna que apunta a otra tabla; «hoy» en una fecha). */
       function nuevaFila(a) {
@@ -989,13 +1655,13 @@
           // Una columna que apunta a otra tabla: se elige por el nombre y se guarda el código.
           var ns = Object.keys(cp.ids);
           return '<div class="u-campo">' + et + '<select id="' + id + '" data-c="' + texto(c) + '"><option value=""></option>' +
-            ns.map(function (n) { return '<option value="' + texto(cp.ids[n]) + '"' + (String(v) === String(cp.ids[n]) ? ' selected' : '') + '>' + texto(n) + '</option>'; }).join('') +
+            ns.map(function (n) { return '<option value="' + texto(cp.ids[n]) + '"' + (String(v) === String(cp.ids[n]) ? ' selected' : '') + '>' + texto(mostrar(cp, n)) + '</option>'; }).join('') +
             (!vacio(v) && !ns.some(function (n) { return String(cp.ids[n]) === String(v); }) ? '<option value="' + texto(v) + '" selected>' + texto(v) + '</option>' : '') + '</select></div>';
         }
         if (cp.opciones) {
           var ops = cp.opciones.slice(); if (!vacio(v) && ops.indexOf(String(v)) < 0) ops.unshift(String(v));
           return '<div class="u-campo">' + et + '<select id="' + id + '" data-c="' + texto(c) + '"><option value=""></option>' +
-            ops.map(function (o) { return '<option' + (String(v) === o ? ' selected' : '') + '>' + texto(o) + '</option>'; }).join('') + '</select></div>';
+            ops.map(function (o) { return '<option value="' + texto(o) + '"' + (String(v) === o ? ' selected' : '') + '>' + texto(mostrar(cp, o)) + '</option>'; }).join('') + '</select></div>';
         }
         // Lo que no se guarda (una cuenta, un DNI) tampoco se enseña al editar: sale tapado y, si se guarda, se quita.
         var tapado = !vacio(v) && prohibido(v, PROHIB).length ? tapar(v, PROHIB) : null;
@@ -1013,20 +1679,28 @@
         return i.defaultValue;
       }
       var abierta = null; // { id } de la ficha abierta, para «Copiar para Claude»
-      function ficha(id, nueva) {
+      function ficha(id, nueva, puesto) {
         var a = ap(), vista = vistaActual(a), fuera = ocultas(a, vista), f = nueva ? {} : filaVista(a, id), hoy = hoyIso(), cli = !!vista.cliente;
         if (!f) { ctx.aviso('Esa fila ya no está.'); return; }
         var crudo = f.__crudo || {}; // lo que de verdad hay (los códigos), para editar
-        if (nueva) crudo = nuevaFila(a);
+        if (nueva) crudo = Object.assign(nuevaFila(a), puesto || {}); // T0642: lo que trae «+ Nueva tarea» (su marca)
         abierta = nueva ? null : { id: id };
+        var llegada = nueva ? !!(puesto && url.get('nueva')) : !!pedida && String(id) === String(pedida); // la ficha que trae la dirección
         var ed = cli ? [] : editables(a).filter(function (c) { return fuera.indexOf(c) < 0; });
         var grupos = a.ficha.length ? a.ficha : [{ titulo: '', campos: columnasDe(a, vista) }];
         var avs = nueva || cli ? [] : avisosDe(a, f, hoy);
-        var vuelta = ctx.desde && pedida && !nueva ? '<button type="button" class="u-btn u-btn-texto li-volver" data-volver>‹ Volver a ' + texto(ctx.desde.titulo) + '</button>' : '';
-        var h = vuelta + '<div class="li-ficha-cab"><h2 id="li-vt">' + (nueva ? 'Añadir · ' + texto(a.titulo) : titulo2(a, f, cli)) + '</h2>' +
+        var tv = llegada ? textoVuelta(deFicha, ctx.desde) : ''; // T0642: a la ficha de la que vienes, si vienes de una
+        var vuelta = tv ? '<button type="button" class="u-btn u-btn-texto li-volver" data-volver>' + texto(tv) + '</button>' : '';
+        var h = vuelta + '<div class="li-ficha-cab"><h2 id="li-vt">' + (nueva ? 'Añadir · ' + texto(a.titulo) : titulo2(a, f, cli, true)) + '</h2>' +
           '<button type="button" class="u-btn u-btn-icono" data-cerrar aria-label="Cerrar">' + ICONO_X + '</button></div>';
         if (avs.length) h += '<div class="li-ficha-avisos">' + marcas(avs) + '</div>';
         if (cli) h += '<p class="li-cliente">Ficha para enseñar a un cliente: sin datos privados.</p>';
+        // T0643: arriba, cerrarla o pasarla en un toque (guardan solas, sin «Guardar»).
+        if (!nueva && conRapidas(a, vista) && rapidaEn(a, f, hoy)) {
+          var rr = a.rapidas, edr = editables(a);
+          h += '<div class="li-rapidas">' + (rr.hecha && edr.indexOf(rr.hecha.campo) >= 0 ? '<button type="button" class="u-btn li-r-hecha" data-r-hecha>' + ICONO_OK + texto(rr.hecha.valor) + '</button>' : '') +
+            (rr.pasar && edr.indexOf(rr.pasar) >= 0 ? opcionesPasar(hoy).map(function (o) { return '<button type="button" class="u-btn" data-r-pasar="' + o.fecha + '" title="' + texto(diaCorto(o.fecha)) + '">' + texto(o.corto) + '</button>'; }).join('') : '') + '</div>';
+        }
         var puestos = [];
         // T0630: lo que tiene algo, cada uno en su sitio; lo vacío, junto en una línea al final de su apartado («Sin
         // rellenar: Formato, Notas»). Lo que se edita se abre al tocar su nombre (su campo ya está, escondido, en el form).
@@ -1038,43 +1712,99 @@
           var cuerpo = rp.ver.map(function (c) {
             if (ed.indexOf(c) >= 0) return entrada(a, c, crudo);
             var cp = campo(a, c);
-            return '<div class="li-dato' + (cp.tipo === 'nota' || cp.tipo === 'foto' ? ' u-ancho' : '') + '"><span class="u-etiqueta">' + texto(cp.titulo) + '</span><span class="li-valor">' + celda(a, c, f, true, cli) + '</span>' +
-              (cp.ayuda && !cli ? '<span class="u-nota">' + texto(cp.ayuda) + '</span>' : '') + '</div>';
+            // T0641: un calculado con «desglose» lleva debajo sus cuentas (no para un cliente: enseñan el coste) y ocupa todo el ancho.
+            var dg = cli ? '' : desglose(a, cp, f, VAL);
+            return '<div class="li-dato' + (cp.tipo === 'nota' || cp.tipo === 'foto' || dg ? ' u-ancho' : '') + '"><span class="u-etiqueta">' + texto(cp.titulo) + '</span><span class="li-valor">' + celda(a, c, f, true, cli) + '</span>' +
+              (dg ? '<span class="li-desglose">' + texto(dg) + '</span>' : '') +
+              (cp.ayuda && !cli && !dg ? '<span class="u-nota">' + texto(cp.ayuda) + '</span>' : '') + '</div>';
           }).join('') + rp.vacios.filter(function (c) { return ed.indexOf(c) >= 0; }).map(function (c) {
             return entrada(a, c, crudo).replace(/^<div class="u-campo/, '<div hidden data-hueco="' + texto(c) + '" class="u-campo');
           }).join('');
-          var linea = rp.vacios.length ? '<p class="li-vacios"><span class="u-etiqueta">Sin rellenar</span>' + rp.vacios.map(function (c) {
+          // T0642: en «Sin rellenar», solo lo que se puede rellenar aquí (lo demás, vacío, no sale: no se puede tocar).
+          var aRellenar = rp.vacios.filter(function (c) { return ed.indexOf(c) >= 0; });
+          var linea = aRellenar.length ? '<p class="li-vacios"><span class="u-etiqueta">Sin rellenar</span>' + aRellenar.map(function (c) {
             var t = texto(campo(a, c).titulo);
             return ed.indexOf(c) >= 0 ? '<button type="button" class="li-rellenar" data-rellenar="' + texto(c) + '" aria-label="Rellenar ' + t + '">' + t + '</button>' : '<span class="li-vacio">' + t + '</span>';
           }).join('') + '</p>' : '';
           return '<section class="li-fgrupo">' + (titulo ? '<h3 class="li-fg-t">' + texto(titulo) + '</h3>' : '') + (cuerpo ? '<div class="u-campos">' + cuerpo + '</div>' : '') + linea + '</section>';
         };
-        h += '<form id="li-form" class="li-form" novalidate>' + grupos.map(function (g) {
-          // Para enseñar a un cliente, la ficha enseña solo lo que enseña su vista (ni marcas interesadas ni muestras).
-          return apartadoFicha(g.titulo, (g.campos || []).filter(function (c) { return fuera.indexOf(c) < 0 && c !== a.codigo && (nueva ? ed.indexOf(c) >= 0 : true) && (!cli || columnasDe(a, vista).indexOf(c) >= 0); }));
-        }).join('');
-        // Lo que se edita y no está en ningún apartado de la ficha, al final.
-        h += apartadoFicha('', ed.filter(function (c) { return puestos.indexOf(c) < 0; }));
+        var alta = nueva && a.alta;
+        if (alta) {
+          // T0643: el alta con lo que dice ALTA, en su orden (lo primero, qué hay que hacer); lo de «mas», plegado.
+          var deEd = function (c) { var cp = campo(a, c); return cp.primero ? cp.primero.some(function (p) { return ed.indexOf(p) >= 0; }) : ed.indexOf(c) >= 0; };
+          var mas = a.alta.mas.filter(function (c) { return fuera.indexOf(c) < 0 && deEd(c); });
+          h += '<form id="li-form" class="li-form li-alta" novalidate><div class="u-campos">' + a.alta.campos.filter(function (c) { return fuera.indexOf(c) < 0 && deEd(c); }).map(function (c) { return entradaAlta(a, c, crudo, ed, hoy); }).join('') + '</div>' +
+            (mas.length ? '<details class="li-mas"><summary>Más: ' + texto(mas.map(function (c) { return campo(a, c).titulo.toLowerCase(); }).join(', ').replace(/, ([^,]*)$/, ' y $1')) + '</summary><div class="u-campos">' +
+              mas.map(function (c) { return entradaAlta(a, c, crudo, ed, hoy); }).join('') + '</div></details>' : '');
+        } else {
+          h += '<form id="li-form" class="li-form" novalidate>' + grupos.map(function (g) {
+            // Para enseñar a un cliente, la ficha enseña solo lo que enseña su vista (ni marcas interesadas ni muestras).
+            return apartadoFicha(g.titulo, (g.campos || []).filter(function (c) { return fuera.indexOf(c) < 0 && c !== a.codigo && (nueva ? ed.indexOf(c) >= 0 : true) && (!cli || columnasDe(a, vista).indexOf(c) >= 0); }));
+          }).join('');
+          // Lo que se edita y no está en ningún apartado de la ficha, al final.
+          // T0642: lo que cambia un botón de ACCIONES («Pasar a Clientes») no sale como campo.
+          var deAccion = []; a.acciones.forEach(function (x) { Object.keys(x.poner || {}).forEach(function (c) { deAccion.push(c); }); });
+          h += apartadoFicha('', ed.filter(function (c) { return puestos.indexOf(c) < 0 && deAccion.indexOf(c) < 0; }));
+        }
         h += '<p class="u-error" id="li-err" role="alert" hidden></p>';
-        if (ed.length) h += '<div class="n-botones"><button type="submit" class="u-btn u-btn-accion">' + (nueva ? 'Añadir' : 'Guardar') + '</button></div>';
+        var acc = nueva || cli ? [] : accionesDe(a, f, hoy);
+        if (ed.length || acc.length) h += '<div class="n-botones">' + (ed.length ? '<button type="submit" class="u-btn u-btn-accion">' + (nueva ? 'Añadir' : 'Guardar') + '</button>' : '') +
+          acc.map(function (x, i) { return '<button type="button" class="u-btn" data-accion="' + i + '">' + texto(x.titulo) + '</button>'; }).join('') + '</div>' +
+          acc.filter(function (x) { return x.texto; }).map(function (x) { return '<p class="u-nota li-accion-t">' + texto(x.texto) + '</p>'; }).join('');
         h += '</form>';
+        // T0652: con quién es, ya abierto (sin la propia tarea: esa es la ficha).
+        if (!nueva && !cli && a.contexto) { var rc = resumenDe(a, D, crudo, vistas(a), { hoy: hoy, prohib: PROHIB, sin: id }); if (rc) h += htmlResumen(rc, true); }
         // Lo relacionado (el seguimiento de un cliente): cada fila lleva a su sección, con su ficha abierta.
-        if (!nueva && !cli) a.relacionados.forEach(function (r) {
-          var rs = relacionadas(r, f, filas(r.tabla).map(function (x) { return conNombres(a, D, r.tabla, x); })), sec = String(r.seccion || '').toUpperCase(), va = sec && veo[sec];
+        if (!nueva && !cli) a.relacionados.filter(function (r) { return veRelacionado(r, ctx); }).forEach(function (r) {
+          // T0641: con «tarjeta», sus filas se preparan como las de una sección (rutas, calculados, «de» y plantillas de sus «campos»).
+          var otroAp = r.tarjeta ? apartado({ TABLA: r.tabla, CAMPOS: r.campos || {}, COLUMNAS: (r.columnas || []).concat(camposTarjeta(r)), _refs: a.refs }) : null;
+          var rs = relacionadas(r, f, otroAp ? preparar(otroAp, filas(r.tabla), D, VAL) : filas(r.tabla).map(function (x) {
+            // T0642: una columna con ruta («ID_TELA.COLOR»: el color de la tela que le interesa) sigue las referencias.
+            var y = conNombres(a, D, r.tabla, x);
+            (r.columnas || []).forEach(function (c) { if (String(c).indexOf('.') > 0) y[c] = seguir(a, D, r.tabla, x, c); });
+            return y;
+          })), sec = String(r.seccion || '').toUpperCase(), va = sec && veo[sec];
           if (r.orden) rs = rs.slice().sort(comparar(r.orden));
-          if (!rs.length && r.siHay) return; // T0602: lo que casi nunca hay (a quién se compra a través de este), solo si hay
+          if (!rs.length && r.siHay && !r.nueva) return; // T0602: lo que casi nunca hay (a quién se compra a través de este), solo si hay
           var otro = { id: sec, titulo: r.titulo, tabla: r.tabla, refs: a.refs, clave: r.clave || 'ID', codigo: r.codigo || '', nombre: r.nombre || (r.columnas || [r.clave || 'ID'])[0], campos: r.campos || {} };
           var cols = (r.columnas || [otro.nombre]).filter(function (c) { return c !== otro.codigo; });
-          h += '<section class="li-fgrupo"><h3 class="li-fg-t">' + texto(r.titulo || r.tabla) + ' <span class="u-cifra">' + rs.length + '</span></h3>' +
-            (rs.length ? '<ul class="li-rel">' + rs.slice(0, r.max || 20).map(function (x) {
-              var dentro = (otro.codigo && !vacio(x[otro.codigo]) ? '<span class="li-cod">' + texto(x[otro.codigo]) + '</span>' : '') + cols.map(function (c) { return '<span>' + celda(otro, c, x, false) + '</span>'; }).join('');
+          // T0642: «+ Nueva tarea» lleva a su sección con una nueva ya puesta con esta (su marca).
+          var nv = r.nueva && va ? (function () {
+            var q = '?s=' + encodeURIComponent(sec.toLowerCase()) + '&nueva=1';
+            Object.keys(r.nueva.poner || {}).forEach(function (k) { q += '&' + encodeURIComponent(k) + '=' + encodeURIComponent((f.__crudo || f)[r.nueva.poner[k]]); });
+            return '<a class="u-btn u-btn-texto li-rel-nueva" href="' + texto(q) + '" data-sx="' + texto(sec) + '">+ ' + texto(r.nueva.titulo || 'Añadir') + '</a>';
+          })() : '';
+          var cab = '<h3 class="li-fg-t">' + texto(r.titulo || r.tabla) + (r.datos ? '' : ' <span class="u-cifra">' + rs.length + '</span>') + '</h3>';
+          var cuerpo;
+          if (!rs.length) cuerpo = '<p class="u-vacio">' + texto(r.vacio || 'Nada todavía.') + '</p>';
+          else if (r.tarjeta) cuerpo = tarjetas(r, otro, rs.slice(0, r.max || 20));
+          else if (r.datos) {
+            // T0642: «datos»: cada fila como en la ficha, cada dato con su título («Material que buscan: 100 % lino»), no
+            // seguidos con puntos. Lo vacío no sale.
+            cuerpo = rs.slice(0, r.max || 20).map(function (x) {
+              return '<div class="u-campos li-rel-datos">' + cols.map(function (c) {
+                var cpo = campo(otro, c), t = celda(otro, c, x, true);
+                return t.indexOf('class="li-nada"') >= 0 ? '' : '<div class="li-dato' + (cpo.tipo === 'nota' ? ' u-ancho' : '') + '"><span class="u-etiqueta">' + texto(cpo.titulo) + '</span><span class="li-valor">' + t + '</span></div>';
+              }).join('') + '</div>';
+            }).join('');
+          } else cuerpo = '<ul class="li-rel">' + rs.slice(0, r.max || 20).map(function (x) {
+              var dentro = cols.map(function (c) { var t = celda(otro, c, x, false); return t.indexOf('class="li-nada"') >= 0 ? '' : '<span>' + t + '</span>'; }).join('');
               return '<li>' + (va ? '<a class="li-rel-f" href="?s=' + encodeURIComponent(sec.toLowerCase()) + '&ficha=' + encodeURIComponent((x.__crudo || x)[otro.clave]) + '" data-sx="' + texto(sec) + '">' + dentro + '<span class="li-ir">' + texto(va) + ' ›</span></a>' : '<div class="li-rel-f">' + dentro + '</div>') + '</li>';
-            }).join('') + '</ul>' : '<p class="u-vacio">' + texto(r.vacio || 'Nada todavía.') + '</p>') + '</section>';
+            }).join('') + '</ul>';
+          h += '<section class="li-fgrupo">' + cab + cuerpo + nv + '</section>';
         });
-        // T0630: «Copiar para Claude», al final: arriba va lo que se decide.
-        if (!nueva && !cli && a.codigo) h += '<div class="li-claude"><button type="button" class="u-btn" data-claude>' + ICONO_COPIAR + 'Copiar para Claude</button><span class="u-nota">Pégalo al empezar una sesión de Claude para trabajar ' + texto(vacio(f[a.codigo]) ? 'esta fila' : f[a.codigo]) + '.</span></div>';
+        // T0630: «Copiar para Claude», al final: arriba va lo que se decide. T0642: dentro de «Más», que no es para el día a día.
+        if (!nueva && !cli && a.codigo) h += '<details class="li-mas"><summary>Más</summary><div class="li-claude"><button type="button" class="u-btn" data-claude>' + ICONO_COPIAR + 'Copiar para Claude</button><span class="u-nota">Pégalo al empezar una sesión de Claude para trabajar ' + texto(vacio(f[a.codigo]) ? 'esta fila' : f[a.codigo]) + '.</span></div></details>';
         abrirVentana(h);
         var form = vent.querySelector('#li-form');
+        [].forEach.call(vent.querySelectorAll('[data-accion]'), function (b) {
+          b.addEventListener('click', function () {
+            var x = acc[+b.getAttribute('data-accion')], cambios = {};
+            Object.keys(x.poner || {}).forEach(function (c) { var cp = campo(a, c), v = x.poner[c]; cambios[c] = cp.ids && v in cp.ids ? cp.ids[v] : v; });
+            cerrarVentana();
+            Promise.resolve(T.actualizar(a.tabla, id, cambios)).then(function () { ctx.aviso(x.hecho || 'Hecho.'); }, function (e) { ctx.aviso('No se ha cambiado: ' + ((e && e.message) || e)); });
+          });
+        });
         form.addEventListener('submit', function (ev) {
           ev.preventDefault();
           var err = vent.querySelector('#li-err'), cambios = {}, malos = [], faltan = [];
@@ -1085,6 +1815,17 @@
             // Al añadir, todo lo que tiene valor (también lo que viene puesto); al editar, solo lo que ha cambiado.
             if (nueva ? v !== '' : v !== String(inicial(i)).trim()) cambios[c] = cp.tipo === 'importe' || cp.tipo === 'numero' ? (v === '' ? '' : (isNaN(aNumero(v)) ? v : aNumero(v))) : v;
           });
+          if (nueva) {
+            // T0643: «Con quién» del alta (una lista para varias columnas) guarda en la que toca.
+            [].forEach.call(form.querySelectorAll('[data-uno]'), function (s) { var v = s.value, k = v.indexOf('|'); if (k > 0) cambios[v.slice(0, k)] = v.slice(k + 1); });
+            // Lo que NUEVA pone y el alta no pregunta (el estado: nace Pendiente), también.
+            var base = nuevaFila(a), enForm = function (c) { return [].some.call(form.querySelectorAll('[data-c]'), function (i) { return i.getAttribute('data-c') === c; }); };
+            Object.keys(base).forEach(function (c) { if (!enForm(c) && !(c in cambios) && !vacio(base[c])) cambios[c] = base[c]; });
+            a.obligatorias.forEach(function (c) { if (!enForm(c) && vacio(cambios[c])) faltan.push(campo(a, c).titulo); });
+          }
+          // T0643: lo que se pone solo (el área por con quién es), si está vacío y no se ha tocado.
+          var ded = deducidos(a, nueva ? cambios : mezclar(crudo, cambios));
+          Object.keys(ded).forEach(function (c) { if (nueva ? vacio(cambios[c]) : vacio(crudo[c]) && !(c in cambios)) cambios[c] = ded[c]; });
           if (malos.length) { err.textContent = textoProhibido(malos.filter(function (k, i) { return malos.indexOf(k) === i; })); err.hidden = false; return; }
           if (faltan.length) { err.textContent = 'Falta ' + faltan.join(', ').replace(/, ([^,]*)$/, ' y $1') + '.'; err.hidden = false; return; }
           if (!Object.keys(cambios).length) { cerrarVentana(); return; }
@@ -1092,6 +1833,65 @@
           cerrarVentana();
           Promise.resolve(p).then(function () { ctx.aviso(nueva ? 'Añadido.' : 'Guardado.'); }, function (e) { ctx.aviso('No se ha guardado: ' + ((e && e.message) || e)); });
         });
+        if (alta) {
+          // El área (lo de DEDUCIR) se pone sola al elegir con quién, mientras no se toque a mano.
+          var ponerDeducidos = function () {
+            var fl = {};
+            [].forEach.call(form.querySelectorAll('[data-c]'), function (i) { fl[i.getAttribute('data-c')] = i.value; });
+            [].forEach.call(form.querySelectorAll('[data-uno]'), function (s) { var v = s.value, k = v.indexOf('|'); if (k > 0) fl[v.slice(0, k)] = v.slice(k + 1); });
+            Object.keys(a.deducir).forEach(function (c) {
+              var s = [].filter.call(form.querySelectorAll('[data-c]'), function (i) { return i.getAttribute('data-c') === c; })[0];
+              if (!s || s.hasAttribute('data-tocado')) return;
+              var tmp = mezclar(fl, {}); tmp[c] = '';
+              var d = deducidos(a, tmp);
+              s.value = d[c] || '';
+              var nota = form.querySelector('[data-deducido="' + c + '"]');
+              if (nota) nota.textContent = d[c] ? 'Puesta sola según con quién es. Puedes cambiarla.' : '';
+            });
+          };
+          form.addEventListener('change', function (ev) {
+            var c = ev.target.getAttribute && ev.target.getAttribute('data-c');
+            if (c && c in a.deducir) { ev.target.setAttribute('data-tocado', ''); var n = form.querySelector('[data-deducido="' + c + '"]'); if (n) n.textContent = ''; return; }
+            ponerDeducidos();
+          });
+          form.addEventListener('click', function (ev) {
+            var b = ev.target.closest('[data-poner-fecha]'); if (!b) return;
+            var c = b.getAttribute('data-col'), i = [].filter.call(form.querySelectorAll('[data-c]'), function (x) { return x.getAttribute('data-c') === c; })[0];
+            if (i) i.value = b.getAttribute('data-poner-fecha');
+            [].forEach.call(b.parentNode.querySelectorAll('[data-poner-fecha]'), function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+          });
+          form.addEventListener('input', function (ev) {
+            var c = ev.target.getAttribute && ev.target.getAttribute('data-c'), ch = c && form.querySelector('.li-dias[data-col-dias="' + c + '"]');
+            if (ch) [].forEach.call(ch.querySelectorAll('[data-poner-fecha]'), function (x) { x.setAttribute('aria-pressed', String(x.getAttribute('data-poner-fecha') === ev.target.value)); });
+          });
+          ponerDeducidos();
+          var pri = form.querySelector('textarea,input,select'); if (pri) pri.focus();
+        }
+      }
+      function mezclar(x, y) { var r = {}; [x, y].forEach(function (o) { Object.keys(o || {}).forEach(function (k) { if (k !== '__crudo') r[k] = o[k]; }); }); return r; }
+      /** T0643 · Un campo del alta: «con quién» (un «primero» de varias columnas) es una sola lista agrupada por cada una; una
+       *  fecha lleva sus días de un toque (hoy, mañana, una semana, sin fecha); lo que se pone solo, su nota. */
+      function entradaAlta(a, c, crudo, ed, hoy) {
+        var cp = campo(a, c), id = 'li-c-' + c;
+        if (cp.primero) {
+          var partes = cp.primero.filter(function (p) { return ed.indexOf(p) >= 0 && campo(a, p).ids; });
+          return '<div class="u-campo u-ancho"><label class="u-etiqueta" for="' + id + '">' + texto(cp.titulo) + '</label><select id="' + id + '" data-uno="' + texto(c) + '">' +
+            '<option value="">Nadie en concreto</option>' + partes.map(function (p) {
+              var ids = campo(a, p).ids;
+              return '<optgroup label="' + texto(campo(a, p).titulo) + '">' + Object.keys(ids).map(function (n) {
+                return '<option value="' + texto(p + '|' + ids[n]) + '"' + (String(crudo[p] || '') === String(ids[n]) ? ' selected' : '') + '>' + texto(n) + '</option>';
+              }).join('') + '</optgroup>';
+            }).join('') + '</select></div>';
+        }
+        var h = entrada(a, c, crudo), fin = h.lastIndexOf('</div>');
+        if (cp.tipo === 'fecha') {
+          var v = String(crudo[c] || ''), ds = [{ fecha: hoy, titulo: 'Hoy' }].concat(opcionesPasar(hoy)).concat([{ fecha: '', titulo: 'Sin fecha' }]);
+          return h.slice(0, fin) + '<div class="li-dias" data-col-dias="' + texto(c) + '" role="group" aria-label="' + texto(cp.titulo) + ' en un toque">' + ds.map(function (o) {
+            return '<button type="button" class="li-dia" data-col="' + texto(c) + '" data-poner-fecha="' + o.fecha + '" aria-pressed="' + (v === o.fecha) + '">' + texto(o.titulo) + '</button>';
+          }).join('') + '</div>' + h.slice(fin);
+        }
+        if (c in a.deducir) return h.slice(0, fin) + '<span class="u-nota" data-deducido="' + texto(c) + '"></span>' + h.slice(fin);
+        return h;
       }
       function copiarClaude() {
         var a = ap(), f = abierta && filaVista(a, abierta.id);
@@ -1119,7 +1919,7 @@
             var x = F[d.campo] || {}, id = 'li-f' + i, et = function (para) { return '<label class="u-etiqueta" for="' + para + '">' + texto(d.titulo) + '</label>'; };
             if (d.tipo === 'lista') {
               return '<div class="u-campo">' + et(id) + '<select id="' + id + '" data-f="' + texto(d.campo) + '"><option value="">Cualquiera</option>' +
-                d.opciones.map(function (o) { return '<option value="=' + texto(o) + '"' + (x.es !== undefined && norm(x.es) === norm(o) ? ' selected' : '') + '>' + texto(o) + '</option>'; }).join('') +
+                d.opciones.map(function (o) { return '<option value="=' + texto(o) + '"' + (x.es !== undefined && norm(x.es) === norm(o) ? ' selected' : '') + '>' + texto(mostrar(d.cp, o)) + '</option>'; }).join('') +
                 (d.vacios ? '<option value="!"' + (x.vacio ? ' selected' : '') + '>Sin ' + texto(d.titulo.toLowerCase()) + '</option>' : '') + '</select></div>';
             }
             var fecha = d.tipo === 'fecha', t = fecha ? 'date' : 'text', k1 = fecha ? 'desde' : 'min', k2 = fecha ? 'hasta' : 'max';
@@ -1160,7 +1960,7 @@
         function contar() {
           var l = leer(), n = filtrar(a, vista, todas, { hoy: hoy, q: S.q, aviso: S.aviso, filtros: l.filtros, valores: VAL }).length;
           err.textContent = l.error; err.hidden = !l.error;
-          boton.textContent = n ? 'Ver ' + n + (n === 1 ? ' fila' : ' filas') : 'Ninguna fila así';
+          boton.textContent = n ? 'Ver ' + cuenta(a, vista, n) : 'Nada con estos filtros';
           return l;
         }
         contar();
@@ -1196,7 +1996,7 @@
       function personalizar() {
         var base = BASE, p = prefDe(ctx.id) || {}, conPref = ap();
         var ordenV = (base.vistas || []).slice().sort(function (x, y) { var o = lista(p.vistas); var ia = o.indexOf(x.id), ib = o.indexOf(y.id); return (ia < 0 ? 1e6 : ia) - (ib < 0 ? 1e6 : ib); });
-        var fuera = lista(p.ocultas), menu = delMenu();
+        var fuera = ocultasDe(base, p), menu = delMenu();
         function fila(id, tit, extra, i, n, grupo) {
           return '<li class="li-p-fila" data-g="' + grupo + '" data-id="' + texto(id) + '">' + extra + '<span class="li-p-t">' + texto(tit) + '</span>' +
             '<button type="button" class="u-btn u-btn-icono" data-sube aria-label="Subir ' + texto(tit) + '"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
@@ -1246,7 +2046,20 @@
 
       /* ---------- eventos ---------- */
       cont.addEventListener('click', function (ev) {
-        var t = ev.target.closest('[data-vista],[data-aviso],[data-id],[data-pers],[data-nueva],[data-filtrar],[data-quitar]');
+        // T0643: el círculo, «Pasar» y su menú. Con el menú abierto, tocar fuera solo lo cierra.
+        var r = ev.target.closest('[data-hecha],[data-pasar-menu],[data-pasar-a],[data-pasar-otro]');
+        if (r) {
+          var abierto = S.menu; S.menu = '';
+          if (r.hasAttribute('data-hecha')) { pintar(); marcarHecha(r.getAttribute('data-hecha')); return; }
+          if (r.hasAttribute('data-pasar-menu')) { var pm = r.getAttribute('data-pasar-menu'); S.menu = abierto === pm ? '' : pm; pintar(); var p1 = cont.querySelector('.li-menu [role=menuitem]'); if (p1) p1.focus(); return; }
+          if (r.hasAttribute('data-pasar-a')) { pintar(); pasar(r.getAttribute('data-fila'), r.getAttribute('data-pasar-a')); return; }
+          pintar(); pasarOtroDia(r.getAttribute('data-pasar-otro')); return;
+        }
+        if (S.menu && !ev.target.closest('.li-menu')) { S.menu = ''; pintar(); return; }
+        // T0652: el nombre de con quién es abre su resumen (otra vez, lo cierra).
+        var bx = ev.target.closest('[data-ctx]');
+        if (bx) { var ix = bx.getAttribute('data-ctx'); if (S.ctx === ix) cerrarCtx(); else abrirCtx(ix); return; }
+        var t = ev.target.closest('[data-vista],[data-aviso],[data-id],[data-pers],[data-qes],[data-nueva],[data-filtrar],[data-quitar]');
         if (!t) return;
         if (t.hasAttribute('data-filtrar')) { panelFiltros(); return; }
         if (t.hasAttribute('data-quitar')) {
@@ -1260,6 +2073,7 @@
         if (t.hasAttribute('data-vista')) { S.vista = t.getAttribute('data-vista'); S.aviso = ''; guardado(K + 'vista', S.vista); pintar(); return; }
         if (t.hasAttribute('data-aviso')) { var x = t.getAttribute('data-aviso'); S.aviso = S.aviso === x ? '' : x; pintar(); return; }
         if (t.hasAttribute('data-pers')) { personalizar(); return; }
+        if (t.hasAttribute('data-qes')) { S.qes = !S.qes; pintar(); return; }
         if (t.hasAttribute('data-nueva')) { ficha(null, true); return; }
         ficha(t.getAttribute('data-id'));
       });
@@ -1311,7 +2125,7 @@
         var f = filaVista(a, era.id), cp = campo(a, c);
         if (!f || norm(f[c]) === norm(v)) return;
         var cambios = {}; cambios[c] = cp.ids && v in cp.ids ? cp.ids[v] : v; // una columna que apunta a otra tabla guarda el código
-        Promise.resolve(T.actualizar(a.tabla, era.id, cambios)).then(function () { ctx.aviso('Movida a «' + (v || 'sin ' + campo(a, c).titulo.toLowerCase()) + '».'); }, function (e) { ctx.aviso('No se ha movido: ' + ((e && e.message) || e)); });
+        Promise.resolve(T.actualizar(a.tabla, era.id, cambios)).then(function () { ctx.aviso('Movida a «' + (v ? mostrar(cp, v) : 'sin ' + campo(a, c).titulo.toLowerCase()) + '».'); }, function (e) { ctx.aviso('No se ha movido: ' + ((e && e.message) || e)); });
       });
       document.addEventListener('pointercancel', alCancelar = function () { soltarArrastre(); });
       // Después de arrastrar no se abre la ficha (el navegador manda un clic al soltar).
@@ -1319,7 +2133,27 @@
       velo.addEventListener('click', function (ev) {
         if (ev.target === velo || ev.target.closest('[data-cerrar]')) { cerrarVentana(); return; }
         if (ev.target.closest('[data-volver]')) { velo.classList.remove('abierto'); ctx.volver(); return; }
+        // T0642: al saltar de esta ficha a otra (lo relacionado, «+ Nueva tarea»), la dirección de ahora se queda con la ficha
+        // abierta, para que «Volver» o el atrás del móvil la vuelvan a abrir, y la siguiente dice «‹ Volver a <esta>».
+        var sx = ev.target.closest('a[data-sx]');
+        if (sx && abierta && !(ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button)) {
+          var h2 = vent.querySelector('#li-vt'), nom = '';
+          if (h2) { var cp2 = h2.cloneNode(true); [].forEach.call(cp2.querySelectorAll('.li-cod'), function (x) { x.parentNode.removeChild(x); }); nom = cp2.textContent.trim(); }
+          try { history.replaceState(history.state, '', location.pathname + conFicha(location.search, abierta.id, editables(BASE)) + location.hash); } catch (e) {}
+          vueltaPendiente = nom;
+          return; // el marco hace el salto
+        }
         if (ev.target.closest('[data-claude]')) { copiarClaude(); return; }
+        // T0652: una tarea del resumen de la ficha abre la suya.
+        var cf = ev.target.closest('[data-ctx-fila]');
+        if (cf) { var idf = cf.getAttribute('data-ctx-fila'); cerrarVentana(); ficha(idf); return; }
+        // T0643: cerrar o pasar desde la ficha (se cierra la ficha y se hace como en la lista).
+        var rh = ev.target.closest('[data-r-hecha],[data-r-pasar]');
+        if (rh && abierta) {
+          var idr = abierta.id; cerrarVentana();
+          if (rh.hasAttribute('data-r-hecha')) marcarHecha(idr); else pasar(idr, rh.getAttribute('data-r-pasar'));
+          return;
+        }
         // T0630: un campo vacío de la ficha se abre al tocar su nombre en «Sin rellenar».
         var rl = ev.target.closest('[data-rellenar]');
         if (rl) {
@@ -1345,8 +2179,35 @@
         // Un enlace a otra sección (lo relacionado): el marco lo abre; aquí solo se cierra la ventana.
         if (ev.target.closest('a[data-sx]')) velo.classList.remove('abierto');
       });
-      teclaEsc = function (ev) { if (ev.key === 'Escape' && ctx.abierta() && velo.classList.contains('abierto')) cerrarVentana(); };
+      // T0652: el resumen. Una tarea de la lista abre su ficha; «Abrir en Clientes», la otra sección (la abre el marco).
+      pCtx.addEventListener('click', function (ev) {
+        if (ev.target.closest('[data-ctx-cerrar]')) { cerrarCtx(); return; }
+        var e = ev.target.closest('[data-ctx-fila]');
+        if (e) { cerrarCtx(true); ficha(e.getAttribute('data-ctx-fila')); return; }
+        if (ev.target.closest('a[data-sx]')) cerrarCtx(true);
+      });
+      // Tocar fuera del resumen solo lo cierra (no abre lo que había debajo); fuera de la sección (el menú), lo cierra y sigue.
+      alTocarFuera = function (ev) {
+        if (!S.ctx || pCtx.contains(ev.target) || (ev.target.closest && ev.target.closest('[data-ctx]'))) return;
+        var dentro = el.contains(ev.target);
+        cerrarCtx(!dentro);
+        if (dentro) { ev.stopPropagation(); ev.preventDefault(); }
+      };
+      document.addEventListener('click', alTocarFuera, true);
+      teclaEsc = function (ev) {
+        if (ev.key !== 'Escape' || !ctx.abierta()) return;
+        if (velo.classList.contains('abierto')) { cerrarVentana(); return; }
+        if (S.ctx) { cerrarCtx(); return; }
+        if (S.menu) { var b = S.menu; S.menu = ''; pintar(); var bb = cont.querySelector('[data-pasar-menu="' + b.replace(/"/g, '') + '"]'); if (bb && bb.offsetParent) bb.focus(); }
+      };
       document.addEventListener('keydown', teclaEsc);
+      // T0643: el menú de «Pasar» va fijo junto a su botón: al desplazar, se cierra (no se queda flotando en otro sitio).
+      alDesplazar = function () { if (S.menu) { S.menu = ''; pintar(); } };
+      window.addEventListener('scroll', alDesplazar, true);
+      avDes.querySelector('[data-deshacer]').addEventListener('click', function () {
+        var d = avDes._deshacer; sinDeshacer();
+        if (d) Promise.resolve(d()).then(function () { ctx.aviso('Deshecho.'); });
+      });
 
       ctx.alCambiar(function (t) {
         if (t === PREF && window.UN.ordenMenu) { var m = prefDe(MENU); if (Array.isArray(m)) window.UN.ordenMenu(m); }
@@ -1357,7 +2218,15 @@
         // El orden del menú que ha guardado quien personaliza (para todos), por si este dispositivo aún no lo tiene.
         if (PREF && window.UN.ordenMenu) { var m = prefDe(MENU); if (Array.isArray(m)) window.UN.ordenMenu(m); }
         pintar();
-        if (pedida) ficha(pedida);
+        // T0644: desde el Perfil («Personalizar»), ?personalizar=1 abre aquí su ventana.
+        if (url.get('personalizar') && puedePersonalizar) personalizar();
+        else if (pedida) ficha(pedida);
+        else if (url.get('nueva') && BASE.crear) {
+          // T0642: «+ Nueva tarea» desde la ficha de una marca: ?nueva=1&ID_MARCA=M-001 (solo columnas que se editan).
+          var puesto = {}, edn = editables(ap());
+          url.forEach(function (v, k) { if (edn.indexOf(k) >= 0 && v) puesto[k] = v; });
+          ficha(null, true, puesto);
+        }
       }, function (e) {
         cont.innerHTML = '<p class="u-error">No se han podido leer los datos: ' + texto((e && e.message) || e) + '</p>';
       });
@@ -1367,7 +2236,9 @@
       if (alMover) document.removeEventListener('pointermove', alMover);
       if (alSoltar) document.removeEventListener('pointerup', alSoltar);
       if (alCancelar) document.removeEventListener('pointercancel', alCancelar);
-      alMover = alSoltar = alCancelar = null;
+      if (alDesplazar) window.removeEventListener('scroll', alDesplazar, true);
+      if (alTocarFuera) document.removeEventListener('click', alTocarFuera, true);
+      alMover = alSoltar = alCancelar = alDesplazar = alTocarFuera = null;
     }
   });
 })();
