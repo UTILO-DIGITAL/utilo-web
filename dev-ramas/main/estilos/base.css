@@ -2150,6 +2150,13 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u a.li-rel-f { text-decoration: none; }
 .u .li-rel-f .li-ir { margin-left: auto; font-weight: 700; color: var(--color-principal-oscuro); white-space: nowrap; }
 .u div.li-rel-f { cursor: default; }
+/* T0642 · Lo relacionado con cada dato y su título («Qué buscan»), «+ Nueva tarea» debajo y «Copiar para Claude» dentro de «Más». */
+.u .li-rel-datos + .li-rel-datos { margin-top: var(--e3); padding-top: var(--e3); border-top: 1px solid var(--color-linea); }
+.u .li-rel-nueva { margin-top: var(--e2); padding-left: 0; padding-right: 0; justify-content: flex-start; }
+.u .li-mas { border-top: 1px solid var(--color-linea); padding-top: var(--e2); }
+.u .li-mas > summary { cursor: pointer; min-height: 40px; display: flex; align-items: center; color: var(--color-suave); font-size: 14px; }
+.u .li-mas[open] .li-claude { border-top: 0; padding-top: var(--e1); }
+.u .li-accion-t { margin: var(--e1) 0 0; }
 /* T0625 · Filtrar en la sección Listado: el botón (con cuántos hay puestos), las etiquetas de los puestos, que se quitan con
    su ✕ o todas con «Quitar filtros», y en el panel los rangos «de … a …» y «desde … hasta …». */
 .u .li-barra .li-filtrar { font-size: 15px; padding: 0 var(--e3); gap: var(--e1); }

@@ -969,7 +969,7 @@
           campo('IVA', '<select id="m-TIPO_IVA">' + opciones(ivas().map(function (x) { return [x, x]; }), v.TIPO_IVA) + '</select>') +
           casillaIva('m') +
           '<p class="u-nota u-ancho" id="m-total"></p>' +
-          campo('Concepto', '<input type="text" id="m-CONCEPTO" value="' + texto(v.CONCEPTO) + '" maxlength="200" placeholder="Qué es, como lo diríais entre vosotros">', 'u-ancho') +
+          campo('Concepto', '<input type="text" id="m-CONCEPTO" value="' + texto(v.CONCEPTO) + '" maxlength="200" placeholder="Por ejemplo: el dominio de la web">', 'u-ancho') +
           campo('Fecha', '<input type="date" id="m-FECHA" value="' + texto(v.FECHA) + '">') +
           (tienePer ? campo(texto(nomPer), '<select id="m-PER">' + opciones(lista.map(function (p) { return [p.id, p.nombre]; }), v[P], 'Elige') + '</select>') : '') +
           campo('Categoría', '<select id="m-ID_CATEGORIA"></select>', 'eco-no-interno') +
