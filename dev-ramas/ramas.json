@@ -885,10 +885,10 @@
    "tarea": "T0672",
    "titulo": "Economía de Marta dice que ahí sí se guarda",
    "pr": 362,
-   "commit": "566b5db",
-   "ultimo": "T0672: La app de ejemplo de DEV lleva el aviso de Telas, y Mis telas sin él",
+   "commit": "207bad9f",
+   "ultimo": "T0672: Al día con main (Ayuda sin costes, T0671; copia tras publicar, T0676)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T16:01:47.856Z",
+   "fecha": "2026-11-19T16:16:20.153Z",
    "toca": [
     "konamigas",
     "telas",

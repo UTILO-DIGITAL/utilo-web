@@ -253,7 +253,7 @@
     if (r.aviso) o.aviso = String(r.aviso); // T0639: el aviso de arriba (config.json · nucleo.aviso)
     if (r.perfilEnMenu === false) o.perfilEnMenu = false; // T0415: Perfil fuera del menú (se abre con el nombre de la cabecera)
     if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
-    if (r.ocultar && Array.isArray(r.ocultar.tablas)) o.ocultar = { tablas: r.ocultar.tablas, refs: r.ocultar.refs || {}, filas: r.ocultar.filas || {} }; // T0650
+    if (r.ocultar && Array.isArray(r.ocultar.tablas)) o.ocultar = { tablas: r.ocultar.tablas, refs: r.ocultar.refs || {}, filas: r.ocultar.filas || {}, columnas: r.ocultar.columnas || {} }; // T0650; T0671: columnas
     return o;
   }
 
