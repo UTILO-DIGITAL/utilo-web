@@ -900,12 +900,12 @@
   },
   "T0679-diseno-nuevo-nucleo": {
    "tarea": "T0679",
-   "titulo": "Diseño nuevo de la app: más claro y actual, con la ficha al lado de la lista",
+   "titulo": "Diseño nuevo de la app: más claro, actual y cómodo en el móvil",
    "pr": 369,
-   "commit": "11489c16",
-   "ultimo": "T0679: Segunda vuelta de las revisiones: lo roto en el móvil, un color para cada cosa, las mismas piezas y palabras en toda la app",
+   "commit": "7bc2db42",
+   "ultimo": "T0679: La prueba del núcleo, con las pestañas de Economía en pastillas en el móvil",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T22:44:05.392Z",
+   "fecha": "2026-11-19T22:55:10.569Z",
    "toca": [
     "konamigas",
     "telas",
