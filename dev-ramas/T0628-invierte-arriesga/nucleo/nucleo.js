@@ -750,8 +750,7 @@
       correo: cred.correo || '', secciones: todas().map(function (x) {
         if (x.enPerfil) return { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true };
         // T0644: las que esta persona personaliza (Listado: quien administra o su perfil en PERSONALIZAN) salen en su Perfil.
-        var pers = (x.base || x.id) === 'LISTADO' && (cred.admin || ((x.config || {}).PERSONALIZAN || []).indexOf(cred.perfil) >= 0);
-        return pers ? { id: x.id, titulo: x.titulo, personaliza: true } : { id: x.id, titulo: x.titulo };
+        return personaliza(x) ? { id: x.id, titulo: x.titulo, personaliza: true } : { id: x.id, titulo: x.titulo };
       }),
       tablas: tablas(),
       alCambiar: function (f) { (oyentes[s.id] = oyentes[s.id] || []).push(f); },
@@ -773,6 +772,21 @@
     tAviso = setTimeout(function () { a.hidden = true; }, 5000);
   }
 
+  /** T0644 · Si quien ha entrado personaliza esta sección (Listado: quien administra o su perfil en PERSONALIZAN). Lo usan el
+   *  Perfil del marco y, por ctx.secciones (personaliza), la sección Perfil. */
+  function personaliza(x) {
+    return (x.base || x.id) === 'LISTADO' && !x.enPerfil && (!!cred.admin || ((x.config || {}).PERSONALIZAN || []).indexOf(cred.perfil) >= 0);
+  }
+  /** T0644 · Personalizar en el Perfil del marco (sin sección PERFIL), como en la sección Perfil: una línea por sección. */
+  function htmlPersonalizar() {
+    var ss = todas().filter(personaliza);
+    if (!ss.length) return '';
+    return '<section class="pf-pers"><h2 class="n-grupo">Personalizar</h2><p class="u-nota">El orden del menú, qué vistas ve cada sección y con cuántos días avisa.</p>' +
+      '<ul class="pf-pers-l">' + ss.map(function (x) {
+        return '<li><a href="?s=' + encodeURIComponent(x.id.toLowerCase()) + '&personalizar=1" data-sx="' + texto(x.id) + '"><span>' + texto(x.titulo) + '</span><span aria-hidden="true">›</span></a></li>';
+      }).join('') + '</ul></section>';
+  }
+
   /** Perfil del marco, mientras el cliente no tenga la sección PERFIL: quién eres, tu perfil, las de dentro de Perfil y cerrar sesión. */
   function htmlPerfil() {
     var ves = menu().filter(function (s) { return s.id !== 'PERFIL'; }).map(function (s) { return s.titulo; }).join(', ');
@@ -791,7 +805,7 @@
       (window.UG.avisos && !cred.como ? '<div class="n-avisos" id="n-avisos"></div>' : '') +
       (dentro.length ? '<div class="n-botones">' + dentro.map(function (s) {
         return '<a class="u-btn" href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '">' + texto(s.titulo) + '</a>';
-      }).join('') + '</div>' : '') + '</div>' + htmlVersion();
+      }).join('') + '</div>' : '') + htmlPersonalizar() + '</div>' + htmlVersion();
   }
 
   function conCodigo() { return !!(window.UG.formas && window.UG.formas().indexOf('codigo') >= 0); }

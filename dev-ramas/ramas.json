@@ -589,12 +589,14 @@
    "tarea": "T0628",
    "titulo": "Ventas en la Economía de Marta: lo que tiene en juego, lo que gana y lo que le falta por recuperar",
    "pr": 352,
-   "commit": "d6e74c4",
-   "ultimo": "T0628: Cierra el bloque de pruebas de Ventas que se quedó fuera al juntar con main",
+   "commit": "e6240c8",
+   "ultimo": "T0628: base.css a la versión 111 (con los estilos de Ventas)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T14:18:22.046Z",
+   "fecha": "2026-11-19T14:42:06.180Z",
    "toca": [
-    "telas"
+    "konamigas",
+    "telas",
+    "utilo"
    ],
    "comun": true,
    "paginas": [

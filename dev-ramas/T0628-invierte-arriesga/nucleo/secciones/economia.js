@@ -12,7 +12,7 @@
  *   Resumen   beneficio frente al presupuesto, ingresos y gastos, IVA; ingresos y gastos por grupo con su barra
  *             («Quedan», «Te has pasado») que se abre en sus categorías, y cada categoría, en sus movimientos;
  *             beneficio y reparto; resultado por desglose. Se puede mirar una sola parte del desglose.
- *   Movimientos  lista con filtros; cada uno abre su ficha (Editar, Borrar, Hacer la factura). «Añadir movimiento»
+ *   Movimientos  buscar y «Filtrar» (tipo, categoría, cuenta y sin factura, en su ventana; T0644); cada uno abre su ficha (Editar, Borrar, Hacer la factura). «Añadir movimiento»
  *             (el botón que flota) solo sale aquí.
  *   Caja      el dinero de cada cuenta (banco, cajas, socios) y, al tocarla, sus movimientos con el saldo.
  *   Pendiente facturas por cobrar y por pagar y gastos sin factura.
@@ -660,7 +660,19 @@
     return xs.length === 1 ? String(xs[0].ID) : '';
   }
 
-  var CALC = { cajaPartes: cajaPartes, clientesFactura: clientesFactura, direccionCliente: direccionCliente, categoriaUnica: categoriaUnica, cts: cts, pct: pct, importe: importe, baseDeTotal: baseDeTotal, eur: eur, eur0: eur0, fecha: fecha, periodos: periodos, periodoActual: periodoActual,
+  /** T0644 · Los filtros puestos en Movimientos, en palabras («gastos», «Telas», «sin factura»), para la línea «Solo …» y para
+   *  contar cuántos hay en «Filtrar». La búsqueda no cuenta: se ve en su caja. nombres: { cat(id), cue(id) }. */
+  function filtrosMovPuestos(f, nombres) {
+    var r = [], n = nombres || {};
+    if (f.tipo) r.push({ Ingreso: 'lo que entra', Gasto: 'gastos', Interno: 'entre cuentas' }[f.tipo] || String(f.tipo).toLowerCase());
+    if (f.cat) r.push(n.cat ? n.cat(f.cat) : f.cat);
+    if (f.cue) r.push((n.cue ? n.cue(f.cue) : f.cue));
+    if (f.sinFac) r.push('sin factura');
+    if (f.cruz) r.push('con categoría del otro tipo');
+    return r;
+  }
+
+  var CALC = { filtrosMovPuestos: filtrosMovPuestos, cajaPartes: cajaPartes, clientesFactura: clientesFactura, direccionCliente: direccionCliente, categoriaUnica: categoriaUnica, cts: cts, pct: pct, importe: importe, baseDeTotal: baseDeTotal, eur: eur, eur0: eur0, fecha: fecha, periodos: periodos, periodoActual: periodoActual,
     anteriores: anteriores, movDe: movDe, facDe: facDe, preDe: preDe, resumen: resumen, saldos: saldos, cuenta: cuenta, pendientes: pendientes,
     sinFactura: sinFactura, presupuesto: presupuesto, grupos: grupos, estadoLinea: estadoLinea, avisos: avisos, cruzados: cruzados,
     desglose: desglose, recomendar: recomendar, esReparto: esReparto, problemasMov: problemasMov,
@@ -785,6 +797,7 @@
         });
         el.querySelector('.eco-fab').hidden = S.tab !== 'MOVIMIENTOS'; // T0272: añadir un movimiento, solo desde Movimientos
         el.querySelector('.eco-per').style.display = S.tab === 'VENTAS' ? 'none' : ''; // T0628: las ventas, desde el principio (no por periodo)
+        cont.classList.toggle('eco-con-fab', S.tab === 'MOVIMIENTOS'); // T0644: con sitio abajo para el botón
         var np = pendientes(d).filter(function (x) { return x.falta > 0; }).length + sinFactura(d, per).length, nb = el.querySelector('#eco-npend');
         if (nb) { nb.textContent = np; nb.hidden = !np; }
         if (!d.cue.length && !d.mov.length) {
@@ -885,8 +898,8 @@
 
       /* ----- Movimientos ----- */
 
-      function movFiltrados() {
-        var f = S.mov, q = norm(f.q);
+      function movFiltrados(f) {
+        f = f || S.mov; var q = norm(f.q);
         return movDe(d, per, S.des).filter(function (m) {
           if (f.tipo && m.TIPO !== f.tipo) return false;
           if (f.cat && String(m.ID_CATEGORIA) !== f.cat) return false;
@@ -912,15 +925,14 @@
       function htmlMovimientos() {
         var f = S.mov, ms = movFiltrados(), neto = 0;
         ms.forEach(function (m) { neto += signo(m); });
-        var cats = d.cat.filter(function (c) { return !f.tipo || c.TIPO === f.tipo; }).map(function (c) { return [c.ID, c.NOMBRE]; });
+        // T0644 · Como Facturas y las demás secciones: buscar, «Filtrar» (abre sus filtros, con cuántos hay puestos) y lo puesto,
+        // en una línea que se quita. Así, en el móvil, el primer movimiento sale arriba (antes, a unos 650 px, tras 6 filtros).
+        var puestos = filtrosMovPuestos(f, { cat: function (id) { return nombre('cat', id); }, cue: function (id) { return nombre('cue', id); } }), nf = puestos.length;
         var h = (f.desde ? '<button type="button" class="u-btn u-btn-texto eco-volver" data-accion="volver">‹ Volver a ' + texto(PESTANAS[f.desde] || 'Resumen') + '</button>' : '') +
-          '<div class="u-filtros">' +
-          '<label class="u-campo"><span class="u-etiqueta">Buscar</span><input type="search" id="eco-q" value="' + texto(f.q) + '" placeholder="Concepto, con quién…"></label>' +
-          '<label class="u-campo"><span class="u-etiqueta">Tipo</span><select data-filtro="tipo">' + opciones([['Ingreso', 'Entra dinero'], ['Gasto', 'Sale dinero'], ['Interno', 'Entre cuentas']], f.tipo, 'Todos') + '</select></label>' +
-          '<label class="u-campo"><span class="u-etiqueta">Categoría</span><select data-filtro="cat">' + opciones(cats, f.cat, 'Todas') + '</select></label>' +
-          '<label class="u-campo"><span class="u-etiqueta">Cuenta</span><select data-filtro="cue">' + opciones(d.cue.map(function (c) { return [c.ID, c.NOMBRE]; }), f.cue, 'Todas') + '</select></label>' +
-          '<label class="u-check"><input type="checkbox" data-filtro="sinFac"' + (f.sinFac ? ' checked' : '') + '> Gastos sin factura</label>' +
-          (f.cruz ? '<label class="u-check"><input type="checkbox" data-filtro="cruz" checked> Con categoría del otro tipo</label>' : '') + '</div>' +
+          '<div class="li-barra eco-fbarra eco-fmov"><div class="li-buscar"><label class="u-oculto" for="eco-q">Buscar</label><input type="search" id="eco-q" value="' + texto(f.q) + '" placeholder="Buscar: concepto, con quién…" autocomplete="off"></div>' +
+          '<button type="button" class="u-btn li-filtrar" data-accion="filtrarmov" aria-haspopup="dialog"' + (nf ? ' aria-pressed="true"' : '') + '>' + ICONO_FILTRO + 'Filtrar' +
+          (nf ? ' <span class="li-nf" aria-label="' + nf + (nf === 1 ? ' puesto' : ' puestos') + '">' + nf + '</span>' : '') + '</button></div>' +
+          (nf ? '<p class="u-nota">Solo ' + texto(puestos.join(', ')) + ' · <button type="button" class="u-btn u-btn-texto" data-accion="quitarfmov">Quitar filtros</button></p>' : '') +
           (S.des ? '<p class="u-nota">Solo ' + texto(S.des === '-' ? 'General' : nombre('des', S.des)) + ' · <button type="button" class="u-btn u-btn-texto" data-accion="todasdes">ver ' + texto(nomDes.toLowerCase()) + ': todas</button></p>' : '');
         if (!ms.length) return h + '<p class="u-vacio">' + (movDe(d, per, S.des).length ? 'Ningún movimiento cumple el filtro. Quita algún filtro para ver más.' :
           'Todavía no hay movimientos en la ' + texto(nomPeriodo() || 'este periodo') + '. Los que apuntes con «Añadir movimiento» salen aquí al momento.') + '</p>';
@@ -1038,6 +1050,29 @@
           (sinPdf ? '<p class="u-nota">' + sinPdf + (sinPdf === 1 ? ' factura no tiene' : ' facturas no tienen') + ' su archivo enlazado: ábrela y pega en «Enlace en Drive» el enlace del PDF (en Drive, Compartir › Copiar enlace).</p>' : '');
       }
       /** T0646 · Los filtros de Facturas, en su ventana (como «Filtrar» del Listado): nada cambia hasta «Ver». */
+      /** T0644 · Filtrar · Movimientos: tipo, categoría (las de ese tipo), cuenta y gastos sin factura, con cuántos se verían. */
+      function filtrosMov() {
+        var f = S.mov;
+        function cats(t) { return d.cat.filter(function (c) { return !t || c.TIPO === t; }).map(function (c) { return [c.ID, c.NOMBRE]; }); }
+        ventana('<h2 id="eco-vt">Filtrar · Movimientos</h2><div class="u-campos">' +
+          campo('Tipo', '<select id="fm-tipo">' + opciones([['Ingreso', 'Entra dinero'], ['Gasto', 'Sale dinero'], ['Interno', 'Entre cuentas']], f.tipo, 'Todos') + '</select>') +
+          campo('Categoría', '<select id="fm-cat">' + opciones(cats(f.tipo), f.cat, 'Todas') + '</select>') +
+          campo('Cuenta', '<select id="fm-cue">' + opciones(d.cue.map(function (c) { return [c.ID, c.NOMBRE]; }), f.cue, 'Todas') + '</select>') +
+          '<label class="u-check"><input type="checkbox" id="fm-sinfac"' + (f.sinFac ? ' checked' : '') + '> Gastos sin factura</label>' +
+          (f.cruz ? '<label class="u-check"><input type="checkbox" id="fm-cruz" checked> Con categoría del otro tipo</label>' : '') + '</div>' +
+          '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="fm-ver"></button><button type="button" class="u-btn u-btn-texto" id="fm-quitar">Quitar filtros</button></div>', function () {
+          function leer() {
+            var c = vent.querySelector('#fm-cruz');
+            return Object.assign({}, S.mov, { tipo: val('fm-tipo'), cat: val('fm-cat'), cue: val('fm-cue'), sinFac: vent.querySelector('#fm-sinfac').checked, cruz: !!(c && c.checked), ver: VER });
+          }
+          function cuenta() { var k = movFiltrados(leer()).length; vent.querySelector('#fm-ver').textContent = 'Ver ' + k + (k === 1 ? ' movimiento' : ' movimientos'); }
+          vent.querySelector('#fm-tipo').addEventListener('change', function () { vent.querySelector('#fm-cat').innerHTML = opciones(cats(val('fm-tipo')), '', 'Todas'); cuenta(); });
+          ['fm-cat', 'fm-cue', 'fm-sinfac', 'fm-cruz'].forEach(function (id) { var e = vent.querySelector('#' + id); if (e) e.addEventListener('change', cuenta); });
+          cuenta();
+          vent.querySelector('#fm-ver').onclick = function () { S.mov = leer(); cerrar(); pintar(); };
+          vent.querySelector('#fm-quitar').onclick = function () { S.mov = Object.assign(movVacio(), { q: S.mov.q, desde: S.mov.desde }); cerrar(); pintar(); };
+        });
+      }
       function filtrosFac() {
         var f = S.fac;
         ventana('<h2 id="eco-vt">Filtrar · Facturas</h2><div class="u-campos">' +
@@ -2091,6 +2126,8 @@
           if (ac === 'apuntar') formMov(null);
           else if (ac === 'factura') formFac(null);
           else if (ac === 'filtrarfac') filtrosFac();
+          else if (ac === 'filtrarmov') filtrosMov();
+          else if (ac === 'quitarfmov') { S.mov = Object.assign(movVacio(), { q: S.mov.q, desde: S.mov.desde }); pintar(); }
           else if (ac === 'quitarffac') { S.fac = { tipo: '', estado: '' }; pintar(); }
           else if (ac === 'empresa') formEmpresa();
           else if (ac === 'vermas') { S.mov.ver += VER; pintar(); }

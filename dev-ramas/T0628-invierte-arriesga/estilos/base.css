@@ -548,6 +548,8 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .eco-kpi.eco-grande { grid-column: 1 / -1; background: var(--color-principal); color: var(--color-sobre-principal); }
 .u .eco-kpi b { display: block; font: 600 13px/1.3 var(--fuente-texto); color: var(--color-suave); }
 .u .eco-fbarra .li-nueva { margin-left: auto; } /* T0646: Filtrar y Añadir, como en el Listado */
+/* T0644 · Movimientos: sitio abajo para que «Añadir movimiento» (flotante) no tape la última fila. */
+.u .eco-con-fab { padding-bottom: 88px; }
 .u .eco-kpi.eco-grande b { color: inherit; }
 .u .eco-pint { font: 400 18px/1 var(--fuente-destacar, var(--fuente-titulos)); text-transform: none; letter-spacing: 0; color: var(--color-destacado, inherit); margin-left: var(--e1); }
 .u .eco-val { display: block; margin-top: var(--e1); font: var(--peso-titulos) 22px/1.2 var(--fuente-titulos); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
@@ -2373,7 +2375,7 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 @media (max-width: 639px) {
   .u .li-qes { display: inline-flex; }
   .u .li-texto { display: none; } .u .li-texto.li-abierto { display: block; }
-  .u .li-barra { flex-wrap: nowrap; gap: var(--e2); }
+  .u .li-barra:not(.eco-fbarra), .u .eco-fbarra.eco-fmov { flex-wrap: nowrap; gap: var(--e2); } /* Facturas (más cosas) sí baja de línea */
   .u .li-barra .li-buscar { flex: 1 1 0; }
   .u .li-barra .li-filtrar, .u .li-barra .li-nueva { flex: none; padding: 0 var(--e3); }
   .u .li-barra .li-nueva { order: 3; }
