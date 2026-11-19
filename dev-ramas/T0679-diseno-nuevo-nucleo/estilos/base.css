@@ -2959,3 +2959,12 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
   /* En el móvil, el filtro rápido solo con tres opciones o menos (más «Todos»); con más, ocuparía varias líneas: está en Filtrar. */
   .u .li-rapido:has(.li-fop:nth-of-type(5)) { display: none; }
 }
+/* T0679 · En el móvil, el resumen de con quién es una tarea (al tocar su nombre) sale como las demás ventanas cortas:
+ * desde abajo, con su asa, las mismas esquinas, el mismo fondo y lo de detrás oscurecido. */
+@media (max-width: 639px) {
+  .u .li-ctx { border-top: 0; border-radius: 18px 18px 0 0; background: var(--color-superficie); padding-top: var(--e2);
+    box-shadow: 0 0 0 100vmax color-mix(in srgb, var(--color-texto) 45%, transparent), 0 -8px 24px rgba(0, 0, 0, .12); }
+  .u .li-ctx::before { content: ""; display: block; width: 40px; height: 5px; margin: 0 auto var(--e2); border-radius: 3px; background: var(--linea-caja); }
+  .u .li-ctx-cab h2 { font: 600 20px/1.25 var(--fuente-titulos); }
+}
+@media (max-width: 639px) { .u .li-ctx { padding-left: max(var(--e4), env(safe-area-inset-left, 0px)); padding-right: max(var(--e4), env(safe-area-inset-right, 0px)); } }
