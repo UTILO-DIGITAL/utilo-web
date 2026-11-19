@@ -1161,11 +1161,11 @@
   "T0682-registro-uso": {
    "tarea": "T0682",
    "titulo": "Ver quién usa la app de cada cliente y dónde se atasca",
-   "pr": null,
-   "commit": "02320a82",
-   "ultimo": "T0682: Las apps que apuntan su uso, en una función: la recarga de DEV no choca con ellas",
+   "pr": 368,
+   "commit": "279b8c98",
+   "ultimo": "T0682: Uso sin nombres de funciones, la etiqueta a la altura del nombre y las dos cuentas de Marta con su perfil",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T19:00:14.236Z",
+   "fecha": "2026-11-19T20:13:32.017Z",
    "toca": [
     "konamigas",
     "telas",

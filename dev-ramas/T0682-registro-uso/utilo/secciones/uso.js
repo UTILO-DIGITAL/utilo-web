@@ -314,7 +314,23 @@
     return L.join('\n');
   }
 
+  /** Lo que se enseña de un aviso o un error: sin la función del motor del final («… (tablasActualizar)»), que es para Claude. */
+  function sinFuncion(t) { return String(t == null ? '' : t).replace(/\s*\((?:[a-z]+[A-Z][A-Za-z0-9_]*|[a-z]+_[a-z0-9_]+)\)$/, ''); }
+  /** El fallo al leer, en palabras: sin red, lo dice así; si no, el mensaje de la base sin el prefijo. */
+  function falloEnPalabras(que, e) {
+    var m = String((e && e.message) || e || '').replace(/^\w+:\s*/, '');
+    return 'No se han podido leer ' + que + ': ' + (/conexión|fetch|network|red\b/i.test(m) ? 'no hay conexión.' : m);
+  }
+  /** Cómo se llama cada correo en Día a día: su nombre o, si dos cuentas tienen el mismo, con su perfil («Marta Canela (Equipo)»). */
+  function nombres(ps) {
+    var n = {}, r = {};
+    (ps || []).forEach(function (p) { var k = p.persona || p.correo; n[k] = (n[k] || 0) + 1; });
+    (ps || []).forEach(function (p) { var k = p.persona || p.correo; r[p.correo] = n[k] > 1 ? k + ' (' + (p.perfil || p.correo) + ')' : k; });
+    return r;
+  }
+
   var CALC = {
+    sinFuncion: sinFuncion, falloEnPalabras: falloEnPalabras, nombres: nombres,
     diaDe: diaDe, diasHasta: diasHasta, mediana: mediana, duracion: duracion, segundos: segundos, haceCuanto: haceCuanto, nombreDia: nombreDia,
     filtrar: filtrar, visitas: visitas, personas: personas, secciones: secciones, tropiezos: tropiezos, diaADia: diaADia,
     resumen: resumen, senales: senales, informe: informe
@@ -333,11 +349,11 @@
     '.us-chip:focus-visible,.us-mas:focus-visible{outline:3px solid var(--color-destacado);outline-offset:2px}',
     '.us-b{background:var(--color-superficie);border:1px solid var(--color-linea);border-radius:var(--radio);padding:16px;min-width:0}',
     '.us-b h2{font-family:var(--fuente-titulos);font-weight:var(--peso-titulos);font-size:1.15rem;margin:0 0 12px}',
-    '.us-pers{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:12px 0;border-top:1px solid var(--color-linea)}',
+    '.us-pers{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px 12px;padding:12px 0;border-top:1px solid var(--color-linea)}',
     '.us-pers:first-of-type{border-top:0;padding-top:0}',
     '.us-pers small{color:var(--color-suave);font-weight:600}',
     '.us-frase{grid-column:1/-1;margin:0;color:var(--color-suave)}',
-    '.us-pill{font-weight:800;font-size:.82rem;border-radius:999px;padding:3px 10px;white-space:nowrap;align-self:start}',
+    '.us-pill{font-weight:800;font-size:.82rem;border-radius:999px;padding:3px 10px;white-space:nowrap}',
     '.us-pill.bien{background:color-mix(in srgb,var(--color-bien) 12%,var(--color-superficie));color:var(--color-bien)}',
     '.us-pill.aviso{background:var(--color-pendiente-fondo);color:var(--color-pendiente)}',
     '.us-dias{grid-column:1/-1;display:flex;gap:4px;align-items:center;flex-wrap:wrap}',
@@ -425,11 +441,11 @@
         var t = r.tropiezos, e = t.esperas;
         var li = t.lista.map(function (x) {
           var d = [x.seccion, uno(x.veces, 'vez', 'veces') + (x.dias > 1 ? ' en ' + x.dias + ' días' : ''), 'la última, ' + CALC.haceCuanto(x.ultima, r.ahora).toLowerCase()].filter(Boolean).join(' · ');
-          return '<li class="' + x.tipo + '"><div><div class="q">' + (x.tipo === 'error' ? 'No se guardó: «' : '«') + texto(x.que) + '»</div><div class="d">' + texto(d) + '</div></div></li>';
+          return '<li class="' + x.tipo + '"><div><div class="q">' + (x.tipo === 'error' ? 'No se guardó: «' : '«') + texto(CALC.sinFuncion(x.que)) + '»</div><div class="d">' + texto(d) + '</div></div></li>';
         });
         if (e.n) {
           li.push('<li class="lento"><div><div class="q">Esperas largas: ' + texto(uno(e.n, 'de más de 3 segundos', 'de más de 3 segundos')) + '</div><div class="d">' +
-            texto('La más larga, ' + CALC.segundos(e.max.ms) + (e.max.seccion ? ' en ' + e.max.seccion : '') + (e.max.que ? ' (' + e.max.que + ')' : '') + ' · la mediana, ' + CALC.segundos(e.mediana)) + '</div></div></li>');
+            texto('La más larga, ' + CALC.segundos(e.max.ms) + (e.max.seccion ? ' en ' + e.max.seccion : '') + ' · la mediana, ' + CALC.segundos(e.mediana)) + '</div></div></li>');
         }
         return '<section class="us-b"><h2>Dónde se atasca</h2>' + (li.length ? '<ul class="us-tr">' + li.join('') + '</ul>' : '<p class="us-vacio">Ni avisos, ni errores, ni esperas largas.</p>') + '</section>';
       }
@@ -438,11 +454,11 @@
         return '<section class="us-b"><h2>Día a día</h2>' + ds.map(function (d) {
           var cu = '<div class="cu">' + texto(d.nombre.cuando) + (d.nombre.debajo ? '<small>' + texto(d.nombre.debajo) + '</small>' : '') + '</div>';
           if (!d.visitas.length) return '<div class="us-jor">' + cu + '<div class="us-vacio">No entró.</div></div>';
-          var varias = r.personas.length > 1;
+          var varias = r.personas.length > 1, nom = nombres(r.personas);
           return '<div class="us-jor">' + cu + '<div>' + d.visitas.map(function (v) {
             var hora = function (t) { var x = new Date(t); return x.getHours() + ':' + ('0' + x.getMinutes()).slice(-2); };
             return '<div class="us-vis"><b>' + hora(v.inicio) + ' a ' + hora(v.fin) + '</b>' + (v.aparato ? ' · ' + (v.aparato === 'movil' ? 'móvil' : 'ordenador') : '') +
-              (varias ? ' · ' + texto(v.persona || v.correo) : '') +
+              (varias ? ' · ' + texto(nom[v.correo] || v.persona || v.correo) : '') +
               (v.avisos ? ' · <span class="us-av">' + uno(v.avisos, 'aviso', 'avisos') + '</span>' : '') +
               (v.errores ? ' · <span class="us-er">' + uno(v.errores, 'error', 'errores') + '</span>' : '') +
               (v.ruta.length ? '<div class="us-ruta">' + texto(v.ruta.join(' → ')) + '</div>' : '') + '</div>';
@@ -474,7 +490,7 @@
           datos = d || { eventos: [] }; pintar();
         }, function (e) {
           if (yo !== pidiendo) return;
-          fallo = 'No se ha podido leer el uso de esta app: ' + String((e && e.message) || e).replace(/^\w+:\s*/, ''); pintar();
+          fallo = falloEnPalabras('el uso de esta app', e); pintar();
         });
       }
       function leer() {
@@ -485,7 +501,7 @@
           if (app) return leerApp();
           pintar();
         }, function (e) {
-          fallo = 'No se han podido leer las apps: ' + String((e && e.message) || e).replace(/^\w+:\s*/, ''); pintar();
+          fallo = falloEnPalabras('las apps', e); pintar();
         });
       }
 
