@@ -558,10 +558,10 @@
    "tarea": "T0642",
    "titulo": "Las fichas de Marta se leen sin explicación y con las mismas palabras",
    "pr": 340,
-   "commit": "0c34619",
-   "ultimo": "T0642: «Volver» te lleva a la ficha de la que vienes (Casa Albero → su tela → ‹ Volver a Casa Albero)",
+   "commit": "cc2428a",
+   "ultimo": "T0642: al día con main (Para enseñar fuera, T0640; elegir la tela, T0635) y base.css a la versión 101",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T07:12:06.468Z",
+   "fecha": "2026-11-19T07:46:49.247Z",
    "toca": [
     "konamigas",
     "utilo"

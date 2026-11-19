@@ -2176,3 +2176,15 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-rango-c input { flex: 1 1 0; min-width: 0; width: auto; }
 .u .li-rango-c .u-nota { margin: 0; white-space: nowrap; }
 @media (max-width: 639px) { .u .li-barra .li-filtrar { order: 2; } }
+/* T0635 · Elegir lo que se vende en una línea (Mis telas): la lista bajo el concepto y el precio recomendado. */
+.u .eco-lin-cw { grid-column: 1 / -1; position: relative; }
+.u .eco-lin-cw .eco-lin-c { width: 100%; }
+.u .eco-lin-op { position: absolute; left: 0; right: 0; top: 100%; z-index: 5; margin-top: 2px; background: var(--color-fondo); border: 1px solid var(--color-linea); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.12); overflow: hidden; }
+.u .eco-lin-o { display: flex; justify-content: space-between; align-items: baseline; gap: var(--e3); width: 100%; padding: var(--e2) var(--e3); border: 0; border-top: 1px solid var(--color-linea); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.u .eco-lin-o:first-child { border-top: 0; }
+.u .eco-lin-o:hover, .u .eco-lin-o-sel { background: color-mix(in srgb, var(--color-texto) 6%, var(--color-fondo)); }
+.u .eco-lin-oc { color: var(--color-suave); font-size: 13px; white-space: nowrap; }
+.u .eco-lin-op-p { white-space: nowrap; font-size: 14px; }
+.u .eco-lin-rec { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--color-suave); }
+.u .eco-lin-pon { min-height: 0; padding: 0 var(--e1); font-size: 13px; }
+.u .eco-lin textarea { resize: none; overflow: hidden; line-height: 1.35; }
