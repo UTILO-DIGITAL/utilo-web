@@ -556,12 +556,12 @@
   },
   "T0643-cerrar-posponer-tareas": {
    "tarea": "T0643",
-   "titulo": "Cerrar y pasar tareas en un toque, con el siguiente paso y un alta más corta",
-   "pr": null,
-   "commit": "6aeb39c",
-   "ultimo": "T0643: Cerrar y pasar tareas en un toque, con el siguiente paso y un alta más corta",
+   "titulo": "Cerrar y pasar tareas en un toque, con el siguiente paso al cerrar",
+   "pr": 341,
+   "commit": "28ea1a0",
+   "ultimo": "T0643: al día con main (ACCIONES y fichas de T0642, T0635, T0639) y base.css a la versión 102",
    "quien": "Javi Canela",
-   "fecha": "2026-11-18T23:23:50.381Z",
+   "fecha": "2026-11-19T09:07:17.255Z",
    "toca": [
     "konamigas",
     "utilo"
