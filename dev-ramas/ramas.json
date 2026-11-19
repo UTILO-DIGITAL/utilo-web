@@ -1132,10 +1132,10 @@
    "tarea": "T0644",
    "titulo": "En Economía › Movimientos, buscar y Filtrar arriba y el primer movimiento a la vista en el móvil",
    "pr": 357,
-   "commit": "245f560",
-   "ultimo": "T0644: En Economía › Movimientos, buscar y «Filtrar» arriba y el primer movimiento a la vista en el móvil",
+   "commit": "08af6cf",
+   "ultimo": "T0644: Personalizar también en el Perfil del marco (sin sección Perfil, como la app de ejemplo de DEV); nucleo.js?v=25",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T14:11:51.906Z",
+   "fecha": "2026-11-19T14:16:36.160Z",
    "toca": [
     "konamigas",
     "telas",
