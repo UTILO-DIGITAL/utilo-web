@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "fdaa40c",
-   "ultimo": "Merge pull request #346 from UTILO-DIGITAL/T0641-comparativa-precio",
+   "commit": "7474e75",
+   "ultimo": "Merge pull request #347 from UTILO-DIGITAL/T0654-app-dev-todas-iniciativas",
    "quien": "",
-   "fecha": "2026-11-19T09:51:05.528Z",
+   "fecha": "2026-11-19T10:11:00.878Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -141,6 +141,37 @@
       "nombre": "konamigas-dev"
      },
      "publica": true,
+     "cambia": true
+    },
+    {
+     "ruta": "dev/listado/",
+     "nombre": "App de ejemplo",
+     "iniciativa": "telas",
+     "proyecto": "",
+     "carga": [
+      "web/' + window.LI_MARCA + '/marca.css",
+      "web/dev/listado/ejemplo-telas.js",
+      "web/dev/listado/motor-falso.js",
+      "web/estilos/base.css",
+      "web/kanban4/tablas.js",
+      "web/nucleo/nucleo.js",
+      "web/nucleo/secciones/listado.js"
+     ],
+     "local": true,
+     "personas": [
+      {
+       "id": "duena",
+       "nombre": "Marta · Dueña"
+      },
+      {
+       "id": "ayudante",
+       "nombre": "Ayudante"
+      },
+      {
+       "id": "admin",
+       "nombre": "Admin"
+      }
+     ],
      "cambia": true
     }
    ],
