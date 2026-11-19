@@ -902,10 +902,10 @@
    "tarea": "T0679",
    "titulo": "Diseño nuevo de la app: más claro y actual, con la ficha al lado de la lista",
    "pr": 369,
-   "commit": "ed12bd61",
-   "ultimo": "T0679: Economía, el año debajo de las pestañas y solo donde cuenta; filtros en pastillas hasta 6 opciones",
+   "commit": "11489c16",
+   "ultimo": "T0679: Segunda vuelta de las revisiones: lo roto en el móvil, un color para cada cosa, las mismas piezas y palabras en toda la app",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T22:12:16.213Z",
+   "fecha": "2026-11-19T22:44:05.392Z",
    "toca": [
     "konamigas",
     "telas",

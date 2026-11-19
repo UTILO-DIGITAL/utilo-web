@@ -1085,10 +1085,10 @@
   function opcionesPasar(hoy) {
     var m = masDias(hoy, 1), dm = aFecha(m).getDay(), r = [];
     if (dm === 6 || dm === 0) {
-      r.push({ fecha: m, titulo: 'Mañana, ' + DIAS_SEMANA[dm], corto: 'Pasar al ' + DIAS_SEMANA[dm] });
-      r.push({ fecha: masDias(hoy, dm === 6 ? 3 : 2), titulo: 'El lunes', corto: 'Pasar al lunes' });
-    } else r.push({ fecha: m, titulo: 'Mañana', corto: 'Pasar a mañana' });
-    r.push({ fecha: masDias(hoy, 7), titulo: 'En una semana', corto: '+1 semana' });
+      r.push({ fecha: m, titulo: 'Mañana, ' + DIAS_SEMANA[dm], corto: 'Mañana' });
+      r.push({ fecha: masDias(hoy, dm === 6 ? 3 : 2), titulo: 'El lunes', corto: 'El lunes' });
+    } else r.push({ fecha: m, titulo: 'Mañana', corto: 'Mañana' });
+    r.push({ fecha: masDias(hoy, 7), titulo: 'En una semana', corto: 'En una semana' });
     return r;
   }
   /** Para cuándo se apunta el siguiente paso: el primer día de trabajo, en 3 días o en una semana. «En 3 días» no cae en
@@ -1556,15 +1556,15 @@
         var h = '<div class="li-ficha-cab"><p class="li-sig-ok">' + ICONO_OK + texto(a.rapidas.hecha.valor) + ': ' + texto(quien(a, f)) + '</p>' +
           '<button type="button" class="u-btn u-btn-icono" data-cerrar aria-label="Volver sin cerrarla" title="Volver sin cerrarla">' + ICONO_X + '</button></div>' +
           ctxSiguiente(a, f, con) +
-          '<h2 id="li-vt">¿Cuál es el siguiente paso con ' + texto(f[con] || '') + '?</h2>' +
-          '<form id="li-fsig" class="li-form" novalidate><div class="u-campo u-ancho"><label class="u-etiqueta" for="li-sig">Siguiente paso</label>' +
+          '<h2 id="li-vt">¿Cuál es el próximo paso con ' + texto(f[con] || '') + '?</h2>' +
+          '<form id="li-fsig" class="li-form" novalidate><div class="u-campo u-ancho"><label class="u-etiqueta" for="li-sig">Próximo paso</label>' +
           '<input id="li-sig" type="text" autocomplete="off" aria-describedby="li-sig-err"></div>' +
           (a.rapidas.pasar ? '<fieldset class="u-campo li-dias"><legend class="u-etiqueta">Cuándo</legend><div>' + fs.map(function (o, i) {
             return '<button type="button" class="li-dia" data-dia="' + o.fecha + '" aria-pressed="' + (i === marcado) + '">' + texto(o.titulo) + ' <small>' + texto(diaCorto(o.fecha)) + '</small></button>';
           }).join('') + '</div></fieldset>' : '') +
           '<p class="u-error" id="li-sig-err" role="alert" hidden></p>' +
-          '<div class="n-botones"><button type="submit" class="u-btn u-btn-accion">Apuntar</button><button type="button" class="u-btn u-btn-texto" data-sig-no>No hay siguiente paso</button></div>' +
-          '<p class="u-nota">¿Te has equivocado? Con la ✕, tocando fuera o con Esc, vuelves atrás y sigue sin cerrar.</p></form>';
+          '<div class="n-botones"><button type="submit" class="u-btn u-btn-accion">Guardar próximo paso</button><button type="button" class="u-btn u-btn-texto" data-sig-no>No hay próximo paso</button></div>' +
+          '<p class="u-nota">¿Te has equivocado? Cierra esta ventana y la tarea seguirá pendiente.</p></form>';
         abrirVentana(h, true);
         // Volver atrás (la ✕, fuera o Esc): sin «Deshecho», pero con su aviso si falla (T0677).
         alCerrar = function () { return Promise.resolve().then(volver).then(null, mal('deshecho')); };
@@ -1581,13 +1581,13 @@
         form.addEventListener('submit', function (ev) {
           ev.preventDefault();
           var t = inp.value.trim(), err = vent.querySelector('#li-sig-err'), p = prohibido(t, PROHIB);
-          if (!t) { err.textContent = 'Escribe el siguiente paso, o pulsa «No hay siguiente paso».'; err.hidden = false; inp.setAttribute('aria-invalid', 'true'); inp.focus(); return; }
+          if (!t) { err.textContent = 'Escribe el próximo paso, o pulsa «No hay próximo paso».'; err.hidden = false; inp.setAttribute('aria-invalid', 'true'); inp.focus(); return; }
           if (p.length) { err.textContent = textoProhibido(p); err.hidden = false; inp.setAttribute('aria-invalid', 'true'); return; }
           var d = form.querySelector('[data-dia][aria-pressed="true"]');
           alCerrar = null; cerrarVentana();
           Promise.resolve(T.crear(a.tabla, filaSiguiente(a, crudo, t, d ? d.getAttribute('data-dia') : ''))).then(function () {
-            ctx.aviso('Apuntado el siguiente paso con ' + (f[con] || '') + '.');
-          }, mal('apuntado el siguiente paso'));
+            ctx.aviso('Guardado el próximo paso con ' + (f[con] || '') + '.');
+          }, mal('guardado el próximo paso'));
         });
       }
       /** T0643 · Si la sección cierra y pasa en un toque en esta vista (no en la de clientes; su columna se edita). */
@@ -1603,7 +1603,7 @@
       function botonPasar(a, f) {
         if (!a.rapidas.pasar || editables(a).indexOf(a.rapidas.pasar) < 0) return '';
         var id = String(f[a.clave]);
-        return '<button type="button" class="u-btn li-pasar" data-pasar-menu="' + texto(id) + '" aria-haspopup="menu" aria-expanded="' + (S.menu === id) + '" aria-label="Mover a otro día: ' + texto(quien(a, f)) + '" title="Mover a otro día">' + ICONO_MOVER + '</button>';
+        return '<button type="button" class="u-btn li-pasar" data-pasar-menu="' + texto(id) + '" aria-haspopup="menu" aria-expanded="' + (S.menu === id) + '" aria-label="Mover a otro día: ' + texto(quien(a, f)) + '" title="Mover a otro día">' + ICONO_MOVER + '<span class="li-pasar-t" aria-hidden="true">Mover</span></button>';
       }
       /* ---------- T0652 · el resumen de con quién es una fila ---------- */
       /** El nombre de con quién es (h, ya pintado) como botón que abre su resumen; sin nadie de CONTEXTO.de, tal cual. */
@@ -1752,7 +1752,7 @@
           var color = col.junta ? '' : (cp.colores || {})[col.id] || '';
           return '<section class="li-col' + (color ? ' li-' + texto(color) : '') + '" data-valor="' + texto(col.id) + '"' + (mueve ? ' data-soltar' : '') + '>' +
             '<h2 class="li-col-t">' + texto(col.titulo) + ' <span class="u-cifra">' + col.filas.length + '</span></h2>' +
-            (col.filas.length ? '<ul class="li-tarjetas li-col-l">' + col.filas.map(function (f) { return tarjeta(a, f, det, cli, hoy, mueve); }).join('') + '</ul>' : '<p class="u-nota li-col-vacia">Nada</p>') + '</section>';
+            (col.filas.length ? '<ul class="li-tarjetas li-col-l">' + col.filas.map(function (f) { return tarjeta(a, f, det, cli, hoy, mueve); }).join('') + '</ul>' : '<p class="u-nota li-col-vacia">Nada todavía</p>') + '</section>';
         }).join('') + '</div>' + (mueve ? '<p class="u-nota li-col-ayuda">En el ordenador, arrastra una tarjeta a otra columna para cambiar su ' + texto(cp.titulo.toLowerCase()) + '. En el móvil, ábrela y cámbialo en su ficha.</p>' : '');
       }
 
