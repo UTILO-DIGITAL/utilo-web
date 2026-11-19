@@ -743,6 +743,20 @@
   }
   function instagramUrl(v) { var c = cuentaInstagram(v); return c ? 'https://www.instagram.com/' + c.slice(1) + '/' : ''; }
 
+  /** T0642 · Volver de una ficha a la que se ha llegado desde otra: a esa ficha («‹ Volver a Casa Albero») si se viene de
+   *  una; si no, a la sección de la que se viene («‹ Volver a Clientes»); '' si no se viene de ninguna. */
+  function textoVuelta(deFicha, desde) { var t = deFicha || (desde && desde.titulo) || ''; return t ? '‹ Volver a ' + t : ''; }
+  /** T0642 · La dirección de ahora con la ficha abierta (?ficha=M-001) y sin lo de «+ Nueva …», para que «atrás» la vuelva a abrir. */
+  function conFicha(search, id, quitar) {
+    var u = new URLSearchParams(search);
+    ['nueva'].concat(quitar || []).forEach(function (k) { u.delete(k); });
+    u.set('ficha', id);
+    return '?' + u.toString();
+  }
+  // T0642: el nombre de la ficha desde la que se salta a otra (una tela, una tarea, «+ Nueva tarea»), hasta que la abre la
+  // sección a la que se va (todas las de Listado comparten este archivo).
+  var vueltaPendiente = null;
+
   /** T0610 · Los avisos de una fila sin el que ya dice el título de su grupo: en «Con la fecha pasada», cada fila no repite
    *  «Con la fecha pasada» (la franja de color de la fila sigue). Sin grupo, todos. */
   function sinRepetir(avs, tituloGrupo, campoPlazo) {
@@ -782,7 +796,7 @@
    *  móvil no hay sesión de Google, o quien mira no tiene permiso). En la ficha, el porqué entero; en una miniatura, corto. */
   var SIN_FOTO = { corto: 'No se ve', largo: 'No se puede ver la foto aquí. Para que se vea en la app (también en el móvil), su carpeta de Drive tiene que estar compartida como «Cualquier persona con el enlace».' };
 
-  var CALC = { mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, cumple: cumple, calcular: calcular, usa: usa,
+  var CALC = { textoVuelta: textoVuelta, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
@@ -812,6 +826,9 @@
       // T0625: los filtros (S.filtros) no se recuerdan: al volver a la sección, se ve todo.
       var S = { vista: guardado(K + 'vista'), q: '', aviso: '', filtros: {}, leido: false };
       var url = new URLSearchParams(location.search), pedida = url.get('ficha');
+      // T0642: si se llega desde otra ficha, su nombre se queda en esta entrada del historial: vale también al ir y volver.
+      if (vueltaPendiente !== null) { try { history.replaceState(Object.assign({}, history.state, { deFicha: vueltaPendiente }), ''); } catch (e) {} vueltaPendiente = null; }
+      var deFicha = (history.state && history.state.deFicha) || '';
 
       el.innerHTML = '<div id="li-cont"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div>' +
         '<div class="u-velo" id="li-velo"><div class="u-ventana li-ventana" role="dialog" aria-modal="true" aria-labelledby="li-vt"><div class="n-ventana" id="li-vent"></div></div></div>';
@@ -1073,10 +1090,12 @@
         var crudo = f.__crudo || {}; // lo que de verdad hay (los códigos), para editar
         if (nueva) crudo = Object.assign(nuevaFila(a), puesto || {}); // T0642: lo que trae «+ Nueva tarea» (su marca)
         abierta = nueva ? null : { id: id };
+        var llegada = nueva ? !!(puesto && url.get('nueva')) : !!pedida && String(id) === String(pedida); // la ficha que trae la dirección
         var ed = cli ? [] : editables(a).filter(function (c) { return fuera.indexOf(c) < 0; });
         var grupos = a.ficha.length ? a.ficha : [{ titulo: '', campos: columnasDe(a, vista) }];
         var avs = nueva || cli ? [] : avisosDe(a, f, hoy);
-        var vuelta = ctx.desde && ((pedida && !nueva) || (nueva && puesto)) ? '<button type="button" class="u-btn u-btn-texto li-volver" data-volver>‹ Volver a ' + texto(ctx.desde.titulo) + '</button>' : '';
+        var tv = llegada ? textoVuelta(deFicha, ctx.desde) : ''; // T0642: a la ficha de la que vienes, si vienes de una
+        var vuelta = tv ? '<button type="button" class="u-btn u-btn-texto li-volver" data-volver>' + texto(tv) + '</button>' : '';
         var h = vuelta + '<div class="li-ficha-cab"><h2 id="li-vt">' + (nueva ? 'Añadir · ' + texto(a.titulo) : titulo2(a, f, cli, true)) + '</h2>' +
           '<button type="button" class="u-btn u-btn-icono" data-cerrar aria-label="Cerrar">' + ICONO_X + '</button></div>';
         if (avs.length) h += '<div class="li-ficha-avisos">' + marcas(avs) + '</div>';
@@ -1411,6 +1430,16 @@
       velo.addEventListener('click', function (ev) {
         if (ev.target === velo || ev.target.closest('[data-cerrar]')) { cerrarVentana(); return; }
         if (ev.target.closest('[data-volver]')) { velo.classList.remove('abierto'); ctx.volver(); return; }
+        // T0642: al saltar de esta ficha a otra (lo relacionado, «+ Nueva tarea»), la dirección de ahora se queda con la ficha
+        // abierta, para que «Volver» o el atrás del móvil la vuelvan a abrir, y la siguiente dice «‹ Volver a <esta>».
+        var sx = ev.target.closest('a[data-sx]');
+        if (sx && abierta && !(ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button)) {
+          var h2 = vent.querySelector('#li-vt'), nom = '';
+          if (h2) { var cp2 = h2.cloneNode(true); [].forEach.call(cp2.querySelectorAll('.li-cod'), function (x) { x.parentNode.removeChild(x); }); nom = cp2.textContent.trim(); }
+          try { history.replaceState(history.state, '', location.pathname + conFicha(location.search, abierta.id, editables(BASE)) + location.hash); } catch (e) {}
+          vueltaPendiente = nom;
+          return; // el marco hace el salto
+        }
         if (ev.target.closest('[data-claude]')) { copiarClaude(); return; }
         // T0630: un campo vacío de la ficha se abre al tocar su nombre en «Sin rellenar».
         var rl = ev.target.closest('[data-rellenar]');
