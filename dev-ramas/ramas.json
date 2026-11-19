@@ -1263,57 +1263,6 @@
     ]
    },
    "rama": "T0655-dev-otros-repos"
-  },
-  "casa-abuela.T0655-dev-datos-inventados": {
-   "tarea": "T0655",
-   "titulo": "Casa Abuela se prueba en la app DEV con datos inventados",
-   "pr": 124,
-   "commit": "5e3e10b",
-   "ultimo": "T0655: Casa Abuela en la app DEV con datos inventados",
-   "quien": "Javi Canela",
-   "fecha": "2026-11-19T10:45:29.632Z",
-   "toca": [
-    "personal"
-   ],
-   "comun": false,
-   "paginas": [
-    {
-     "ruta": "",
-     "nombre": "Casa Abuela",
-     "iniciativa": "personal",
-     "proyecto": "",
-     "repo": "casa-abuela",
-     "carga": [],
-     "local": true,
-     "cambia": true,
-     "personas": [
-      {
-       "id": "carmen",
-       "nombre": "Carmen · lleva la web"
-      },
-      {
-       "id": "abuela",
-       "nombre": "Abuela"
-      },
-      {
-       "id": "pablo",
-       "nombre": "Pablo · nieto"
-      },
-      {
-       "id": "luis",
-       "nombre": "Luis · pareja de Carmen"
-      },
-      {
-       "id": "rosa",
-       "nombre": "Rosa · servicio"
-      }
-     ]
-    }
-   ],
-   "migraciones": {},
-   "principal": false,
-   "rama": "T0655-dev-datos-inventados",
-   "repo": "casa-abuela"
   }
  },
  "bases": {
