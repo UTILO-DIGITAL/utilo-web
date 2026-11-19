@@ -58,17 +58,24 @@
     var f = aFecha(v), h = aFecha(hoy);
     return f && h ? Math.round((f - h) / DIA) : null;
   }
-  /** Un número de la tabla: 12.5, «12,5», «1.234,50 €», «50 %» (0,5). NaN si no lo es. */
+  /**
+   * Un número de la tabla: 12.5, «12,5», «1.234,50 €», «50 %» (0,5). NaN si no lo es. Una coma con grupos de tres cifras
+   * detrás («1,020», «1,020.50»: como se escribe en la India y en inglés) es de miles: 1020 (T0645).
+   */
   function aNumero(v) {
     if (typeof v === 'number') return v;
     if (vacio(v)) return NaN;
     var s = String(v).trim(), pc = /%$/.test(s);
     s = s.replace(/[€₹%\s]/g, '');
-    if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, '');
+    if (/^-?[1-9]\d{0,2}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g, '');
+    else if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, '');
     s = s.replace(',', '.');
     var n = /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : NaN;
     return pc ? n / 100 : n;
   }
+
+  /** ¿Es un teléfono («+91 98200 12345», «(93) 555-12-34»)? «Formulario en la web» no: sale como texto, sin enlace (T0645). */
+  function esTelefono(v) { var s = String(v || '').trim(); return /^\+?[\d\s().\-\/]+$/.test(s) && s.replace(/\D/g, '').length >= 6; }
 
   /* ---------- condiciones (filtros de las vistas y avisos) ----------
    * Una lista de condiciones que se cumplen todas: { campo, es | no | vacio | contiene | desde | hasta | mayor | menor }.
@@ -702,6 +709,8 @@
   function verTexto(cp, f, valores, prohib) {
     var v = cp.calculo ? calcular(cp.calculo, f, valores) : f[cp.n];
     if (cp.calculo) {
+      // T0645: un envío a 0 no es un envío (en su Excel, una celda sin rellenar): el precio sin él no sale.
+      if (cp.precio && !lista(cp.precio.envio).some(function (e) { return calcular(e, f, valores) > 0; })) return 'Falta el envío';
       if (isNaN(v)) return cp.precio ? 'Falta el coste o el envío' : '';
       v = Math.round(v * 100) / 100;
     }
@@ -796,7 +805,7 @@
    *  móvil no hay sesión de Google, o quien mira no tiene permiso). En la ficha, el porqué entero; en una miniatura, corto. */
   var SIN_FOTO = { corto: 'No se ve', largo: 'No se puede ver la foto aquí. Para que se vea en la app (también en el móvil), su carpeta de Drive tiene que estar compartida como «Cualquier persona con el enlace».' };
 
-  var CALC = { textoVuelta: textoVuelta, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, cumple: cumple, calcular: calcular, usa: usa,
+  var CALC = { textoVuelta: textoVuelta, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
@@ -881,7 +890,7 @@
           if (cp.tipo === 'enlace' && /^https?:\/\//i.test(String(v))) return '<a href="' + texto(v) + '" target="_blank" rel="noopener">Abrir ↗</a>';
           if (cp.tipo === 'instagram' && instagramUrl(v)) return '<a href="' + texto(instagramUrl(v)) + '" target="_blank" rel="noopener">' + texto(cuentaInstagram(v)) + ' ↗</a>';
           if (cp.tipo === 'email' && /@/.test(String(v))) return '<a href="mailto:' + texto(v) + '">' + texto(v) + '</a>';
-          if (cp.tipo === 'telefono') return '<a href="tel:' + texto(String(v).replace(/[^\d+]/g, '')) + '">' + texto(v) + '</a>';
+          if (cp.tipo === 'telefono' && esTelefono(v)) return '<a href="tel:' + texto(String(v).replace(/[^\d+]/g, '')) + '">' + texto(v) + '</a>';
           if (cp.tipo === 'foto' && imagen(v)) return '<img class="li-foto" src="' + texto(imagen(v)) + '" alt="" referrerpolicy="no-referrer" data-li-foto>' +
             (/^https?:/i.test(String(v)) ? ' <a class="u-nota li-verfoto" href="' + texto(v) + '" target="_blank" rel="noopener">Ver foto ↗</a>' : '');
         }
