@@ -838,12 +838,13 @@
    "tarea": "T0652",
    "titulo": "Ver lo último con cada cliente desde Hoy",
    "pr": 344,
-   "commit": "a8c27e7",
-   "ultimo": "T0652: al día con la T0643 (y esta con main); base.css a la versión 103",
+   "commit": "b884e7c",
+   "ultimo": "T0652: al día con la T0643 (y esta con main); base.css a la versión 106",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T09:07:44.356Z",
+   "fecha": "2026-11-19T12:08:39.715Z",
    "toca": [
     "konamigas",
+    "telas",
     "utilo"
    ],
    "comun": true,
@@ -978,6 +979,37 @@
       "nombre": "konamigas-dev"
      },
      "publica": true,
+     "cambia": true
+    },
+    {
+     "ruta": "dev/listado/",
+     "nombre": "App de ejemplo",
+     "iniciativa": "telas",
+     "proyecto": "",
+     "carga": [
+      "web/' + window.LI_MARCA + '/marca.css",
+      "web/dev/listado/ejemplo-telas.js",
+      "web/dev/listado/motor-falso.js",
+      "web/estilos/base.css",
+      "web/kanban4/tablas.js",
+      "web/nucleo/nucleo.js",
+      "web/nucleo/secciones/listado.js"
+     ],
+     "local": true,
+     "personas": [
+      {
+       "id": "duena",
+       "nombre": "Marta · Dueña"
+      },
+      {
+       "id": "ayudante",
+       "nombre": "Ayudante"
+      },
+      {
+       "id": "admin",
+       "nombre": "Admin"
+      }
+     ],
      "cambia": true
     }
    ],

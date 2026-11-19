@@ -390,7 +390,8 @@
     if (typeof v === 'number') return v;
     var s = String(v == null ? '' : v).trim(); if (!s) return NaN;
     var pc = /%$/.test(s); s = s.replace(/[€₹%\s]/g, '');
-    if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, '');
+    if (/^-?[1-9]\d{0,2}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g, ''); // T0645: «1,020» es mil veinte, como en el listado
+    else if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, '');
     s = s.replace(',', '.');
     var n = /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : NaN;
     return pc ? n / 100 : n;
@@ -469,8 +470,14 @@
       var nom = [].concat(art.nombre || []).map(function (c) { return String(seguirRuta(art, D, art.tabla, f, c) || '').trim(); }).filter(Boolean).join(' · ') || cod;
       var det = [].concat(art.detalle || []).map(function (o) { return detalleDe(art, D, f, o); }).filter(Boolean).join(' · ');
       var pr = art._precio ? calcArt(art, D, art._precio, f, val) : art.precio ? aNum(f[art.precio]) : NaN;
+      // T0653: lo que cuesta (Mis telas: puesta en España), para enseñarlo junto al precio y avisar si se vende por debajo.
+      var co = art._coste ? calcArt(art, D, art._coste, f, val) : art.coste ? aNum(f[art.coste]) : NaN;
+      if (!isNaN(co)) co = Math.round(co * 100) / 100;
+      // T0645: un envío a 0 no es un envío: sin precio recomendado, como «Falta el envío» en Mis telas.
+      if (art._envio && ![].concat(art._envio).some(function (e) { return calcArt(art, D, e, f, val) > 0; })) pr = NaN;
       if (!isNaN(pr)) pr = Math.round(pr * 100) / 100;
-      return { codigo: cod, nombre: nom, detalle: det, unidad: String(art.unidad || ''), precio: isNaN(pr) || pr < 0 ? NaN : pr, _b: normArt(nom + ' ' + cod + ' ' + det) };
+      return { codigo: cod, nombre: nom, detalle: det, unidad: String(art.unidad || ''), precio: isNaN(pr) || pr < 0 ? NaN : pr,
+        coste: isNaN(co) || co < 0 ? NaN : co, _b: normArt(nom + ' ' + cod + ' ' + det) };
     }).filter(function (a) { return a.codigo; }).sort(function (a, b) { return a.codigo.localeCompare(b.codigo, 'es'); });
   }
   /** Los que tienen todas las palabras de q (en el nombre, el código o el detalle), como mucho max. Sin palabras, ninguno. */
@@ -484,12 +491,36 @@
     return c ? arts.filter(function (a) { return a.codigo === c; })[0] || null : null;
   }
 
+  /**
+   * T0653 · El último precio de un artículo a un cliente: el de su línea en la factura emitida más reciente a esa contraparte
+   * (sin las anuladas ni la factura que se está haciendo, sinFac). Las líneas se reconocen por el código al final del concepto,
+   * como artDe. → { precio (sin IVA), numero, fecha } o null.
+   */
+  function ultimoPrecio(lineas, facturas, idCtr, codigo, sinFac) {
+    if (!idCtr || !codigo) return null;
+    var fs = {};
+    (facturas || []).forEach(function (f) {
+      if (f.TIPO === 'Emitida' && f.ESTADO !== 'Anulada' && String(f.ID_CONTRAPARTE) === String(idCtr) && String(f.ID) !== String(sinFac == null ? '' : sinFac)) fs[f.ID] = f;
+    });
+    // La más reciente: por fecha y, el mismo día, por su número (FE.10 después de FE.9); dentro de una factura, la última línea.
+    var orden = function (f, l) { var n = /(\d+)\s*$/.exec(String(f.NUMERO || '')); return String(f.FECHA || '') + '|' + ('0000000000' + (n ? n[1] : '')).slice(-10) + '|' + String(l.ID || ''); };
+    var mejor = null, k = '';
+    (lineas || []).forEach(function (l) {
+      var f = fs[l.ID_FACTURA], m = String(l.CONCEPTO || '').match(/·\s*([^·]+)$/);
+      if (!f || !m || m[1].trim() !== String(codigo)) return;
+      var p = aNum(l.PRECIO), o = orden(f, l);
+      if (isNaN(p) || (mejor && o <= k)) return;
+      mejor = { precio: Math.round(p * 100) / 100, numero: String(f.NUMERO || ''), fecha: String(f.FECHA || '') }; k = o;
+    });
+    return mejor;
+  }
+
   var CALC = { cts: cts, pct: pct, importe: importe, baseDeTotal: baseDeTotal, eur: eur, eur0: eur0, fecha: fecha, periodos: periodos, periodoActual: periodoActual,
     anteriores: anteriores, movDe: movDe, facDe: facDe, preDe: preDe, resumen: resumen, saldos: saldos, cuenta: cuenta, pendientes: pendientes,
     sinFactura: sinFactura, presupuesto: presupuesto, grupos: grupos, estadoLinea: estadoLinea, avisos: avisos, cruzados: cruzados,
     desglose: desglose, recomendar: recomendar, esReparto: esReparto, problemasMov: problemasMov,
     cantidad: cantidad, precio: precio, sinIva: sinIva, conIvaPrecio: conIvaPrecio, importeLinea: importeLinea, baseLineas: baseLineas, lineasDe: lineasDe,
-    articulos: articulos, buscarArt: buscarArt, artDe: artDe };
+    articulos: articulos, buscarArt: buscarArt, artDe: artDe, ultimoPrecio: ultimoPrecio };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -1104,7 +1135,7 @@
        * suma), con el CIF y la dirección del cliente (CONTRAPARTES, si el negocio tiene esas columnas), y se puede ver como
        * documento («Ver la factura») y, con FACTURA_CARPETA, guardar su PDF en Drive («Guardar y sacar el PDF»).
        */
-      function formFac(f, pre, movId) {
+      function formFac(f, pre, movId, linea0) {
         var v = f || Object.assign({ TIPO: 'Recibida', FECHA: hoy(), TIPO_IVA: '21%', ESTADO: 'Pendiente' }, pre || {});
         var movs = f ? d.mov.filter(function (m) { return String(m.ID_FACTURA) === String(f.ID); }) : [];
         var pagado = 0; movs.forEach(function (m) { pagado += importe(m).total; });
@@ -1188,17 +1219,31 @@
           }
           function artPorCodigo(c) { return ARTS.filter(function (a) { return a.codigo === c; })[0] || null; }
           function eurPrecio(n) { return n.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' €'; }
+          /** T0653 · El último precio de este artículo al cliente elegido (si ARTICULOS lo pide con «ultimo»), o null. */
+          function ultimoDe(a) { return ART.ultimo ? ultimoPrecio(d.lin, d.fac, val('f-ID_CONTRAPARTE'), a.codigo, f && f.ID) : null; }
+          /** Lo que se propone al elegirlo y con «Ponerlo»: el último precio a ese cliente o, si no, el recomendado (NaN: nada). */
+          function propuesto(a) { var u = ultimoDe(a); return u ? u.precio : a.precio; }
           function pintaRec(r) {
             var p = r.querySelector('.eco-lin-rec'); if (!p) return;
             var a = artPorCodigo(r.getAttribute('data-art') || '');
             p.hidden = !a;
             if (!a) { p.innerHTML = ''; return; }
             var u = a.unidad ? '/' + a.unidad : '';
-            var dp = r.querySelector('.eco-lin-p').getAttribute('data-precio'), sinPrecio = dp === '' || dp == null;
+            var dp = r.querySelector('.eco-lin-p').getAttribute('data-precio'), sinPrecio = dp === '' || dp == null, puesto = sinPrecio ? NaN : Number(dp);
+            var ult = ultimoDe(a), prop = ult ? ult.precio : a.precio, partes = [];
+            var pon = !isNaN(prop) && !(Math.abs(puesto - prop) < 0.005) ? ' · <button type="button" class="u-btn u-btn-texto eco-lin-pon" data-pon="' + prop + '">Ponerlo</button>' : '';
+            // T0653: con «ultimo», lo que le pusiste la última vez a este cliente; si no hay, el recomendado (si lo hay).
+            if (ult) partes.push('La última vez a este cliente: <b>' + eurPrecio(ult.precio) + texto(u) + '</b> sin IVA (' + (ult.numero ? texto(ult.numero) + ', ' : '') + texto(fecha(ult.fecha)) + ')' + pon);
+            else if (!isNaN(a.precio)) partes.push('Recomendado: <b>' + eurPrecio(a.precio) + texto(u) + '</b> sin IVA' + pon);
             // Sin recomendado (en Mis telas le falta el coste): en rojo solo mientras la línea no tiene precio.
-            if (isNaN(a.precio)) { p.innerHTML = sinPrecio ? '<span class="u-mal">Sin precio recomendado: en ' + texto(ART.titulo || 'la lista') + ' le falta el coste. Ponlo tú.</span>' : 'Sin precio recomendado: en ' + texto(ART.titulo || 'la lista') + ' le falta el coste.'; return; }
-            var igual = !sinPrecio && Math.abs(Number(dp) - a.precio) < 0.005;
-            p.innerHTML = 'Recomendado: <b>' + eurPrecio(a.precio) + texto(u) + '</b> sin IVA' + (igual ? '' : ' · <button type="button" class="u-btn u-btn-texto eco-lin-pon">Ponerlo</button>');
+            else if (ART.precio) partes.push(sinPrecio ? '<span class="u-mal">Sin precio recomendado: en ' + texto(ART.titulo || 'la lista') + ' le falta el coste. Ponlo tú.</span>' : 'Sin precio recomendado: en ' + texto(ART.titulo || 'la lista') + ' le falta el coste.');
+            if (ART.coste) {
+              if (isNaN(a.coste)) partes.push('Sin coste: en ' + texto(ART.titulo || 'la lista') + ' le falta.');
+              else if (!isNaN(puesto) && puesto < a.coste - 0.004) partes.push('<span class="u-mal">Por debajo de lo que te cuesta (' + eurPrecio(a.coste) + texto(u) + ')</span>');
+              else partes.push('Te cuesta ' + eurPrecio(a.coste) + texto(u));
+            }
+            p.hidden = !partes.length;
+            p.innerHTML = partes.join(' · ');
           }
           function sugerir(r, q) {
             var caja = r.querySelector('.eco-lin-op'), inp = r.querySelector('.eco-lin-c'), hay = buscarArt(ARTS, q, 6);
@@ -1215,9 +1260,10 @@
             if (a.unidad) r.querySelector('.eco-lin-u').value = a.unidad;
             r.querySelector('.eco-lin-ci').checked = false;
             var pi = r.querySelector('.eco-lin-p');
-            pi.value = isNaN(a.precio) ? '' : String(a.precio).replace('.', ',');
-            leerPrecio(pi);
             r.setAttribute('data-art', a.codigo);
+            var pr = propuesto(a); // T0653: el último a este cliente o el recomendado; si no, vacío para que lo ponga
+            pi.value = isNaN(pr) ? '' : String(pr).replace('.', ',');
+            leerPrecio(pi);
             cerrarOp(r);
             crecer(r);
             pintaLineas(); pintaTot();
@@ -1346,9 +1392,9 @@
               cajaLin.addEventListener('click', function (e) {
                 var o = e.target.closest('.eco-lin-o'); if (o) { elegir(o.closest('.eco-lin'), artPorCodigo(o.getAttribute('data-cod'))); return; }
                 var pon = e.target.closest('.eco-lin-pon'); if (!pon) return;
-                var r = pon.closest('.eco-lin'), a = artPorCodigo(r.getAttribute('data-art') || ''); if (!a) return;
+                var r = pon.closest('.eco-lin'), pv = Number(pon.getAttribute('data-pon')); if (isNaN(pv)) return;
                 r.querySelector('.eco-lin-ci').checked = false;
-                var pi = r.querySelector('.eco-lin-p'); pi.value = String(a.precio).replace('.', ','); leerPrecio(pi);
+                var pi = r.querySelector('.eco-lin-p'); pi.value = String(pv).replace('.', ','); leerPrecio(pi);
                 pintaLineas(); pintaTot();
               });
             }
@@ -1368,6 +1414,14 @@
           }
           refrescar();
           pintaCliente();
+          // T0653 · Desde «Calcular precio» («Llevar a una factura»): la primera línea, con la tela y el precio calculado.
+          if (linea0 && cajaLin && ARTS.length && porLineas()) {
+            var a0 = artPorCodigo(String(linea0.articulo || '')), r0 = cajaLin.querySelector('.eco-lin');
+            if (a0 && r0) {
+              elegir(r0, a0);
+              if (!isNaN(linea0.precio)) { var pi0 = r0.querySelector('.eco-lin-p'); pi0.value = String(linea0.precio).replace('.', ','); leerPrecio(pi0); pintaLineas(); pintaTot(); }
+            }
+          }
           ['f-TIPO', 'f-TIPO_IVA'].forEach(function (id) { var e = vent.querySelector('#' + id); if (e) e.addEventListener('change', function () { refrescar(); pintaCliente(); }); });
           // En las líneas con el IVA incluido, cambiar el tipo de IVA deja lo escrito (lo que cobra) y cambia el sin IVA.
           vent.querySelector('#f-TIPO_IVA').addEventListener('change', function () {
@@ -1375,7 +1429,8 @@
             Array.prototype.forEach.call(cajaLin.querySelectorAll('.eco-lin-p'), function (inp) { if (linIva(inp)) leerPrecio(inp); });
             pintaLineas(); pintaTot();
           });
-          vent.querySelector('#f-ID_CONTRAPARTE').addEventListener('change', pintaCliente);
+          // T0653: otro cliente, otro «la última vez a este cliente» en cada línea.
+          vent.querySelector('#f-ID_CONTRAPARTE').addEventListener('change', function () { pintaCliente(); if (porLineas()) pintaLineas(); });
           vent.querySelector('#f-BASE').addEventListener('input', refrescar);
           oirImporte('f', refrescar);
           /** Lo que hay en pantalla, para el documento (el número, el que tiene; una nueva aún no lo tiene). */
@@ -1655,7 +1710,24 @@
       });
 
       ctx.alCambiar(function (t) { if (tablas.indexOf(t) >= 0) pintar(); });
-      ctx.tablas.leer(tablas).then(function () { S.leido = true; pintar(); }, function (e) {
+      /**
+       * T0653 · ?factura=nueva&articulo=BOR-004-01&precio=28&cliente=ID_MARCA:M-002 (desde «Calcular precio» de Telas): abre una
+       * factura emitida nueva con esa línea y, si hay una contraparte con esa columna en ese valor, a su nombre. Se quita de la
+       * dirección para que volver a entrar no la abra otra vez.
+       */
+      function desdeEnlace() {
+        var u; try { u = new URL(location.href); } catch (e) { return; }
+        if (u.searchParams.get('factura') !== 'nueva') return;
+        var art = u.searchParams.get('articulo') || '', pr = aNum(u.searchParams.get('precio')), cli = String(u.searchParams.get('cliente') || ''), i = cli.indexOf(':');
+        ['factura', 'articulo', 'precio', 'cliente'].forEach(function (k) { u.searchParams.delete(k); });
+        try { history.replaceState(history.state, '', u.pathname + u.search + u.hash); } catch (e) {}
+        if (!LINEAS) return;
+        var col = i > 0 ? cli.slice(0, i) : '', valor = cli.slice(i + 1);
+        var ctr = col ? (T.filas('CONTRAPARTES') || []).filter(function (c) { return c[col] != null && String(c[col]) === valor; })[0] : null;
+        formFac(null, { TIPO: 'Emitida', FECHA: hoy(), ID_CONTRAPARTE: ctr ? ctr.ID : '' }, null, { articulo: art, precio: pr });
+      }
+
+      ctx.tablas.leer(tablas).then(function () { S.leido = true; pintar(); desdeEnlace(); }, function (e) {
         cont.innerHTML = '<p class="u-error">No se han podido leer las cuentas.</p><p class="u-nota">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + ' Vuelve a abrir la sección para probar otra vez.</p>';
       });
       this._cerrar = cerrar;

@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Telas · ejemplo</title>
+<!-- T0654: en la app «Utilo DEV», en la iniciativa Telas, y «Entrar como» son sus personas (las de motor-falso.js · GENTE). -->
+<meta name="dev-ramas" content="App de ejemplo">
+<meta name="dev-iniciativa" content="telas">
+<meta name="dev-personas" content="duena=Marta · Dueña, ayudante=Ayudante, admin=Admin">
 <link rel="icon" href="data:,">
 <!-- T0599: la app de ejemplo de la sección Listado (nucleo/secciones/listado.js) con el marco de verdad (nucleo/nucleo.js: el
      menú a la izquierda en el ordenador y abajo en el móvil) y la capa de tablas de verdad (kanban4/tablas.js), con los datos
@@ -16,7 +20,7 @@
   window.LI_MARCA = (/[?&]marca=(utilo|konamigas|telas)\b/.exec(location.search) || [])[1] || 'telas';
   document.write('<link rel="stylesheet" href="../../' + window.LI_MARCA + '/marca.css?v=3">');
 </script>
-<link rel="stylesheet" href="../../estilos/base.css?v=103">
+<link rel="stylesheet" href="../../estilos/base.css?v=106">
 <style>
   /* El selector de quién entra: fuera del marco (que rehace el body), abajo a la derecha, encima de la barra del móvil. */
   #mf-quien { position: fixed; right: max(12px, env(safe-area-inset-right, 0px)); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 90;

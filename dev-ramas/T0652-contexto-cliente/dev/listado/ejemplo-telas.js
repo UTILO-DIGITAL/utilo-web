@@ -158,10 +158,39 @@
   var AJUSTES = tabla(['ID', 'RUPIAS_POR_EURO', 'MARGEN', 'ENVIO_ARANCEL'], [{ ID: 1, RUPIAS_POR_EURO: 110, MARGEN: '50%', ENVIO_ARANCEL: 5 }]);
   var PREFERENCIAS = tabla(['ID', 'VALOR'], []);
 
+  /* ---------- T0641 · composición de cada diseño y la comparativa (lo que paga hoy cada marca frente a la tela de Marta) ---------- */
+  var FIBRAS = dimension('FI', ['Algodón', 'Lino', 'Viscosa', 'Poliéster', 'Seda', 'Yute']);
+  var fi = function (n) { return idDe(FIBRAS, n); };
+  var COMPOSICION = tabla(['ID', 'ID_DISENO', 'ID_FIBRA', 'PARTE'], [
+    { ID: 'BP-001·FI01', ID_DISENO: 'BP-001', ID_FIBRA: fi('Algodón'), PARTE: 1 },
+    { ID: 'IK-002·FI01', ID_DISENO: 'IK-002', ID_FIBRA: fi('Algodón'), PARTE: '0,7' },
+    { ID: 'IK-002·FI05', ID_DISENO: 'IK-002', ID_FIBRA: fi('Seda'), PARTE: 0.3 },
+    { ID: 'RY-003·FI01', ID_DISENO: 'RY-003', ID_FIBRA: fi('Algodón'), PARTE: 0.55 },
+    { ID: 'RY-003·FI02', ID_DISENO: 'RY-003', ID_FIBRA: fi('Lino'), PARTE: 0.45 }
+  ]);
+  var COMPETIDORES = tabla(['ID', 'NOMBRE'], [{ ID: 'COM001', NOMBRE: 'Almacén Textil Centro' }, { ID: 'COM002', NOMBRE: 'Tejidos del Norte' }]);
+  var TIPOS_PRECIO = dimension('TPC', ['Objetivo', 'Pagan hoy', 'Catálogo']);
+  var ESTADOS_COMPARATIVA = dimension('ECO', ['Buscando', 'Propuesta enviada', 'Muestra enviada']);
+  var tp = function (n) { return idDe(TIPOS_PRECIO, n); }, eco = function (n) { return idDe(ESTADOS_COMPARATIVA, n); };
+  var COMPARATIVA = tabla(['ID', 'ID_MARCA', 'SU_TELA', 'USO', 'COMPOSICION', 'ANCHO', 'GSM', 'ID_COMPETIDOR', 'DETALLE_COMPETIDOR', 'PRECIO_A_BATIR', 'ID_TIPO_PRECIO', 'ID_DISENO', 'ID_ESTADO', 'NOTAS'], [
+    // Casa Albero: dos telas con alternativa. La primera, los mismos 140 cm (por metro); la segunda, 140 frente a 150 (por m²).
+    { ID: 'C-002', ID_MARCA: 'M-001', SU_TELA: 'Ikat de algodón y seda', USO: 'Cojines y pufs', COMPOSICION: '70 % algodón · 30 % seda', ANCHO: '140', GSM: '210', ID_COMPETIDOR: 'COM001',
+      DETALLE_COMPETIDOR: 'Madrid, hoy 22–26 €/m', PRECIO_A_BATIR: 24, ID_TIPO_PRECIO: tp('Pagan hoy'), ID_DISENO: 'IK-002', ID_ESTADO: eco('Propuesta enviada'), NOTAS: 'Les gustó la mostaza; piden la carta de colores.' },
+    { ID: 'C-003', ID_MARCA: 'M-001', SU_TELA: 'Rayas de algodón para tapizar', USO: 'Cabeceros', COMPOSICION: '100 % algodón', ANCHO: '140', GSM: '450', ID_COMPETIDOR: 'COM002',
+      PRECIO_A_BATIR: 15, ID_TIPO_PRECIO: tp('Objetivo'), ID_DISENO: 'RY-003', ID_ESTADO: eco('Muestra enviada') },
+    // Nido Sur: una sin alternativa todavía y otra con un diseño que aún no tiene coste.
+    { ID: 'C-004', ID_MARCA: 'M-002', SU_TELA: 'Lino lavado grueso', USO: 'Fundas de sofá', ANCHO: '280', PRECIO_A_BATIR: 19, ID_TIPO_PRECIO: tp('Objetivo'), ID_ESTADO: eco('Buscando') },
+    { ID: 'C-005', ID_MARCA: 'M-002', SU_TELA: 'Lino natural liso', USO: 'Cortinas', ANCHO: '280', ID_COMPETIDOR: 'COM001', PRECIO_A_BATIR: 16, ID_TIPO_PRECIO: tp('Pagan hoy'), ID_DISENO: 'LI-010', ID_ESTADO: eco('Buscando') },
+    // Lumbre Estudio: sin su ancho (por metro) y paga menos de lo que a Marta le cuesta la suya.
+    { ID: 'C-006', ID_MARCA: 'M-003', SU_TELA: 'Estampado de catálogo', USO: 'Cojines', ID_COMPETIDOR: 'COM002', PRECIO_A_BATIR: 8, ID_TIPO_PRECIO: tp('Catálogo'), ID_DISENO: 'BP-004', ID_ESTADO: eco('Buscando'),
+      NOTAS: 'Con este precio no compensa.' }
+  ]);
+
   var TABLAS = { FASES: FASES, ESTADOS_TAREA: ESTADOS_TAREA, TIPOS_SEGUIMIENTO: TIPOS_SEGUIMIENTO, TEMAS: TEMAS, FORMATOS: FORMATOS, PRIORIDADES: PRIORIDADES, TIPOS_MARCA: TIPOS_MARCA,
     VIAS: VIAS, ESTADOS_PROVEEDOR: ESTADOS_PROVEEDOR, TIPOS_PROVEEDOR: TIPOS_PROVEEDOR, REGIONES: REGIONES, ESTADOS_TELA: ESTADOS_TELA, TECNICAS: TECNICAS, SI_NO: SI_NO,
     MARCAS: MARCAS, PROVEEDORES: PROVEEDORES, OTROS_CONTACTOS: OTROS_CONTACTOS, PERSONAS: PERSONAS, NECESIDADES: NECESIDADES, SEGUIMIENTO: SEGUIMIENTO,
-    DISENOS: DISENOS, TELAS: TELAS, INTERESES: INTERESES, AJUSTES: AJUSTES, PREFERENCIAS: PREFERENCIAS };
+    DISENOS: DISENOS, TELAS: TELAS, INTERESES: INTERESES, AJUSTES: AJUSTES, PREFERENCIAS: PREFERENCIAS,
+    FIBRAS: FIBRAS, COMPOSICION: COMPOSICION, COMPETIDORES: COMPETIDORES, TIPOS_PRECIO: TIPOS_PRECIO, ESTADOS_COMPARATIVA: ESTADOS_COMPARATIVA, COMPARATIVA: COMPARATIVA };
 
   /** Las referencias de cada tabla, como las saca montar.js de los YAML de GESTION (config._refs). */
   var REFS = {
@@ -172,7 +201,9 @@
     NECESIDADES: { ID_MARCA: 'MARCAS', ID_IMPORTAN: 'SI_NO', ID_ANTICIPO: 'SI_NO' },
     DISENOS: { ID_TECNICA: 'TECNICAS', ID_PROVEEDOR: 'PROVEEDORES' },
     TELAS: { ID_DISENO: 'DISENOS', ID_ESTADO: 'ESTADOS_TELA' },
-    INTERESES: { ID_TELA: 'TELAS', ID_MARCA: 'MARCAS' }
+    INTERESES: { ID_TELA: 'TELAS', ID_MARCA: 'MARCAS' },
+    COMPOSICION: { ID_DISENO: 'DISENOS', ID_FIBRA: 'FIBRAS' },
+    COMPARATIVA: { ID_MARCA: 'MARCAS', ID_COMPETIDOR: 'COMPETIDORES', ID_TIPO_PRECIO: 'TIPOS_PRECIO', ID_DISENO: 'DISENOS', ID_ESTADO: 'ESTADOS_COMPARATIVA' }
   };
   function refsDesde(t) { var r = {}; (function ir(x, n) { if (r[x] || n > 2) return; r[x] = REFS[x] || {}; Object.keys(r[x]).forEach(function (c) { ir(r[x][c], n + 1); }); })(t, 0); return r; }
 
@@ -181,6 +212,32 @@
   var COMUN = {
     VALORES: { RUPIAS: { tabla: 'AJUSTES', fila: 1, columna: 'RUPIAS_POR_EURO' }, MARGEN: { tabla: 'AJUSTES', fila: 1, columna: 'MARGEN' }, ENVIO: { tabla: 'AJUSTES', fila: 1, columna: 'ENVIO_ARANCEL' } },
     PERSONALIZAN: ['Dueña'], PREFERENCIAS: 'PREFERENCIAS'
+  };
+  // T0641 · Lo que le cuesta una tela puesta en España: coste del proveedor en euros + envío (Marta aún no pone precios).
+  var EUROS = ['/', 'ID_DISENO.COSTE_INR', '$RUPIAS'], COSTE = ['redondear', ['+', EUROS, '$ENVIO'], 2];
+  var COMP_DE = { tabla: 'COMPOSICION', campo: 'ID_DISENO', con: 'ID_DISENO', orden: '-PARTE', columnas: ['PARTE', 'ID_FIBRA'], campos: { PARTE: { tipo: 'porcentaje' } } };
+  var COMPARATIVA_REL = {
+    titulo: 'Comparativa', tabla: 'COMPARATIVA', campo: 'ID_MARCA', con: 'ID', nombre: 'SU_TELA', siHay: true, perfiles: ['Dueña'], // lo que le cuesta: no para la ayudante
+    tarjeta: { titulo: 'SU_TELA', linea: ['HOY', 'PROPUESTA', 'HUECO'], debajo: ['ID_ESTADO'],
+      comparar: { titulos: ['Su tela', 'Tu alternativa'], filas: [
+        { titulo: 'Composición', campos: ['COMPOSICION', 'ALT_COMPOSICION'] }, { titulo: 'Ancho', campos: ['ANCHO', 'ID_DISENO.ANCHO'] },
+        { titulo: 'Peso', campos: ['GSM', 'ID_DISENO.GSM'] }, { titulo: 'Por metro', campos: ['PRECIO_SU', 'MI_COSTE'] }, { titulo: 'Por m²', campos: ['M2_SU', 'M2_MIO'] }] },
+      detalle: ['USO', 'PROVEEDOR_HOY', 'NOTAS'] },
+    campos: {
+      SU_TELA: { titulo: 'Su tela' }, USO: { titulo: 'Para' }, ANCHO: { titulo: 'Ancho', unidad: 'cm' }, GSM: { titulo: 'Peso', unidad: 'g/m²' },
+      'ID_DISENO.ANCHO': { titulo: 'Ancho', unidad: 'cm' }, 'ID_DISENO.GSM': { titulo: 'Peso', unidad: 'g/m²' },
+      PRECIO_A_BATIR: { titulo: 'Precio a batir', tipo: 'importe', unidad: '€/m' }, ID_ESTADO: { titulo: 'Estado' }, NOTAS: { titulo: 'Notas', tipo: 'nota' },
+      MI_COSTE: { titulo: 'Te cuesta', tipo: 'importe', unidad: '€/m', calculo: COSTE },
+      HUECO: { titulo: 'Hasta su precio', tipo: 'importe', unidad: '€/m', signo: { mas: 'Hasta su precio te quedan {}', menos: 'Tu coste ya pasa su precio en {}', cero: 'Tu coste es su precio' },
+        calculo: ['o', ['-', ['*', ['/', 'PRECIO_A_BATIR', 'ANCHO'], 'ID_DISENO.ANCHO'], 'MI_COSTE'], ['-', 'PRECIO_A_BATIR', 'MI_COSTE']] },
+      M2_SU: { titulo: 'Por m²', tipo: 'importe', unidad: '€/m²', calculo: ['/', 'PRECIO_A_BATIR', ['/', 'ANCHO', 100]] },
+      M2_MIO: { titulo: 'Por m²', tipo: 'importe', unidad: '€/m²', calculo: ['/', 'MI_COSTE', ['/', 'ID_DISENO.ANCHO', 100]] },
+      HOY: { titulo: 'Hoy', plantilla: 'Hoy paga {PRECIO_A_BATIR}[ ({ID_COMPETIDOR})]' },
+      PROPUESTA: { titulo: 'Tu alternativa', plantilla: '{ID_DISENO}[: te cuesta {MI_COSTE}]' },
+      PRECIO_SU: { titulo: 'Precio', plantilla: '{PRECIO_A_BATIR}[ · {ID_TIPO_PRECIO}]' },
+      PROVEEDOR_HOY: { titulo: 'Hoy la compra a', plantilla: '{ID_COMPETIDOR}[ ({DETALLE_COMPETIDOR})]' },
+      ALT_COMPOSICION: { titulo: 'Composición', de: COMP_DE }
+    }
   };
   var COLORES_TAREA = { 'Pendiente': 'medio', 'En curso': 'info', 'Esperando respuesta': 'info', 'Hecha': 'bien', 'Descartada': 'apagado' };
   function suSeguimiento(col) {
@@ -240,6 +297,7 @@
           campos: { PAGAN_HOY: { titulo: 'Pagan hoy (€/m)' }, PRECIO_OBJETIVO: { titulo: 'Precio objetivo (€/m)' }, ID_ANTICIPO: { titulo: '¿Anticipo 50 %?' } } },
         { titulo: 'Telas que le interesan', tabla: 'INTERESES', seccion: 'telas', campo: 'ID_MARCA', con: 'ID', clave: 'ID_TELA', nombre: 'ID_TELA', columnas: ['ID_TELA', 'ID_TELA.COLOR'],
           campos: { ID_TELA: { titulo: 'Tela' }, 'ID_TELA.COLOR': { titulo: 'Color' } }, vacio: 'Ninguna todavía.' },
+        COMPARATIVA_REL,
         suSeguimiento('ID_MARCA')
       ],
       VISTAS: [
@@ -292,8 +350,8 @@
 
     telas: { modulo: 'listado', titulo: 'Mis telas', perfiles: ['Dueña'], icono: '<path d="M4 5h12a3 3 0 0 1 0 6H8a3 3 0 0 0 0 6h12"/><path d="M4 5v14"/>', config: mezcla(COMUN, {
       TABLA: 'TELAS', CODIGO: 'ID', NOMBRE: 'COLOR', ORDEN: 'ID', FILAS: ['tela', 'telas'],
-      COLUMNAS: ['ENLACE_FOTO', 'ID_DISENO.ID_TECNICA', 'COLOR', 'ID_DISENO.ANCHO', 'ID_DISENO.GSM', 'ID_DISENO.ID_PROVEEDOR', 'PRECIO_TALLER', 'ID_ESTADO'],
-      DETALLE: ['ID_DISENO.ID_TECNICA', 'PRECIO_TALLER', 'ID_ESTADO'],
+      COLUMNAS: ['ENLACE_FOTO', 'ID_DISENO.ID_TECNICA', 'COLOR', 'ID_DISENO.ANCHO', 'ID_DISENO.GSM', 'ID_DISENO.ID_PROVEEDOR', 'COSTE_ESPANA', 'ID_ESTADO'],
+      DETALLE: ['ID_DISENO.ID_TECNICA', 'COSTE_ESPANA', 'ID_ESTADO'],
       CAMPOS: {
         ENLACE_FOTO: { titulo: 'Foto', tipo: 'foto' }, COLOR: { titulo: 'Color' }, ID_DISENO: { titulo: 'Diseño' },
         'ID_DISENO.ID_TECNICA': { titulo: 'Técnica' }, 'ID_DISENO.ANCHO': { titulo: 'Ancho', unidad: 'cm' }, 'ID_DISENO.GSM': { titulo: 'Peso', unidad: 'g/m²' },
@@ -305,12 +363,21 @@
           calculo: ['redondear', ['*', ['+', ['/', 'ID_DISENO.COSTE_INR', '$RUPIAS'], '$ENVIO'], ['+', 1, ['o', 'ID_DISENO.MARGEN', '$MARGEN']]], 2],
           ayuda: 'Coste del proveedor en euros + envío y arancel + margen. Nunca sale sin el envío.' },
         ID_ESTADO: { titulo: 'Estado', colores: { 'Aprobada': 'bien', 'Propuesta a marca': 'info', 'Muestra pedida': 'medio', 'Descartada': 'apagado' } },
-        MUESTRA_EN_MANO: { titulo: 'Muestra en mano' }, NOTAS: { tipo: 'nota' }, N_INTERESADAS: { titulo: 'Marcas interesadas', de: { tabla: 'INTERESES', campo: 'ID_TELA' } }
+        MUESTRA_EN_MANO: { titulo: 'Muestra en mano' }, NOTAS: { tipo: 'nota' }, N_INTERESADAS: { titulo: 'Marcas interesadas', de: { tabla: 'INTERESES', campo: 'ID_TELA' } },
+        // T0641
+        COSTE_ESPANA: { titulo: 'Te cuesta puesta en España', tipo: 'importe', unidad: '€/m', privado: true, calculo: COSTE,
+          desglose: [{ calculo: 'ID_DISENO.COSTE_INR', tipo: 'numero', unidad: '₹' }, '→', { calculo: EUROS }, '+ envío', { calculo: '$ENVIO' }],
+          ayuda: 'El coste del proveedor en euros más el envío y el arancel de Ajustes. El precio para cada cliente lo pones tú.' },
+        COMPOSICION: { titulo: 'Composición', de: COMP_DE },
+        PESO: { titulo: 'Peso', plantilla: '{ID_DISENO.GSM}[ · {ID_DISENO.GLM}]' }, 'ID_DISENO.GLM': { titulo: 'Peso por metro', unidad: 'g/m' },
+        RAPPORT: { titulo: 'Rapport', plantilla: '{ID_DISENO.RAPPORT_ANCHO} × {ID_DISENO.RAPPORT_LARGO} cm' },
+        'ID_DISENO.BORDADO_HILO': { titulo: 'Hilo del bordado' }, 'ID_DISENO.LIMPIEZA_SECO': { titulo: 'Limpieza en seco' }, 'ID_DISENO.LAVABLE': { titulo: 'Lavable' }
       },
       FICHA: [
-        { titulo: '', campos: ['ENLACE_FOTO', 'ID_ESTADO', 'PRECIO_TALLER'] },
-        { titulo: 'La tela', campos: ['ID_DISENO', 'ID_DISENO.ID_TECNICA', 'COLOR', 'ID_DISENO.ANCHO', 'ID_DISENO.GSM', 'ID_DISENO.MARTINDALE', 'ID_DISENO.USO'] },
-        { titulo: 'Proveedor y coste', campos: ['ID_DISENO.ID_PROVEEDOR', 'REF_PROVEEDOR', 'ID_DISENO.COSTE_INR', 'ID_DISENO.MARGEN'] },
+        { titulo: '', campos: ['ENLACE_FOTO', 'ID_ESTADO', 'COSTE_ESPANA'] },
+        { titulo: 'La tela', campos: ['ID_DISENO', 'ID_DISENO.ID_TECNICA', 'COLOR', 'COMPOSICION', 'ID_DISENO.BORDADO_HILO', 'ID_DISENO.ANCHO', 'PESO', 'RAPPORT', 'ID_DISENO.MARTINDALE', 'ID_DISENO.USO',
+          'ID_DISENO.LAVABLE', 'ID_DISENO.LIMPIEZA_SECO'] },
+        { titulo: 'Proveedor y coste', campos: ['ID_DISENO.ID_PROVEEDOR', 'REF_PROVEEDOR', 'ID_DISENO.MARGEN'] },
         { titulo: 'Con las marcas', campos: ['N_INTERESADAS', 'MUESTRA_EN_MANO', 'NOTAS'] }
       ],
       RELACIONADOS: [{ titulo: 'Marcas interesadas', tabla: 'INTERESES', campo: 'ID_TELA', con: 'ID', seccion: 'clientes', clave: 'ID_MARCA', columnas: ['ID_MARCA'], nombre: 'ID_MARCA', campos: { ID_MARCA: { titulo: 'Marca' } } }],
@@ -320,7 +387,7 @@
         { id: 'TODAS', titulo: 'Todas', agrupar: 'ID_DISENO.ID_TECNICA' }
       ],
       AVISOS: [
-        { id: 'SIN_COSTE', titulo: 'Sin coste: no hay precio', nivel: 'alto', si: [{ campo: 'ID_DISENO.COSTE_INR', vacio: true }, { campo: 'ID_ESTADO', no: ['Descartada'] }] },
+        { id: 'SIN_COSTE', titulo: 'Sin coste del proveedor', nivel: 'alto', si: [{ campo: 'ID_DISENO.COSTE_INR', vacio: true }, { campo: 'ID_ESTADO', no: ['Descartada'] }] },
         { id: 'SIN_FOTO', titulo: 'Sin foto', nivel: 'info', si: [{ campo: 'ENLACE_FOTO', vacio: true }, { campo: 'ID_ESTADO', no: ['Descartada'] }] }
       ],
       EDITAR: ['ID_ESTADO', 'MUESTRA_EN_MANO', 'NOTAS'], _refs: refsDesde('TELAS') }) }
@@ -344,6 +411,7 @@
   Object.keys(SECCIONES).forEach(function (n) {
     var c = SECCIONES[n].config;
     var mas = (c.RELACIONADOS || []).map(function (r) { return r.tabla; }).concat(Object.keys(c.CAMPOS || {}).map(function (k) { return c.CAMPOS[k].de && c.CAMPOS[k].de.tabla; }).filter(Boolean));
+    (c.RELACIONADOS || []).forEach(function (r) { Object.keys(r.campos || {}).forEach(function (k) { var de = r.campos[k].de; if (de && de.tabla) mas.push(de.tabla); }); }); // T0641
     mas.forEach(function (t) { var x = refsDesde(t); Object.keys(x).forEach(function (k) { c._refs[k] = c._refs[k] || x[k]; }); });
   });
 
