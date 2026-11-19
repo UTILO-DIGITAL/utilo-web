@@ -589,10 +589,10 @@
    "tarea": "T0628",
    "titulo": "Ventas en la Economía de Marta: lo que tiene en juego, lo que gana y lo que le falta por recuperar",
    "pr": 352,
-   "commit": "1885995",
-   "ultimo": "T0628: al día con main",
+   "commit": "d6e74c4",
+   "ultimo": "T0628: Cierra el bloque de pruebas de Ventas que se quedó fuera al juntar con main",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T14:07:09.559Z",
+   "fecha": "2026-11-19T14:18:22.046Z",
    "toca": [
     "telas"
    ],
