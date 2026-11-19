@@ -589,12 +589,13 @@
    "tarea": "T0643",
    "titulo": "Cerrar y pasar tareas en un toque, con el siguiente paso al cerrar",
    "pr": 341,
-   "commit": "28ea1a0",
-   "ultimo": "T0643: al día con main (ACCIONES y fichas de T0642, T0635, T0639) y base.css a la versión 102",
+   "commit": "9250f34",
+   "ultimo": "T0643: al día con main (calculadora de precios T0653 y T0657, DEV T0655) y base.css a la versión 105",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T09:07:17.255Z",
+   "fecha": "2026-11-19T12:08:15.818Z",
    "toca": [
     "konamigas",
+    "telas",
     "utilo"
    ],
    "comun": true,
@@ -729,6 +730,37 @@
       "nombre": "konamigas-dev"
      },
      "publica": true,
+     "cambia": true
+    },
+    {
+     "ruta": "dev/listado/",
+     "nombre": "App de ejemplo",
+     "iniciativa": "telas",
+     "proyecto": "",
+     "carga": [
+      "web/' + window.LI_MARCA + '/marca.css",
+      "web/dev/listado/ejemplo-telas.js",
+      "web/dev/listado/motor-falso.js",
+      "web/estilos/base.css",
+      "web/kanban4/tablas.js",
+      "web/nucleo/nucleo.js",
+      "web/nucleo/secciones/listado.js"
+     ],
+     "local": true,
+     "personas": [
+      {
+       "id": "duena",
+       "nombre": "Marta · Dueña"
+      },
+      {
+       "id": "ayudante",
+       "nombre": "Ayudante"
+      },
+      {
+       "id": "admin",
+       "nombre": "Admin"
+      }
+     ],
      "cambia": true
     }
    ],

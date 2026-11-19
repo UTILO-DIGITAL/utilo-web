@@ -253,6 +253,7 @@
     if (r.aviso) o.aviso = String(r.aviso); // T0639: el aviso de arriba (config.json · nucleo.aviso)
     if (r.perfilEnMenu === false) o.perfilEnMenu = false; // T0415: Perfil fuera del menú (se abre con el nombre de la cabecera)
     if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
+    if (r.ocultar && Array.isArray(r.ocultar.tablas)) o.ocultar = { tablas: r.ocultar.tablas, refs: r.ocultar.refs || {}, filas: r.ocultar.filas || {} }; // T0650
     return o;
   }
 
@@ -726,6 +727,8 @@
    * - personaId (T0387, solo con Supabase; si no, ''): el id de quien ha entrado, el de las columnas persona (ASIGNADO…).
    * - roles (T0417, solo con Supabase; si no, []): sus roles, [{ rol, ambito, ambito_id }], para no ofrecer lo que la base no le
    *   deja (en qué iniciativas es responsable). La que manda sigue siendo la base.
+   * - ocultar (T0650): lo que su perfil no ve (config.json · nucleo.ocultar): { tablas, refs: { TABLA: [columnas] }, filas: { TABLA:
+   *   { COLUMNA: [valores] } } } o null. La sección no pide esas tablas, no enseña esas columnas ni ofrece esos valores; el motor no las da.
    * - desde y volver() (T0420): la sección de la que se viene con un enlace ({ id, titulo } o null) y volver a ella como estaba.
    */
   function ctxDe(s) {
@@ -738,6 +741,9 @@
       autor: cred.como ? cred.como.persona + ' como ' + cred.persona : cred.persona,
       personaId: cred.persona_id || '', // T0387
       roles: cred.roles || [], // T0417
+      // T0650: lo que su perfil no ve (nucleo.ocultar del motor): { tablas, refs: { TABLA: [columnas que apuntan a una oculta] },
+      // filas: { TABLA: { COLUMNA: [valores que no ve] } } } o null.
+      ocultar: cred.ocultar || null,
       // T0420: la sección de la que vienes ({ id, titulo }, o null si se ha entrado directo) y volver a ella como estaba.
       desde: (function () { var d = history.state && history.state.desde, x = d && seccion(d); return x ? { id: x.id, titulo: x.titulo } : null; })(),
       volver: function () { history.back(); },

@@ -2159,6 +2159,21 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 /* T0642 · Lo relacionado con cada dato y su título («Qué buscan»), «+ Nueva tarea» debajo y «Copiar para Claude» dentro de «Más». */
 .u .li-rel-datos + .li-rel-datos { margin-top: var(--e3); padding-top: var(--e3); border-top: 1px solid var(--color-linea); }
 .u .li-rel-nueva { margin-top: var(--e2); padding-left: 0; padding-right: 0; justify-content: flex-start; }
+/* T0641 · Las cuentas de un precio debajo de su valor, un número en palabras según su signo («Ahorra 32 %», en verde) y lo
+   relacionado como tarjetas cortas (la comparativa de una marca): título, una línea, lo de debajo y «Ver detalle» con el cara a cara. */
+.u .li-desglose { font-size: 14px; color: var(--color-suave); }
+.u .li-signo-mas { color: var(--color-bien); font-weight: 600; }
+.u .li-signo-menos { color: var(--color-vencido); font-weight: 600; }
+.u .li-rt { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e2); }
+.u .li-rt-f { padding: var(--e2) var(--e3); border-radius: var(--radio-peq); border: 1px solid var(--color-linea); background: var(--color-superficie);
+  font: 400 14px/1.4 var(--fuente-texto); }
+.u .li-rt-t { font-weight: 600; font-size: 15px; }
+.u .li-rt-l, .u .li-rt-d { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e1) var(--e3); margin-top: var(--e1); }
+.u .li-rt-d { font-size: 13px; color: var(--color-suave); }
+.u .li-rt-mas > summary { cursor: pointer; min-height: 36px; display: flex; align-items: center; color: var(--color-principal-oscuro); font-size: 14px; }
+.u .li-rt-mas .u-campos { margin-top: var(--e2); }
+.u .li-cara { display: grid; gap: var(--e1) var(--e3); align-items: baseline; overflow-wrap: anywhere; }
+.u .li-cara-t { font-weight: 600; }
 .u .li-mas { border-top: 1px solid var(--color-linea); padding-top: var(--e2); }
 .u .li-mas > summary { cursor: pointer; min-height: 40px; display: flex; align-items: center; color: var(--color-suave); font-size: 14px; }
 .u .li-mas[open] .li-claude { border-top: 0; padding-top: var(--e1); }
@@ -2195,6 +2210,42 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .eco-lin-pon { min-height: 0; padding: 0 var(--e1); font-size: 13px; }
 .u .eco-lin textarea { resize: none; overflow: hidden; line-height: 1.35; }
 
+/* T0653 · Calcular precio (Telas): datos a la izquierda; el precio y lo que paga hoy la marca a la derecha (debajo en el móvil). */
+.u .pr-caja.u-campos { grid-template-columns: 1fr; } /* T0657: los datos, siempre uno debajo de otro (a 600-820 px, u-campos los partía en dos) */
+.u .pr-calc { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--e4); align-items: start; }
+.u .pr-lado { display: grid; gap: var(--e4); min-width: 0; }
+.u .pr-caja { background: var(--color-superficie); border: 1px solid var(--color-linea); border-radius: var(--radio); padding: var(--e4); display: grid; gap: var(--e2); align-content: start; min-width: 0; }
+.u .pr-caja > p { margin: 0; }
+.u .pr-manual { display: grid; gap: var(--e3); }
+.u .pr-dos { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e2); }
+.u .pr-ud { position: relative; display: block; }
+.u .pr-ud input:not([type=checkbox]):not([type=radio]) { width: 100%; padding-right: 44px; text-align: right; }
+.u .pr-ud i { position: absolute; right: var(--e3); top: 50%; transform: translateY(-50%); font-style: normal; font-size: 13px; color: var(--color-suave); pointer-events: none; }
+.u .pr-seg { display: inline-flex; width: max-content; max-width: 100%; border: 1px solid var(--color-borde-campo); border-radius: var(--radio); overflow: hidden; }
+.u .pr-seg button { font: inherit; font-size: 14px; min-height: 36px; padding: 0 var(--e3); border: 0; background: transparent; color: var(--color-texto); cursor: pointer; }
+.u .pr-seg button[aria-pressed=true] { background: var(--color-principal-oscuro); color: var(--color-sobre-principal); }
+.u .pr-par { display: grid; grid-template-columns: 1fr auto 1fr; gap: var(--e2); align-items: end; }
+.u .pr-o { padding-bottom: var(--e3); color: var(--color-suave); font-size: 13px; }
+.u .pr-activo input { border-color: var(--color-principal-oscuro); box-shadow: 0 0 0 1px var(--color-principal-oscuro); }
+.u .pr-grande { font-size: 30px; font-weight: 500; line-height: 1.15; }
+.u .pr-grande small, .u .pr-nada { font-size: 15px; font-weight: 400; color: var(--color-suave); }
+.u .pr-nada { font-size: 24px; }
+.u .pr-aviso { border-radius: var(--radio); padding: var(--e2) var(--e3); font-size: 14px; background: var(--color-pendiente-fondo); color: var(--color-pendiente); }
+.u .pr-aviso.pr-mal { background: var(--color-vencido-fondo); color: var(--color-vencido); }
+.u .pr-aviso .u-btn-texto { min-height: 0; padding: 0; font-size: 14px; }
+.u .pr-cuentas { font-size: 13.5px; color: var(--color-suave); border-top: 1px dashed var(--color-linea); padding-top: var(--e2); }
+.u .pr-cuentas b { color: var(--color-texto); font-weight: 500; }
+.u .pr-fac { width: max-content; }
+.u .pr-h { margin: 0; font-size: 15px; font-weight: 500; }
+.u .pr-cmp { display: grid; gap: 2px; padding: var(--e2) 0; border-top: 1px solid var(--color-linea); }
+.u .pr-h + .pr-cmp { border-top: 0; padding-top: 0; }
+.u .pr-cmp-t { font-weight: 500; }
+.u .pr-cmp .u-btn-texto { min-height: 0; padding: 0; font-size: 13.5px; }
+.u .pr-bien { color: var(--color-bien); font-weight: 500; }
+.u .pr-cmp .u-mal { font-weight: 500; }
+.u .pr-otras summary { cursor: pointer; font-size: 13.5px; color: var(--color-principal-oscuro); padding-top: var(--e1); }
+@media (max-width: 820px) { .u .pr-calc { grid-template-columns: 1fr; } }
+@media (max-width: 420px) { .u .pr-par { grid-template-columns: 1fr; } .u .pr-o { display: none; } }
 /* T0643 · Sección Listado: cerrar, pasar y apuntar en un toque. El círculo cierra una fila (como en una lista de tareas) y
    «Pasar» la lleva a otro día; en el móvil, los dos van encima de la tarjeta (no dentro: un botón no va dentro de otro). */
 .u .li-circ { width: 26px; height: 26px; flex: none; padding: 0; border-radius: 50%; border: 1.5px solid var(--color-suave); background: var(--color-superficie);

@@ -158,7 +158,10 @@
   function guardar(E) { ponerLS(CLAVE, JSON.stringify(E)); }
   function nombre(ini) { return NOMBRES[ini] || (ini ? ini.charAt(0).toUpperCase() + ini.slice(1) : ''); }
   function ahora() { return Math.floor(Date.now() / 1000); }
-  function quienDe(x) { return x && x.como && x.como.tipo === 'prueba' ? x.como.correo : 'yo'; }
+  function quienDe(x) { return x && x.como && x.como.tipo === 'prueba' ? x.como.correo : x && x.como && x.como.tipo === 'local' ? 'local:' + x.como.id : 'yo'; }
+  /** T0654 · Una página sin Supabase (el ejemplo de Telas): se abre tal cual y «Entrar como» son sus propias personas. */
+  function esLocal(p) { return !!(p && p.local); }
+  function comoLocal(p, id) { var q = ((p && p.personas) || []).filter(function (y) { return y.id === id; })[0]; return q ? { tipo: 'local', id: q.id, nombre: q.nombre } : null; }
 
   /** «hace 5 min», «hace 3 h», «ayer», «hace 4 días». */
   function hace(iso) {
@@ -174,6 +177,13 @@
   /* ---------- las ramas y sus páginas (ramas.json) ---------- */
 
   function rama(c) { return (datos.ramas || {})[c] || null; }
+  /** T0655 · «main»: el de utilo-apps o el de un proyecto suelto (casa-abuela.main: «principal», lo fusionado en su repositorio). */
+  function esMain(c) { var r = rama(c); return c === 'main' || !!(r && r.principal); }
+  /** El main que tiene páginas de esa iniciativa (el de utilo-apps o el de su proyecto suelto), o ''. */
+  function mainDe(ini) {
+    if (rama('main') && paginasDe(rama('main'), ini).length) return 'main';
+    return Object.keys(datos.ramas || {}).filter(function (c) { return c !== 'main' && esMain(c) && paginasDe(rama(c), ini).length; }).sort()[0] || '';
+  }
   function paginasDe(r, ini) { return ((r && r.paginas) || []).filter(function (p) { return p.iniciativa === ini; }); }
   /** Las páginas de esa iniciativa que cambia la rama (dev-ramas.js · cambia); en main, todas. */
   function cambiadas(r, ini) { return paginasDe(r, ini).filter(function (p) { return p.cambia !== false; }); }
@@ -185,11 +195,12 @@
   function iniciativas() {
     var vistas = {};
     Object.keys(datos.ramas || {}).forEach(function (c) { (datos.ramas[c].paginas || []).forEach(function (p) { if (p.iniciativa) vistas[p.iniciativa] = 1; }); });
-    return Object.keys(NOMBRES).filter(function (x) { return vistas[x]; }).concat(Object.keys(vistas).filter(function (x) { return !NOMBRES[x]; }).sort());
+    // T0654: Utilo, la primera; las demás, por su nombre (salen solas: las dice cada página).
+    return Object.keys(vistas).sort(function (a, b) { return (a === 'utilo' ? -1 : 0) - (b === 'utilo' ? -1 : 0) || nombre(a).localeCompare(nombre(b), 'es'); });
   }
   function ramasDe(ini) {
     var rs = datos.ramas || {};
-    var todas = Object.keys(rs).filter(function (c) { return c !== 'main' && paginasDe(rs[c], ini).length; })
+    var todas = Object.keys(rs).filter(function (c) { return !esMain(c) && paginasDe(rs[c], ini).length; })
       .sort(function (a, b) { return String(rs[b].fecha).localeCompare(String(rs[a].fecha)); });
     return { suyas: todas.filter(function (c) { return toca(rs[c], ini); }), otras: todas.filter(function (c) { return !toca(rs[c], ini); }) };
   }
@@ -197,10 +208,10 @@
   function webs(c, ini) {
     var r = rama(c);
     if (!r) return [];
-    var ps = c === 'main' ? paginasDe(r, ini) : cambiadas(r, ini);
+    var ps = esMain(c) ? paginasDe(r, ini) : cambiadas(r, ini);
     return ps.length ? ps : paginasDe(r, ini);
   }
-  function nombreRama(c) { var r = rama(c); return c === 'main' ? 'main' : r ? (r.tarea ? r.tarea + ' · ' : '') + (r.titulo || c) : c; }
+  function nombreRama(c) { var r = rama(c); return esMain(c) ? 'main' : r ? (r.tarea ? r.tarea + ' · ' : '') + (r.titulo || c) : c; }
 
   /** Lo que la rama trae de la base frente a lo que tiene cargado el Supabase de DEV de esa iniciativa. */
   function base(c, ini) {
@@ -218,11 +229,16 @@
     var inis = iniciativas();
     if (inis.indexOf(x.ini) < 0) x.ini = inis[0] || '';
     if (!x.carpeta || !rama(x.carpeta) || !paginasDe(rama(x.carpeta), x.ini).length) {
-      x.carpeta = rama('main') && paginasDe(rama('main'), x.ini).length ? 'main' : (ramasDe(x.ini).suyas[0] || '');
+      x.carpeta = mainDe(x.ini) || (ramasDe(x.ini).suyas[0] || '');
     }
     var ws = webs(x.carpeta, x.ini);
     if (!ws.some(function (p) { return p.ruta === x.ruta; })) x.ruta = ws[0] ? ws[0].ruta : '';
     if (!x.como || (x.como.tipo === 'prueba' && x.como.ini !== x.ini)) x.como = ((E.comoDe || {})[x.ini]) || { tipo: 'yo' };
+    // T0654: en una página sin Supabase, una de sus personas (o la primera); en una con Supabase, nunca una de esas.
+    var p = ws.filter(function (w) { return w.ruta === x.ruta; })[0];
+    if (esLocal(p)) x.como = (x.como.tipo === 'local' && comoLocal(p, x.como.id)) || comoLocal(p, ((E.localDe || {})[p.ruta]) || '') ||
+      (p.personas && p.personas[0] ? comoLocal(p, p.personas[0].id) : { tipo: 'local', id: '', nombre: '' });
+    else if (x.como.tipo === 'local') x.como = ((E.comoDe || {})[x.ini]) || { tipo: 'yo' };
     return x;
   }
   /** Cambia una parte de la elección; lo que depende de ella vuelve a lo de antes o a lo primero. */
@@ -233,15 +249,16 @@
       // La misma web si la nueva rama la tiene; si no, la primera que cambia.
       if (!webs(cambio.carpeta, x.ini).some(function (p) { return p.ruta === antes.ruta; })) delete x.ruta;
     }
-    if (cambio.como) { E.comoDe = E.comoDe || {}; E.comoDe[x.ini] = cambio.como; }
+    if (cambio.como && cambio.como.tipo === 'local') { E.localDe = E.localDe || {}; E.localDe[x.ruta] = cambio.como.id; }
+    else if (cambio.como) { E.comoDe = E.comoDe || {}; E.comoDe[x.ini] = cambio.como; }
     E.eleccion = x;
     guardar(E);
   }
   function pagina(x) { return webs(x.carpeta, x.ini).filter(function (p) { return p.ruta === x.ruta; })[0] || null; }
-  function quienTexto(x, p) { return p && p.publica ? 'sin entrar' : x.como && x.como.tipo === 'prueba' ? (x.como.nombre || x.como.correo) + (x.como.rol ? ' · ' + x.como.rol : '') : 'Yo'; }
+  function quienTexto(x, p) { return p && p.publica ? 'sin entrar' : esLocal(p) ? (x.como && x.como.nombre) || 'tal cual' : x.como && x.como.tipo === 'prueba' ? (x.como.nombre || x.como.correo) + (x.como.rol ? ' · ' + x.como.rol : '') : 'Yo'; }
   function recienteTexto(x) {
     var p = pagina(x);
-    return [nombre(x.ini), p ? p.nombre : x.ruta, x.carpeta === 'main' ? 'main' : (rama(x.carpeta) || {}).tarea || x.carpeta, quienTexto(x, p)].join(' · ');
+    return [nombre(x.ini), p ? p.nombre : x.ruta, esMain(x.carpeta) ? 'main' : (rama(x.carpeta) || {}).tarea || x.carpeta, quienTexto(x, p)].join(' · ');
   }
 
   /* ---------- las personas de prueba (personas_de_prueba de su Supabase de DEV) ---------- */
@@ -428,11 +445,13 @@
     function apuntar() {
       var E = leer();
       E.eleccion = x;
-      E.actual = Object.assign({}, x, { clave: p.clave || '', publica: !!p.publica, tarea: r.tarea || '', titulo: x.carpeta === 'main' ? '' : r.titulo || '' });
+      E.actual = Object.assign({}, x, { clave: p.clave || '', publica: !!p.publica, tarea: r.tarea || '', titulo: esMain(x.carpeta) ? '' : r.titulo || '' },
+        esLocal(p) ? { local: true, personas: p.personas || [] } : {});
       E.recientes = [x].concat((E.recientes || []).filter(function (y) { return sello(y) !== sello(x); })).slice(0, 5);
       E.ultima = new URL(url).pathname;
       guardar(E);
     }
+    if (esLocal(p)) { if (x.como && x.como.tipo === 'local' && x.como.id) url += '#' + encodeURIComponent(x.como.id); apuntar(); location.assign(url); return; }
     if (p.publica || !p.clave || !p.supabase) { apuntar(); location.assign(url); return; }
     var sb = p.supabase, K = 'sb_' + p.clave + '_dev';
     var antes = null;
@@ -499,16 +518,17 @@
     var ws = webs(x.carpeta, x.ini);
     var h = '<div class="grupo">' + fila('Iniciativa', nombre(x.ini), 'iniciativa') + fila('Rama', x.carpeta ? nombreRama(x.carpeta) : 'Elige una rama', 'rama');
     if (r) {
-      h += '<div class="bloque"><span class="etiqueta">' + (x.carpeta === 'main' ? 'Web' : 'Web · las que cambia esta rama') + '</span><span class="chips">' +
+      h += '<div class="bloque"><span class="etiqueta">' + (esMain(x.carpeta) ? 'Web' : 'Web · las que cambia esta rama') + '</span><span class="chips">' +
         ws.map(function (w) { return '<button type="button" class="chip" data-web="' + texto(w.ruta) + '" aria-pressed="' + (w.ruta === x.ruta) + '">' + texto(w.nombre) + '</button>'; }).join('') + '</span></div>';
     }
     if (p && p.publica) h += '<div class="bloque"><span class="etiqueta">Entrar como</span><span class="valor" style="font-weight:500;font-size:15px">Nadie: es la consulta pública, sin entrar</span></div>';
+    else if (esLocal(p) && !(p.personas || []).length) h += '<div class="bloque"><span class="etiqueta">Entrar como</span><span class="valor" style="font-weight:500;font-size:15px">Tal cual: datos de ejemplo, sin Google ni Supabase</span></div>';
     else if (p) h += fila('Entrar como', quienTexto(x, p), 'como');
     h += '</div>';
     var b = r && base(x.carpeta, x.ini);
     if (b) h += '<p class="aviso">' + ICONOS.aviso + '<span>Esta rama cambia la base de ' + texto(nombre(x.ini)) + ' y DEV tiene ' + texto(b.cargada) + '. ' +
       '<a href="' + ACCION + '" target="_blank" rel="noopener">Cargar la de esta rama</a> con la acción «Supabase» en DEV, rama ' + texto(x.carpeta) + '.</span></p>';
-    if (r && x.carpeta !== 'main' && r.tarea && daily()) h += htmlTarea(r.tarea);
+    if (r && !esMain(x.carpeta) && r.tarea && daily()) h += htmlTarea(r.tarea);
     var rec = (leer().recientes || []).filter(function (y) { return rama(y.carpeta) && pagina(y); });
     if (rec.length) h += '<div><p class="titulo">Recientes</p>' + rec.map(function (y, i) { return '<button type="button" class="reciente" data-reciente="' + i + '">' + texto(recienteTexto(y)) + '</button>'; }).join('') + '</div>';
     hoja.innerHTML = h;
@@ -520,8 +540,10 @@
   /** La rama subida de esa tarea (la más reciente, si hay varias), o ''. */
   function ramaDeTarea(id) {
     var rs = datos.ramas || {};
-    return Object.keys(rs).filter(function (c) { return c !== 'main' && rs[c].tarea === id; })
-      .sort(function (a, b) { return String(rs[b].fecha).localeCompare(String(rs[a].fecha)); })[0] || '';
+    // T0655 · Una tarea puede tener rama en utilo-apps y en un proyecto suelto: primero la que cambia alguna web.
+    var cambia = function (c) { return (rs[c].paginas || []).some(function (p) { return p.cambia !== false; }) ? 1 : 0; };
+    return Object.keys(rs).filter(function (c) { return !esMain(c) && rs[c].tarea === id; })
+      .sort(function (a, b) { return cambia(b) - cambia(a) || String(rs[b].fecha).localeCompare(String(rs[a].fecha)); })[0] || '';
   }
   /** La elección que pide el enlace, o { error }. */
   function eleccionPedida(P) {
@@ -531,7 +553,11 @@
     var p = P.web ? ps.filter(function (x) { return x.ruta === P.web; })[0] : ps.filter(function (x) { return x.cambia !== false; })[0] || ps[0];
     if (!p) return { error: 'La rama de ' + P.tarea + ' no tiene ' + (P.web ? 'la web ' + P.web : 'ninguna web') + ' en DEV.' };
     var x = { ini: p.iniciativa, carpeta: c, ruta: p.ruta };
-    if (P.como) x.como = { tipo: 'prueba', ini: p.iniciativa, correo: P.como, nombre: '', rol: '' };
+    if (esLocal(p)) {
+      x.como = P.como ? comoLocal(p, P.como) : null;
+      if (P.como && !x.como) return { error: 'La web ' + p.nombre + ' no tiene a «' + P.como + '». Tiene: ' + ((p.personas || []).map(function (q) { return q.id; }).join(', ') || 'nadie') + '.' };
+      if (!x.como) delete x.como;
+    } else if (P.como) x.como = { tipo: 'prueba', ini: p.iniciativa, correo: P.como, nombre: '', rol: '' };
     else if (P.web) x.como = { tipo: 'yo' };
     return { x: x, publica: !!p.publica };
   }
@@ -544,7 +570,7 @@
     var e = eleccionPedida(P);
     if (e.error) { pintar(); aviso(e.error, true); return true; }
     elegir({ ini: e.x.ini }); // cambiar de iniciativa deja la rama y la persona como estaban: primero ella, después lo demás
-    elegir({ carpeta: e.x.carpeta, ruta: e.x.ruta, como: e.x.como });
+    elegir(e.x.como ? { carpeta: e.x.carpeta, ruta: e.x.ruta, como: e.x.como } : { carpeta: e.x.carpeta, ruta: e.x.ruta });
     var x = eleccion();
     pintar();
     // Si la base de DEV no tiene lo de esta rama, se queda en la hoja con el aviso (cargarla) en vez de entrar.
@@ -738,11 +764,11 @@
 
   function filaRama(c, x, todas) {
     var r = rama(c), ws = todas ? paginasDe(r, x.ini) : webs(c, x.ini), el = c === x.carpeta;
-    var dato = c === 'main' ? 'Lo fusionado, aún sin publicar · todas las webs'
+    var dato = c === 'main' ? 'Lo fusionado, aún sin publicar · todas las webs' : esMain(c) ? 'Lo fusionado · con datos inventados'
       : [r.tarea, hace(r.fecha), ws.map(function (w) { return w.nombre; }).join(', '), r.quien && r.quien !== 'Javi Canela' ? r.quien : ''].filter(Boolean).join(' · ');
-    var falta = c !== 'main' && base(c, x.ini) ? '<span class="falta">Necesita cargar su base</span>' : '';
+    var falta = !esMain(c) && base(c, x.ini) ? '<span class="falta">Necesita cargar su base</span>' : '';
     return '<button type="button" class="fila' + (el ? ' elegida' : '') + '" data-rama="' + texto(c) + '"><span class="que"><span class="nombre">' +
-      texto(c === 'main' ? 'main' : r.titulo || c) + '</span><span class="dato">' + texto(dato) + '</span>' + falta + '</span>' + (el ? ICONOS.si : '') + '</button>';
+      texto(esMain(c) ? 'main' : r.titulo || c) + '</span><span class="dato">' + texto(dato) + '</span>' + falta + '</span>' + (el ? ICONOS.si : '') + '</button>';
   }
   function pintarRama() {
     var x = eleccion();
@@ -750,7 +776,8 @@
     pie.hidden = true;
     var rs = ramasDe(x.ini), ok = function (c) { var r = rama(c); return coincide(c, r.tarea, r.titulo); };
     var h = buscador('Buscar tarea o T0…');
-    if (rama('main') && paginasDe(rama('main'), x.ini).length && ok('main')) h += '<div class="grupo">' + filaRama('main', x, true) + '</div>';
+    var m = mainDe(x.ini);
+    if (m && ok(m)) h += '<div class="grupo">' + filaRama(m, x, true) + '</div>';
     var suyas = rs.suyas.filter(ok), otras = rs.otras.filter(ok);
     h += '<div><p class="titulo">Ramas abiertas</p>' + (suyas.length ? '<div class="grupo">' + suyas.map(function (c) { return filaRama(c, x); }).join('') + '</div>'
       : '<p class="nota">' + (filtro ? 'Ninguna con eso.' : 'Ninguna rama abierta cambia ' + texto(nombre(x.ini)) + '.') + '</p>') + '</div>';
@@ -761,8 +788,23 @@
     hoja.innerHTML = h;
   }
 
+  /** T0654 · Las personas de una página sin Supabase: las suyas, sin Google ni código. */
+  function pintarComoLocal(x, p) {
+    var l = (p.personas || []).filter(function (q) { return coincide(q.nombre, q.id); });
+    hoja._locales = l;
+    hoja.innerHTML = ((p.personas || []).length > 6 ? buscador('Buscar persona') : '') + '<div><p class="titulo">Personas · ' + texto(p.nombre) + '</p>' +
+      (l.length ? '<div class="grupo">' + l.map(function (q, i) {
+        var el = x.como && x.como.id === q.id;
+        return '<button type="button" class="fila' + (el ? ' elegida' : '') + '" data-local="' + i + '"><span class="que"><span class="nombre">' + texto(q.nombre) + '</span></span>' + (el ? ICONOS.si : '') + '</button>';
+      }).join('') + '</div>' : '<p class="nota">Nadie con eso.</p>') +
+      '</div><p class="nota">' + (p.repo
+        // T0655 · Un proyecto suelto: datos inventados que se guardan en el dispositivo, nunca los de verdad.
+        ? 'Datos inventados, nunca los de verdad: lo que se cambia se queda solo en este dispositivo. Dentro se puede cambiar de persona con su propio selector.'
+        : 'Esta web no usa Google ni Supabase: son sus datos de ejemplo, y lo que se cambia se pierde al recargar. Dentro se puede cambiar de persona con su propio selector.') + '</p>';
+  }
   function pintarComo() {
-    var x = eleccion(), yo = quienDe(x) === 'yo';
+    var x = eleccion(), yo = quienDe(x) === 'yo', pl = pagina(x);
+    if (esLocal(pl)) { cabecera('Entrar como', nombre(x.ini), true); pie.hidden = true; return pintarComoLocal(x, pl); }
     cabecera('Entrar como', nombre(x.ini), true);
     pie.hidden = true;
     cargarPersonas(x.ini);
@@ -820,6 +862,7 @@
     if (b.hasAttribute('data-aprobar')) { aprobar(b.getAttribute('data-aprobar'), true); return; }
     if (b.hasAttribute('data-aprobar-si')) { aprobar(b.getAttribute('data-aprobar-si'), false); return; }
     if (b.hasAttribute('data-aprobar-no')) { var sa = tareas[b.getAttribute('data-aprobar-no')]; if (sa) sa.ap = null; pintar(); return; }
+    if (b.hasAttribute('data-local')) { var q = (hoja._locales || [])[+b.getAttribute('data-local')]; if (q) { elegir({ como: { tipo: 'local', id: q.id, nombre: q.nombre } }); atras(); } return; }
     if (b.hasAttribute('data-yo')) { elegir({ como: { tipo: 'yo' } }); return atras(); }
     if (b.hasAttribute('data-persona')) {
       var p = hoja._personas[+b.getAttribute('data-persona')];
