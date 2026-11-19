@@ -900,10 +900,10 @@
    "tarea": "T0673",
    "titulo": "Economía de Marta: facturas en el móvil, el capital aparte y las ventas por adelantado",
    "pr": 364,
-   "commit": "f0eca0db",
-   "ultimo": "T0673: El tipo de factura en tres botones y el capital, fuera de Caja",
+   "commit": "cd0c1a1c",
+   "ultimo": "T0673: Al día con main (DEV de Telas, T0669; aviso de Economía, T0672)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T16:37:17.004Z",
+   "fecha": "2026-11-19T17:19:07.391Z",
    "toca": [
     "telas"
    ],
@@ -1070,6 +1070,21 @@
        "nombre": "Admin"
       }
      ],
+     "cambia": true
+    },
+    {
+     "ruta": "dev/telas/",
+     "nombre": "App con Excel de prueba",
+     "iniciativa": "telas",
+     "proyecto": "",
+     "carga": [
+      "web/estilos/base.css",
+      "web/kanban4/google.js",
+      "web/kanban4/tablas.js",
+      "web/nucleo/nucleo.js",
+      "web/telas/marca.css"
+     ],
+     "local": true,
      "cambia": true
     }
    ],

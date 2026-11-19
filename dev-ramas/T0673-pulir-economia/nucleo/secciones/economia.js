@@ -1494,7 +1494,7 @@
               : '<textarea rows="1" class="eco-lin-c" aria-label="Concepto" placeholder="Qué (p. ej. Lino Celosía BOR-004-01)">' + texto(l.CONCEPTO) + '</textarea>') +
               '<textarea rows="1" class="eco-lin-d" aria-label="Detalle" placeholder="Detalle (opcional)">' + texto(l.DETALLE) + '</textarea>' +
               '<input type="text" inputmode="decimal" class="eco-lin-n" aria-label="Cantidad" placeholder="Cant." value="' + texto(n(l.CANTIDAD)) + '">' +
-              '<input type="text" class="eco-lin-u" aria-label="Unidad" placeholder="m" maxlength="8" value="' + texto(l.UNIDAD) + '">' +
+              '<input type="text" class="eco-lin-u" aria-label="Unidad" placeholder="ud." maxlength="8" value="' + texto(l.UNIDAD) + '">' +
               '<input type="text" inputmode="decimal" class="eco-lin-p" aria-label="Precio" placeholder="Precio" value="' + texto(n(pv)) + '" data-precio="' + texto(l.PRECIO == null ? '' : l.PRECIO) + '">' +
               '<label class="eco-lin-iva" title="El precio que has puesto ya lleva el IVA"><input type="checkbox" class="eco-lin-ci"' + (ci ? ' checked' : '') + '> IVA incl.</label>' +
               '<span class="eco-lin-t u-cifra"></span><button type="button" class="u-btn u-btn-texto eco-lin-x" aria-label="Quitar la línea">Quitar</button>' +
@@ -1651,7 +1651,7 @@
               ci.parentNode.hidden = lin;
               vent.querySelector('#f-BASE').readOnly = lin;
               vent.querySelector('.eco-base').classList.toggle('eco-calculada', lin);
-              if (lin) { if (!cajaLin.children.length) filaLin({ CANTIDAD: '', UNIDAD: 'm' }); pintaLineas(); }
+              if (lin) { if (!cajaLin.children.length) filaLin({ CANTIDAD: '', UNIDAD: '' }); pintaLineas(); }
               var bv = vent.querySelector('#f-ver'); if (bv) bv.hidden = !lin;
               var bp = vent.querySelector('#f-pdf'); if (bp) bp.hidden = !lin;
               // Por líneas, el enlace al PDF lo pone la app: no se enseña el campo (sale arriba, «Abrir el PDF»).
@@ -1716,10 +1716,10 @@
             cajaLin.addEventListener('click', function (e) {
               var x = e.target.closest('.eco-lin-x'); if (!x) return;
               x.closest('.eco-lin').remove();
-              if (!cajaLin.children.length) filaLin({ CANTIDAD: '', UNIDAD: 'm' });
+              if (!cajaLin.children.length) filaLin({ CANTIDAD: '', UNIDAD: '' });
               pintaLineas(); pintaTot();
             });
-            vent.querySelector('#f-mas').onclick = function () { filaLin({ CANTIDAD: '', UNIDAD: 'm' }); var u = cajaLin.lastChild.querySelector('.eco-lin-c'); if (u) u.focus(); };
+            vent.querySelector('#f-mas').onclick = function () { filaLin({ CANTIDAD: '', UNIDAD: '' }); var u = cajaLin.lastChild.querySelector('.eco-lin-c'); if (u) u.focus(); };
           }
           refrescar();
           pintaCliente();
@@ -1796,12 +1796,13 @@
           }
           /** Las líneas de la factura en FACTURA_LINEAS: las nuevas se crean, las cambiadas se actualizan y las quitadas se borran. */
           function guardarLineas(id, ls) {
-            var antes = lineasDe(d.lin, id), vistas = {};
+            var antes = lineasDe(d.lin, id), vistas = {}, altas = Promise.resolve();
             ls.forEach(function (l) {
               var fila = { ID_FACTURA: id, CONCEPTO: l.CONCEPTO, DETALLE: l.DETALLE, CANTIDAD: l.CANTIDAD, UNIDAD: l.UNIDAD, PRECIO: l.PRECIO, IVA_INCLUIDO: !!l.IVA_INCLUIDO };
               var a = l.ID && antes.filter(function (x) { return String(x.ID) === String(l.ID); })[0];
               if (a) { vistas[a.ID] = 1; var c = cambios(a, fila); if (Object.keys(c).length) T.actualizar('FACTURA_LINEAS', a.ID, c).then(function () {}, function () {}); }
-              else T.crear('FACTURA_LINEAS', fila).then(function () {}, function () {});
+              // T0669: las nuevas, una tras otra: a la vez, el ID (que da el orden) salía según llegaban y la factura las ponía al revés.
+              else altas = altas.then(function () { return T.crear('FACTURA_LINEAS', fila); }).then(function () {}, function () {});
             });
             antes.forEach(function (a) { if (!vistas[a.ID]) T.borrar('FACTURA_LINEAS', a.ID).then(function () {}, function () {}); });
           }

@@ -269,13 +269,15 @@
    * tablas ocultas (lo que se lee de ellas: VALORES, lo relacionado, los campos con «de», sus referencias) ni, en las demás, las
    * columnas que apuntan a ellas (Con quién = proveedor). Así la sección no las pide, que el motor diría «no tienes permiso», ni
    * enseña esos campos. Con «filas» ({ TABLA: { COLUMNA: [valores] } }), esos valores no salen en los desplegables de su tabla.
+   * T0671: ni lo de CONTEXTO que va a una tabla oculta (el resumen del proveedor) o a una columna quitada, ni sus líneas; y, con
+   * «columnas» ({ TABLA: [columnas] }, que le llegan vacías), esos campos fuera como los demás.
    * No cambia cfg. Sin nada que ocultar, la misma.
    */
   function quitada(vs, n) { var k = String(n).trim().toLowerCase(); return vs.some(function (v) { return String(v).trim().toLowerCase() === k; }); }
   function sinOcultas(cfg, oc) {
-    var ts = (oc && oc.tablas) || [], fs = ((oc && oc.filas) || {})[cfg && cfg.TABLA] || {};
-    if ((!ts.length && !Object.keys(fs).length) || !cfg) return cfg;
-    var c = JSON.parse(JSON.stringify(cfg)), refs = (oc && oc.refs) || {}, fuera = (refs[c.TABLA] || []).slice();
+    var ts = (oc && oc.tablas) || [], fs = ((oc && oc.filas) || {})[cfg && cfg.TABLA] || {}, vacias = (oc && oc.columnas) || {};
+    if ((!ts.length && !Object.keys(fs).length && !Object.keys(vacias).length) || !cfg) return cfg;
+    var c = JSON.parse(JSON.stringify(cfg)), refs = (oc && oc.refs) || {}, fuera = (refs[c.TABLA] || []).concat(vacias[c.TABLA] || []);
     // Las opciones con las que dejaría de ver la fila (el área «Proveedores»), fuera de los desplegables: el motor no dejaría guardarla.
     Object.keys(fs).forEach(function (k) {
       var d = (c.CAMPOS = c.CAMPOS || {})[k] = c.CAMPOS[k] || {};
@@ -298,6 +300,20 @@
       if (v.tablero && !vale(v.tablero.campo)) delete v.tablero;
     });
     if (c.RELACIONADOS) c.RELACIONADOS = c.RELACIONADOS.filter(function (r) { return !oculta(r.tabla); });
+    // T0671: el resumen de con quién es (CONTEXTO.de): sin el de una tabla oculta ni el de una columna quitada (el proveedor), y
+    // sin las líneas de una tabla oculta o por una columna que apunta a una oculta (las personas de un proveedor).
+    var cx = c.CONTEXTO;
+    if (cx && typeof cx === 'object') {
+      if (cx.campo && !vale(cx.campo)) delete c.CONTEXTO;
+      else if (cx.de && typeof cx.de === 'object') {
+        Object.keys(cx.de).forEach(function (k) {
+          var d = cx.de[k];
+          if (!vale(k) || !d || oculta(d.tabla)) { delete cx.de[k]; return; }
+          if (Array.isArray(d.lineas)) d.lineas = d.lineas.filter(function (l) { return !l || (!oculta(l.tabla) && (refs[l.tabla] || []).indexOf(l.campo) < 0); });
+        });
+        if (!Object.keys(cx.de).length) delete c.CONTEXTO;
+      }
+    }
     Object.keys(c.VALORES || {}).forEach(function (k) { var v = c.VALORES[k]; if (v && typeof v === 'object' && oculta(v.tabla)) delete c.VALORES[k]; });
     var r = c._refs || {};
     Object.keys(r).forEach(function (t) {

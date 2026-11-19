@@ -253,7 +253,7 @@
     if (r.aviso) o.aviso = String(r.aviso); // T0639: el aviso de arriba (config.json · nucleo.aviso)
     if (r.perfilEnMenu === false) o.perfilEnMenu = false; // T0415: Perfil fuera del menú (se abre con el nombre de la cabecera)
     if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
-    if (r.ocultar && Array.isArray(r.ocultar.tablas)) o.ocultar = { tablas: r.ocultar.tablas, refs: r.ocultar.refs || {}, filas: r.ocultar.filas || {} }; // T0650
+    if (r.ocultar && Array.isArray(r.ocultar.tablas)) o.ocultar = { tablas: r.ocultar.tablas, refs: r.ocultar.refs || {}, filas: r.ocultar.filas || {}, columnas: r.ocultar.columnas || {} }; // T0650; T0671: columnas
     return o;
   }
 
@@ -266,9 +266,14 @@
 
   /** T0639 · El aviso del proyecto (config.json · nucleo.aviso), arriba en todas las secciones; sin él, nada. No se queda
    *  fijo al bajar: no tapa nada. */
-  function htmlAviso() {
-    return cred.aviso ? '<p class="n-aviso-app" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/>' +
-      '<path d="M12 11v5M12 8h.01"/></svg><span>' + texto(cred.aviso) + '</span></p>' : '';
+  function htmlAviso() { return '<div id="n-aviso-app"></div>'; }
+
+  /** T0672 · El aviso de la sección abierta: el suyo (nucleo.secciones.<id>.aviso; "" = ninguno) o, si no tiene, el del proyecto. */
+  function ponerAviso(s) {
+    var c = $('n-aviso-app'); if (!c) return;
+    var t = s && s.aviso !== undefined ? s.aviso : cred.aviso || '';
+    c.innerHTML = t ? '<p class="n-aviso-app" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/>' +
+      '<path d="M12 11v5M12 8h.01"/></svg><span>' + texto(t) + '</span></p>' : '';
   }
 
   /* ---------- el marco ---------- */
@@ -656,6 +661,7 @@
     marcarMenu(s.enPerfil ? 'PERFIL' : s.id); // una sección de dentro de Perfil marca Perfil en el menú (T0269)
     verMas(false);
     $('n-titulo').textContent = s.titulo;
+    ponerAviso(s);
     document.title = s.titulo + ' · ' + (C.nombreApp || cred.negocio || '');
     if (push) {
       // T0420: cuánto habías bajado donde estabas y de qué sección vienes, para que «atrás» (o «Volver a …» de la ficha de
