@@ -991,11 +991,11 @@
   "T0654-app-dev-todas-iniciativas": {
    "tarea": "T0654",
    "titulo": "La app DEV enseña sola todas las iniciativas, también las que no tienen Supabase",
-   "pr": null,
+   "pr": 347,
    "commit": "8cfc901",
    "ultimo": "T0654: La app DEV enseña sola todas las iniciativas, también las que no tienen Supabase",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T09:49:40.901Z",
+   "fecha": "2026-11-19T10:00:37.301Z",
    "toca": [],
    "comun": true,
    "paginas": [
@@ -1130,6 +1130,37 @@
      },
      "publica": true,
      "cambia": false
+    },
+    {
+     "ruta": "dev/listado/",
+     "nombre": "App de ejemplo",
+     "iniciativa": "telas",
+     "proyecto": "",
+     "carga": [
+      "web/' + window.LI_MARCA + '/marca.css",
+      "web/dev/listado/ejemplo-telas.js",
+      "web/dev/listado/motor-falso.js",
+      "web/estilos/base.css",
+      "web/kanban4/tablas.js",
+      "web/nucleo/nucleo.js",
+      "web/nucleo/secciones/listado.js"
+     ],
+     "local": true,
+     "personas": [
+      {
+       "id": "duena",
+       "nombre": "Marta · Dueña"
+      },
+      {
+       "id": "ayudante",
+       "nombre": "Ayudante"
+      },
+      {
+       "id": "admin",
+       "nombre": "Admin"
+      }
+     ],
+     "cambia": true
     }
    ],
    "migraciones": {
