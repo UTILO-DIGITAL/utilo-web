@@ -423,7 +423,10 @@
     Object.keys(DEFECTOS).forEach(function (k) { if (!(k in c)) c[k] = JSON.parse(JSON.stringify(DEFECTOS[k])); });
   });
 
-  var E = { nucleo: { perfiles: ['Dueña', 'Ayudante'], secciones: SECCIONES }, tablas: TABLAS, refs: REFS, defectos: DEFECTOS };
+  // T0672 · El aviso de arriba, como en la app de Marta (nucleo.aviso), y una sección sin él ("": Mis telas), para ver que
+  // cambia al pasar de una sección a otra. En su app, Economía lleva el suyo («Aquí sí se guarda…»; npm run local -- telas).
+  SECCIONES.telas.aviso = '';
+  var E = { nucleo: { perfiles: ['Dueña', 'Ayudante'], aviso: 'Esto es una prueba: lo que cambies aquí no se guarda. Tu Excel sigue mandando.', secciones: SECCIONES }, tablas: TABLAS, refs: REFS, defectos: DEFECTOS };
   if (typeof module !== 'undefined' && module.exports) module.exports = E;
   if (typeof window !== 'undefined') window.LISTADO_EJEMPLO = E;
 })();
