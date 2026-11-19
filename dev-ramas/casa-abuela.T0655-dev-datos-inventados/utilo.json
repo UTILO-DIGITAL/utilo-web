@@ -1,0 +1,22 @@
+{
+  "nombre": "Casa Abuela",
+  "publicar": [
+    { "rutas": ["README.md", "**/*.md", "apps-script/probar.js", "apps-script/.clasp.json", "apps-script/.claspignore", ".github/", "dev/"], "como": "nada" },
+    { "rutas": ["apps-script/"], "como": "tag", "tag": "apps-script-v*",
+      "donde": "el Apps Script de Casa Abuela", "boton": "A mano · desplegar el Apps Script de Casa Abuela" },
+    { "rutas": ["**"], "como": "pages", "donde": "la web de Casa Abuela" }
+  ],
+  "dev": {
+    "iniciativa": "personal",
+    "paginas": [
+      { "ruta": "", "nombre": "Casa Abuela", "antes": ["dev/servidor.js"],
+        "personas": [
+          { "id": "carmen", "nombre": "Carmen · lleva la web" },
+          { "id": "abuela", "nombre": "Abuela" },
+          { "id": "pablo", "nombre": "Pablo · nieto" },
+          { "id": "luis", "nombre": "Luis · pareja de Carmen" },
+          { "id": "rosa", "nombre": "Rosa · servicio" }
+        ] }
+    ]
+  }
+}
