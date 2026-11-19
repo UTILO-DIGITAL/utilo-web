@@ -2159,6 +2159,21 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 /* T0642 · Lo relacionado con cada dato y su título («Qué buscan»), «+ Nueva tarea» debajo y «Copiar para Claude» dentro de «Más». */
 .u .li-rel-datos + .li-rel-datos { margin-top: var(--e3); padding-top: var(--e3); border-top: 1px solid var(--color-linea); }
 .u .li-rel-nueva { margin-top: var(--e2); padding-left: 0; padding-right: 0; justify-content: flex-start; }
+/* T0641 · Las cuentas de un precio debajo de su valor, un número en palabras según su signo («Ahorra 32 %», en verde) y lo
+   relacionado como tarjetas cortas (la comparativa de una marca): título, una línea, lo de debajo y «Ver detalle» con el cara a cara. */
+.u .li-desglose { font-size: 14px; color: var(--color-suave); }
+.u .li-signo-mas { color: var(--color-bien); font-weight: 600; }
+.u .li-signo-menos { color: var(--color-vencido); font-weight: 600; }
+.u .li-rt { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e2); }
+.u .li-rt-f { padding: var(--e2) var(--e3); border-radius: var(--radio-peq); border: 1px solid var(--color-linea); background: var(--color-superficie);
+  font: 400 14px/1.4 var(--fuente-texto); }
+.u .li-rt-t { font-weight: 600; font-size: 15px; }
+.u .li-rt-l, .u .li-rt-d { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e1) var(--e3); margin-top: var(--e1); }
+.u .li-rt-d { font-size: 13px; color: var(--color-suave); }
+.u .li-rt-mas > summary { cursor: pointer; min-height: 36px; display: flex; align-items: center; color: var(--color-principal-oscuro); font-size: 14px; }
+.u .li-rt-mas .u-campos { margin-top: var(--e2); }
+.u .li-cara { display: grid; gap: var(--e1) var(--e3); align-items: baseline; overflow-wrap: anywhere; }
+.u .li-cara-t { font-weight: 600; }
 .u .li-mas { border-top: 1px solid var(--color-linea); padding-top: var(--e2); }
 .u .li-mas > summary { cursor: pointer; min-height: 40px; display: flex; align-items: center; color: var(--color-suave); font-size: 14px; }
 .u .li-mas[open] .li-claude { border-top: 0; padding-top: var(--e1); }
