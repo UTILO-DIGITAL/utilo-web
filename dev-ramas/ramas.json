@@ -1132,12 +1132,12 @@
   },
   "T0662-aviso-config-mis-telas": {
    "tarea": "T0662",
-   "titulo": "Quien administra ya no ve el aviso de configuración en las secciones que no usan RAPIDAS, ALTA ni CONTEXTO",
-   "pr": null,
-   "commit": "8991bc1",
-   "ultimo": "T0662: Quien administra ya no ve el aviso de configuración en las secciones que no usan RAPIDAS, ALTA ni CONTEXTO",
+   "titulo": "Quien administra ya no ve un aviso de configuración que no era verdad en Mis telas, Clientes, Prospección y Proveedores",
+   "pr": 358,
+   "commit": "9e23186",
+   "ultimo": "T0662: La app de ejemplo de DEV recibe los defectos del motor, como la de verdad",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T14:39:57.322Z",
+   "fecha": "2026-11-19T14:43:25.860Z",
    "toca": [],
    "comun": true,
    "paginas": [
