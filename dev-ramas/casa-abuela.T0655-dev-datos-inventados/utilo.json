@@ -9,7 +9,7 @@
   "dev": {
     "iniciativa": "personal",
     "paginas": [
-      { "ruta": "", "nombre": "Casa Abuela", "antes": ["dev/servidor.js"],
+      { "ruta": "", "nombre": "Casa Abuela", "antes": ["dev/servidor.js"], "abajo": [".ev-fab", "#per-arbol-btn", ".actualizando"],
         "personas": [
           { "id": "carmen", "nombre": "Carmen · lleva la web" },
           { "id": "abuela", "nombre": "Abuela" },

@@ -11,7 +11,7 @@
  */
 (function () {
   'use strict';
-  var GUARDADO = 'casa-abuela-dev-hojas', VERSION = 1;
+  var GUARDADO = 'casa-abuela-dev-hojas', VERSION = 2;  // 2: con parentescos (lo de antes se vuelve a inventar)
   var aqui = (document.currentScript && document.currentScript.src) || location.href;
   var CODIGO = new URL('../apps-script/C%C3%B3digo.js', aqui).href;
   var FALSO = new URL('google-falso.js', aqui).href;
@@ -25,10 +25,16 @@
   if (pide === 'datos-nuevos') { ls(GUARDADO, null); }
   if (PERSONAS[pide]) { ls('mesa-abuela-yo', PERSONAS[pide]); ls('mesa-abuela-datos', null); }
   if (pide === 'datos-nuevos' || PERSONAS[pide]) history.replaceState(null, '', location.pathname + location.search);
+  // Con la página ya abierta, cambiar la dirección a #datos-nuevos o #pablo no la recarga: se hace aquí.
+  window.addEventListener('hashchange', function () {
+    var h = decodeURIComponent(location.hash.replace(/^#/, ''));
+    if (h === 'datos-nuevos' || PERSONAS[h]) location.reload();
+  });
 
   /* ---------- los datos inventados ---------- */
 
   function dia(n) { var d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return d; }
+  function ddmm(n) { var d = dia(n); return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2); }
   function iso(n) { var d = dia(n); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
 
   /** El Sheet de partida: una familia inventada, con lo que pasa de verdad (quien viene, quien no, fijos, un evento). */
@@ -38,7 +44,7 @@
       PERSONAS: h('PERSONAS', [['Id', 'Apodo', 'Jerarquia', 'Familia', 'Cama', 'Menu', 'Alergias', 'Cumple'],
         ['', 'Abuela', 'Abuelos', 'Abuelos', 'Su cuarto', '🌕 Entero', '', '15/03'],
         ['', 'Carmen', 'Tios', 'Ruiz', '', '🌕 Entero', '', '02/07'],
-        ['', 'Luis', 'Tios +1', 'Ruiz', '', '🌗 Medio', '', '21/11'],
+        ['', 'Luis', 'Tios +1', 'Ruiz', '', '🌗 Medio', '', ddmm(5)],  // su cumpleaños, el día del evento
         ['', 'Pablo', 'Nietos', 'Ruiz', '', '🌕 Entero', 'Frutos secos', '09/01'],
         ['', 'Lucía', 'Nietos', 'Ruiz', '', '🌕 Entero', '', ''],
         ['', 'Elena', 'Tios', 'Soler', '', '🌕 Entero', 'Sin gluten', '30/04'],
@@ -115,9 +121,14 @@
         return r.r;
       };
       if (nuevas) {
-        // Con la API de la rama, como lo haría alguien desde la web: un evento de un día y una excursión con quién va.
+        // Con la API de la rama, como lo haría alguien desde la web: quién es quién, un evento de un día y una excursión.
         var V = { desde: iso(-7), hasta: iso(14), yo: '(T) - Carmen' };
         try {
+          [['(A) - Abuela', { sexo: 'Mujer' }], ['(T+1) - Luis', { sexo: 'Hombre' }],
+            ['(T) - Carmen', { sexo: 'Mujer', hijoDe: '(A) - Abuela', pareja: '(T+1) - Luis', casados: 'Sí' }],
+            ['(T) - Elena', { sexo: 'Mujer', hijoDe: '(A) - Abuela' }], ['(N) - Pablo', { sexo: 'Hombre', hijoDe: '(T) - Carmen' }],
+            ['(N) - Lucía', { sexo: 'Mujer', hijoDe: '(T) - Carmen' }], ['(N) - Marcos', { sexo: 'Hombre', hijoDe: '(T) - Elena' }],
+            ['(O) - Rosa', { sexo: 'Mujer' }]].forEach(function (x) { llamar('guardarPersona', [x[0], x[1], '(T) - Carmen', V]); });
           llamar('guardarDia', [iso(5), { evento: 'Cumpleaños de Luis', eventoTurno: 'CENA', eventoTexto: 'Cada uno trae algo de postre' }, '(T) - Carmen', V]);
           var d = llamar('guardarEvento', [{ nombre: 'Excursión a la sierra', desde: iso(12), hasta: iso(13), cuando: 'DIA', texto: 'Salimos a las 9' }, '(T) - Carmen', V]);
           var ev = (d.eventos || []).filter(function (e) { return e.nombre === 'Excursión a la sierra'; })[0];

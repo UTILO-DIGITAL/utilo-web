@@ -1517,10 +1517,10 @@
    "tarea": "T0655",
    "titulo": "Casa Abuela se prueba en la app DEV con datos inventados",
    "pr": 124,
-   "commit": "2f18034",
-   "ultimo": "T0655: La llamada a «DEV ramas», directa (solo con el permiso de Actions)",
+   "commit": "cbfb666",
+   "ultimo": "T0655: DEV con parentescos, el cumple de Luis en su día, #datos-nuevos sin recargar y los botones flotantes encima de la línea DEV",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T11:21:02.534Z",
+   "fecha": "2026-11-19T11:43:24.919Z",
    "toca": [
     "personal"
    ],
