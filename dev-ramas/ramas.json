@@ -1379,12 +1379,12 @@
   },
   "T0669-dev-telas": {
    "tarea": "T0669",
-   "titulo": "Telas se prueba en DEV con datos inventados, y Ayuda vuelve a ver Hoy y Seguimiento",
+   "titulo": "Telas se prueba en DEV con datos inventados, y dar de alta una fila ya no falla sin la primera pestaña",
    "pr": 363,
-   "commit": "58db27e6",
-   "ultimo": "Merge remote-tracking branch 'origin/main' into T0669-dev-telas",
+   "commit": "791c4c8a",
+   "ultimo": "T0669: El PDF de la factura enseña el total, deja las líneas en su orden y el envío sin metros; DEV sin carpetas de clientes",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T16:11:15.555Z",
+   "fecha": "2026-11-19T16:27:05.475Z",
    "toca": [
     "telas"
    ],
