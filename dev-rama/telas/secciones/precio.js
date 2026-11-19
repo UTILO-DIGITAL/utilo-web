@@ -154,7 +154,7 @@
           '<optgroup label="Prospección">' + grupo(false).sort(orden).map(op).join('') + '</optgroup>';
         $('pr-marca').value = S.marca;
         $('pr-tela').innerHTML = '<option value="">Elige una tela</option>' + telas(D).map(function (t) {
-          return '<option value="' + texto(t.id) + '">' + texto(t.id + ' · ' + t.nombre) + (isNaN(t.inr) ? ' (sin coste)' : '') + '</option>';
+          return '<option value="' + texto(t.id) + '">' + texto(t.id + ' · ' + t.nombre) + (isNaN(t.inr) ? ' (falta el coste)' : '') + '</option>';
         }).join('') + '<option value="otra">Otra: escribo el coste</option>';
         $('pr-tela').value = S.tela;
         if (!S.envioTocado) { var e = ajustes(D).envio; $('pr-envio').value = isNaN(e) ? '' : cifra(e); }
@@ -216,7 +216,7 @@
       function linea(c, t, r, pista) {
         var h = '<div class="pr-cmp"><span class="pr-cmp-t">' + texto(c.tela) + (pista ? ' <span class="u-chip">' + pista + '</span>' : '') + '</span>';
         h += '<span class="u-nota u-cifra">Hoy paga ' + eur(c.precio) + (c.ancho > 0 ? ' (' + cifra(c.ancho, 0) + ' cm)' : '') + (c.de ? ' · ' + texto(c.de) : '') +
-          (c.porM2 && Math.abs(c.ancho - t.ancho) > 0.001 ? ' → a tu ancho, ' + eur(c.su) : '') + (!c.porM2 ? ' · por metro: falta un ancho' : '') + '</span>';
+          (c.porM2 && Math.abs(c.ancho - t.ancho) > 0.001 ? ' → a tu ancho, ' + eur(c.su) : '') + (!c.porM2 ? ' (sin el ancho, comparado por metro)' : '') + '</span>';
         if (!isNaN(r.precio)) {
           var dif = r2(c.su - r.precio);
           h += dif > 0 ? '<span class="pr-bien u-cifra">Tu precio queda ' + eur(dif, false) + ' por debajo</span>'
@@ -238,7 +238,7 @@
         c.misma.forEach(function (x) { h += linea(x, tt, r, 'La comparas con esta'); });
         if (c.misma.length && c.otras.length) h += '<details class="pr-otras"><summary>' + (c.otras.length === 1 ? 'Su otra tela' : 'Sus otras ' + c.otras.length + ' telas') + '</summary>' + c.otras.map(function (x) { return linea(x, tt, r); }).join('') + '</details>';
         else {
-          if (t && !c.misma.length) h += '<p class="u-nota">No la comparas con ninguna tela suya. Por si alguna se parece:</p>';
+          if (t && !c.misma.length) h += '<p class="u-nota">Esta marca no te compra ninguna tela igual. La más parecida:</p>';
           h += c.otras.map(function (x) { return linea(x, tt, r); }).join('');
         }
         caja.innerHTML = h;
