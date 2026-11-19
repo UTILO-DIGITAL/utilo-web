@@ -2860,3 +2860,8 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
 /* Un filtro de muchas opciones (con quién, ciudad): un desplegable redondeado, a todo el ancho. */
 .u select.li-fsel { -webkit-appearance: none; appearance: none; width: 100%; padding-right: 34px; border-radius: 10px;
   background: var(--color-superficie) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center; }
+/* T0679 · Economía: primero las pestañas; debajo, «Año 2026», solo en las que cuenta (en Caja y Ventas no sale). */
+.u .eco-barra { flex-wrap: wrap; align-items: center; gap: var(--e3); }
+.u .eco-barra .u-pestanas { order: -1; flex: 1 1 100%; }
+.u .eco-per { flex-direction: row; align-items: center; gap: var(--e2); }
+.u .eco-per > .u-etiqueta { position: static; width: auto; height: auto; overflow: visible; clip: auto; font-size: 13px; color: var(--color-suave); }

@@ -838,7 +838,7 @@
           if (si && b.parentNode.scrollWidth > b.parentNode.clientWidth) b.parentNode.scrollLeft = Math.max(0, b.offsetLeft - b.parentNode.offsetLeft - 16); // en el móvil, que se vea
         });
         el.querySelector('.eco-fab').hidden = S.tab !== 'MOVIMIENTOS'; // T0272: añadir un movimiento, solo desde Movimientos
-        el.querySelector('.eco-per').style.display = S.tab === 'VENTAS' ? 'none' : ''; // T0628: las ventas, desde el principio (no por periodo)
+        el.querySelector('.eco-per').style.display = S.tab === 'VENTAS' || S.tab === 'CAJA' ? 'none' : ''; // T0628: las ventas, desde el principio (no por periodo). T0679: Caja tampoco (sus saldos son de siempre): el año sale solo donde cuenta
         cont.classList.toggle('eco-con-fab', S.tab === 'MOVIMIENTOS'); // T0644: con sitio abajo para el botón
         var np = pendientes(d).filter(function (x) { return x.falta > 0; }).length + sinFactura(d, per).length, nb = el.querySelector('#eco-npend');
         if (nb) { nb.textContent = np; nb.hidden = !np; }
