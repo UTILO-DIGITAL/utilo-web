@@ -902,10 +902,10 @@
    "tarea": "T0679",
    "titulo": "Diseño nuevo de la app: más claro, actual y cómodo en el móvil",
    "pr": 369,
-   "commit": "7bc2db42",
-   "ultimo": "T0679: La prueba del núcleo, con las pestañas de Economía en pastillas en el móvil",
+   "commit": "0e9a1233",
+   "ultimo": "T0679: La app de ejemplo de DEV carga la marca de Telas nueva (sin caché)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T22:55:10.569Z",
+   "fecha": "2026-11-19T23:06:41.897Z",
    "toca": [
     "konamigas",
     "telas",
