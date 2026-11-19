@@ -1318,6 +1318,57 @@
    "principal": false,
    "rama": "T0655-dev-datos-inventados",
    "repo": "casa-abuela"
+  },
+  "casa-abuela.main": {
+   "tarea": "",
+   "titulo": "Lo fusionado de Casa Abuela",
+   "pr": null,
+   "commit": "31b7adf",
+   "ultimo": "Merge pull request #124 from UTILO-DIGITAL/T0655-dev-datos-inventados",
+   "quien": "",
+   "fecha": "2026-11-19T12:07:45.396Z",
+   "toca": [
+    "personal"
+   ],
+   "comun": false,
+   "paginas": [
+    {
+     "ruta": "",
+     "nombre": "Casa Abuela",
+     "iniciativa": "personal",
+     "proyecto": "",
+     "repo": "casa-abuela",
+     "carga": [],
+     "local": true,
+     "cambia": true,
+     "personas": [
+      {
+       "id": "carmen",
+       "nombre": "Carmen · lleva la web"
+      },
+      {
+       "id": "abuela",
+       "nombre": "Abuela"
+      },
+      {
+       "id": "pablo",
+       "nombre": "Pablo · nieto"
+      },
+      {
+       "id": "luis",
+       "nombre": "Luis · pareja de Carmen"
+      },
+      {
+       "id": "rosa",
+       "nombre": "Rosa · servicio"
+      }
+     ]
+    }
+   ],
+   "migraciones": {},
+   "principal": true,
+   "rama": "main",
+   "repo": "casa-abuela"
   }
  },
  "bases": {
