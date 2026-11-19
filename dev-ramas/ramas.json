@@ -1455,9 +1455,9 @@
    ]
   },
   "utilo": {
-   "rama": "main y las ramas abiertas",
-   "commit": "6f7cbee",
-   "fecha": "2026-11-19T12:08:35.884Z",
+   "rama": "T0682-registro-uso",
+   "commit": "02320a82",
+   "fecha": "2026-11-19T19:04:00.270Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
@@ -1500,7 +1500,8 @@
     "20261112170000_avisos_sin_telegram.sql",
     "20261112182957_plan_pruebas_tablas.sql",
     "20261112183000_plan_pruebas.sql",
-    "20261112190000_avisos_prueba_diaria.sql"
+    "20261112190000_avisos_prueba_diaria.sql",
+    "20261119200000_uso.sql"
    ]
   }
  },
