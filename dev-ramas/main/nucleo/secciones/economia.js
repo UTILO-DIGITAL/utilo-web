@@ -497,10 +497,14 @@
       var co = art._coste ? calcArt(art, D, art._coste, f, val) : art.coste ? aNum(f[art.coste]) : NaN;
       if (!isNaN(co)) co = Math.round(co * 100) / 100;
       // T0645: un envío a 0 no es un envío: sin precio recomendado, como «Falta el envío» en Mis telas.
-      if (art._envio && ![].concat(art._envio).some(function (e) { return calcArt(art, D, e, f, val) > 0; })) pr = NaN;
+      var sinEnvio = function (env) { return env && ![].concat(env).some(function (e) { return calcArt(art, D, e, f, val) > 0; }); };
+      if (sinEnvio(art._envio)) pr = NaN;
+      // T0678: lo que cuesta, tampoco sin el envío (con 0 en Ajustes saldría el coste sin él y una venta parecería ganar más).
+      var faltaEnvio = sinEnvio(art._envioCoste);
+      if (faltaEnvio) co = NaN;
       if (!isNaN(pr)) pr = Math.round(pr * 100) / 100;
       return { codigo: cod, nombre: nom, detalle: det, unidad: String(art.unidad || ''), precio: isNaN(pr) || pr < 0 ? NaN : pr,
-        coste: isNaN(co) || co < 0 ? NaN : co, _b: normArt(nom + ' ' + cod + ' ' + det) };
+        coste: isNaN(co) || co < 0 ? NaN : co, faltaEnvio: !!faltaEnvio, _b: normArt(nom + ' ' + cod + ' ' + det) };
     }).filter(function (a) { return a.codigo; }).sort(function (a, b) { return a.codigo.localeCompare(b.codigo, 'es'); });
   }
   /** T0673 · Lo que dice cada tela al elegirla en una factura: el recomendado si lo hay; si no, lo que te cuesta; si no, nada (nunca «sin precio»). */
@@ -1553,7 +1557,8 @@
             // Sin recomendado (en Mis telas le falta el coste): en rojo solo mientras la línea no tiene precio.
             else if (ART.precio) partes.push(sinPrecio ? '<span class="u-mal">Sin precio recomendado: en ' + texto(ART.titulo || 'la lista') + ' le falta el coste. Ponlo tú.</span>' : 'Sin precio recomendado: en ' + texto(ART.titulo || 'la lista') + ' le falta el coste.');
             if (ART.coste) {
-              if (isNaN(a.coste)) partes.push('Sin coste: en ' + texto(ART.titulo || 'la lista') + ' le falta.');
+              if (a.faltaEnvio) partes.push('<span class="u-mal">Sin coste: falta el envío en tus ajustes.</span>');
+              else if (isNaN(a.coste)) partes.push('Sin coste: en ' + texto(ART.titulo || 'la lista') + ' le falta.');
               else if (!isNaN(puesto) && puesto < a.coste - 0.004) partes.push('<span class="u-mal">Por debajo de lo que te cuesta (' + eurPrecio(a.coste) + texto(u) + ')</span>');
               else partes.push('Te cuesta ' + eurPrecio(a.coste) + texto(u));
             }
