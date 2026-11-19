@@ -1162,10 +1162,10 @@
    "tarea": "T0682",
    "titulo": "Ver quién usa la app de cada cliente y dónde se atasca",
    "pr": null,
-   "commit": "97521867",
-   "ultimo": "T0682: Ver quién usa la app de cada cliente y dónde se atasca",
+   "commit": "02320a82",
+   "ultimo": "T0682: Las apps que apuntan su uso, en una función: la recarga de DEV no choca con ellas",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T18:53:01.954Z",
+   "fecha": "2026-11-19T19:00:14.236Z",
    "toca": [
     "konamigas",
     "telas",
