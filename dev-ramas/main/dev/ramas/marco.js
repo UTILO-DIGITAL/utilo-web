@@ -51,13 +51,15 @@
     guardarSesion();
   }
 
-  function etiqueta() {
+  /** [la rama, la persona]: en el móvil se corta la rama, nunca la persona (T0655). */
+  function partes() {
     var rama = a && a.tarea ? a.tarea + (a.titulo ? ' ' + a.titulo : '') : CARPETA;
     // T0654 · En una página sin Supabase, la persona que tiene ahora (su #, que cambia su propio selector).
     var local = a && a.local ? ((a.personas || []).filter(function (q) { return '#' + q.id === location.hash; })[0] || (a.como && a.como.id ? a.como : (a.personas || [])[0])) : null;
     var quien = !a ? '' : a.local ? (local && local.nombre) || '' : a.publica ? 'sin entrar' : a.como && a.como.tipo === 'prueba' ? (a.como.nombre || a.como.correo) + (a.como.rol ? ' · ' + a.como.rol : '') : 'Yo';
-    return ['DEV', rama, quien].filter(Boolean).join(' · ');
+    return ['DEV · ' + rama, quien];
   }
+  function etiqueta() { return partes().filter(Boolean).join(' · '); }
 
   var AMARILLO = '#F5C518', ABAJO = '30px';
   var css = ':root{--dev-linea:' + ABAJO + ';--dev-abajo:calc(' + ABAJO + ' + env(safe-area-inset-bottom, 0px))}' +
@@ -75,7 +77,8 @@
     '#dev-marco .dev-hueco{position:absolute;top:3px;left:6px;right:6px;bottom:var(--dev-abajo);border-radius:14px;box-shadow:0 0 0 240px ' + AMARILLO + '}' +
     '#dev-marco a{position:absolute;left:0;right:0;bottom:env(safe-area-inset-bottom, 0px);height:var(--dev-linea);pointer-events:auto;display:flex;align-items:center;justify-content:center;gap:6px;' +
     'padding:0 16px;color:#1C1C1C;text-decoration:none;font:600 12px/1 system-ui,-apple-system,sans-serif}' +
-    '#dev-marco a span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '#dev-marco a span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}' +
+    '#dev-marco a span.dev-quien{flex:none;max-width:45%}' +
     '#dev-marco a:focus-visible{outline:2px solid #1C1C1C;outline-offset:-4px;border-radius:8px}';
 
   function pintar() {
@@ -98,7 +101,7 @@
     var d = document.createElement('div');
     d.id = 'dev-marco';
     d.innerHTML = '<div class="dev-hueco"></div><a href="' + texto(APP) + '?probar" aria-label="' + texto(etiqueta()) + '. Abrir Probar en DEV">' +
-      '<span>' + texto(etiqueta()) + '</span><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1C1C1C" ' +
+      '<span>' + texto(partes()[0]) + '</span>' + (partes()[1] ? '<span class="dev-quien">· ' + texto(partes()[1]) + '</span>' : '') + '<svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1C1C1C" ' +
       'stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></a>';
     document.body.appendChild(d);
   }
