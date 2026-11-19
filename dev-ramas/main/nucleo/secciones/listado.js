@@ -110,7 +110,8 @@
 
   /* ---------- campos calculados ----------
    * Una expresión en JSON: un número, el nombre de una columna de la fila, «$NOMBRE» (de VALORES) o [op, …] con op
-   * +, -, *, /, «o» (el primero que no está vacío) y «redondear» ([«redondear», x, decimales]). Un hueco da NaN. */
+   * +, -, *, /, «o» (el primero que no está vacío) y «redondear» ([«redondear», x, decimales]). Un campo calculado puede usar
+   * otro por su nombre (campo() lo cambia por su cálculo; T0641). Un hueco da NaN. */
   function calcular(expr, f, valores) {
     if (typeof expr === 'number') return expr;
     if (typeof expr === 'string') {
@@ -131,6 +132,16 @@
     if (op === '-') return ns.length === 1 ? -ns[0] : ns.slice(1).reduce(function (s, n) { return s - n; }, ns[0]);
     if (op === '/') return ns[1] === 0 ? NaN : ns[0] / ns[1];
     return NaN;
+  }
+  /** T0641 · Una expresión con los campos calculados que nombra cambiados por su cálculo (el ahorro usa «MI_PRECIO»). */
+  function expandir(expr, campos, vistos) {
+    vistos = vistos || [];
+    if (typeof expr === 'string') {
+      var d = (campos || {})[expr];
+      return d && d.calculo && vistos.indexOf(expr) < 0 ? expandir(d.calculo, campos, vistos.concat(expr)) : expr;
+    }
+    if (Array.isArray(expr)) return [expr[0]].concat(expr.slice(1).map(function (e) { return expandir(e, campos, vistos); }));
+    return expr;
   }
   /** Las columnas y valores ($…) que usa una expresión. */
   function usa(expr, acc) {
@@ -271,11 +282,11 @@
   function campo(ap, c) {
     var d = (ap.campos || {})[c] || {};
     var base = String(c).split('.').pop();
-    var tipo = d.tipo || (d.calculo ? 'importe' : (d.de && !d.de.columna ? 'numero' : (/^FECHA/.test(base) ? 'fecha' : (/^(ID_)?ESTADO$/.test(base) ? 'estado' : 'texto'))));
+    var tipo = d.tipo || (d.calculo ? 'importe' : (d.de && !d.de.columna && !d.de.columnas ? 'numero' : (/^FECHA/.test(base) ? 'fecha' : (/^(ID_)?ESTADO$/.test(base) ? 'estado' : 'texto'))));
     return { n: c, titulo: d.titulo || (c === ap.codigo ? 'Código' : titulo(base)), tipo: tipo, opciones: d.opciones || null, ref: d.ref || refDe(ap, ap.tabla, c), ids: d._ids || null,
       de: d.de || null, primero: d.primero || null,
-      unidad: d.unidad || '', calculo: d.calculo || null, precio: d.precio || null, privado: !!d.privado, colores: d.colores || null,
-      ayuda: d.ayuda || '', sinNumero: !!d.sinNumero, nombres: d.nombres || null };
+      unidad: d.unidad || '', calculo: d.calculo ? expandir(d.calculo, ap.campos, [c]) : null, precio: d.precio || null, privado: !!d.privado, colores: d.colores || null,
+      ayuda: d.ayuda || '', sinNumero: !!d.sinNumero, nombres: d.nombres || null, signo: d.signo || null, desglose: d.desglose || null, plantilla: d.plantilla || '' };
   }
   /** T0642 · Un valor como se enseña: sin el número de delante («1 Contactado» → «Contactado», con «sinNumero») y con su
    *  nombre en palabras («IG» → «Instagram», con «nombres»). Lo guardado, los filtros y los colores siguen con el valor de verdad. */
@@ -339,7 +350,12 @@
     });
     lista(ap.filtro).forEach(function (c) { t.push(c.campo); });
     ap.avisos.forEach(function (a) { lista(a.si).forEach(function (c) { t.push(c.campo); }); });
-    Object.keys(ap.campos).forEach(function (c) { t.push(c); if (ap.campos[c].calculo) t = t.concat(usa(ap.campos[c].calculo)); t = t.concat(ap.campos[c].primero || []); });
+    Object.keys(ap.campos).forEach(function (c) {
+      var d = ap.campos[c]; t.push(c);
+      if (d.calculo) t = t.concat(usa(expandir(d.calculo, ap.campos, [c])));
+      t = t.concat(d.primero || [], d.plantilla ? enPlantilla(d.plantilla) : []);
+      lista(d.desglose).forEach(function (p) { if (p && p.calculo) t = t.concat(usa(expandir(p.calculo, ap.campos))); });
+    });
     return t.filter(function (c, i) { return c && typeof c === 'string' && c.charAt(0) !== '$' && t.indexOf(c) === i; }).map(function (c) { return c.replace(/^-/, ''); });
   }
   /**
@@ -364,10 +380,39 @@
     });
     return a;
   }
-  /** Las filas como se ven: con nombres, rutas, «de» y «primero». Cada una guarda la de verdad en __crudo. */
-  function preparar(a, filas, D) {
+  /** T0641 · Los campos que nombra una plantilla («Hoy {PRECIO_A_BATIR}[ ({ID_COMPETIDOR})]»). */
+  function enPlantilla(p) { var r = [], m, re = /\{([^{}]+)\}/g; while ((m = re.exec(String(p)))) r.push(m[1]); return r; }
+  /**
+   * T0641 · Una plantilla rellenada: cada {CAMPO}, como se ve (con su unidad; un calculado que no da número, vacío). Lo que va
+   * entre [corchetes] solo sale si todo lo de dentro tiene algo; si algo de fuera está vacío, toda la plantilla queda vacía.
+   */
+  function rellenar(ap, p, f, valores) {
+    var hueco = false;
+    function poner(t) {
+      return t.replace(/\{([^{}]+)\}/g, function (x, c) {
+        var cp = campo(ap, c), v = cp.calculo && isNaN(calcular(cp.calculo, f, valores)) ? '' : (cp.plantilla ? '' : verTexto(cp, f, valores, []));
+        if (v === '') hueco = true;
+        return v;
+      });
+    }
+    var r = String(p).replace(/\[([^\[\]]*)\]/g, function (x, dentro) { hueco = false; var t = poner(dentro); return hueco ? '' : t; });
+    hueco = false;
+    r = poner(r);
+    return hueco ? '' : r.trim();
+  }
+  /**
+   * T0641 · Las filas de otra tabla de un campo con «de» y «columnas», en una línea: cada fila, sus columnas como se ven
+   * (con su tipo en «campos»: la parte, en porcentaje) separadas por un espacio; las filas, por « · » («52 % Poliéster · 48 % Algodón»).
+   */
+  function enLinea(de, xs) {
+    var sub = { campos: de.campos || {}, refs: {}, tabla: de.tabla };
+    return xs.map(function (x) { return de.columnas.map(function (c) { return verTexto(campo(sub, c), x, {}, []); }).filter(String).join(' '); }).filter(String).join(' · ');
+  }
+  /** Las filas como se ven: con nombres, rutas, «de», «primero» y, con valores, las plantillas. Cada una guarda la de verdad en __crudo. */
+  function preparar(a, filas, D, valores) {
     var rs = (a.refs || {})[a.tabla] || {}, rutas = nombradas(a).filter(function (c) { return c.indexOf('.') > 0; });
     var conDe = Object.keys(a.campos).filter(function (c) { return a.campos[c].de; }), conPrimero = Object.keys(a.campos).filter(function (c) { return a.campos[c].primero; });
+    var conPlantilla = Object.keys(a.campos).filter(function (c) { return a.campos[c].plantilla; });
     return filas.map(function (f) {
       var r = {};
       Object.keys(f).forEach(function (k) { r[k] = rs[k] ? nombreDe(D, rs[k], f[k]) : f[k]; });
@@ -377,9 +422,10 @@
         var xs = vacio(clave) ? [] : (D.filas(de.tabla) || []).filter(function (x) { return norm(x[de.campo]) === norm(clave); }).map(function (x) { return conNombres(a, D, de.tabla, x); });
         if (de.filtro) xs = xs.filter(function (x) { return cumple(x, de.filtro, { hoy: de.hoy }); });
         if (de.orden) xs.sort(comparar(de.orden));
-        r[c] = de.columna ? (xs.length ? xs[0][de.columna] : '') : xs.length;
+        r[c] = de.columnas ? enLinea(de, xs) : (de.columna ? (xs.length ? xs[0][de.columna] : '') : xs.length);
       });
       conPrimero.forEach(function (c) { r[c] = a.campos[c].primero.map(function (x) { return r[x]; }).filter(function (v) { return !vacio(v); })[0] || ''; });
+      conPlantilla.forEach(function (c) { r[c] = rellenar(a, a.campos[c].plantilla, r, valores || {}); });
       r.__crudo = f;
       return r;
     });
@@ -396,7 +442,7 @@
     var cols = columnasTabla ? columnasTabla(ap.tabla) : null, calc = Object.keys(ap.campos).filter(function (c) { return ap.campos[c].calculo; });
     function hay(c, que, t, cs) {
       if (!t && calc.indexOf(c) >= 0) return;
-      if (!t && ap.campos[c] && (ap.campos[c].de || ap.campos[c].primero)) return;
+      if (!t && ap.campos[c] && (ap.campos[c].de || ap.campos[c].primero || ap.campos[c].plantilla)) return;
       if (!t && String(c).indexOf('.') > 0) { // una ruta: su primer paso tiene que apuntar a otra tabla
         var p0 = String(c).split('.')[0];
         if (cols && cols.indexOf(p0) < 0) errores.push(donde + que + ' «' + c + '»: ' + p0 + ' no es una columna de ' + ap.tabla + '.');
@@ -475,8 +521,23 @@
       // T0642: una columna con ruta («ID_TELA.COLOR»): su primer paso es una columna de esa tabla.
       if (cs) [r.campo].concat(r.columnas || []).forEach(function (c) { hay(String(c).split('.')[0], q + ' usa', r.tabla, cs); });
       if (r.nueva && !r.seccion) errores.push(donde + q + ': «nueva» necesita la sección a la que lleva (seccion).');
+      // T0641: en una «tarjeta», cada campo es una columna de esa tabla, una ruta o uno de sus «campos» (calculado, plantilla, «de»).
+      if (cs && r.tarjeta) camposTarjeta(r).forEach(function (c) {
+        var d = (r.campos || {})[c];
+        if (!(d && (d.calculo || d.plantilla || d.de || d.primero))) hay(String(c).split('.')[0], q + ' usa', r.tabla, cs);
+      });
     });
     return errores;
+  }
+
+  /** T0641 · Si quien ha entrado ve lo relacionado: sin «perfiles», todos; con ellos, esos perfiles y quien administra (la
+   *  comparativa de una marca lleva lo que le cuesta a Marta: no para el perfil Ayuda, que no ve costes). */
+  function veRelacionado(r, quien) { return !r.perfiles || !!(quien && quien.admin) || lista(r.perfiles).indexOf(quien && quien.perfil) >= 0; }
+  /** T0641 · Lo que enseña la tarjeta de lo relacionado: la línea, lo de debajo, el cara a cara y el detalle. */
+  function camposTarjeta(r) {
+    var t = r.tarjeta || {}, cs = [].concat(lista(t.titulo), t.linea || [], t.debajo || [], t.detalle || []);
+    ((t.comparar || {}).filas || []).forEach(function (x) { cs = cs.concat(x.campos || []); });
+    return cs.filter(function (c, i) { return c && cs.indexOf(c) === i; });
   }
 
   /* ---------- personalizar ----------
@@ -759,6 +820,11 @@
       // T0645: un envío a 0 no es un envío (en su Excel, una celda sin rellenar): el precio sin él no sale.
       if (cp.precio && !lista(cp.precio.envio).some(function (e) { return calcular(e, f, valores) > 0; })) return 'Falta el envío';
       if (isNaN(v)) return cp.precio ? 'Falta el coste o el envío' : '';
+      // T0641: «signo» dice el número en palabras según sea positivo o negativo («Te quedan 17,04 €/m», «Tu coste ya pasa su precio en 2,27 €/m»).
+      if (cp.signo) {
+        var pl = v > 0.00001 ? cp.signo.mas : (v < -0.00001 ? cp.signo.menos : (cp.signo.cero || cp.signo.mas));
+        return String(pl || '{}').replace('{}', verTexto(Object.assign({}, cp, { calculo: ['+', Math.abs(v)], signo: null }), f, valores, prohib));
+      }
       v = Math.round(v * 100) / 100;
     }
     if (vacio(v)) return '';
@@ -771,6 +837,22 @@
     if (cp.tipo === 'sino') return v === true || norm(v) === 'si' || norm(v) === 'true' ? 'Sí' : (v === false || norm(v) === 'no' || norm(v) === 'false' ? 'No' : String(v));
     if (cp.tipo === 'instagram') return cuentaInstagram(v) || String(v);
     return mostrar(cp, v) + u;
+  }
+  /**
+   * T0641 · Las cuentas de un calculado, en una línea: «1.020 ₹ → 9,27 € + envío 5,00 € + margen 50 % = 21,41 €/m». Cada parte
+   * de «desglose» es un texto («→», «+ envío») o { calculo, tipo, unidad }; al final, «=» y el valor. '' si a alguna parte le falta
+   * algo (sin coste no hay cuentas que enseñar).
+   */
+  function desglose(ap, cp, f, valores) {
+    if (!cp.desglose || !cp.calculo) return '';
+    var total = verTexto(cp, f, valores, []), falta = isNaN(calcular(cp.calculo, f, valores));
+    var partes = cp.desglose.map(function (p) {
+      if (typeof p === 'string') return p;
+      var x = { n: '', titulo: '', tipo: p.tipo || 'importe', unidad: p.unidad || '', calculo: expandir(p.calculo, ap.campos) };
+      if (isNaN(calcular(x.calculo, f, valores))) falta = true;
+      return verTexto(x, f, valores, []);
+    });
+    return falta ? '' : partes.join(' ') + ' = ' + total;
   }
   /** Cuándo es una fecha, en palabras: «hoy», «mañana», «hace 3 días», «en 5 días». */
   function cuando(v, hoy) {
@@ -856,7 +938,7 @@
     valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
-    relacionadas: relacionadas, verTexto: verTexto, cuando: cuando, comparar: comparar,
+    relacionadas: relacionadas, verTexto: verTexto, rellenar: rellenar, enPlantilla: enPlantilla, veRelacionado: veRelacionado, expandir: expandir, camposTarjeta: camposTarjeta, desglose: desglose, cuando: cuando, comparar: comparar,
     filtrables: filtrables, aIntervalo: aIntervalo, cumpleFiltros: cumpleFiltros, filtrosQueValen: filtrosQueValen, textoFiltro: textoFiltro };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
@@ -908,6 +990,8 @@
       // Las tablas a las que apuntan (los nombres de las fases, de las marcas…) y las de los campos con «de».
       Object.keys(BASE.refs).forEach(function (t) { if (tablas.indexOf(t) < 0) tablas.push(t); });
       Object.keys(BASE.campos).forEach(function (c) { var de = BASE.campos[c].de; if (de && de.tabla && tablas.indexOf(de.tabla) < 0) tablas.push(de.tabla); });
+      // T0641: y las de los campos con «de» de lo relacionado (la composición de la alternativa de una comparativa).
+      BASE.relacionados.forEach(function (r) { Object.keys(r.campos || {}).forEach(function (c) { var de = r.campos[c].de; if (de && de.tabla && tablas.indexOf(de.tabla) < 0) tablas.push(de.tabla); }); });
       function filas(t) { return T.filas(t) || []; }
       function filaDe(t, id) { return T.fila ? T.fila(t, id) : null; }
       var D = { filas: filas, fila: filaDe };
@@ -918,7 +1002,7 @@
       }
       function ap() { return enriquecer(aplicar(BASE, prefDe(ctx.id)), D); }
       /** Las filas como se ven (nombres en vez de códigos, rutas, «de»); cada una con la de verdad en __crudo. */
-      function vistas(a) { return preparar(a, filas(a.tabla), D); }
+      function vistas(a) { return preparar(a, filas(a.tabla), D, VAL); }
       function filaVista(a, id) { return vistas(a).filter(function (f) { return String(f[a.clave]) === String(id); })[0] || null; }
       function vistaActual(a) { var vs = vistasDe(a); return vs.filter(function (v) { return v.id === S.vista; })[0] || vs[0]; }
       var VAL = {};
@@ -933,6 +1017,7 @@
         if (t === '') return '<span class="li-nada">—</span>';
         var v = f[c];
         if (cp.calculo && cp.precio && t.indexOf('Falta') === 0) return cliente ? 'Precio a consultar' : '<span class="u-mal">' + texto(t) + '</span>';
+        if (cp.signo) { var sv = calcular(cp.calculo, f, VAL); return '<span class="' + (sv > 0.00001 ? 'li-signo-mas' : (sv < -0.00001 ? 'li-signo-menos' : '')) + '">' + texto(t) + '</span>'; }
         if (conEnlaces && !cp.calculo && !prohibido(v, PROHIB).length) {
           if (cp.tipo === 'enlace' && /^https?:\/\//i.test(String(v))) return '<a href="' + texto(v) + '" target="_blank" rel="noopener">Abrir ↗</a>';
           if (cp.tipo === 'instagram' && instagramUrl(v)) return '<a href="' + texto(instagramUrl(v)) + '" target="_blank" rel="noopener">' + texto(cuentaInstagram(v)) + ' ↗</a>';
@@ -948,6 +1033,33 @@
         }
         if (cp.tipo === 'fecha') { var cu = cuando(v, hoyIso()); return texto(t) + (cu ? ' <span class="u-nota">· ' + texto(cu) + '</span>' : ''); }
         return texto(t);
+      }
+      /**
+       * T0641 · Lo relacionado como tarjetas cortas (la comparativa de una marca): el título, una línea con lo que se decide
+       * («Hoy 32,00 €/m (Yutes) · BOR-004 a 21,41 €/m · Ahorra 32 %»), lo de debajo (el estado) y, al tocar «Ver detalle», el
+       * cara a cara (una fila por dato, una columna por lado; sin la fila si los dos están vacíos) y el resto de sus datos.
+       */
+      function tarjetas(r, otro, rs) {
+        var tj = r.tarjeta, cmp = tj.comparar || {}, tits = cmp.titulos || [];
+        var nada = function (t) { return t.indexOf('class="li-nada"') >= 0; };
+        return '<ul class="li-rt">' + rs.map(function (x) {
+          var trozos = function (cs, cls) {
+            var p = (cs || []).map(function (c) { var t = celda(otro, c, x, false); return nada(t) ? '' : '<span>' + t + '</span>'; }).join('');
+            return p ? '<div class="' + cls + '">' + p + '</div>' : '';
+          };
+          var cara = (cmp.filas || []).map(function (fl) {
+            var vs = (fl.campos || []).map(function (c) { return celda(otro, c, x, false); });
+            return vs.every(nada) ? '' : '<span class="u-etiqueta">' + texto(fl.titulo || '') + '</span>' + vs.map(function (v) { return '<span>' + v + '</span>'; }).join('');
+          }).join('');
+          if (cara) cara = '<div class="li-cara" style="grid-template-columns:auto' + new Array(tits.length + 1).join(' 1fr') + '"><span></span>' +
+            tits.map(function (t) { return '<span class="u-etiqueta li-cara-t">' + texto(t) + '</span>'; }).join('') + cara + '</div>';
+          var det = (tj.detalle || []).map(function (c) {
+            var cp = campo(otro, c), t = celda(otro, c, x, true);
+            return nada(t) ? '' : '<div class="li-dato' + (cp.tipo === 'nota' ? ' u-ancho' : '') + '"><span class="u-etiqueta">' + texto(cp.titulo) + '</span><span class="li-valor">' + t + '</span></div>';
+          }).join('');
+          var mas = cara || det ? '<details class="li-rt-mas"><summary>' + texto(tj.verMas || 'Ver detalle') + '</summary>' + cara + (det ? '<div class="u-campos">' + det + '</div>' : '') + '</details>' : '';
+          return '<li class="li-rt-f"><div class="li-rt-t">' + celda(otro, tj.titulo || otro.nombre, x, false) + '</div>' + trozos(tj.linea, 'li-rt-l') + trozos(tj.debajo, 'li-rt-d') + mas + '</li>';
+        }).join('') + '</ul>';
       }
       /** El nombre de una fila con su código delante (el de la tarea, para trabajarla en Claude). */
       function titulo2(a, f, cli, conCodigo) {
@@ -1167,8 +1279,11 @@
           var cuerpo = rp.ver.map(function (c) {
             if (ed.indexOf(c) >= 0) return entrada(a, c, crudo);
             var cp = campo(a, c);
-            return '<div class="li-dato' + (cp.tipo === 'nota' || cp.tipo === 'foto' ? ' u-ancho' : '') + '"><span class="u-etiqueta">' + texto(cp.titulo) + '</span><span class="li-valor">' + celda(a, c, f, true, cli) + '</span>' +
-              (cp.ayuda && !cli ? '<span class="u-nota">' + texto(cp.ayuda) + '</span>' : '') + '</div>';
+            // T0641: un calculado con «desglose» lleva debajo sus cuentas (no para un cliente: enseñan el coste) y ocupa todo el ancho.
+            var dg = cli ? '' : desglose(a, cp, f, VAL);
+            return '<div class="li-dato' + (cp.tipo === 'nota' || cp.tipo === 'foto' || dg ? ' u-ancho' : '') + '"><span class="u-etiqueta">' + texto(cp.titulo) + '</span><span class="li-valor">' + celda(a, c, f, true, cli) + '</span>' +
+              (dg ? '<span class="li-desglose">' + texto(dg) + '</span>' : '') +
+              (cp.ayuda && !cli && !dg ? '<span class="u-nota">' + texto(cp.ayuda) + '</span>' : '') + '</div>';
           }).join('') + rp.vacios.filter(function (c) { return ed.indexOf(c) >= 0; }).map(function (c) {
             return entrada(a, c, crudo).replace(/^<div class="u-campo/, '<div hidden data-hueco="' + texto(c) + '" class="u-campo');
           }).join('');
@@ -1195,8 +1310,10 @@
           acc.filter(function (x) { return x.texto; }).map(function (x) { return '<p class="u-nota li-accion-t">' + texto(x.texto) + '</p>'; }).join('');
         h += '</form>';
         // Lo relacionado (el seguimiento de un cliente): cada fila lleva a su sección, con su ficha abierta.
-        if (!nueva && !cli) a.relacionados.forEach(function (r) {
-          var rs = relacionadas(r, f, filas(r.tabla).map(function (x) {
+        if (!nueva && !cli) a.relacionados.filter(function (r) { return veRelacionado(r, ctx); }).forEach(function (r) {
+          // T0641: con «tarjeta», sus filas se preparan como las de una sección (rutas, calculados, «de» y plantillas de sus «campos»).
+          var otroAp = r.tarjeta ? apartado({ TABLA: r.tabla, CAMPOS: r.campos || {}, COLUMNAS: (r.columnas || []).concat(camposTarjeta(r)), _refs: a.refs }) : null;
+          var rs = relacionadas(r, f, otroAp ? preparar(otroAp, filas(r.tabla), D, VAL) : filas(r.tabla).map(function (x) {
             // T0642: una columna con ruta («ID_TELA.COLOR»: el color de la tela que le interesa) sigue las referencias.
             var y = conNombres(a, D, r.tabla, x);
             (r.columnas || []).forEach(function (c) { if (String(c).indexOf('.') > 0) y[c] = seguir(a, D, r.tabla, x, c); });
@@ -1215,6 +1332,7 @@
           var cab = '<h3 class="li-fg-t">' + texto(r.titulo || r.tabla) + (r.datos ? '' : ' <span class="u-cifra">' + rs.length + '</span>') + '</h3>';
           var cuerpo;
           if (!rs.length) cuerpo = '<p class="u-vacio">' + texto(r.vacio || 'Nada todavía.') + '</p>';
+          else if (r.tarjeta) cuerpo = tarjetas(r, otro, rs.slice(0, r.max || 20));
           else if (r.datos) {
             // T0642: «datos»: cada fila como en la ficha, cada dato con su título («Material que buscan: 100 % lino»), no
             // seguidos con puntos. Lo vacío no sale.
