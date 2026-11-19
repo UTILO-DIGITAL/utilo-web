@@ -556,6 +556,21 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .eco-grande .eco-val { font-size: 30px; color: var(--color-destacado, inherit); }
 .u .eco-sub { display: block; margin-top: var(--e1); font-size: 13px; }
 @media (min-width: 640px) { .u .eco-kpis { grid-template-columns: 1.4fr 1fr 1fr; } .u .eco-kpi.eco-grande { grid-column: auto; } }
+/* T0628 · Ventas: las cifras se tocan y abren de dónde salen; los pasos de una venta. */
+.u button.eco-kpi { display: block; width: 100%; border: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.u button.eco-kpi:hover, .u button.eco-kpi[aria-expanded=true] { outline: 2px solid var(--color-principal); outline-offset: 2px; }
+.u .eco-ver { display: block; margin-top: var(--e2); font-size: 13px; font-weight: 700; text-decoration: underline; }
+.u .eco-des { padding: var(--e3) var(--e4); margin: 0 0 var(--e4); }
+.u .eco-des-cab { display: flex; justify-content: space-between; align-items: center; gap: var(--e2); }
+.u .eco-des-cab .n-grupo { margin: 0; }
+.u .eco-paso { display: block; font-size: 13px; color: var(--color-suave); font-weight: 400; }
+.u .eco-paso b { color: var(--color-texto); font-weight: 600; }
+.u .eco-pasos { list-style: none; margin: 0 0 var(--e4); padding: 0; }
+.u .eco-pasos li { display: flex; justify-content: space-between; gap: var(--e2); padding: var(--e2) 0; border-bottom: 1px solid var(--color-linea); }
+.u .eco-pasos li::before { content: "·"; width: 18px; flex: none; }
+.u .eco-pasos li.eco-ya::before { content: "✓"; color: var(--color-principal); font-weight: 700; }
+.u .eco-pasos li:not(.eco-ya) { color: var(--color-suave); }
+.u .eco-pasos li > span:first-of-type { flex: 1; }
 /* T0270 · En una pantalla ancha, las cifras pequeñas (IVA, sin factura, pendientes) van al lado de las grandes, a su altura. */
 @media (min-width: 1400px) {
   .u .eco-arriba { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--e2); margin: 0 0 var(--e3); }
