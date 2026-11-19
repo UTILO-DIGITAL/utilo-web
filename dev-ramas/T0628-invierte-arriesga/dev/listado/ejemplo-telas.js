@@ -38,7 +38,7 @@
   var FASES = dimension('FA', ['Por contactar', '1 Contactado', '2 Interesado', '3 Reunión hecha', '4 Cuestionario enviado', '5 Cuestionario recibido', '6 Propuesta enviada',
     '7 Muestras enviadas', '8 Primer pedido', '9 Cliente habitual', 'En pausa', 'Descartado']);
   var ESTADOS_TAREA = dimension('ET', ['Pendiente', 'En curso', 'Esperando respuesta', 'Hecha', 'Descartada']);
-  var TIPOS_SEGUIMIENTO = dimension('TS', ['Tarea', 'Reunión', 'Próximo paso', 'Nota']);
+  var TIPOS_SEGUIMIENTO = dimension('TS', ['Tarea', 'Reunión', 'Nota']);
   var TEMAS = dimension('TE', ['Clientes', 'Proveedores', 'Telas', 'Pedidos', 'Empresa', 'Envíos', 'Ferias', 'Formación', 'Marca propia']);
   var FORMATOS = dimension('FO', ['Videollamada', 'Llamada', 'Presencial', 'WhatsApp', 'Email', 'Visita a taller', 'Feria']);
   var PRIORIDADES = dimension('PR', ['Alta', 'Media', 'Baja']);
@@ -123,10 +123,10 @@
     [diaBarras(-20), 'Reunión', 'Clientes', 'Hecha', 'Llamada de presentación', '', { ID_MARCA: 'M-002' }],
     [dia(-30), 'Tarea', 'Clientes', 'Descartada', 'Propuesta de jacquard', 'No les cuadra el pedido mínimo.', { ID_MARCA: 'M-005' }],
     [dia(-6), 'Tarea', 'Proveedores', 'Hecha', 'Pedir muestras de rayas de telar', '', { ID_PROVEEDOR: 'P-003' }],
-    // T0643: una nota (sin estado: ni círculo ni «Pasar»), un próximo paso y una tarea con marca y sin área (como en su
+    // T0643: una nota (sin estado: ni círculo ni «Pasar»), el siguiente paso con una marca (una tarea, T0661) y una tarea con marca y sin área (como en su
     // Excel: al guardar su ficha, el área se pone sola).
     [dia(-3), 'Nota', 'Proveedores', '', 'El ikat destiñe un poco al lavarlo a 40°', '', { ID_PROVEEDOR: 'P-002' }],
-    [dia(1), 'Próximo paso', 'Clientes', 'Pendiente', 'Llamar para ver si les cuadra el precio', '', { ID_MARCA: 'M-002' }],
+    [dia(1), 'Tarea', 'Clientes', 'Pendiente', 'Llamar para ver si les cuadra el precio', '', { ID_MARCA: 'M-002' }],
     [dia(4), 'Tarea', '', 'Pendiente', 'Mandarles la carta de colores', '', { ID_MARCA: 'M-003' }]
   ];
   var SEGUIMIENTO = tabla(['ID', 'FECHA', 'ID_TIPO', 'ID_TEMA', 'ID_ESTADO', 'ID_FORMATO', 'DETALLE', 'NOTAS', 'ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO'], seg.map(function (r, i) {
@@ -272,7 +272,7 @@
       NUEVA: { ID_ESTADO: 'Pendiente', ID_TIPO: 'Tarea', FECHA: 'hoy' }, OBLIGATORIAS: ['DETALLE', 'ID_ESTADO'],
       // T0643: cerrar y pasar en un toque, el siguiente paso al cerrar con una marca o un proveedor, el alta con el texto primero y el área puesta sola.
       RAPIDAS: { HECHA: { campo: 'ID_ESTADO', valor: 'Hecha' }, PASAR: 'FECHA', SI: [{ campo: 'ID_TIPO', no: ['Nota'] }, NO_HECHAS],
-        SIGUIENTE: { con: ['ID_MARCA', 'ID_PROVEEDOR'], copia: ['ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO', 'ID_TEMA'], pone: { ID_TIPO: 'Próximo paso', ID_ESTADO: 'Pendiente' } } },
+        SIGUIENTE: { con: ['ID_MARCA', 'ID_PROVEEDOR'], copia: ['ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO', 'ID_TEMA'], pone: { ID_TIPO: 'Tarea', ID_ESTADO: 'Pendiente' } } },
       ALTA: { campos: ['DETALLE', 'CON_QUIEN', 'FECHA', 'ID_TEMA'], mas: ['ID_TIPO', 'ID_FORMATO', 'NOTAS'] },
       DEDUCIR: { ID_TEMA: { ID_MARCA: 'Clientes', ID_PROVEEDOR: 'Proveedores' } },
       // T0652: el nombre de con quién es abre lo último con esa marca o ese proveedor, lo que queda y su ficha en dos líneas.

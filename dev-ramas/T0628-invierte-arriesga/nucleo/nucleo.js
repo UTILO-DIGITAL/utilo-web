@@ -747,7 +747,12 @@
       // T0420: la sección de la que vienes ({ id, titulo }, o null si se ha entrado directo) y volver a ella como estaba.
       desde: (function () { var d = history.state && history.state.desde, x = d && seccion(d); return x ? { id: x.id, titulo: x.titulo } : null; })(),
       volver: function () { history.back(); },
-      correo: cred.correo || '', secciones: todas().map(function (x) { return x.enPerfil ? { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true } : { id: x.id, titulo: x.titulo }; }),
+      correo: cred.correo || '', secciones: todas().map(function (x) {
+        if (x.enPerfil) return { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true };
+        // T0644: las que esta persona personaliza (Listado: quien administra o su perfil en PERSONALIZAN) salen en su Perfil.
+        var pers = (x.base || x.id) === 'LISTADO' && (cred.admin || ((x.config || {}).PERSONALIZAN || []).indexOf(cred.perfil) >= 0);
+        return pers ? { id: x.id, titulo: x.titulo, personaliza: true } : { id: x.id, titulo: x.titulo };
+      }),
       tablas: tablas(),
       alCambiar: function (f) { (oyentes[s.id] = oyentes[s.id] || []).push(f); },
       llamar: llamar,
@@ -1040,6 +1045,32 @@
       comprobar();      // y por detrás, con el motor
     } else { borrarComo(); acceso(''); }
   }
+  /* T0644 · Un solo patrón de pestañas (.u-pestanas) en toda la app: una línea que se desliza de lado, con la activa a la
+     vista (sin mover la página arriba o abajo) y el borde difuminado donde hay más. Vale para cualquier sección, que solo
+     pinta sus pestañas. */
+  function pestanasAVista() {
+    [].forEach.call(document.querySelectorAll('.u-pestanas'), function (p) {
+      var a = p.querySelector('[aria-selected=true]');
+      if (a && p.scrollWidth > p.clientWidth && p._activa !== a) {
+        p._activa = a;
+        var izq = a.getBoundingClientRect().left - p.getBoundingClientRect().left + p.scrollLeft, der = izq + a.offsetWidth;
+        if (izq < p.scrollLeft + 24) p.scrollLeft = Math.max(0, izq - 24);
+        else if (der > p.scrollLeft + p.clientWidth - 40) p.scrollLeft = der - p.clientWidth + 40;
+      }
+      bordes(p);
+      if (!p._conBordes) { p._conBordes = true; p.addEventListener('scroll', function () { bordes(p); }, { passive: true }); }
+    });
+  }
+  function bordes(p) {
+    var hay = p.scrollWidth > p.clientWidth + 1;
+    p.classList.toggle('u-mas-izda', hay && p.scrollLeft > 1);
+    p.classList.toggle('u-mas-dcha', hay && p.scrollLeft + p.clientWidth < p.scrollWidth - 1);
+  }
+  var tPest = 0;
+  function pestanasLuego() { cancelAnimationFrame(tPest); tPest = requestAnimationFrame(pestanasAVista); }
+  if (window.MutationObserver) new MutationObserver(pestanasLuego).observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('resize', pestanasLuego);
+
   // Con la página ya leída: así, una sección que va en la misma página (después de este archivo) ya se ha registrado.
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arrancar); else arrancar();
 })();
