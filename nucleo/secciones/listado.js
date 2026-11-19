@@ -150,6 +150,19 @@
     if (Array.isArray(expr)) return [expr[0]].concat(expr.slice(1).map(function (e) { return expandir(e, campos, vistos); }));
     return expr;
   }
+  /** El envío que lleva un calculado: el de «envio» (un coste: T0678) o el de su «precio». */
+  function envioDe(d) { return (d && (d.envio || (d.precio && d.precio.envio))) || null; }
+  /** T0678 · Si una expresión usa un calculado que lleva envío (MI_COSTE en «Hasta su precio»), ese envío: sin él, tampoco sale. */
+  function conEnvio(expr, campos, vistos) {
+    var r = null;
+    usa(expr).some(function (u) {
+      var d = (campos || {})[u];
+      if (!d || !d.calculo || vistos.indexOf(u) >= 0) return false;
+      r = envioDe(d) || conEnvio(d.calculo, campos, vistos.concat(u));
+      return !!r;
+    });
+    return r;
+  }
   /** Las columnas y valores ($…) que usa una expresión. */
   function usa(expr, acc) {
     acc = acc || [];
@@ -241,7 +254,7 @@
       relacionados: cfg.RELACIONADOS || [], vistas: cfg.VISTAS || [], avisos: cfg.AVISOS || [], editar: cfg.EDITAR || [],
       crear: !!cfg.CREAR, texto: cfg.TEXTO || '', vacio: cfg.VACIO || '', refs: cfg._refs || {}, filtro: cfg.FILTRO || [],
       nueva: cfg.NUEVA || {}, obligatorias: cfg.OBLIGATORIAS || [], filtros: cfg.FILTROS || [], filas: cfg.FILAS && cfg.FILAS.length ? cfg.FILAS : null,
-      rapidas: rapidasDe(cfg.RAPIDAS), alta: cfg.ALTA && lista(cfg.ALTA.campos).length ? { campos: lista(cfg.ALTA.campos), mas: lista(cfg.ALTA.mas) } : null,
+      rapidas: rapidasDe(cfg.RAPIDAS), alta: cfg.ALTA && lista(cfg.ALTA.campos).length ? { campos: lista(cfg.ALTA.campos), mas: lista(cfg.ALTA.mas), titulo: cfg.ALTA.titulo || '' } : null,
       deducir: cfg.DEDUCIR || {}, acciones: cfg.ACCIONES || [], contexto: contextoDe(cfg.CONTEXTO) };
   }
   /** T0652 · CONTEXTO de la configuración, con sus claves por defecto; null sin ninguna tabla en «de». Cada sección de
@@ -269,13 +282,15 @@
    * tablas ocultas (lo que se lee de ellas: VALORES, lo relacionado, los campos con «de», sus referencias) ni, en las demás, las
    * columnas que apuntan a ellas (Con quién = proveedor). Así la sección no las pide, que el motor diría «no tienes permiso», ni
    * enseña esos campos. Con «filas» ({ TABLA: { COLUMNA: [valores] } }), esos valores no salen en los desplegables de su tabla.
+   * T0671: ni lo de CONTEXTO que va a una tabla oculta (el resumen del proveedor) o a una columna quitada, ni sus líneas; y, con
+   * «columnas» ({ TABLA: [columnas] }, que le llegan vacías), esos campos fuera como los demás.
    * No cambia cfg. Sin nada que ocultar, la misma.
    */
   function quitada(vs, n) { var k = String(n).trim().toLowerCase(); return vs.some(function (v) { return String(v).trim().toLowerCase() === k; }); }
   function sinOcultas(cfg, oc) {
-    var ts = (oc && oc.tablas) || [], fs = ((oc && oc.filas) || {})[cfg && cfg.TABLA] || {};
-    if ((!ts.length && !Object.keys(fs).length) || !cfg) return cfg;
-    var c = JSON.parse(JSON.stringify(cfg)), refs = (oc && oc.refs) || {}, fuera = (refs[c.TABLA] || []).slice();
+    var ts = (oc && oc.tablas) || [], fs = ((oc && oc.filas) || {})[cfg && cfg.TABLA] || {}, vacias = (oc && oc.columnas) || {};
+    if ((!ts.length && !Object.keys(fs).length && !Object.keys(vacias).length) || !cfg) return cfg;
+    var c = JSON.parse(JSON.stringify(cfg)), refs = (oc && oc.refs) || {}, fuera = (refs[c.TABLA] || []).concat(vacias[c.TABLA] || []);
     // Las opciones con las que dejaría de ver la fila (el área «Proveedores»), fuera de los desplegables: el motor no dejaría guardarla.
     Object.keys(fs).forEach(function (k) {
       var d = (c.CAMPOS = c.CAMPOS || {})[k] = c.CAMPOS[k] || {};
@@ -298,6 +313,20 @@
       if (v.tablero && !vale(v.tablero.campo)) delete v.tablero;
     });
     if (c.RELACIONADOS) c.RELACIONADOS = c.RELACIONADOS.filter(function (r) { return !oculta(r.tabla); });
+    // T0671: el resumen de con quién es (CONTEXTO.de): sin el de una tabla oculta ni el de una columna quitada (el proveedor), y
+    // sin las líneas de una tabla oculta o por una columna que apunta a una oculta (las personas de un proveedor).
+    var cx = c.CONTEXTO;
+    if (cx && typeof cx === 'object') {
+      if (cx.campo && !vale(cx.campo)) delete c.CONTEXTO;
+      else if (cx.de && typeof cx.de === 'object') {
+        Object.keys(cx.de).forEach(function (k) {
+          var d = cx.de[k];
+          if (!vale(k) || !d || oculta(d.tabla)) { delete cx.de[k]; return; }
+          if (Array.isArray(d.lineas)) d.lineas = d.lineas.filter(function (l) { return !l || (!oculta(l.tabla) && (refs[l.tabla] || []).indexOf(l.campo) < 0); });
+        });
+        if (!Object.keys(cx.de).length) delete c.CONTEXTO;
+      }
+    }
     Object.keys(c.VALORES || {}).forEach(function (k) { var v = c.VALORES[k]; if (v && typeof v === 'object' && oculta(v.tabla)) delete c.VALORES[k]; });
     var r = c._refs || {};
     Object.keys(r).forEach(function (t) {
@@ -312,8 +341,8 @@
     var base = String(c).split('.').pop();
     var tipo = d.tipo || (d.calculo ? 'importe' : (d.de && !d.de.columna && !d.de.columnas ? 'numero' : (/^FECHA/.test(base) ? 'fecha' : (/^(ID_)?ESTADO$/.test(base) ? 'estado' : 'texto'))));
     return { n: c, titulo: d.titulo || (c === ap.codigo ? 'Código' : titulo(base)), tipo: tipo, opciones: d.opciones || null, ref: d.ref || refDe(ap, ap.tabla, c), ids: d._ids || null,
-      de: d.de || null, primero: d.primero || null,
-      unidad: d.unidad || '', calculo: d.calculo ? expandir(d.calculo, ap.campos, [c]) : null, precio: d.precio || null, privado: !!d.privado, colores: d.colores || null,
+      de: d.de || null, primero: d.primero || null, grupos: d.grupos || null,
+      unidad: d.unidad || '', calculo: d.calculo ? expandir(d.calculo, ap.campos, [c]) : null, precio: d.precio || null, envio: d.calculo ? envioDe(d) || conEnvio(d.calculo, ap.campos, [c]) : null, privado: !!d.privado, colores: d.colores || null,
       ayuda: d.ayuda || '', sinNumero: !!d.sinNumero, nombres: d.nombres || null, signo: d.signo || null, desglose: d.desglose || null, plantilla: d.plantilla || '' };
   }
   /** T0642 · Un valor como se enseña: sin el número de delante («1 Contactado» → «Contactado», con «sinNumero») y con su
@@ -419,6 +448,7 @@
     function poner(t) {
       return t.replace(/\{([^{}]+)\}/g, function (x, c) {
         var cp = campo(ap, c), v = cp.calculo && isNaN(calcular(cp.calculo, f, valores)) ? '' : (cp.plantilla ? '' : verTexto(cp, f, valores, []));
+        if (cp.calculo && cp.envio && v.indexOf('Falta') === 0) v = ''; // T0678: un coste sin envío no va dentro de una frase
         if (v === '') hueco = true;
         return v;
       });
@@ -500,6 +530,8 @@
         if (!env.length) errores.push(donde + 'el precio «' + c + '» no dice cuál es su envío (precio.envio).');
         else if (!env.some(function (e) { return usa(d.calculo).indexOf(e) >= 0; })) errores.push(donde + 'el precio «' + c + '» no suma su envío (' + env.join(' o ') + '): se vería un precio sin envío.');
       }
+      // T0678: lo que cuesta con su envío («envio»), igual: tiene que sumarlo.
+      if (d.envio && !lista(d.envio).some(function (e) { return usa(d.calculo).indexOf(e) >= 0; })) errores.push(donde + '«' + c + '» no suma su envío (' + lista(d.envio).join(' o ') + '): se vería un coste sin envío.');
     });
     // T0656: los calculados de lo relacionado (la Comparativa en la ficha de una marca) también sacan sus $ de VALORES.
     lista(ap.relacionados).forEach(function (r) {
@@ -550,8 +582,10 @@
     });
     // T0643 · Lo de un toque (RAPIDAS), el alta (ALTA) y lo que se pone solo (DEDUCIR).
     var edTodo = ap.editar === true, sePuede = function (c) { return edTodo || ed.indexOf(c) >= 0; };
+    // T0662: el motor pone {} a lo que la sección no dice (el defecto de modulo.json): eso no es un error, es que no lo usa.
+    var puesto = function (x) { return !!x && (typeof x !== 'object' || Object.keys(x).length > 0); };
     var rp = ap.rapidas;
-    if (cfg.RAPIDAS && !rp) errores.push(donde + 'RAPIDAS no dice ni HECHA ni PASAR.');
+    if (puesto(cfg.RAPIDAS) && !rp) errores.push(donde + 'RAPIDAS no dice ni HECHA ni PASAR.');
     if (rp) {
       if (cfg.RAPIDAS.HECHA && !rp.hecha) errores.push(donde + 'RAPIDAS.HECHA no dice su columna (campo).');
       if (rp.hecha) {
@@ -574,7 +608,7 @@
         }
       }
     }
-    if (cfg.ALTA && !ap.alta) errores.push(donde + 'ALTA no dice sus campos (campos).');
+    if (puesto(cfg.ALTA) && !ap.alta) errores.push(donde + 'ALTA no dice sus campos (campos).');
     if (ap.alta) ap.alta.campos.concat(ap.alta.mas).forEach(function (c) {
       var d = ap.campos[c];
       if (d && d.primero) { d.primero.forEach(function (p) { hay(p, 'ALTA usa'); if (!sePuede(p)) errores.push(donde + 'ALTA pide «' + c + '», pero «' + p + '» no está en EDITAR.'); }); return; }
@@ -587,7 +621,7 @@
       Object.keys(ap.deducir[c] || {}).forEach(function (o) { hay(o, 'DEDUCIR mira'); });
     });
     // T0652: el resumen de con quién es la fila.
-    if (cfg.CONTEXTO && !ap.contexto) errores.push(donde + 'CONTEXTO no dice en «de» de qué tablas sale el resumen.');
+    if (puesto(cfg.CONTEXTO) && !ap.contexto) errores.push(donde + 'CONTEXTO no dice en «de» de qué tablas sale el resumen.');
     if (ap.contexto) {
       var cx = ap.contexto, cn = function (p) { return typeof p === 'string' ? p : (p && p.campo); };
       if (!cx.campo) errores.push(donde + 'CONTEXTO no dice en «campo» qué columna lleva al resumen.');
@@ -915,7 +949,8 @@
     var v = cp.calculo ? calcular(cp.calculo, f, valores) : f[cp.n];
     if (cp.calculo) {
       // T0645: un envío a 0 no es un envío (en su Excel, una celda sin rellenar): el precio sin él no sale.
-      if (cp.precio && !lista(cp.precio.envio).some(function (e) { return calcular(e, f, valores) > 0; })) return 'Falta el envío';
+      // T0678: también lo que cuesta («envio»: lo que te cuesta puesta en España) y lo que lo usa (lo que te queda hasta su precio).
+      if (cp.envio && !lista(cp.envio).some(function (e) { return calcular(e, f, valores) > 0; })) return 'Falta el envío';
       if (isNaN(v)) return cp.precio ? 'Falta el coste o el envío' : '';
       // T0641: «signo» dice el número en palabras según sea positivo o negativo («Te quedan 17,04 €/m», «Tu coste ya pasa su precio en 2,27 €/m»).
       if (cp.signo) {
@@ -949,7 +984,7 @@
       if (isNaN(calcular(x.calculo, f, valores))) falta = true;
       return verTexto(x, f, valores, []);
     });
-    return falta ? '' : partes.join(' ') + ' = ' + total;
+    return falta || (cp.envio && total.indexOf('Falta') === 0) ? '' : partes.join(' ') + ' = ' + total;
   }
   /** Cuándo es una fecha, en palabras: «hoy», «mañana», «hace 3 días», «en 5 días». */
   function cuando(v, hoy) {
@@ -1051,10 +1086,60 @@
     r.push({ fecha: masDias(hoy, 7), titulo: 'En una semana', corto: '+1 semana' });
     return r;
   }
-  /** Para cuándo se apunta el siguiente paso: el primer día de trabajo, en 3 días o en una semana. */
+  /** Para cuándo se apunta el siguiente paso: el primer día de trabajo, en 3 días o en una semana. «En 3 días» no cae en
+   *  fin de semana (como Pasar, T0677): si cae, va al lunes; y si ese día ya es el primero (el viernes, «El lunes»), al
+   *  siguiente de trabajo. Cuando no es justo dentro de 3 días, se dice el día («El lunes», «El martes»). */
   function fechasSiguiente(hoy) {
     var p = opcionesPasar(hoy), lab = p.length > 2 ? p[1] : p[0];
-    return [{ fecha: lab.fecha, titulo: lab.titulo }, { fecha: masDias(hoy, 3), titulo: 'En 3 días' }, { fecha: masDias(hoy, 7), titulo: 'En una semana' }];
+    var t = masDias(hoy, 3), dt = aFecha(t).getDay();
+    if (dt === 6) t = masDias(t, 2); else if (dt === 0) t = masDias(t, 1);
+    if (t <= lab.fecha) { t = masDias(lab.fecha, 1); dt = aFecha(t).getDay(); if (dt === 6) t = masDias(t, 2); else if (dt === 0) t = masDias(t, 1); }
+    var tres = t === masDias(hoy, 3) ? 'En 3 días' : 'El ' + DIAS_SEMANA[aFecha(t).getDay()];
+    return [{ fecha: lab.fecha, titulo: lab.titulo }, { fecha: t, titulo: tres }, { fecha: masDias(hoy, 7), titulo: 'En una semana' }];
+  }
+  /** T0677 · Un texto cortado para un aviso: hasta n letras, por la última palabra entera, con «…». */
+  function textoCorto(t, n) {
+    t = String(t == null ? '' : t).replace(/\s+/g, ' ').trim(); n = n || 40;
+    if (t.length <= n) return t;
+    var c = t.slice(0, n - 1), e = c.lastIndexOf(' ');
+    if (t.charAt(n - 1) !== ' ' && e > n / 2) c = c.slice(0, e); // si se corta a media palabra, hasta la anterior
+    return c.replace(/[\s,.;:·–-]+$/, '') + '…';
+  }
+  /** T0677 · Cómo se nombra una fila en un aviso (««Mandar muestras» pasa al vie 20»): su texto, cortado y entre comillas;
+   *  sin texto, su código. Lo que no se guarda sale tapado. */
+  function nombreCorto(ap, f, prohib) {
+    var v = f ? f[ap.nombre] : '', t = vacio(v) ? '' : (prohibido(v, prohib || []).length ? tapar(v, prohib) : String(v));
+    t = textoCorto(t, 48);
+    return t ? '«' + t + '»' : (f && !vacio(f[ap.codigo]) ? String(f[ap.codigo]) : '');
+  }
+  /** T0677 · Un cambio que se puede deshacer. «hecho»: la promesa del cambio. deshacer(): espera a que el cambio acabe (si
+   *  aún se está guardando) y entonces vuelve atrás; si el cambio no llegó a guardarse, no hay nada que deshacer. Su promesa
+   *  falla si falla el deshacer, para no decir «Deshecho» sin serlo. Una sola vez: la segunda no hace nada. */
+  function deshacerEnOrden(cambio, volver) {
+    var hecho = Promise.resolve().then(cambio), usado = null;
+    return { hecho: hecho, deshacer: function () {
+      if (!usado) usado = hecho.then(function () { return Promise.resolve().then(volver).then(function () { return true; }); }, function () { return false; });
+      return usado;
+    } };
+  }
+  /** T0677 · La lista de «con quién» al añadir (un campo con «primero»): un grupo por columna, con el título de «grupos»
+   *  («Marcas», «Proveedores», «Otros») o el del campo, en orden alfabético y, con q, solo lo que lo lleva (sin tildes ni
+   *  mayúsculas). ed: las columnas que se pueden poner. [{ col, titulo, opciones: [{ nombre, valor }] }], sin grupos vacíos. */
+  function gruposConQuien(ap, c, ed, q) {
+    var cp = campo(ap, c), t = norm(q);
+    return (cp.primero || []).filter(function (p) { return (!ed || ed.indexOf(p) >= 0) && campo(ap, p).ids; }).map(function (p) {
+      var ids = campo(ap, p).ids;
+      var ops = Object.keys(ids).filter(function (n) { return !t || norm(n).indexOf(t) >= 0; })
+        .sort(function (x, y) { return x.localeCompare(y, 'es', { sensitivity: 'base' }); })
+        .map(function (n) { return { nombre: n, valor: ids[n] }; });
+      return { col: p, titulo: (cp.grupos && cp.grupos[p]) || campo(ap, p).titulo, opciones: ops };
+    }).filter(function (g) { return g.opciones.length; });
+  }
+  /** T0677 · Lo que se enseña de una fila que ya dice un aviso: el estado «Esperando respuesta» junto al aviso «Esperando
+   *  respuesta hace días» es lo mismo dos veces. true si algún aviso empieza por ese texto. */
+  function loDiceUnAviso(txt, avs) {
+    var t = norm(txt);
+    return !!t && (avs || []).some(function (x) { return norm(x.titulo).indexOf(t) === 0; });
   }
   /** Si una fila (como se ve, con nombres) lleva el círculo y «Pasar». */
   function rapidaEn(ap, f, hoy) {
@@ -1111,6 +1196,7 @@
     if (vacio(v)) return '';
     var s = prohibido(v, prohib).length ? tapar(v, prohib) : String(v).trim();
     if (q.despues && !isNaN(aNumero(v))) s += q.despues;
+    if (q.sinNumero) s = mostrar({ sinNumero: true }, s); // T0677: «6 Propuesta enviada» → «Propuesta enviada», como en las listas
     // «Prioridad alta»: el nombre de otra tabla, detrás de su «antes», en minúscula.
     if (q.antes) s = q.antes + ' ' + (refDe(ap, t, q.campo) ? s.charAt(0).toLowerCase() + s.slice(1) : s);
     return s;
@@ -1158,7 +1244,7 @@
       masPendientes: Math.max(0, pend.length - cx.pendientes), lineas: lineas };
   }
 
-  var CALC = { contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
+  var CALC = { textoCorto: textoCorto, gruposConQuien: gruposConQuien, nombreCorto: nombreCorto, deshacerEnOrden: deshacerEnOrden, loDiceUnAviso: loDiceUnAviso, contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
     textoVuelta: textoVuelta, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir,
@@ -1251,7 +1337,7 @@
         if (c === a.codigo && t) return '<span class="li-cod">' + texto(t) + '</span>';
         if (t === '') return '<span class="li-nada">—</span>';
         var v = f[c];
-        if (cp.calculo && cp.precio && t.indexOf('Falta') === 0) return cliente ? 'Precio a consultar' : '<span class="u-mal">' + texto(t) + '</span>';
+        if (cp.calculo && cp.envio && t.indexOf('Falta') === 0) return cliente ? 'Precio a consultar' : '<span class="u-mal">' + texto(t) + '</span>';
         if (cp.signo) { var sv = calcular(cp.calculo, f, VAL); return '<span class="' + (sv > 0.00001 ? 'li-signo-mas' : (sv < -0.00001 ? 'li-signo-menos' : '')) + '">' + texto(t) + '</span>'; }
         if (conEnlaces && !cp.calculo && !prohibido(v, PROHIB).length) {
           if (cp.tipo === 'enlace' && /^https?:\/\//i.test(String(v))) return '<a href="' + texto(v) + '" target="_blank" rel="noopener">Abrir ↗</a>';
@@ -1266,7 +1352,7 @@
           var col = (cp.colores || {})[String(v)] || '';
           return '<span class="u-chip li-estado' + (col ? ' li-' + texto(col) : '') + '">' + texto(t) + '</span>';
         }
-        if (cp.tipo === 'fecha') { var cu = cuando(v, hoyIso()); return texto(t) + (cu ? ' <span class="u-nota">· ' + texto(cu) + '</span>' : ''); }
+        if (cp.tipo === 'fecha') { var cu = cuando(v, hoyIso()); return texto(t) + (cu ? '<span class="u-nota li-cuando"><span class="li-punto"> · </span>' + texto(cu) + '</span>' : ''); }
         return texto(t);
       }
       /**
@@ -1378,16 +1464,25 @@
       }
       function sinDeshacer() { clearTimeout(tDes); avDes.hidden = true; avDes._deshacer = null; }
       function mal(que) { return function (e) { ctx.aviso('No se ha ' + que + ': ' + ((e && e.message) || e)); }; }
-      /** El nombre corto de una fila para un aviso: su código o, sin él, su nombre (cortado). */
-      function quien(a, f) { var t = !vacio(f[a.codigo]) ? f[a.codigo] : String(f[a.nombre] || ''); return t.length > 40 ? t.slice(0, 38) + '…' : t; }
+      /** El nombre de una fila para un aviso: su texto, cortado (T0677: no su código, que no dice nada a quien la usa). */
+      function quien(a, f) { return nombreCorto(a, f, PROHIB); }
+      /** T0677 · Guarda un cambio de la fila id y da cómo deshacerlo: el deshacer espera al cambio y falla si falla. */
+      function cambioDeshacible(a, id, cambios, antes) {
+        var c = deshacerEnOrden(function () { return T.actualizar(a.tabla, id, cambios); }, function () { return T.actualizar(a.tabla, id, antes); });
+        c.hecho.then(null, mal('guardado'));
+        return c.deshacer;
+      }
+      /** Deshace y lo dice: «Deshecho.» solo si de verdad se ha deshecho. */
+      function deshacerYDecir(d) {
+        return Promise.resolve().then(d).then(function () { ctx.aviso('Deshecho.'); }, mal('deshecho'));
+      }
       function marcarHecha(id) {
         var a = ap(), r = a.rapidas, f = filaVista(a, id);
         if (!f || !r || !r.hecha) return;
         var crudo = f.__crudo || f, c = r.hecha.campo, antes = {}, cambios = {};
         antes[c] = vacio(crudo[c]) ? '' : crudo[c];
         cambios[c] = codigoDe(a, c, r.hecha.valor);
-        var volver = function () { return Promise.resolve(T.actualizar(a.tabla, id, antes)).then(null, mal('deshecho')); };
-        Promise.resolve(T.actualizar(a.tabla, id, cambios)).then(null, mal('guardado'));
+        var volver = cambioDeshacible(a, id, cambios, antes);
         var con = siguienteCon(a, crudo);
         if (con) { sinDeshacer(); siguientePaso(a, f, con, volver); }
         else deshacible(r.hecha.valor + ': ' + quien(a, f), volver);
@@ -1397,8 +1492,7 @@
         if (!f || !c || !fecha) return;
         var crudo = f.__crudo || f, antes = {}, cambios = {};
         antes[c] = vacio(crudo[c]) ? '' : crudo[c]; cambios[c] = fecha;
-        Promise.resolve(T.actualizar(a.tabla, id, cambios)).then(null, mal('guardado'));
-        deshacible(quien(a, f) + ' pasa al ' + diaCorto(fecha), function () { return Promise.resolve(T.actualizar(a.tabla, id, antes)).then(null, mal('deshecho')); });
+        deshacible(quien(a, f) + ' pasa al ' + diaCorto(fecha), cambioDeshacible(a, id, cambios, antes));
       }
       /** «Otro día…»: una ventana con el calendario. */
       function pasarOtroDia(id) {
@@ -1430,7 +1524,8 @@
           '<div class="n-botones"><button type="submit" class="u-btn u-btn-accion">Apuntar</button><button type="button" class="u-btn u-btn-texto" data-sig-no>No hay siguiente paso</button></div>' +
           '<p class="u-nota">¿Te has equivocado? Con la ✕, tocando fuera o con Esc, vuelves atrás y sigue sin cerrar.</p></form>';
         abrirVentana(h);
-        alCerrar = volver;
+        // Volver atrás (la ✕, fuera o Esc): sin «Deshecho», pero con su aviso si falla (T0677).
+        alCerrar = function () { return Promise.resolve().then(volver).then(null, mal('deshecho')); };
         var form = vent.querySelector('#li-fsig'), inp = vent.querySelector('#li-sig');
         inp.focus();
         form.addEventListener('click', function (ev) {
@@ -1459,7 +1554,7 @@
         return !!r && !vista.cliente && ((r.hecha && ed.indexOf(r.hecha.campo) >= 0) || (r.pasar && ed.indexOf(r.pasar) >= 0));
       }
       function circulo(a, f) {
-        var r = a.rapidas, id = f[a.clave], cod = !vacio(f[a.codigo]) ? f[a.codigo] : f[a.nombre];
+        var r = a.rapidas, id = f[a.clave], cod = quien(a, f); // T0677: lo que dice el lector de pantalla, el texto de la tarea
         if (!r.hecha || editables(a).indexOf(r.hecha.campo) < 0) return '';
         return '<button type="button" class="li-circ" data-hecha="' + texto(id) + '" aria-label="Marcar como ' + texto(String(r.hecha.valor).toLowerCase()) + ': ' + texto(cod) + '" title="Marcar como ' + texto(String(r.hecha.valor).toLowerCase()) + '">' + ICONO_OK + '</button>';
       }
@@ -1538,7 +1633,9 @@
         var cx = !cli && !arrastrar && a.contexto && contextoCol(a, f.__crudo) ? a.contexto.campo : '';
         if (cx) det = det.filter(function (x) { return x !== cx; });
         // T0601: en la tarjeta, lo vacío no sale (una prospección sin estado ni nota no enseña «— —»).
-        var dets = det.filter(function (x) { return x !== foto; }).map(function (x) { return fechaAviso(a, x, celda(a, x, f, false, cli), avs); }).filter(function (h) { return h.indexOf('class="li-nada"') < 0; });
+        var dets = det.filter(function (x) { return x !== foto; }).map(function (x) { return fechaAviso(a, x, celda(a, x, f, false, cli), avs); }).filter(function (h) { return h.indexOf('class="li-nada"') < 0; })
+          // T0677: lo que ya dice un aviso de la tarjeta no sale dos veces («Esperando respuesta» y «Esperando respuesta hace días»).
+          .filter(function (h) { return !loDiceUnAviso(h.replace(/<[^>]*>/g, ''), mar); });
         // T0633: con foto, a la izquierda (sin foto, un hueco igual, para que los nombres caigan en línea).
         var src = foto && !prohibido(f[foto], PROHIB).length ? imagen(f[foto]) : '';
         var img = !foto ? '' : (src ? '<img class="li-mini li-t-img" src="' + texto(src) + '" alt="" referrerpolicy="no-referrer" loading="lazy" data-li-foto>' : '<span class="li-t-img li-t-vacia" aria-hidden="true"></span>');
@@ -1572,6 +1669,10 @@
         var nCols = conCod.length + (conCi ? 1 : 0) + (conPa ? 1 : 0);
         var fila = function (f, g) {
           var avs = cli ? [] : avisosDe(a, f, hoy), mar = sinRepetir(avs, g.titulo, plazo), r = (conCi || conPa) && rapidaEn(a, f, hoy);
+          // T0677: en la tabla, el estado tiene su columna: el aviso que solo lo repite («Esperando respuesta hace días») no sale
+          // (la fecha ya va en rojo con «hace 9 días»). En la tarjeta del móvil es al revés: se queda el aviso y se quita la etiqueta.
+          var vistos = conCod.filter(function (c) { return c !== nom; }).map(function (c) { return verTexto(campo(a, c), f, VAL, PROHIB); });
+          mar = mar.filter(function (x) { return !vistos.some(function (t) { return loDiceUnAviso(t, [x]); }); });
           return '<tr tabindex="0" data-id="' + texto(f[a.clave]) + '"' + (avs.length ? ' class="li-con-aviso li-f-' + texto(avs[0].nivel || 'medio') + '"' : '') + '>' +
             (conCi ? '<td class="li-td-ci">' + (r ? circulo(a, f) : '') + '</td>' : '') + conCod.map(function (c) {
             var cp = campo(a, c), principal = c === nom;
@@ -1579,7 +1680,7 @@
             var h = fechaAviso(a, c, celda(a, c, f, false, cli), avs);
             if (!cli && a.contexto && c === a.contexto.campo) h = botonCtx(a, f, h);
             var corta = !principal && (num(cp) || /^(fecha|estado|sino)$/.test(cp.tipo) || h.replace(/<[^>]*>/g, '').length <= 14);
-            return '<td class="' + (num(cp) ? 'num' : '') + (corta ? ' li-td-corta' : '') + (principal ? ' u-tabla-t' : '') + (c === a.codigo ? ' li-td-cod' : '') + '">' + h +
+            return '<td class="' + (num(cp) ? 'num' : '') + (corta ? ' li-td-corta' : '') + (cp.tipo === 'fecha' ? ' li-td-fecha' : '') + (cp.tipo === 'estado' || cp.colores ? ' li-td-estado' : '') + (principal ? ' u-tabla-t' : '') + (c === a.codigo ? ' li-td-cod' : '') + '">' + h +
               (principal && mar.length ? '<div class="li-marcas">' + marcas(mar) + '</div>' : '') + '</td>';
           }).join('') + (conPa ? '<td class="li-td-pa">' + (r ? botonPasar(a, f) : '') + '</td>' : '') + '</tr>';
         };
@@ -1689,7 +1790,7 @@
         var avs = nueva || cli ? [] : avisosDe(a, f, hoy);
         var tv = llegada ? textoVuelta(deFicha, ctx.desde) : ''; // T0642: a la ficha de la que vienes, si vienes de una
         var vuelta = tv ? '<button type="button" class="u-btn u-btn-texto li-volver" data-volver>' + texto(tv) + '</button>' : '';
-        var h = vuelta + '<div class="li-ficha-cab"><h2 id="li-vt">' + (nueva ? 'Añadir · ' + texto(a.titulo) : titulo2(a, f, cli, true)) + '</h2>' +
+        var h = vuelta + '<div class="li-ficha-cab"><h2 id="li-vt">' + (nueva ? texto(a.alta && a.alta.titulo ? a.alta.titulo : 'Añadir · ' + a.titulo) : titulo2(a, f, cli, true)) + '</h2>' +
           '<button type="button" class="u-btn u-btn-icono" data-cerrar aria-label="Cerrar">' + ICONO_X + '</button></div>';
         if (avs.length) h += '<div class="li-ficha-avisos">' + marcas(avs) + '</div>';
         if (cli) h += '<p class="li-cliente">Ficha para enseñar a un cliente: sin datos privados.</p>';
@@ -1847,6 +1948,15 @@
               if (nota) nota.textContent = d[c] ? 'Puesta sola según con quién es. Puedes cambiarla.' : '';
             });
           };
+          // T0677: el buscador de «con quién» deja en la lista solo lo que lleva lo escrito (y elige lo primero que lo lleva).
+          form.addEventListener('input', function (ev) {
+            var c = ev.target.getAttribute && ev.target.getAttribute('data-buscar-uno'); if (!c) return;
+            var sl = form.querySelector('select[data-uno="' + c + '"]'), antes = sl.value;
+            var gs = gruposConQuien(a, c, editables(a), ev.target.value), vale = gs.some(function (g) { return g.opciones.some(function (o) { return g.col + '|' + o.valor === antes; }); });
+            var sel = vale || !ev.target.value.trim() ? antes : (gs[0] ? gs[0].col + '|' + gs[0].opciones[0].valor : '');
+            sl.innerHTML = opcionesUno(gs, sel);
+            if (sl.value !== antes) ponerDeducidos();
+          });
           form.addEventListener('change', function (ev) {
             var c = ev.target.getAttribute && ev.target.getAttribute('data-c');
             if (c && c in a.deducir) { ev.target.setAttribute('data-tocado', ''); var n = form.querySelector('[data-deducido="' + c + '"]'); if (n) n.textContent = ''; return; }
@@ -1869,17 +1979,23 @@
       function mezclar(x, y) { var r = {}; [x, y].forEach(function (o) { Object.keys(o || {}).forEach(function (k) { if (k !== '__crudo') r[k] = o[k]; }); }); return r; }
       /** T0643 · Un campo del alta: «con quién» (un «primero» de varias columnas) es una sola lista agrupada por cada una; una
        *  fecha lleva sus días de un toque (hoy, mañana, una semana, sin fecha); lo que se pone solo, su nota. */
+      function opcionesUno(gs, sel) {
+        return '<option value="">Nadie en concreto</option>' + gs.map(function (g) {
+          return '<optgroup label="' + texto(g.titulo) + '">' + g.opciones.map(function (o) {
+            var v = g.col + '|' + o.valor;
+            return '<option value="' + texto(v) + '"' + (v === sel ? ' selected' : '') + '>' + texto(o.nombre) + '</option>';
+          }).join('') + '</optgroup>';
+        }).join('');
+      }
       function entradaAlta(a, c, crudo, ed, hoy) {
         var cp = campo(a, c), id = 'li-c-' + c;
         if (cp.primero) {
-          var partes = cp.primero.filter(function (p) { return ed.indexOf(p) >= 0 && campo(a, p).ids; });
-          return '<div class="u-campo u-ancho"><label class="u-etiqueta" for="' + id + '">' + texto(cp.titulo) + '</label><select id="' + id + '" data-uno="' + texto(c) + '">' +
-            '<option value="">Nadie en concreto</option>' + partes.map(function (p) {
-              var ids = campo(a, p).ids;
-              return '<optgroup label="' + texto(campo(a, p).titulo) + '">' + Object.keys(ids).map(function (n) {
-                return '<option value="' + texto(p + '|' + ids[n]) + '"' + (String(crudo[p] || '') === String(ids[n]) ? ' selected' : '') + '>' + texto(n) + '</option>';
-              }).join('') + '</optgroup>';
-            }).join('') + '</select></div>';
+          // T0677: agrupada (Marcas, Proveedores, Otros), por orden alfabético y, si es larga, con un buscador encima.
+          var gs = gruposConQuien(a, c, ed), n = gs.reduce(function (k, g) { return k + g.opciones.length; }, 0), sel = '';
+          gs.forEach(function (g) { if (!vacio(crudo[g.col])) sel = g.col + '|' + crudo[g.col]; });
+          return '<div class="u-campo u-ancho"><label class="u-etiqueta" for="' + id + '">' + texto(cp.titulo) + '</label>' +
+            (n > 12 ? '<input type="search" class="li-cq-buscar" data-buscar-uno="' + texto(c) + '" placeholder="Busca por el nombre" aria-label="Buscar en ' + texto(cp.titulo.toLowerCase()) + '" autocomplete="off">' : '') +
+            '<select id="' + id + '" data-uno="' + texto(c) + '">' + opcionesUno(gs, sel) + '</select></div>';
         }
         var h = entrada(a, c, crudo), fin = h.lastIndexOf('</div>');
         if (cp.tipo === 'fecha') {
@@ -2204,7 +2320,7 @@
       window.addEventListener('scroll', alDesplazar, true);
       avDes.querySelector('[data-deshacer]').addEventListener('click', function () {
         var d = avDes._deshacer; sinDeshacer();
-        if (d) Promise.resolve(d()).then(function () { ctx.aviso('Deshecho.'); });
+        if (d) deshacerYDecir(d);
       });
 
       ctx.alCambiar(function (t) {

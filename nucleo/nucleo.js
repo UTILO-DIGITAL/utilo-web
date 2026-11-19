@@ -101,6 +101,7 @@
 
   /** Entrar con Google: el motor dice el nombre del negocio y si tiene sesión larga (T0209); después, «entrar». */
   function acceso(aviso) {
+    usoParar(); // T0682: en la pantalla de entrada no hay nadie a quien apuntar
     cargando('Conectando…');
     inicio().then(function (ini) {
       if (window.UG.configurar) window.UG.configurar(ini);
@@ -253,7 +254,8 @@
     if (r.aviso) o.aviso = String(r.aviso); // T0639: el aviso de arriba (config.json · nucleo.aviso)
     if (r.perfilEnMenu === false) o.perfilEnMenu = false; // T0415: Perfil fuera del menú (se abre con el nombre de la cabecera)
     if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
-    if (r.ocultar && Array.isArray(r.ocultar.tablas)) o.ocultar = { tablas: r.ocultar.tablas, refs: r.ocultar.refs || {}, filas: r.ocultar.filas || {} }; // T0650
+    if (r.uso && r.uso.app && r.uso.url) o.uso = { app: String(r.uso.app), url: String(r.uso.url), clave: String(r.uso.clave || '') }; // T0682
+    if (r.ocultar && Array.isArray(r.ocultar.tablas)) o.ocultar = { tablas: r.ocultar.tablas, refs: r.ocultar.refs || {}, filas: r.ocultar.filas || {}, columnas: r.ocultar.columnas || {} }; // T0650; T0671: columnas
     return o;
   }
 
@@ -266,9 +268,14 @@
 
   /** T0639 · El aviso del proyecto (config.json · nucleo.aviso), arriba en todas las secciones; sin él, nada. No se queda
    *  fijo al bajar: no tapa nada. */
-  function htmlAviso() {
-    return cred.aviso ? '<p class="n-aviso-app" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/>' +
-      '<path d="M12 11v5M12 8h.01"/></svg><span>' + texto(cred.aviso) + '</span></p>' : '';
+  function htmlAviso() { return '<div id="n-aviso-app"></div>'; }
+
+  /** T0672 · El aviso de la sección abierta: el suyo (nucleo.secciones.<id>.aviso; "" = ninguno) o, si no tiene, el del proyecto. */
+  function ponerAviso(s) {
+    var c = $('n-aviso-app'); if (!c) return;
+    var t = s && s.aviso !== undefined ? s.aviso : cred.aviso || '';
+    c.innerHTML = t ? '<p class="n-aviso-app" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/>' +
+      '<path d="M12 11v5M12 8h.01"/></svg><span>' + texto(t) + '</span></p>' : '';
   }
 
   /* ---------- el marco ---------- */
@@ -413,6 +420,7 @@
       '<div class="u-aviso" id="n-aviso" role="status" hidden></div>';
     $('n-plegar').onclick = plegar;
     tope();
+    usoSegun(cred); // T0682: antes de abrir, para que la primera sección cuente
     abrir(pedida() || menu()[0].id, false);
     avisarVersiones();
     cifras();
@@ -655,7 +663,9 @@
     actual = s.id;
     marcarMenu(s.enPerfil ? 'PERFIL' : s.id); // una sección de dentro de Perfil marca Perfil en el menú (T0269)
     verMas(false);
+    usar(function (u) { u.seccion(s.id, s.titulo); }); // T0682
     $('n-titulo').textContent = s.titulo;
+    ponerAviso(s);
     document.title = s.titulo + ' · ' + (C.nombreApp || cred.negocio || '');
     if (push) {
       // T0420: cuánto habías bajado donde estabas y de qué sección vienes, para que «atrás» (o «Volver a …» de la ficha de
@@ -750,8 +760,7 @@
       correo: cred.correo || '', secciones: todas().map(function (x) {
         if (x.enPerfil) return { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true };
         // T0644: las que esta persona personaliza (Listado: quien administra o su perfil en PERSONALIZAN) salen en su Perfil.
-        var pers = (x.base || x.id) === 'LISTADO' && (cred.admin || ((x.config || {}).PERSONALIZAN || []).indexOf(cred.perfil) >= 0);
-        return pers ? { id: x.id, titulo: x.titulo, personaliza: true } : { id: x.id, titulo: x.titulo };
+        return personaliza(x) ? { id: x.id, titulo: x.titulo, personaliza: true } : { id: x.id, titulo: x.titulo };
       }),
       tablas: tablas(),
       alCambiar: function (f) { (oyentes[s.id] = oyentes[s.id] || []).push(f); },
@@ -764,6 +773,51 @@
     };
   }
 
+  /* ---------- T0682 · el uso de la app (nucleo/uso.js) ----------
+   * Si «entrar» trae uso ({ app, url, clave }: config.json · nucleo.uso) y no se está viendo como otra persona, se carga
+   * nucleo/uso.js cuando la sección ya está pintada y apunta quién entra, las secciones, los avisos en rojo, los errores y las
+   * esperas del motor, y cuándo sale. Lo de antes de que cargue espera en usoPend. Otra persona o sin uso: se para. */
+  var usoAhora = null, usoPend = [], usoCargando = false, usoOyentes = false;
+  function usar(f) { if (usoAhora) { try { f(usoAhora); } catch (e) {} } else if (usoCargando) usoPend.push(f); }
+  function usoParar() { if (usoAhora) usoAhora.parar(); usoAhora = null; usoPend = []; usoCargando = false; }
+  function usoSegun(c) {
+    if (!c || !c.uso || c.como || !c.correo) { usoParar(); return; }
+    if (usoAhora && usoAhora.correo === c.correo) return;
+    if (usoCargando && usoCargando === c.correo) return;
+    usoParar();
+    usoCargando = c.correo;
+    var listo = function () {
+      if (usoCargando !== c.correo || !window.NUCLEO_USO) return;
+      var U = window.NUCLEO_USO;
+      usoAhora = U.crear({
+        app: c.uso.app, url: c.uso.url, clave: c.uso.clave, correo: c.correo, persona: c.persona, perfil: c.perfil, version: c.version,
+        aparato: U.aparato(navigator, window.innerWidth),
+        local: /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) || location.protocol === 'file:'
+      });
+      usoCargando = false;
+      var p = usoPend; usoPend = [];
+      p.forEach(usar);
+      U.envolver(window.UG, function () { return usoAhora; });
+      if (!usoOyentes) {
+        usoOyentes = true;
+        U.vigilarAvisos(document, function () { return usoAhora; });
+        document.addEventListener('visibilitychange', function () { usar(function (u) { if (document.visibilityState === 'hidden') u.salir(); else u.volver(); }); });
+        window.addEventListener('pagehide', function () { usar(function (u) { u.salir(); }); });
+        window.addEventListener('error', function (e) { usar(function (u) { u.falloPagina(e && (e.message || e.error)); }); });
+      }
+    };
+    if (window.NUCLEO_USO) { listo(); return; }
+    // Cuando la página ya está pintada: no compite con lo que se ve al entrar.
+    setTimeout(function () {
+      if (usoCargando !== c.correo) return;
+      var sc = document.createElement('script');
+      sc.src = RAIZ + 'nucleo/uso.js?v=1';
+      sc.onload = listo;
+      sc.onerror = function () { if (usoCargando === c.correo) { usoCargando = false; usoPend = []; } };
+      document.head.appendChild(sc);
+    }, 1200);
+  }
+
   var tAviso = 0;
   function aviso(t) {
     var a = $('n-aviso');
@@ -771,6 +825,21 @@
     a.textContent = t; a.hidden = false;
     clearTimeout(tAviso);
     tAviso = setTimeout(function () { a.hidden = true; }, 5000);
+  }
+
+  /** T0644 · Si quien ha entrado personaliza esta sección (Listado: quien administra o su perfil en PERSONALIZAN). Lo usan el
+   *  Perfil del marco y, por ctx.secciones (personaliza), la sección Perfil. */
+  function personaliza(x) {
+    return (x.base || x.id) === 'LISTADO' && !x.enPerfil && (!!cred.admin || ((x.config || {}).PERSONALIZAN || []).indexOf(cred.perfil) >= 0);
+  }
+  /** T0644 · Personalizar en el Perfil del marco (sin sección PERFIL), como en la sección Perfil: una línea por sección. */
+  function htmlPersonalizar() {
+    var ss = todas().filter(personaliza);
+    if (!ss.length) return '';
+    return '<section class="pf-pers"><h2 class="n-grupo">Personalizar</h2><p class="u-nota">El orden del menú, qué vistas ve cada sección y con cuántos días avisa.</p>' +
+      '<ul class="pf-pers-l">' + ss.map(function (x) {
+        return '<li><a href="?s=' + encodeURIComponent(x.id.toLowerCase()) + '&personalizar=1" data-sx="' + texto(x.id) + '"><span>' + texto(x.titulo) + '</span><span aria-hidden="true">›</span></a></li>';
+      }).join('') + '</ul></section>';
   }
 
   /** Perfil del marco, mientras el cliente no tenga la sección PERFIL: quién eres, tu perfil, las de dentro de Perfil y cerrar sesión. */
@@ -791,7 +860,7 @@
       (window.UG.avisos && !cred.como ? '<div class="n-avisos" id="n-avisos"></div>' : '') +
       (dentro.length ? '<div class="n-botones">' + dentro.map(function (s) {
         return '<a class="u-btn" href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '">' + texto(s.titulo) + '</a>';
-      }).join('') + '</div>' : '') + '</div>' + htmlVersion();
+      }).join('') + '</div>' : '') + htmlPersonalizar() + '</div>' + htmlVersion();
   }
 
   function conCodigo() { return !!(window.UG.formas && window.UG.formas().indexOf('codigo') >= 0); }

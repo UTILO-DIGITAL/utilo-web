@@ -548,12 +548,29 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .eco-kpi.eco-grande { grid-column: 1 / -1; background: var(--color-principal); color: var(--color-sobre-principal); }
 .u .eco-kpi b { display: block; font: 600 13px/1.3 var(--fuente-texto); color: var(--color-suave); }
 .u .eco-fbarra .li-nueva { margin-left: auto; } /* T0646: Filtrar y Añadir, como en el Listado */
+/* T0644 · Movimientos: sitio abajo para que «Añadir movimiento» (flotante) no tape la última fila. */
+.u .eco-con-fab { padding-bottom: 88px; }
 .u .eco-kpi.eco-grande b { color: inherit; }
 .u .eco-pint { font: 400 18px/1 var(--fuente-destacar, var(--fuente-titulos)); text-transform: none; letter-spacing: 0; color: var(--color-destacado, inherit); margin-left: var(--e1); }
 .u .eco-val { display: block; margin-top: var(--e1); font: var(--peso-titulos) 22px/1.2 var(--fuente-titulos); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .u .eco-grande .eco-val { font-size: 30px; color: var(--color-destacado, inherit); }
 .u .eco-sub { display: block; margin-top: var(--e1); font-size: 13px; }
 @media (min-width: 640px) { .u .eco-kpis { grid-template-columns: 1.4fr 1fr 1fr; } .u .eco-kpi.eco-grande { grid-column: auto; } }
+/* T0628 · Ventas: las cifras se tocan y abren de dónde salen; los pasos de una venta. */
+.u button.eco-kpi { display: block; width: 100%; border: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.u button.eco-kpi:hover, .u button.eco-kpi[aria-expanded=true] { outline: 2px solid var(--color-principal); outline-offset: 2px; }
+.u .eco-ver { display: block; margin-top: var(--e2); font-size: 13px; font-weight: 700; text-decoration: underline; }
+.u .eco-des { padding: var(--e3) var(--e4); margin: 0 0 var(--e4); }
+.u .eco-des-cab { display: flex; justify-content: space-between; align-items: center; gap: var(--e2); }
+.u .eco-des-cab .n-grupo { margin: 0; }
+.u .eco-paso { display: block; font-size: 13px; color: var(--color-suave); font-weight: 400; }
+.u .eco-paso b { color: var(--color-texto); font-weight: 600; }
+.u .eco-pasos { list-style: none; margin: 0 0 var(--e4); padding: 0; }
+.u .eco-pasos li { display: flex; justify-content: space-between; gap: var(--e2); padding: var(--e2) 0; border-bottom: 1px solid var(--color-linea); }
+.u .eco-pasos li::before { content: "·"; width: 18px; flex: none; }
+.u .eco-pasos li.eco-ya::before { content: "✓"; color: var(--color-principal); font-weight: 700; }
+.u .eco-pasos li:not(.eco-ya) { color: var(--color-suave); }
+.u .eco-pasos li > span:first-of-type { flex: 1; }
 /* T0270 · En una pantalla ancha, las cifras pequeñas (IVA, sin factura, pendientes) van al lado de las grandes, a su altura. */
 @media (min-width: 1400px) {
   .u .eco-arriba { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--e2); margin: 0 0 var(--e3); }
@@ -2064,7 +2081,7 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-aviso + .li-aviso::before { content: "·"; margin-right: var(--e2); }
 .u .li-ficha-avisos .li-aviso { font-weight: 700; font-size: 13px; color: var(--li-c, var(--color-pendiente)); }
 .u .li-ficha-avisos .li-aviso + .li-aviso::before { color: var(--color-suave); }
-.u .li-marcas { margin-top: var(--e1); font-weight: 400; }
+.u .li-marcas { margin-top: var(--e1); font-weight: 400; display: flex; flex-wrap: wrap; } /* T0677: dos avisos juntos bajan de línea (no ensanchan la tabla) */
 .u .li-fecha, .u .li-fecha .u-nota { color: var(--li-c); font-weight: 700; }
 .u .u-tabla tr.li-con-aviso td:first-child { box-shadow: inset 4px 0 0 var(--li-barra, transparent); }
 .u .li-f-alto { --li-barra: var(--color-vencido); } .u .li-f-medio { --li-barra: var(--color-pendiente); }
@@ -2146,6 +2163,17 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
   color: var(--color-suave); white-space: nowrap; }
 .u .u-tabla td.li-td-cod { width: 1%; white-space: nowrap; }
 .u .u-tabla td.li-td-corta { white-space: nowrap; }
+/* T0677: con la tabla estrecha (portátil pequeño, tableta, o el menú abierto), la fecha pone «hace 9 días» debajo y el estado
+   se puede partir, para que «Pasar» y el Estado no queden fuera. Mira el ancho de la tabla, no el de la pantalla. */
+.u .li-tabla { container-type: inline-size; }
+@container (max-width: 960px) {
+  .u .u-tabla td.li-td-fecha .li-cuando { display: block; }
+  .u .u-tabla td.li-td-fecha .li-punto { display: none; }
+  .u .u-tabla td.li-td-estado { white-space: normal; }
+  .u .u-tabla td.li-td-estado .u-chip { white-space: normal; line-height: 1.3; }
+  .u .li-tabla .u-tabla th, .u .li-tabla .u-tabla td { padding-left: var(--e2); padding-right: var(--e2); }
+  .u .li-tabla .u-tabla thead th { white-space: normal; } /* «Qué hay que hacer o qué pasó», en dos líneas */
+}
 .u .li-ficha-cab h2 .li-cod { font-size: 14px; vertical-align: 3px; }
 .u .li-claude { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e3); padding-top: var(--e3); border-top: 1px solid var(--color-linea); }
 /* T0630 · En la ficha, lo vacío de un apartado, junto en una línea («Sin rellenar: Formato · Notas»); lo que se edita se abre al tocarlo. */
@@ -2358,7 +2386,7 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 @media (max-width: 639px) {
   .u .li-qes { display: inline-flex; }
   .u .li-texto { display: none; } .u .li-texto.li-abierto { display: block; }
-  .u .li-barra { flex-wrap: nowrap; gap: var(--e2); }
+  .u .li-barra:not(.eco-fbarra), .u .eco-fbarra.eco-fmov { flex-wrap: nowrap; gap: var(--e2); } /* Facturas (más cosas) sí baja de línea */
   .u .li-barra .li-buscar { flex: 1 1 0; }
   .u .li-barra .li-filtrar, .u .li-barra .li-nueva { flex: none; padding: 0 var(--e3); }
   .u .li-barra .li-nueva { order: 3; }

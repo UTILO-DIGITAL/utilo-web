@@ -36,7 +36,9 @@
   function nombre(D, t, id) { var f = id ? D.fila(t, id) : null; return f ? String(f.NOMBRE || id) : ''; }
   function ajustes(D) {
     var a = D.fila('AJUSTES', 'AJUSTES') || {};
-    return { rupias: aNum(a.RUPIAS_POR_EURO), envio: aNum(a.ENVIO_ARANCEL) };
+    // T0678: un envío a 0 es que falta (en su Excel, una celda sin rellenar), como «Falta el envío» en Mis telas.
+    var e = aNum(a.ENVIO_ARANCEL);
+    return { rupias: aNum(a.RUPIAS_POR_EURO), envio: e > 0 ? e : NaN };
   }
   /** Las telas que se pueden elegir (sin las descartadas), por código: { id, nombre, diseno, inr, ancho }. */
   function telas(D) {
@@ -54,10 +56,10 @@
     if (isNaN(t.inr) || !(rupias > 0)) return NaN;
     return r2(t.inr / rupias);
   }
-  /** El envío por metro: el escrito o, del pedido entero, repartido entre los metros. NaN si falta. */
+  /** El envío por metro: el escrito o, del pedido entero, repartido entre los metros. NaN si falta (también a 0: T0678). */
   function envioMetro(e) {
-    if (e.modo === 'pedido') { var tot = aNum(e.total), m = aNum(e.metros); return tot >= 0 && m > 0 ? tot / m : NaN; }
-    var n = aNum(e.metro); return n >= 0 ? n : NaN;
+    if (e.modo === 'pedido') { var tot = aNum(e.total), m = aNum(e.metros); return tot > 0 && m > 0 ? tot / m : NaN; }
+    var n = aNum(e.metro); return n > 0 ? n : NaN;
   }
   /** Lo que gana, en euros por metro: precio = lo que le cuesta + lo que gana (12 € + 6 € = 18 €). */
   function precioDe(coste, gana) { return r2(coste + gana); }
@@ -190,7 +192,7 @@
         h += '<span class="u-etiqueta">Precio para ' + texto(para) + '</span>';
         if (!t) h += '<p class="u-vacio">Elige una tela de Mis telas o «Otra: escribo el coste».</p>';
         else if (isNaN(r.base)) h += '<p class="u-vacio">' + (t.otra ? 'Escribe el coste del proveedor.' : isNaN(t.inr) ? 'Esta tela aún no tiene el coste del proveedor en Mis telas. Elige «Otra: escribo el coste» y ponlo.' : 'Falta el cambio de rupias en tus ajustes.') + '</p>';
-        else if (isNaN(r.envio)) h += '<p class="u-vacio">Falta el envío.</p>';
+        else if (isNaN(r.envio)) h += '<p class="u-vacio">Falta el envío: escríbelo arriba. Sin él no se sabe lo que te cuesta.</p>';
         else {
           if (isNaN(r.precio)) h += '<p class="pr-grande pr-nada">— <small>pon lo que quieres ganar o un precio</small></p>';
           else {
@@ -199,8 +201,9 @@
             if (r.perdida) h += '<p class="pr-aviso pr-mal">Por debajo de lo que te cuesta (' + eur(r.coste) + ').</p>';
           }
           var origen = !isNaN(t.inr) && isNaN(t.eur) ? cifra(t.inr, 0) + ' ₹ → ' + eur(r.base, false) : eur(r.base, false);
-          h += '<p class="pr-cuentas u-cifra">Te cuesta <b>' + eur(r.coste) + '</b>: ' + origen + ' + envío ' + eur(r.envio, false) +
-            (!isNaN(r.precio) && !r.perdida ? ' · + ganas ' + eur(r.gana, false) + ' = ' + eur(r.precio) : '') + '</p>';
+          // T0678: lo que cuesta y lo que gana, cada uno en su línea (en una, «+ ganas» parecía parte del coste).
+          h += '<p class="pr-cuentas u-cifra">Te cuesta <b>' + eur(r.coste) + '</b>: ' + origen + ' + envío ' + eur(r.envio, false) + '</p>' +
+            (!isNaN(r.precio) && !r.perdida ? '<p class="pr-cuentas u-cifra">' + eur(r.coste, false) + ' + ganas ' + eur(r.gana, false) + ' = ' + eur(r.precio) + '</p>' : '');
           if (factura && !isNaN(r.precio) && t.id) {
             var href = '?s=economia&factura=nueva&articulo=' + encodeURIComponent(t.id) + '&precio=' + encodeURIComponent(r.precio) + (S.marca ? '&cliente=' + encodeURIComponent('ID_MARCA:' + S.marca) : '');
             h += '<a class="u-btn pr-fac" href="' + texto(href) + '" data-sx="ECONOMIA">Llevar a una factura</a>';
