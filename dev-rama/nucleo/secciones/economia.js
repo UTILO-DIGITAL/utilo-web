@@ -17,6 +17,11 @@
  *   Caja      el dinero de cada cuenta (banco, cajas, socios) y, al tocarla, sus movimientos con el saldo.
  *   Pendiente facturas por cobrar y por pagar y gastos sin factura.
  *   Facturas  de T0257, con el cliente o el proveedor de cada una y su enlace para abrirla en Drive (ARCHIVO_URL).
+ *             T0627 · Con FACTURA_LINEAS = Sí, una emitida se hace por líneas (FACTURA_LINEAS: qué, cantidad, unidad,
+ *             precio; la base es su suma), con el CIF y la dirección del cliente (economiaClienteDatos), y se ve como
+ *             documento («Ver la factura», economiaFacturaVer) o, con FACTURA_CARPETA, se guarda su PDF en Drive y se
+ *             enlaza («Guardar y sacar el PDF», economiaFacturaPdf). Los datos de la empresa, en la tabla EMPRESA («Datos de
+ *             tu empresa», en Facturas). El documento, en motor/modulos/economia/ECONOMIA_FACTURA.js.
  *   Presupuesto  quien dice PREPARA_PRESUPUESTO toca una categoría y define lo previsto, con una recomendación sacada
  *             de lo real del periodo anterior (por MEDIDAS, si las hay) y confirmación; los demás solo lo miran.
  *
@@ -54,6 +59,38 @@
     var p = pct(tipo), b = Math.round(total * 100 / (100 + p)), c = [b, b - 1, b + 1];
     for (var k = 0; k < c.length; k++) if (c[k] + Math.round(c[k] * p / 100) === total) return c[k];
     return b;
+  }
+  /** T0627 · Una cantidad escrita («12,5», «30», vacía = 1) → número. */
+  function cantidad(v) {
+    if (v === '' || v == null) return 1;
+    var n = typeof v === 'number' ? v : Number(String(v).replace(/\s/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'));
+    return isFinite(n) ? n : 0;
+  }
+  /** T0627 · Un precio escrito («22,5», «18,595») → euros, sin redondear (el de sin IVA puede llevar hasta 4 decimales). */
+  function precio(v) {
+    if (v === '' || v == null) return 0;
+    var n = typeof v === 'number' ? v : Number(String(v).replace(/\s|€/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'));
+    return isFinite(n) ? n : 0;
+  }
+  /**
+   * T0627 · El precio sin IVA de uno con el IVA incluido (como lo sabe Marta), con 4 decimales: así cantidad × precio, con
+   * su IVA, da lo que ella cuenta (20 m a 22,50 € con IVA → 18,595 € sin IVA → 371,90 € + 78,10 € = 450,00 €).
+   */
+  function sinIva(conIva, tipo) { return Math.round(precio(conIva) * 1000000 / (100 + pct(tipo))) / 10000; }
+  /** T0627 · El precio con IVA (2 decimales) de uno sin IVA: para enseñarlo cuando se escriben con IVA. */
+  function conIvaPrecio(sin, tipo) { return Math.round(precio(sin) * (100 + pct(tipo))) / 100; }
+  /** T0627 · El importe (céntimos) de una línea de factura: cantidad × precio, redondeado al céntimo (como el documento). */
+  function importeLinea(l) { return Math.round(cantidad(l.CANTIDAD) * precio(l.PRECIO) * 100); }
+  /** T0627 · La base (céntimos) de unas líneas: la suma de sus importes; las vacías (sin concepto ni precio) no cuentan. */
+  function baseLineas(ls) {
+    var b = 0;
+    (ls || []).forEach(function (l) { if (l && (String(l.CONCEPTO || '').trim() || precio(l.PRECIO))) b += importeLinea(l); });
+    return b;
+  }
+  /** T0627 · Las líneas de una factura, en su orden (por ID: se crean una tras otra). */
+  function lineasDe(lin, idFac) {
+    return (lin || []).filter(function (l) { return String(l.ID_FACTURA) === String(idFac); })
+      .sort(function (a, b) { return String(a.ID).localeCompare(String(b.ID), 'es', { numeric: true }); });
   }
   function suma(a, b) { return { base: a.base + b.base, iva: a.iva + b.iva, total: a.total + b.total }; }
   function cero() { return { base: 0, iva: 0, total: 0 }; }
@@ -346,10 +383,113 @@
     return mal;
   }
 
+  /* ---------- T0635 · lo que se vende (ARTICULOS, p. ej. Mis telas) ----------
+   * art: la configuración ARTICULOS ya montada (con _refs de los YAML y, si sale de una sección Listado, _precio y _valores).
+   * D: { filas(t), fila(t, id) }, las tablas al momento. */
+  function aNum(v) {
+    if (typeof v === 'number') return v;
+    var s = String(v == null ? '' : v).trim(); if (!s) return NaN;
+    var pc = /%$/.test(s); s = s.replace(/[€₹%\s]/g, '');
+    if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, '');
+    s = s.replace(',', '.');
+    var n = /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : NaN;
+    return pc ? n / 100 : n;
+  }
+  function nombreFila(D, t, id) {
+    var f = id === '' || id == null ? null : D.fila(t, id);
+    if (!f) return id == null ? '' : String(id);
+    var n = ['NOMBRE', 'TITULO', 'DETALLE'].filter(function (k) { return f[k] !== '' && f[k] != null; })[0];
+    return n ? String(f[n]) : String(id);
+  }
+  /** El valor de una ruta («ID_DISENO.ANCHO») desde una fila de t, siguiendo las referencias; al final, el nombre si es una ref (crudo: el código). */
+  function seguirRuta(art, D, t, f, ruta, crudo) {
+    var ps = String(ruta).split('.'), rs = art._refs || {}, fila = f, tt = t;
+    for (var i = 0; i < ps.length - 1; i++) {
+      var r = (rs[tt] || {})[ps[i]];
+      if (!r || !fila || fila[ps[i]] === '' || fila[ps[i]] == null) return '';
+      fila = D.fila(r, fila[ps[i]]); tt = r;
+    }
+    if (!fila) return '';
+    var ult = ps[ps.length - 1], rr = (rs[tt] || {})[ult];
+    return rr && !crudo ? nombreFila(D, rr, fila[ult]) : fila[ult];
+  }
+  /** El mismo cálculo que la sección Listado (el precio de Mis telas): números, columnas o rutas, «$VALOR» y [op, …]. Un hueco da NaN. */
+  function calcArt(art, D, e, f, val) {
+    if (typeof e === 'number') return e;
+    if (typeof e === 'string') return aNum(e.charAt(0) === '$' ? val[e.slice(1)] : seguirRuta(art, D, art.tabla, f, e, true));
+    if (!Array.isArray(e) || !e.length) return NaN;
+    var op = e[0], a = e.slice(1);
+    if (op === 'o') { for (var i = 0; i < a.length; i++) { var x = calcArt(art, D, a[i], f, val); if (!isNaN(x)) return x; } return NaN; }
+    if (op === 'redondear') { var r = calcArt(art, D, a[0], f, val), p = Math.pow(10, a[1] || 0); return Math.round(r * p) / p; }
+    var ns = a.map(function (y) { return calcArt(art, D, y, f, val); });
+    if (ns.some(isNaN)) return NaN;
+    if (op === '+') return ns.reduce(function (s, n) { return s + n; }, 0);
+    if (op === '*') return ns.reduce(function (s, n) { return s * n; }, 1);
+    if (op === '-') return ns.length === 1 ? -ns[0] : ns.slice(1).reduce(function (s, n) { return s - n; }, ns[0]);
+    if (op === '/') return ns[1] === 0 ? NaN : ns[0] / ns[1];
+    return NaN;
+  }
+  /** Una parte del detalle: un campo o ruta (con su unidad) o, con «tabla», las filas de otra tabla que le tocan, con su parte («52 % Viscosa · 48 % Algodón»). */
+  function detalleDe(art, D, f, o) {
+    if (typeof o === 'string') o = { campo: o };
+    if (o.tabla) {
+      var de = String(seguirRuta(art, D, art.tabla, f, o.con || art.codigo || 'ID', true));
+      if (!de) return '';
+      var xs = (D.filas(o.tabla) || []).filter(function (x) { return String(x[o.campo]) === de; }).map(function (x) {
+        var n = aNum(x[o.porcentaje]); if (n > 1) n = n / 100;
+        var nom = (((art._refs || {})[o.tabla] || {})[o.nombre]) ? nombreFila(D, art._refs[o.tabla][o.nombre], x[o.nombre]) : String(x[o.nombre] == null ? '' : x[o.nombre]);
+        return { n: n, t: (isNaN(n) ? '' : Math.round(n * 100) + ' % ') + nom };
+      }).filter(function (x) { return x.t.trim(); });
+      xs.sort(function (a, b) { return (isNaN(b.n) ? -1 : b.n) - (isNaN(a.n) ? -1 : a.n); });
+      return xs.map(function (x) { return x.t; }).join(' · ');
+    }
+    var v = String(seguirRuta(art, D, art.tabla, f, o.campo) == null ? '' : seguirRuta(art, D, art.tabla, f, o.campo)).trim();
+    return v ? v + (o.unidad ? ' ' + o.unidad : '') : '';
+  }
+  /** ¿Pasa la fila los filtros? ({ campo, no: […] } o { campo, es: […] }, con los nombres como se ven). */
+  function pasaArt(art, D, f) {
+    return (art.filtro || []).every(function (c) {
+      var v = String(seguirRuta(art, D, art.tabla, f, c.campo));
+      if (c.no) return [].concat(c.no).indexOf(v) < 0;
+      if (c.es) return [].concat(c.es).indexOf(v) >= 0;
+      return true;
+    });
+  }
+  function normArt(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  /** Lo que se puede vender, por código: [{ codigo, nombre, detalle, unidad, precio (sin IVA; NaN si falta algo para calcularlo) }]. */
+  function articulos(art, D) {
+    if (!art || !art.tabla) return [];
+    var val = {};
+    Object.keys(art._valores || {}).forEach(function (k) {
+      var v = art._valores[k];
+      if (v && typeof v === 'object') { var f = D.fila(v.tabla, v.fila); val[k] = f ? f[v.columna || 'VALOR'] : ''; } else val[k] = v;
+    });
+    return (D.filas(art.tabla) || []).filter(function (f) { return pasaArt(art, D, f); }).map(function (f) {
+      var cod = String(f[art.codigo || 'ID'] == null ? '' : f[art.codigo || 'ID']).trim();
+      var nom = [].concat(art.nombre || []).map(function (c) { return String(seguirRuta(art, D, art.tabla, f, c) || '').trim(); }).filter(Boolean).join(' · ') || cod;
+      var det = [].concat(art.detalle || []).map(function (o) { return detalleDe(art, D, f, o); }).filter(Boolean).join(' · ');
+      var pr = art._precio ? calcArt(art, D, art._precio, f, val) : art.precio ? aNum(f[art.precio]) : NaN;
+      if (!isNaN(pr)) pr = Math.round(pr * 100) / 100;
+      return { codigo: cod, nombre: nom, detalle: det, unidad: String(art.unidad || ''), precio: isNaN(pr) || pr < 0 ? NaN : pr, _b: normArt(nom + ' ' + cod + ' ' + det) };
+    }).filter(function (a) { return a.codigo; }).sort(function (a, b) { return a.codigo.localeCompare(b.codigo, 'es'); });
+  }
+  /** Los que tienen todas las palabras de q (en el nombre, el código o el detalle), como mucho max. Sin palabras, ninguno. */
+  function buscarArt(arts, q, max) {
+    var ws = normArt(q).split(/\s+/).filter(Boolean);
+    return ws.length ? arts.filter(function (a) { return ws.every(function (w) { return a._b.indexOf(w) >= 0; }); }).slice(0, max || 6) : [];
+  }
+  /** El artículo de una línea guardada: el código al final de su concepto («… · BOR-004-01»). */
+  function artDe(arts, concepto) {
+    var m = String(concepto || '').match(/·\s*([^·]+)$/), c = m ? m[1].trim() : '';
+    return c ? arts.filter(function (a) { return a.codigo === c; })[0] || null : null;
+  }
+
   var CALC = { cts: cts, pct: pct, importe: importe, baseDeTotal: baseDeTotal, eur: eur, eur0: eur0, fecha: fecha, periodos: periodos, periodoActual: periodoActual,
     anteriores: anteriores, movDe: movDe, facDe: facDe, preDe: preDe, resumen: resumen, saldos: saldos, cuenta: cuenta, pendientes: pendientes,
     sinFactura: sinFactura, presupuesto: presupuesto, grupos: grupos, estadoLinea: estadoLinea, avisos: avisos, cruzados: cruzados,
-    desglose: desglose, recomendar: recomendar, esReparto: esReparto, problemasMov: problemasMov };
+    desglose: desglose, recomendar: recomendar, esReparto: esReparto, problemasMov: problemasMov,
+    cantidad: cantidad, precio: precio, sinIva: sinIva, conIvaPrecio: conIvaPrecio, importeLinea: importeLinea, baseLineas: baseLineas, lineasDe: lineasDe,
+    articulos: articulos, buscarArt: buscarArt, artDe: artDe };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -375,7 +515,14 @@
       var T = ctx.tablas, cfg = ctx.config || {}, R = cfg._refs || {};
       var P = String(cfg.PERIODO || ''), DS = String(cfg.DESGLOSE || '');
       var nomPer = String(cfg.NOMBRE_PERIODO || 'Año'), nomDes = String(cfg.NOMBRE_DESGLOSE || DS);
-      var tablas = TABLAS.concat(R.PERIODO ? [R.PERIODO] : [], R.DESGLOSE && R.DESGLOSE !== R.PERIODO ? [R.DESGLOSE] : []);
+      // T0627: con FACTURA_LINEAS, una factura emitida se hace por líneas (tabla FACTURA_LINEAS) y se ve como documento.
+      var LINEAS = cfg.FACTURA_LINEAS === 'Sí';
+      // y los datos de la empresa para el documento salen de la tabla EMPRESA, que se cambia desde aquí (Datos de tu empresa).
+      var tablas = TABLAS.concat(LINEAS ? ['FACTURA_LINEAS', 'EMPRESA'] : [], R.PERIODO ? [R.PERIODO] : [], R.DESGLOSE && R.DESGLOSE !== R.PERIODO ? [R.DESGLOSE] : []);
+      // T0635: con ARTICULOS (Mis telas), en cada línea se elige lo que se vende y sale su precio recomendado.
+      var ART = LINEAS && cfg.ARTICULOS && cfg.ARTICULOS.tabla ? cfg.ARTICULOS : null;
+      if (ART) [ART.tabla].concat(Object.keys(ART._refs || {}), Object.keys(ART._valores || {}).map(function (k) { var v = ART._valores[k]; return v && v.tabla; }))
+        .forEach(function (t) { if (t && tablas.indexOf(t) < 0) tablas.push(t); });
       var pest = String(cfg.PESTANAS || Object.keys(PESTANAS).join(',')).split(',').map(function (s) { return s.trim().toUpperCase(); })
         .filter(function (s) { return PESTANAS[s]; });
       if (!pest.length) pest = Object.keys(PESTANAS);
@@ -395,13 +542,20 @@
         '<div class="u-velo" id="eco-velo"><div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="eco-vt"><div class="n-ventana" id="eco-vent"></div></div></div>';
       var cont = el.querySelector('#eco-cont'), velo = el.querySelector('#eco-velo'), vent = el.querySelector('#eco-vent'), selPer = el.querySelector('#eco-per');
 
+      function filaDe(t, id) {
+        if (id === '' || id == null) return null;
+        if (T.fila) return T.fila(t, id);
+        return (T.filas(t) || []).filter(function (x) { return String(x.ID) === String(id); })[0] || null;
+      }
+
       /* ---------- datos ---------- */
 
       function datos() {
         return {
           cfg: cfg, mov: T.filas('MOVIMIENTOS'), cat: T.filas('CATEGORIAS'), cue: T.filas('CUENTAS'), ctr: T.filas('CONTRAPARTES'),
           fac: T.filas('FACTURAS'), pre: T.filas('PRESUPUESTOS'), per: R.PERIODO ? T.filas(R.PERIODO) : [], des: R.DESGLOSE ? T.filas(R.DESGLOSE) : [],
-          colsPre: T.columnas ? T.columnas('PRESUPUESTOS') : [], colsMov: T.columnas ? T.columnas('MOVIMIENTOS') : []
+          colsPre: T.columnas ? T.columnas('PRESUPUESTOS') : [], colsMov: T.columnas ? T.columnas('MOVIMIENTOS') : [],
+          lin: LINEAS ? T.filas('FACTURA_LINEAS') : [], emp: LINEAS ? T.filas('EMPRESA')[0] || null : null, colsCtr: T.columnas ? T.columnas('CONTRAPARTES') : []
         };
       }
       var d, lista, per, ix;
@@ -650,7 +804,9 @@
           .sort(function (a, b) { return String(a.FECHA) < String(b.FECHA) ? 1 : -1; });
         var tot = 0; fs.forEach(function (x) { if (x.ESTADO !== 'Anulada') tot += importe(x).total; });
         var h = '<div class="eco-cab"><p class="u-nota">' + fs.length + (fs.length === 1 ? ' factura' : ' facturas') + ' · ' + eur(tot) + ' con IVA (sin las anuladas)</p>' +
-          '<button type="button" class="u-btn u-btn-accion" data-accion="factura">Añadir factura</button></div>' +
+          '<div class="n-botones">' + (LINEAS ? '<button type="button" class="u-btn" data-accion="empresa">Datos de tu empresa</button>' : '') +
+          '<button type="button" class="u-btn u-btn-accion" data-accion="factura">Añadir factura</button></div></div>' +
+          (LINEAS && empresaFaltan().length ? '<p class="u-nota eco-falta">Para que tus facturas estén completas falta ' + texto(empresaFaltan().join(', ')) + ': ponlo en «Datos de tu empresa».</p>' : '') +
           '<div class="u-filtros"><label class="u-campo"><span class="u-etiqueta">Tipo</span><select data-ffac="tipo">' + opciones([['Emitida', 'Emitidas'], ['Recibida', 'Recibidas'], ['Ticket', 'Tickets']], f.tipo, 'Todas') + '</select></label>' +
           '<label class="u-campo"><span class="u-etiqueta">Estado</span><select data-ffac="estado">' + opciones([['Pendiente', 'Pendiente'], ['Pagada', 'Pagada'], ['Anulada', 'Anulada'], ['-', 'Sin estado']], f.estado, 'Todos') + '</select></label></div>';
         if (!fs.length) return h + '<p class="u-vacio">No hay facturas ' + (f.tipo || f.estado ? 'con este filtro' : 'en la ' + texto(nomPeriodo() || 'este periodo')) + '. Las que añadas salen aquí al momento.</p>';
@@ -906,68 +1062,418 @@
         }, function () {});
       }
 
+      /** T0627 · Lo que le falta a la empresa para que sus facturas estén completas. */
+      function empresaFaltan() {
+        var e = d.emp || {}, f = [];
+        if (!String(e.NOMBRE || '').trim()) f.push('el nombre');
+        if (!String(e.NIF || '').trim()) f.push('el CIF');
+        if (!String(e.DIRECCION || '').trim()) f.push('la dirección');
+        return f;
+      }
+      /** T0627 · Los datos de la empresa para sus facturas (la fila de EMPRESA; si no hay, se crea al guardar). */
+      function formEmpresa() {
+        var e = d.emp || {};
+        var c = function (et, col, html, extra) { return campo(et, html.replace('%v', texto(e[col])), extra); };
+        ventana('<h2 id="eco-vt">Datos de tu empresa</h2><p class="u-nota">Salen en todas tus facturas. El nombre, el CIF y la dirección son obligatorios en una factura.</p><div class="u-campos">' +
+          c('Nombre o razón social', 'NOMBRE', '<input type="text" id="e-NOMBRE" value="%v" maxlength="120">', 'u-ancho') +
+          c('CIF', 'NIF', '<input type="text" id="e-NIF" value="%v" maxlength="20" autocomplete="off">') +
+          c('Teléfono', 'TELEFONO', '<input type="tel" id="e-TELEFONO" value="%v" maxlength="30">') +
+          c('Dirección fiscal', 'DIRECCION', '<textarea id="e-DIRECCION" rows="2" placeholder="Calle y número&#10;Código postal y ciudad">%v</textarea>', 'u-ancho') +
+          c('Email', 'EMAIL', '<input type="email" id="e-EMAIL" value="%v" maxlength="120">') +
+          c('Web', 'WEB', '<input type="text" id="e-WEB" value="%v" maxlength="120">') +
+          c('Forma de pago', 'FORMA_PAGO', '<textarea id="e-FORMA_PAGO" rows="2" placeholder="P. ej. Transferencia a 30 días">%v</textarea>', 'u-ancho') +
+          c('Pie de la factura (opcional)', 'PIE', '<textarea id="e-PIE" rows="2">%v</textarea>', 'u-ancho') + '</div>' +
+          '<p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="e-guardar">Guardar</button><button type="button" class="u-btn" data-cerrar>Cancelar</button></div>',
+        function () {
+          vent.querySelector('#e-guardar').onclick = function () {
+            var nv = {};
+            ['NOMBRE', 'NIF', 'DIRECCION', 'EMAIL', 'TELEFONO', 'WEB', 'FORMA_PAGO', 'PIE'].forEach(function (k) { nv[k] = val('e-' + k); });
+            nv.NIF = nv.NIF.toUpperCase().replace(/\s+/g, '');
+            if (nv.EMAIL && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(nv.EMAIL)) { verError(['El email no parece bien escrito.']); return; }
+            cerrar();
+            var p = d.emp ? T.actualizar('EMPRESA', d.emp.ID, cambios(d.emp, nv)) : T.crear('EMPRESA', nv);
+            p.then(function () { if (ctx.abierta()) ctx.aviso('Datos de tu empresa guardados en el Excel.'); }, function () {});
+          };
+        });
+      }
+
       /**
        * Ventana de una factura: nueva (f null, con lo que venga en pre) o una que ya está. Una emitida nueva la numera el
        * motor. movId: el movimiento al que se enlaza al guardarla (desde «Hacer la factura» de su ficha).
+       * T0627 · Con FACTURA_LINEAS, una emitida se hace por líneas (qué se vende, cantidad, unidad y precio; la base es su
+       * suma), con el CIF y la dirección del cliente (CONTRAPARTES, si el negocio tiene esas columnas), y se puede ver como
+       * documento («Ver la factura») y, con FACTURA_CARPETA, guardar su PDF en Drive («Guardar y sacar el PDF»).
        */
       function formFac(f, pre, movId) {
         var v = f || Object.assign({ TIPO: 'Recibida', FECHA: hoy(), TIPO_IVA: '21%', ESTADO: 'Pendiente' }, pre || {});
         var movs = f ? d.mov.filter(function (m) { return String(m.ID_FACTURA) === String(f.ID); }) : [];
         var pagado = 0; movs.forEach(function (m) { pagado += importe(m).total; });
+        var lin0 = f && LINEAS ? lineasDe(d.lin, f.ID) : [];
+        var ARTS = ART ? articulos(ART, { filas: function (t) { return T.filas(t) || []; }, fila: filaDe }) : [];
+        var datosCli = LINEAS && d.colsCtr.indexOf('NIF') >= 0 && d.colsCtr.indexOf('DIRECCION') >= 0;
+        var pdf = LINEAS && !!String(cfg.FACTURA_CARPETA || '').trim();
         var html = '<h2 id="eco-vt">' + (f ? 'Factura ' + texto(numFac(f)) : movId ? (v.TIPO === 'Emitida' ? 'Hacer la factura' : 'Añadir su factura') : 'Añadir factura') + '</h2>' +
-          (f ? '<p>' + enlaceDrive(f) + '</p>' : '') +
+          // T0627: en una emitida por líneas, arriba, su PDF guardado (el que se manda al cliente) o que aún no tiene.
+          (f && LINEAS && f.TIPO === 'Emitida' ? '<p>' + (f.ARCHIVO_URL ? '<a class="eco-drive" href="' + texto(f.ARCHIVO_URL) + '" target="_blank" rel="noopener" data-fuera>Abrir el PDF ↗</a>' : '<span class="u-nota">Todavía sin PDF' + (pdf ? ': «Guardar y sacar el PDF» lo hace.' : '.') + '</span>') + '</p>'
+            : f ? '<p>' + enlaceDrive(f) + '</p>' : '') +
           (movId ? '<p class="u-nota">Con los datos del movimiento. ' + (v.TIPO === 'Emitida' ? 'La fecha es la de hoy, que es cuando se emite; el número lo pone el Excel al guardarla.' : 'Pon el número que trae la factura.') + ' Al guardarla queda enlazada al movimiento.</p>' : '') +
           '<div class="u-campos">' +
           (f ? '' : campo('Tipo', '<select id="f-TIPO">' + opciones([['Emitida', 'Emitida (la hacemos nosotros)'], ['Recibida', 'Recibida'], ['Ticket', 'Ticket']], v.TIPO) + '</select>')) +
           campo('Número', '<input type="text" id="f-NUMERO" value="' + texto(v.NUMERO) + '" maxlength="40">', 'eco-numero') +
+          '<p class="u-nota u-ancho" id="f-num-nota" hidden></p>' +
           campo('Fecha', '<input type="date" id="f-FECHA" value="' + texto(v.FECHA) + '">') +
           campo('<span id="f-ctr-et">' + (v.TIPO === 'Emitida' ? 'Cliente (a quién se la hacemos)' : 'Proveedor (quién nos la hace)') + '</span>', '<select id="f-ID_CONTRAPARTE">' + opciones(d.ctr.map(function (c) { return [c.ID, c.NOMBRE]; }).sort(function (a, b) { return String(a[1]).localeCompare(String(b[1]), 'es'); }), v.ID_CONTRAPARTE, 'Elige') + '</select>') +
-          campo('<span id="f-imp-et">Base imponible</span>', '<input type="text" inputmode="decimal" id="f-BASE" value="' + texto(verImporte(v)) + '" placeholder="0,00">') +
+          (datosCli ? '<div class="u-campos u-ancho" id="f-cli">' + campo('CIF o NIF del cliente', '<input type="text" id="f-NIF" maxlength="20" autocomplete="off">') +
+            campo('Dirección del cliente', '<textarea id="f-DIRECCION" rows="2" placeholder="Calle y número&#10;Código postal y ciudad"></textarea>', 'u-ancho') +
+            '<p class="u-nota u-ancho">Salen en su factura. Se guardan en el cliente: la próxima vez ya están.</p></div>' : '') +
+          (LINEAS ? '<div class="u-ancho" id="f-lin"><span class="u-etiqueta">Qué se vende</span><div id="f-lineas"></div>' +
+            '<button type="button" class="u-btn u-btn-texto" id="f-mas">+ Añadir línea</button>' +
+            '<p class="u-nota" id="f-lin-nota"></p></div>' : '') +
+          campo('<span id="f-imp-et">Base imponible</span>', '<input type="text" inputmode="decimal" id="f-BASE" value="' + texto(verImporte(v)) + '" placeholder="0,00">', 'eco-base') +
           campo('IVA', '<select id="f-TIPO_IVA">' + opciones(ivas().map(function (x) { return [x, x]; }), v.TIPO_IVA) + '</select>') +
           casillaIva('f') +
-          '<p class="u-nota u-ancho" id="f-total"></p>' +
+          '<div class="u-nota u-ancho" id="f-total"></div>' +
           campo('Estado', '<select id="f-ESTADO">' + opciones([['Pendiente', 'Pendiente'], ['Pagada', 'Pagada'], ['Anulada', 'Anulada']], v.ESTADO, 'Sin estado') + '</select>') +
-          campo('Enlace en Drive', '<input type="url" id="f-ARCHIVO_URL" value="' + texto(v.ARCHIVO_URL) + '" placeholder="https://drive.google.com/…">', 'u-ancho') +
-          '<p class="u-nota u-ancho">El del PDF o la foto de la factura: en Drive, Compartir › Copiar enlace.</p>' +
+          campo('Enlace en Drive', '<input type="url" id="f-ARCHIVO_URL" value="' + texto(v.ARCHIVO_URL) + '" placeholder="https://drive.google.com/…">', 'u-ancho eco-url') +
+          '<p class="u-nota u-ancho" id="f-url-nota">El del PDF o la foto de la factura: en Drive, Compartir › Copiar enlace.</p>' +
           campo('Notas', '<textarea id="f-NOTAS" rows="2">' + texto(v.NOTAS) + '</textarea>', 'u-ancho') + '</div>' +
           (f ? '<p class="u-nota">' + (movs.length ? movs.length + (movs.length === 1 ? ' movimiento' : ' movimientos') + ' con esta factura: ' + eur(pagado) + ' de ' + eur(importe(f).total) + '.' : 'Ningún movimiento lleva todavía esta factura.') + '</p>' : '') +
           '<p class="u-error" role="alert" hidden></p><div class="n-botones">' +
-          '<button type="button" class="u-btn u-btn-accion" id="f-guardar">Guardar factura</button><button type="button" class="u-btn" data-cerrar>Cancelar</button>' +
+          '<button type="button" class="u-btn u-btn-accion" id="f-guardar">Guardar factura</button>' +
+          (LINEAS ? '<button type="button" class="u-btn" id="f-ver" hidden title="Cómo queda con lo que hay ahora en pantalla, sin guardar">Vista previa</button>' : '') +
+          (pdf && f ? '<button type="button" class="u-btn" id="f-pdf" hidden>Guardar y sacar el PDF</button>' : '') +
+          '<button type="button" class="u-btn" data-cerrar>Cancelar</button>' +
           (f && f.ESTADO === 'Pendiente' ? '<button type="button" class="u-btn" id="f-apuntar">' + (f.TIPO === 'Emitida' ? 'Apuntar el cobro' : 'Apuntar el pago') + '</button>' : '') + '</div>';
         ventana(html, function () {
+          var cajaLin = vent.querySelector('#f-lineas');
+          function tipoAhora() { return f ? f.TIPO : val('f-TIPO'); }
+          function porLineas() { return LINEAS && tipoAhora() === 'Emitida'; }
+          /** T0627 · ¿El precio de esta línea (la fila o algo dentro de ella) se escribió con el IVA incluido? (su casilla «IVA incl.») */
+          function linIva(x) { var r = x && x.closest ? x.closest('.eco-lin') : null, c = r && r.querySelector('.eco-lin-ci'); return !!(c && c.checked); }
+          function siBool(v) { return v === true || /^(true|sí|si|1|x)$/i.test(String(v == null ? '' : v)); }
+          /** Una línea en pantalla (l: { ID, CONCEPTO, DETALLE, CANTIDAD, UNIDAD, PRECIO }). */
+          function filaLin(l) {
+            var n = function (x) { return x === '' || x == null ? '' : String(x).replace('.', ','); };
+            var ci = siBool(l.IVA_INCLUIDO), pv = l.PRECIO === '' || l.PRECIO == null ? '' : ci ? conIvaPrecio(l.PRECIO, val('f-TIPO_IVA')) : precio(l.PRECIO);
+            var div = document.createElement('div');
+            div.className = 'eco-lin';
+            if (l.ID) div.setAttribute('data-id', l.ID);
+            div.innerHTML = (ARTS.length
+              ? '<div class="eco-lin-cw"><textarea rows="1" class="eco-lin-c" aria-label="Concepto" autocomplete="off" role="combobox" aria-expanded="false" placeholder="Busca en ' + texto(ART.titulo || 'la lista') + ' por nombre o código, o escribe (el envío)">' + texto(l.CONCEPTO) + '</textarea>' +
+                '<div class="eco-lin-op" role="listbox" hidden></div></div>'
+              : '<textarea rows="1" class="eco-lin-c" aria-label="Concepto" placeholder="Qué (p. ej. Lino Celosía BOR-004-01)">' + texto(l.CONCEPTO) + '</textarea>') +
+              '<textarea rows="1" class="eco-lin-d" aria-label="Detalle" placeholder="Detalle (opcional)">' + texto(l.DETALLE) + '</textarea>' +
+              '<input type="text" inputmode="decimal" class="eco-lin-n" aria-label="Cantidad" placeholder="Cant." value="' + texto(n(l.CANTIDAD)) + '">' +
+              '<input type="text" class="eco-lin-u" aria-label="Unidad" placeholder="m" maxlength="8" value="' + texto(l.UNIDAD) + '">' +
+              '<input type="text" inputmode="decimal" class="eco-lin-p" aria-label="Precio" placeholder="Precio" value="' + texto(n(pv)) + '" data-precio="' + texto(l.PRECIO == null ? '' : l.PRECIO) + '">' +
+              '<label class="eco-lin-iva" title="El precio que has puesto ya lleva el IVA"><input type="checkbox" class="eco-lin-ci"' + (ci ? ' checked' : '') + '> IVA incl.</label>' +
+              '<span class="eco-lin-t u-cifra"></span><button type="button" class="u-btn u-btn-texto eco-lin-x" aria-label="Quitar la línea">Quitar</button>' +
+              (ARTS.length ? '<p class="eco-lin-rec" hidden></p>' : '');
+            cajaLin.appendChild(div);
+            crecer(div);
+            if (ARTS.length) {
+              // Una línea guardada de un artículo (su código al final del concepto) sigue con su recomendado.
+              var a0 = artDe(ARTS, l.CONCEPTO);
+              if (a0) div.setAttribute('data-art', a0.codigo);
+              pintaRec(div);
+            }
+          }
+          /* T0635 · Elegir lo que se vende de ARTICULOS (Mis telas): se busca por nombre o código y la línea se rellena
+           * con su nombre y código, el detalle, la unidad y el precio recomendado sin IVA (se puede cambiar). */
+          /** T0635 · El concepto y el detalle crecen con el texto (en el móvil, una tela con su código no cabe en una línea). */
+          function crecer(r) {
+            Array.prototype.forEach.call(r.querySelectorAll('textarea.eco-lin-c, textarea.eco-lin-d'), function (t) {
+              t.style.height = 'auto'; if (t.scrollHeight) t.style.height = t.scrollHeight + 'px';
+            });
+          }
+          function artPorCodigo(c) { return ARTS.filter(function (a) { return a.codigo === c; })[0] || null; }
+          function eurPrecio(n) { return n.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' €'; }
+          function pintaRec(r) {
+            var p = r.querySelector('.eco-lin-rec'); if (!p) return;
+            var a = artPorCodigo(r.getAttribute('data-art') || '');
+            p.hidden = !a;
+            if (!a) { p.innerHTML = ''; return; }
+            var u = a.unidad ? '/' + a.unidad : '';
+            var dp = r.querySelector('.eco-lin-p').getAttribute('data-precio'), sinPrecio = dp === '' || dp == null;
+            // Sin recomendado (en Mis telas le falta el coste): en rojo solo mientras la línea no tiene precio.
+            if (isNaN(a.precio)) { p.innerHTML = sinPrecio ? '<span class="u-mal">Sin precio recomendado: en ' + texto(ART.titulo || 'la lista') + ' le falta el coste. Ponlo tú.</span>' : 'Sin precio recomendado: en ' + texto(ART.titulo || 'la lista') + ' le falta el coste.'; return; }
+            var igual = !sinPrecio && Math.abs(Number(dp) - a.precio) < 0.005;
+            p.innerHTML = 'Recomendado: <b>' + eurPrecio(a.precio) + texto(u) + '</b> sin IVA' + (igual ? '' : ' · <button type="button" class="u-btn u-btn-texto eco-lin-pon">Ponerlo</button>');
+          }
+          function sugerir(r, q) {
+            var caja = r.querySelector('.eco-lin-op'), inp = r.querySelector('.eco-lin-c'), hay = buscarArt(ARTS, q, 6);
+            caja.hidden = !hay.length; inp.setAttribute('aria-expanded', hay.length ? 'true' : 'false');
+            caja.innerHTML = hay.map(function (a, i) {
+              return '<button type="button" role="option" class="eco-lin-o' + (i ? '' : ' eco-lin-o-sel') + '" data-cod="' + texto(a.codigo) + '">' +
+                '<span class="eco-lin-on">' + texto(a.nombre) + ' <span class="eco-lin-oc">' + texto(a.codigo) + '</span></span>' +
+                '<span class="eco-lin-op-p">' + (isNaN(a.precio) ? 'sin precio' : eurPrecio(a.precio) + (a.unidad ? '/' + texto(a.unidad) : '')) + '</span></button>';
+            }).join('');
+          }
+          function elegir(r, a) {
+            r.querySelector('.eco-lin-c').value = a.nombre + ' · ' + a.codigo;
+            r.querySelector('.eco-lin-d').value = a.detalle;
+            if (a.unidad) r.querySelector('.eco-lin-u').value = a.unidad;
+            r.querySelector('.eco-lin-ci').checked = false;
+            var pi = r.querySelector('.eco-lin-p');
+            pi.value = isNaN(a.precio) ? '' : String(a.precio).replace('.', ',');
+            leerPrecio(pi);
+            r.setAttribute('data-art', a.codigo);
+            cerrarOp(r);
+            crecer(r);
+            pintaLineas(); pintaTot();
+            var cant = r.querySelector('.eco-lin-n'); if (cant) cant.focus();
+          }
+          function cerrarOp(r) { var c = r.querySelector('.eco-lin-op'); if (c) { c.hidden = true; c.innerHTML = ''; r.querySelector('.eco-lin-c').setAttribute('aria-expanded', 'false'); } }
+          /**
+           * T0627 · Cada precio guarda en data-precio el sin IVA exacto. Lo escrito se queda tal cual en pantalla: la casilla
+           * «IVA incl.» de su línea solo dice cómo se lee (100 con IVA → 82,6446 sin IVA). Lo que no se toca se queda como
+           * estaba: abrir y guardar no cambia ni un céntimo.
+           */
+          function leerPrecio(inp) {
+            var x = String(inp.value).trim();
+            inp.setAttribute('data-precio', x === '' ? '' : String(linIva(inp) ? sinIva(x, val('f-TIPO_IVA')) : precio(x)));
+          }
+          /** Las líneas de la pantalla, como filas de FACTURA_LINEAS (sin las vacías). */
+          function lineasAhora() {
+            return cajaLin ? Array.prototype.map.call(cajaLin.querySelectorAll('.eco-lin'), function (r) {
+              var q = function (c) { return String(r.querySelector(c).value).trim(); };
+              var dp = r.querySelector('.eco-lin-p').getAttribute('data-precio');
+              return { ID: r.getAttribute('data-id') || '', CONCEPTO: q('.eco-lin-c'), DETALLE: q('.eco-lin-d'), CANTIDAD: q('.eco-lin-n') === '' ? '' : cantidad(q('.eco-lin-n')),
+                UNIDAD: q('.eco-lin-u'), PRECIO: dp === '' || dp == null ? '' : Number(dp), IVA_INCLUIDO: r.querySelector('.eco-lin-ci').checked };
+            }).filter(function (l) { return l.CONCEPTO || l.PRECIO !== ''; }) : [];
+          }
+          function pintaLineas() {
+            if (!cajaLin) return;
+            Array.prototype.forEach.call(cajaLin.querySelectorAll('.eco-lin'), function (r) {
+              var q = function (c) { return r.querySelector(c).value; };
+              var vacia = !String(q('.eco-lin-c')).trim() && !String(q('.eco-lin-p')).trim();
+              // El importe de cada línea, como su precio: con IVA si su casilla está marcada, sin IVA si no.
+              var ci = linIva(r);
+              r.querySelector('.eco-lin-t').textContent = vacia ? '' : eur(importeLinea({ CANTIDAD: q('.eco-lin-n'), PRECIO: q('.eco-lin-p') })) + (ci ? ' con IVA' : '');
+              pintaRec(r);
+            });
+            vent.querySelector('#f-lin-nota').textContent = 'Precio por unidad (metro, pieza…), sin IVA. Si el que sabes ya lleva el IVA, ponlo tal cual y marca «IVA incl.» en esa línea: la factura lo pone sin IVA y el total cuadra.';
+            var b = vent.querySelector('#f-BASE');
+            b.value = (baseLineas(lineasAhora()) / 100).toFixed(2).replace('.', ',');
+          }
+          /**
+           * T0627 · El importe debajo del IVA; por líneas, un resumen a la vista mientras se escribe: base, IVA y el total
+           * de la factura en grande (la casilla de la base no sale: ya está aquí).
+           */
+          function pintaTot() {
+            pintaImporte('f', 'Base imponible');
+            var lin = porLineas(), b = vent.querySelector('.eco-base');
+            if (b) b.hidden = lin;
+            if (!lin) return;
+            var t = importe({ BASE: baseEn('f') / 100, TIPO_IVA: val('f-TIPO_IVA') });
+            vent.querySelector('#f-total').innerHTML = '<div class="eco-tot">' +
+              '<div><span>Base imponible</span><span>' + eur(t.base) + '</span></div>' +
+              '<div><span>IVA ' + texto(val('f-TIPO_IVA')) + '</span><span>' + eur(t.iva) + '</span></div>' +
+              '<div class="eco-tot-total"><span>Total de la factura</span><span>' + eur(t.total) + '</span></div></div>';
+          }
+          function clienteElegido() { return ix.ctr[val('f-ID_CONTRAPARTE')] || null; }
+          function pintaCliente() {
+            if (!datosCli) return;
+            var c = clienteElegido(), caja = vent.querySelector('#f-cli');
+            caja.hidden = !porLineas() || !c;
+            vent.querySelector('#f-NIF').value = c ? String(c.NIF || '') : '';
+            vent.querySelector('#f-DIRECCION').value = c ? String(c.DIRECCION || '') : '';
+          }
           function refrescar() {
-            var tipo = f ? f.TIPO : val('f-TIPO'), em = tipo === 'Emitida' && !f;
+            var tipo = tipoAhora(), em = tipo === 'Emitida' && !f, lin = porLineas();
+            // T0627: el número de una emitida lo pone el motor al guardarla y ya no se cambia (correlativo y sin huecos).
             vent.querySelector('#f-ctr-et').textContent = tipo === 'Emitida' ? 'Cliente (a quién se la hacemos)' : 'Proveedor (quién nos la hace)';
             var n = vent.querySelector('#f-NUMERO');
-            n.disabled = em; if (em) n.value = ''; n.placeholder = em ? 'Se numera sola al guardar (' + String(cfg.SERIE_EMITIDAS || '') + '…)' : '';
-            pintaImporte('f', 'Base imponible');
+            // Bloqueado se ve como texto, sin caja (no parece que se pueda escribir), con su porqué debajo.
+            n.disabled = tipo === 'Emitida'; if (em) n.value = ''; n.placeholder = em ? 'Se pone sola al guardar' : '';
+            var nn = vent.querySelector('#f-num-nota');
+            nn.hidden = tipo !== 'Emitida';
+            nn.textContent = em ? 'La siguiente de la serie ' + String(cfg.SERIE_EMITIDAS || '') + ', seguida y sin huecos.' : 'No se cambia: si hay un error, ponla en Anulada y haz otra.';
+            if (LINEAS) {
+              vent.querySelector('#f-lin').hidden = !lin;
+              var ci = vent.querySelector('#f-coniva');
+              if (lin && ci.checked) ci.checked = false; // por líneas, los precios van sin IVA
+              ci.parentNode.hidden = lin;
+              vent.querySelector('#f-BASE').readOnly = lin;
+              vent.querySelector('.eco-base').classList.toggle('eco-calculada', lin);
+              if (lin) { if (!cajaLin.children.length) filaLin({ CANTIDAD: '', UNIDAD: 'm' }); pintaLineas(); }
+              var bv = vent.querySelector('#f-ver'); if (bv) bv.hidden = !lin;
+              var bp = vent.querySelector('#f-pdf'); if (bp) bp.hidden = !lin;
+              // Por líneas, el enlace al PDF lo pone la app: no se enseña el campo (sale arriba, «Abrir el PDF»).
+              vent.querySelector('.eco-url').hidden = lin && pdf;
+              vent.querySelector('#f-url-nota').hidden = lin && pdf;
+            }
+            pintaTot();
+          }
+          if (cajaLin) {
+            lin0.forEach(filaLin);
+            if (!lin0.length && f && f.TIPO === 'Emitida' && cts(f.BASE)) filaLin({ CONCEPTO: '', CANTIDAD: 1, PRECIO: f.BASE }); // una de antes, sin líneas
+            cajaLin.addEventListener('input', function (e) {
+              if (e.target.classList.contains('eco-lin-p')) leerPrecio(e.target);
+              if (e.target.tagName === 'TEXTAREA') {
+                if (/\n/.test(e.target.value)) e.target.value = e.target.value.replace(/\s*\n+\s*/g, ' '); // una sola línea (al pegar)
+                crecer(e.target.closest('.eco-lin'));
+              }
+              if (ARTS.length && e.target.classList.contains('eco-lin-c')) {
+                var r = e.target.closest('.eco-lin'), a = artDe(ARTS, e.target.value);
+                if (a) r.setAttribute('data-art', a.codigo); else r.removeAttribute('data-art');
+                sugerir(r, e.target.value);
+              }
+              pintaLineas(); pintaTot();
+            });
+            // Intro no parte el concepto ni el detalle en dos líneas (con la lista abierta, elige).
+            cajaLin.addEventListener('keydown', function (e) {
+              if (e.key !== 'Enter' || e.target.tagName !== 'TEXTAREA') return;
+              var op = e.target.closest('.eco-lin').querySelector('.eco-lin-op');
+              if (!op || op.hidden) e.preventDefault();
+            });
+            if (ARTS.length) {
+              // Con el teclado: flechas para moverse, Intro elige, Esc cierra. Con el ratón o el dedo, al tocar.
+              cajaLin.addEventListener('keydown', function (e) {
+                if (!e.target.classList.contains('eco-lin-c')) return;
+                var r = e.target.closest('.eco-lin'), caja = r.querySelector('.eco-lin-op');
+                if (caja.hidden) return;
+                var os = Array.prototype.slice.call(caja.querySelectorAll('.eco-lin-o')), i = os.findIndex(function (o) { return o.classList.contains('eco-lin-o-sel'); });
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  if (os[i]) os[i].classList.remove('eco-lin-o-sel');
+                  i = (i + (e.key === 'ArrowDown' ? 1 : os.length - 1)) % os.length; os[i].classList.add('eco-lin-o-sel');
+                } else if (e.key === 'Enter' && os[i]) { e.preventDefault(); elegir(r, artPorCodigo(os[i].getAttribute('data-cod'))); }
+                else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrarOp(r); }
+              });
+              cajaLin.addEventListener('mousedown', function (e) { if (e.target.closest('.eco-lin-o')) e.preventDefault(); });
+              cajaLin.addEventListener('focusout', function (e) { if (e.target.classList.contains('eco-lin-c')) cerrarOp(e.target.closest('.eco-lin')); });
+              cajaLin.addEventListener('click', function (e) {
+                var o = e.target.closest('.eco-lin-o'); if (o) { elegir(o.closest('.eco-lin'), artPorCodigo(o.getAttribute('data-cod'))); return; }
+                var pon = e.target.closest('.eco-lin-pon'); if (!pon) return;
+                var r = pon.closest('.eco-lin'), a = artPorCodigo(r.getAttribute('data-art') || ''); if (!a) return;
+                r.querySelector('.eco-lin-ci').checked = false;
+                var pi = r.querySelector('.eco-lin-p'); pi.value = String(a.precio).replace('.', ','); leerPrecio(pi);
+                pintaLineas(); pintaTot();
+              });
+            }
+            // Marcar «IVA incl.» en una línea cambia cómo se lee su precio (el número escrito no cambia); las demás, igual.
+            cajaLin.addEventListener('change', function (e) {
+              if (!e.target.classList.contains('eco-lin-ci')) return;
+              leerPrecio(e.target.closest('.eco-lin').querySelector('.eco-lin-p'));
+              pintaLineas(); pintaTot();
+            });
+            cajaLin.addEventListener('click', function (e) {
+              var x = e.target.closest('.eco-lin-x'); if (!x) return;
+              x.closest('.eco-lin').remove();
+              if (!cajaLin.children.length) filaLin({ CANTIDAD: '', UNIDAD: 'm' });
+              pintaLineas(); pintaTot();
+            });
+            vent.querySelector('#f-mas').onclick = function () { filaLin({ CANTIDAD: '', UNIDAD: 'm' }); var u = cajaLin.lastChild.querySelector('.eco-lin-c'); if (u) u.focus(); };
           }
           refrescar();
-          ['f-TIPO', 'f-TIPO_IVA'].forEach(function (id) { var e = vent.querySelector('#' + id); if (e) e.addEventListener('change', refrescar); });
+          pintaCliente();
+          ['f-TIPO', 'f-TIPO_IVA'].forEach(function (id) { var e = vent.querySelector('#' + id); if (e) e.addEventListener('change', function () { refrescar(); pintaCliente(); }); });
+          // En las líneas con el IVA incluido, cambiar el tipo de IVA deja lo escrito (lo que cobra) y cambia el sin IVA.
+          vent.querySelector('#f-TIPO_IVA').addEventListener('change', function () {
+            if (!cajaLin) return;
+            Array.prototype.forEach.call(cajaLin.querySelectorAll('.eco-lin-p'), function (inp) { if (linIva(inp)) leerPrecio(inp); });
+            pintaLineas(); pintaTot();
+          });
+          vent.querySelector('#f-ID_CONTRAPARTE').addEventListener('change', pintaCliente);
           vent.querySelector('#f-BASE').addEventListener('input', refrescar);
           oirImporte('f', refrescar);
-          vent.querySelector('#f-guardar').onclick = function () {
-            var tipo = f ? f.TIPO : val('f-TIPO'), em = tipo === 'Emitida' && !f;
+          /** Lo que hay en pantalla, para el documento (el número, el que tiene; una nueva aún no lo tiene). */
+          function documento(numero) {
+            var c = clienteElegido() || {};
+            return {
+              factura: { NUMERO: numero || (f && f.NUMERO) || '', FECHA: val('f-FECHA'), TIPO_IVA: val('f-TIPO_IVA'), NOTAS: val('f-NOTAS'), ESTADO: val('f-ESTADO'), ARCHIVO_URL: val('f-ARCHIVO_URL') },
+              cliente: { NOMBRE: c.NOMBRE || '', NIF: datosCli ? val('f-NIF') : c.NIF || '', DIRECCION: datosCli ? val('f-DIRECCION') : c.DIRECCION || '' },
+              lineas: lineasAhora(), base: baseEn('f') / 100, empresa: d.emp || null
+            };
+          }
+          /** Guarda la factura (y sus líneas y los datos del cliente) → promesa con { id, numero }. */
+          function guardar() {
+            var tipo = tipoAhora(), em = tipo === 'Emitida' && !f, lin = porLineas(), conNumero = tipo !== 'Emitida';
             var nv = { FECHA: val('f-FECHA'), ID_CONTRAPARTE: val('f-ID_CONTRAPARTE'), BASE: baseEn('f') / 100, TIPO_IVA: val('f-TIPO_IVA'),
               ESTADO: val('f-ESTADO'), ARCHIVO_URL: val('f-ARCHIVO_URL'), NOTAS: val('f-NOTAS') };
-            if (!em) nv.NUMERO = val('f-NUMERO');
-            var mal = [];
-            if (!em && !nv.NUMERO) mal.push('Falta el número.');
+            if (conNumero) nv.NUMERO = val('f-NUMERO');
+            var mal = [], ls = lin ? lineasAhora() : [];
+            if (conNumero && !nv.NUMERO) mal.push('Falta el número.');
             if (!nv.FECHA) mal.push('Falta la fecha.');
             if (!nv.ID_CONTRAPARTE) mal.push('Falta ' + (tipo === 'Emitida' ? 'el cliente.' : 'el proveedor.'));
-            if (!(cts(val('f-BASE')) > 0)) mal.push('La base tiene que ser mayor que 0.');
-            if (!em && nv.NUMERO && d.fac.some(function (x) { return x !== f && x.TIPO === tipo && String(x.NUMERO).trim() === nv.NUMERO; })) mal.push('Ya hay una ' + tipo.toLowerCase() + ' con el número ' + nv.NUMERO + '.');
-            if (mal.length) { verError(mal); return; }
-            cerrar();
+            if (lin && ls.some(function (l) { return !l.CONCEPTO; })) mal.push('Cada línea necesita qué se vende.');
+            if (lin && ls.some(function (l) { return l.PRECIO === ''; })) mal.push('Cada línea necesita su precio.');
+            if (!(cts(val('f-BASE')) > 0)) mal.push(lin ? 'Añade lo que se vende, con su precio.' : 'La base tiene que ser mayor que 0.');
+            if (conNumero && nv.NUMERO && d.fac.some(function (x) { return x !== f && x.TIPO === tipo && String(x.NUMERO).trim() === nv.NUMERO; })) mal.push('Ya hay una ' + tipo.toLowerCase() + ' con el número ' + nv.NUMERO + '.');
+            if (mal.length) { verError(mal); return null; }
+            var cli = clienteElegido(), cliNuevo = datosCli && lin && cli ? { NIF: val('f-NIF'), DIRECCION: val('f-DIRECCION') } : null;
+            if (cliNuevo && String(cli.NIF || '') === cliNuevo.NIF && String(cli.DIRECCION || '') === cliNuevo.DIRECCION) cliNuevo = null;
             var p;
             if (f) p = T.actualizar('FACTURAS', f.ID, cambios(f, nv));
             else if (em) p = T.crear('FACTURAS', Object.assign({ TIPO: 'Emitida', NUMERO: '' }, nv), { fn: 'economiaEmitir' });
             else p = T.crear('FACTURAS', Object.assign({ TIPO: tipo }, nv));
-            p.then(function (r) {
-              var x = r && r.fila ? r.fila : null, id = (r && r.id) || (x && x.ID);
-              if (ctx.abierta()) ctx.aviso(x && em ? 'Factura ' + x.NUMERO + ' guardada en el Excel.' : 'Factura guardada en el Excel.');
+            return p.then(function (r) {
+              var x = r && r.fila ? r.fila : null, id = (f && f.ID) || (r && r.id) || (x && x.ID), numero = (x && x.NUMERO) || nv.NUMERO || (f && f.NUMERO) || '';
               if (movId && id) T.actualizar('MOVIMIENTOS', movId, { ID_FACTURA: id }).then(function () {}, function () {});
-            }, function () {});
+              if (lin && id) guardarLineas(id, ls);
+              if (cliNuevo) ctx.llamar('economiaClienteDatos', [cli.ID, cliNuevo]).then(function () { T.refrescar(['CONTRAPARTES'], true); }, function (e) { ctx.aviso(String((e && e.message) || e)); });
+              return { id: id, numero: numero, nueva: !f && em };
+            });
+          }
+          /** Las líneas de la factura en FACTURA_LINEAS: las nuevas se crean, las cambiadas se actualizan y las quitadas se borran. */
+          function guardarLineas(id, ls) {
+            var antes = lineasDe(d.lin, id), vistas = {};
+            ls.forEach(function (l) {
+              var fila = { ID_FACTURA: id, CONCEPTO: l.CONCEPTO, DETALLE: l.DETALLE, CANTIDAD: l.CANTIDAD, UNIDAD: l.UNIDAD, PRECIO: l.PRECIO, IVA_INCLUIDO: !!l.IVA_INCLUIDO };
+              var a = l.ID && antes.filter(function (x) { return String(x.ID) === String(l.ID); })[0];
+              if (a) { vistas[a.ID] = 1; var c = cambios(a, fila); if (Object.keys(c).length) T.actualizar('FACTURA_LINEAS', a.ID, c).then(function () {}, function () {}); }
+              else T.crear('FACTURA_LINEAS', fila).then(function () {}, function () {});
+            });
+            antes.forEach(function (a) { if (!vistas[a.ID]) T.borrar('FACTURA_LINEAS', a.ID).then(function () {}, function () {}); });
+          }
+          vent.querySelector('#f-guardar').onclick = function () {
+            var p = guardar(); if (!p) return;
+            cerrar();
+            p.then(function (r) { if (ctx.abierta()) ctx.aviso(r.nueva ? 'Factura ' + r.numero + ' guardada en el Excel.' : 'Factura guardada en el Excel.'); }, function () {});
+          };
+          var bver = vent.querySelector('#f-ver');
+          if (bver) bver.onclick = function () {
+            // T0627: flotante, encima de la factura, y con la marca BORRADOR (la pone el motor): nunca se confunde con el PDF.
+            var o = document.createElement('div');
+            o.className = 'eco-previa';
+            o.innerHTML = '<div class="eco-previa-caja" role="dialog" aria-modal="true" aria-label="Vista previa de la factura">' +
+              '<div class="eco-previa-cab"><span><b>Vista previa</b> · borrador, sin guardar</span><button type="button" class="u-btn" data-previa-cerrar>Cerrar</button></div>' +
+              '<div class="eco-previa-hoja"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div></div>';
+            el.appendChild(o);
+            function quitar() { o.remove(); document.removeEventListener('keydown', esc, true); }
+            function esc(e) { if (e.key === 'Escape') { e.stopPropagation(); quitar(); } }
+            document.addEventListener('keydown', esc, true);
+            o.addEventListener('click', function (e) { if (e.target === o || e.target.closest('[data-previa-cerrar]')) quitar(); });
+            o.querySelector('[data-previa-cerrar]').focus();
+            ctx.llamar('economiaFacturaVer', [documento(f ? '' : '(se numera al guardar)')]).then(function (r) {
+              var hoja = o.querySelector('.eco-previa-hoja');
+              hoja.innerHTML = '<iframe title="Factura en borrador"></iframe>';
+              var ifr = hoja.querySelector('iframe');
+              // La hoja A4 (794 px) se encoge para caber entera a lo ancho (en el móvil, como un PDF).
+              ifr.onload = function () {
+                var k = Math.min(1, (hoja.clientWidth - 16) / 794);
+                ifr.style.width = Math.round(794 * k) + 'px';
+                ifr.style.height = Math.round(1123 * k) + 'px';
+                try { ifr.contentDocument.documentElement.style.zoom = k; } catch (e) {}
+              };
+              ifr.srcdoc = r.html;
+              verError(r.faltan && r.faltan.length ? ['Le falta ' + r.faltan.join(', ') + ': sale en rojo en el borrador.'] : []);
+            }, function (e) { quitar(); verError([String((e && e.message) || e)]); });
+          };
+          var bpdf = vent.querySelector('#f-pdf');
+          if (bpdf) bpdf.onclick = function () {
+            var doc = documento();
+            bpdf.disabled = true; bpdf.textContent = 'Sacando el PDF…';
+            ctx.llamar('economiaFacturaVer', [doc]).then(function (r) {
+              if (r.faltan && r.faltan.length) { bpdf.disabled = false; bpdf.textContent = 'Guardar y sacar el PDF'; verError(['Antes de sacar el PDF falta ' + r.faltan.join(', ') + '.']); return; }
+              var p = guardar(); if (!p) { bpdf.disabled = false; bpdf.textContent = 'Guardar y sacar el PDF'; return; }
+              cerrar();
+              ctx.aviso('Sacando el PDF de la factura ' + numFac(f) + '…');
+              p.then(function () { return ctx.llamar('economiaFacturaPdf', [doc]); }).then(function (x) {
+                return T.actualizar('FACTURAS', f.ID, { ARCHIVO_URL: x.url }).then(function () { if (ctx.abierta()) ctx.aviso('PDF de la factura ' + numFac(f) + ' guardado en Drive y enlazado.'); });
+              }, function (e) { if (ctx.abierta()) ctx.aviso(String((e && e.message) || e).replace(/^[A-Z]+: /, '')); });
+            }, function (e) { bpdf.disabled = false; bpdf.textContent = 'Guardar y sacar el PDF'; verError([String((e && e.message) || e)]); });
           };
           var ba = vent.querySelector('#f-apuntar');
           if (ba) ba.onclick = function () {
@@ -1105,6 +1611,7 @@
           var ac = a.getAttribute('data-accion');
           if (ac === 'apuntar') formMov(null);
           else if (ac === 'factura') formFac(null);
+          else if (ac === 'empresa') formEmpresa();
           else if (ac === 'vermas') { S.mov.ver += VER; pintar(); }
           else if (ac === 'vermascaja') { S.caja.ver = (S.caja.ver || VER) + VER; pintar(); }
           else if (ac === 'ceros') { S.ceros = !S.ceros; pintar(); }

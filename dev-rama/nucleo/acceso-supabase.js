@@ -10,7 +10,8 @@
  * - Lo que pide una sección (las tablas y las funciones de su «api») va a Supabase con la capa de tablas (nucleo/supabase.js),
  *   con la sesión de quien ha entrado. Quién puede qué lo dicen las reglas por fila: aquí no se comprueba nada que importe.
  * - Sin «entrar como otra persona» (sinComo): con Supabase, cada uno entra con su sesión.
- * - El entorno: DEV si la página está en utilo-web/dev-rama/; si no, producción. Cada uno con su proyecto (montaje.supabase).
+ * - El entorno: DEV si la página está en utilo-web/dev-rama/ o, T0441, en dev-ramas/<rama>/ (la banda dice la rama); si no,
+ *   producción. Cada uno con su proyecto (montaje.supabase). Todas las ramas comparten la sesión de DEV de este dispositivo.
  * - T0391 · Entrar con un código al correo (montaje.entrar con 'codigo'): pedirCodigo(correo) pide a Auth que lo envíe y
  *   entrarConCodigo(correo, codigo) lo cambia por la sesión. En local y DEV el correo no sale: buzon(correo) lo lee del
  *   buzón de pruebas. correos.* son los de quien ha entrado (Perfil: añadir otro, confirmado con su código).
@@ -26,7 +27,8 @@
   var C = window.KANBAN || {};
   var M = window.NUCLEO_MONTAJE || {};
   // En el modo local, local.js pone C.supabaseLocal ({ url, clave, nombre }): el Supabase de npm run local.
-  var ENTORNO = C.supabaseLocal ? 'local' : /\/dev-rama\//.test(location.pathname) ? 'dev' : 'prod';
+  var ENTORNO = C.supabaseLocal ? 'local' : /\/dev-ramas?\//.test(location.pathname) ? 'dev' : 'prod';
+  var RAMA = (/\/dev-ramas\/([^/]+)\//.exec(location.pathname) || [])[1] || '';     // T0441: la rama de dev-ramas/<rama>/
   var P = C.supabaseLocal || (M.supabase || {})[ENTORNO] || {};
   var URL_SB = String(P.url || '').replace(/\/+$/, '');
   var K = 'sb_' + (C.clave || 'negocio') + '_' + ENTORNO;      // la sesión de este dispositivo
@@ -140,12 +142,37 @@
     }, function () { throw new Error('No hay conexión: revisa internet y vuelve a probar.'); });
   }
 
-  /** Local y DEV: los últimos correos del buzón de pruebas a ese correo (sin entrar), o null si aquí no hay buzón. */
+  /** T0456 · La llave de DEV: la sesión de Google de una persona de verdad en este Supabase, que guarda la app «Utilo DEV»
+   *  (dev/ramas/index.html, «dev_llaves»), renovada si hace falta; o null. */
+  function llaveDev() {
+    var L = null;
+    try { L = JSON.parse(localStorage.getItem('dev_llaves') || 'null') || {}; } catch (e) { L = {}; }
+    var s = L[URL_SB];
+    if (!s || !s.refresh_token) return Promise.resolve(null);
+    if (s.access_token && s.expires_at - 60 > ahora()) return Promise.resolve(s);
+    return auth('token?grant_type=refresh_token', { refresh_token: s.refresh_token }).then(function (r) {
+      var n = r.ok && r.j.access_token ? sesionDe(r.j, s) : null;
+      try { var M2 = JSON.parse(localStorage.getItem('dev_llaves') || 'null') || {}; if (n) M2[URL_SB] = n; else delete M2[URL_SB]; localStorage.setItem('dev_llaves', JSON.stringify(M2)); } catch (e) {}
+      return n;
+    }, function () { return null; });
+  }
+
+  /** Local y DEV: los últimos correos del buzón de pruebas a ese correo, o null si aquí no hay buzón o no se puede leer.
+   *  T0456: DEV está cerrado, así que va con la llave de la app «Utilo DEV» (sin ella, null); en local lo lee local.js con
+   *  la clave secreta. */
   function buzon(correo) {
     if (ENTORNO === 'prod' || !URL_SB) return Promise.resolve(null);
-    return fetch(URL_SB + '/rest/v1/rpc/buzon_de_pruebas', { method: 'POST', headers: { apikey: P.clave, 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ correo: bajo(correo) }) })
-      .then(function (r) { return r.ok ? r.json() : null; }, function () { return null; });
+    var c = JSON.stringify({ correo: bajo(correo) });
+    var leerlo = function (r) { return r.ok ? r.json() : null; };
+    if (ENTORNO === 'local') {
+      return fetch('/_local/supabase/buzon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: c })
+        .then(leerlo, function () { return null; });
+    }
+    return llaveDev().then(function (s) {
+      if (!s) return null;
+      return fetch(URL_SB + '/rest/v1/rpc/buzon_de_pruebas', { method: 'POST', headers: { apikey: P.clave, Authorization: 'Bearer ' + s.access_token,
+        'Content-Type': 'application/json', Accept: 'application/json' }, body: c }).then(leerlo);
+    }).then(null, function () { return null; });
   }
 
   /** Los correos de quien ha entrado (Perfil): leer, añadir con su código, confirmar y quitar. */
@@ -320,7 +347,7 @@
       if (avisos) avisos.refrescar(); // T0432: sin esperar
       return {
         persona: yo.nombre, correo: bajo(yo.correo || correo), perfil: alto.nombre + (alto.ambito !== 'todo' && alto.ambito_id ? ' en ' + alto.ambito_id : ''),
-        admin: admin, negocio: M.negocio || '', dev: ENTORNO === 'prod' ? '' : (ENTORNO === 'dev' ? 'DEV' : 'Local') + ' · Supabase ' + (P.nombre || 'de pruebas') + (M.commit ? ' · ' + M.commit : ''),
+        admin: admin, negocio: M.negocio || '', dev: ENTORNO === 'prod' ? '' : (ENTORNO === 'dev' ? 'DEV' : 'Local') + (RAMA ? ' · ' + decodeURIComponent(RAMA) : '') + ' · Supabase ' + (P.nombre || 'de pruebas') + (M.commit ? ' · ' + M.commit : ''),
         secciones: secciones, version: (ver && ver.version) || M.version || '', versiones: (ver && ver.versiones) || [], persona_id: yo.persona, roles: roles,
         perfilEnMenu: M.perfilEnMenu !== false   // T0415: false, Perfil fuera del menú (con el nombre de la cabecera)
       };
@@ -345,7 +372,7 @@
     /** Lo que antes daba «inicio» del motor: el nombre y si es DEV. */
     inicio: function () {
       if (!URL_SB || !P.clave) return Promise.reject(new Error('Esta web no sabe a qué Supabase llamar (falta ' + ENTORNO + ' en su montaje.js).'));
-      return Promise.resolve({ negocio: M.negocio || '', titulo: C.nombreApp || M.nombreApp || M.negocio || '', nucleo: { dev: ENTORNO === 'prod' ? '' : (ENTORNO === 'dev' ? 'DEV' : 'Local') + ' · Supabase ' + (P.nombre || 'de pruebas') } });
+      return Promise.resolve({ negocio: M.negocio || '', titulo: C.nombreApp || M.nombreApp || M.negocio || '', nucleo: { dev: ENTORNO === 'prod' ? '' : (ENTORNO === 'dev' ? 'DEV' : 'Local') + (RAMA ? ' · ' + decodeURIComponent(RAMA) : '') + ' · Supabase ' + (P.nombre || 'de pruebas') } });
     },
     configurar: function () {},
     /** Lo que trae la vuelta de Google (o false si no se venía de allí). La espera nucleo.js antes de pintar. */

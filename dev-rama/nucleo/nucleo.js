@@ -41,6 +41,13 @@
   var CLAVE = 'nucleo_' + (C.clave || 'negocio');
   // Raíz de utilo-web (…/utilo-web/): de aquí cuelgan nucleo/, kanban4/, estilos/ y la carpeta de cada negocio.
   var RAIZ = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/nucleo\/[^/]*$/, '') : '../'; })();
+  // T0446: en la app «Utilo DEV» (dev-ramas/<rama>/…), su marco (el borde amarillo y la línea DEV), de dev-ramas/marco.js.
+  var APP_DEV = (/^(.*\/dev-ramas\/)[^/]+\//.exec(location.pathname) || [])[1] || '';
+  if (APP_DEV) {
+    var mDev = document.createElement('script');
+    mDev.src = APP_DEV + 'marco.js?v=' + Math.floor(Date.now() / 600000); // GitHub Pages lo guarda 10 minutos
+    document.head.appendChild(mDev);
+  }
   var MENU_CLAVE = 'kanbanMenuPlegado'; // el mismo que kanban4/app.js (T0225): cada dispositivo recuerda cómo dejó el menú
 
   var ICONO_PERFIL = '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"/>';
@@ -212,7 +219,8 @@
           var v = $('n-buzon-ver');
           window.UG.buzon(correo).then(function (ms) {
             v.hidden = false;
-            v.innerHTML = !ms ? '<p class="u-nota">Aquí no hay buzón de pruebas para ' + texto(correo) + ' (solo los correos de prueba, como los de @ejemplo.com).</p>' :
+            v.innerHTML = !ms ? '<p class="u-nota">Aquí no hay buzón de pruebas para ' + texto(correo) + ' (solo los correos de prueba, como los de @ejemplo.com).' +
+                (window.UG.entorno === 'dev' ? ' En DEV, además, solo se lee después de entrar con tu Google en «Entrar como» de la app Utilo DEV.' : '') + '</p>' :
               !ms.length ? '<p class="u-nota">No ha llegado nada a ' + texto(correo) + '. Si el correo no está dado de alta, no se envía ningún código.</p>' :
               '<p class="u-nota">Buzón de pruebas: los correos no salen de verdad.</p><p><strong>' + texto(ms[0].asunto) + '</strong></p><p>' + texto(ms[0].texto).replace(/\n/g, '<br>') + '</p>';
           });
@@ -242,15 +250,24 @@
       version: r.version || '', versiones: Array.isArray(r.versiones) ? r.versiones : [] }; // T0283
     if (r.persona_id) o.persona_id = r.persona_id; // T0387: con Supabase, el id de la persona (acceso.personas)
     if (Array.isArray(r.roles)) o.roles = r.roles; // T0394: con Supabase, sus roles (ctx.roles); antes se perdían aquí
+    if (r.aviso) o.aviso = String(r.aviso); // T0639: el aviso de arriba (config.json · nucleo.aviso)
     if (r.perfilEnMenu === false) o.perfilEnMenu = false; // T0415: Perfil fuera del menú (se abre con el nombre de la cabecera)
     if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
     return o;
   }
 
   /** En DEV, la banda «DEV · rama · commit · modo» (la misma que DEV.gs del motor: colores fijos, solo en DEV). */
+  // T0446: en la app «Utilo DEV» (dev-ramas/<rama>/), sin banda: la marca de DEV es el marco de la app (dev-ramas/marco.js).
   function bandaDev(t) {
-    return t ? '<div role="status" style="position:sticky;top:0;z-index:99999;padding:6px 12px;font:600 13px/1.35 system-ui,sans-serif;text-align:center;' +
+    return t && !APP_DEV ? '<div role="status" style="position:sticky;top:0;z-index:99999;padding:6px 12px;font:600 13px/1.35 system-ui,sans-serif;text-align:center;' +
       'color:#1C1C1C;background:#FFE08A;border-bottom:2px solid #B88A00;overflow-wrap:anywhere">' + texto(t) + '</div>' : '';
+  }
+
+  /** T0639 · El aviso del proyecto (config.json · nucleo.aviso), arriba en todas las secciones; sin él, nada. No se queda
+   *  fijo al bajar: no tapa nada. */
+  function htmlAviso() {
+    return cred.aviso ? '<p class="n-aviso-app" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/>' +
+      '<path d="M12 11v5M12 8h.01"/></svg><span>' + texto(cred.aviso) + '</span></p>' : '';
   }
 
   /* ---------- el marco ---------- */
@@ -267,8 +284,31 @@
     /** Cada sección se registra al cargar su JS: UN.registrar('EJEMPLO', { abrir: function (el, ctx) {}, cerrar: function () {} }). */
     registrar: function (id, def) { DEF[String(id).toUpperCase()] = def; },
     /** T0283: el bloque «Versión» de Perfil (vacío si no hay versión: DEV, local sin ejemplo). */
-    htmlVersion: function () { return htmlVersion(); }
+    htmlVersion: function () { return htmlVersion(); },
+    /**
+     * T0599 · El orden del menú que ha elegido quien personaliza (la sección Listado lo guarda para todos): ids de las
+     * secciones. Se recuerda en el dispositivo, para pintar el menú en ese orden desde el principio, y se vuelve a pintar.
+     * Sin ids, el de config.json. Lo que no nombra va detrás, como venía.
+     */
+    ordenMenu: function (ids) {
+      if (ids === undefined) return ordenGuardado();
+      var antes = JSON.stringify(ordenGuardado());
+      try { if (ids && ids.length) localStorage.setItem(ORDEN_CLAVE, JSON.stringify(ids)); else localStorage.removeItem(ORDEN_CLAVE); } catch (e) {}
+      if (cred && JSON.stringify(ordenGuardado()) !== antes) repintarMenu();
+    }
   };
+  var ORDEN_CLAVE = 'nucleo_orden_' + (C.clave || 'negocio');
+  function ordenGuardado() { try { var o = JSON.parse(localStorage.getItem(ORDEN_CLAVE) || '[]'); return Array.isArray(o) ? o.map(String) : []; } catch (e) { return []; } }
+  /** Vuelve a pintar solo el menú (con el orden nuevo), con la sección abierta marcada. */
+  function repintarMenu() {
+    var nav = document.querySelector('nav.sx');
+    if (!nav) return;
+    var d = document.createElement('div'); d.innerHTML = htmlMenu();
+    nav.parentNode.replaceChild(d.firstChild, nav);
+    $('n-plegar').onclick = plegar;
+    marcarMenu((seccion(actual) || {}).enPerfil ? 'PERFIL' : actual);
+    cifras();
+  }
 
   function tablas() {
     if (T) return T;
@@ -290,6 +330,10 @@
   /** Las secciones que ves y, al final, Perfil (la sección PERFIL si el cliente la tiene; si no, la del marco). */
   function todas() {
     var ss = (cred.secciones || []).filter(function (s) { return s.id !== 'PERFIL'; });
+    // T0599: en el orden que ha elegido quien personaliza (UN.ordenMenu); las que no nombra, detrás y como venían.
+    var o = ordenGuardado();
+    if (o.length) ss = ss.filter(function (s) { return o.indexOf(s.id) >= 0; }).sort(function (a, b) { return o.indexOf(a.id) - o.indexOf(b.id); })
+      .concat(ss.filter(function (s) { return o.indexOf(s.id) < 0; }));
     var p = (cred.secciones || []).filter(function (s) { return s.id === 'PERFIL'; })[0] || { id: 'PERFIL', titulo: 'Perfil', icono: ICONO_PERFIL, propia: true };
     return ss.concat([p]);
   }
@@ -299,19 +343,60 @@
   function menu() { return todas().filter(function (s) { return !s.enPerfil && !(s.id === 'PERFIL' && sinPerfil()); }); }
   function seccion(id) { return todas().filter(function (s) { return s.id === id; })[0] || null; }
 
+  /* T0629: en el móvil la barra de abajo lleva como mucho MAX_BARRA botones: con más secciones, las MAX_BARRA - 1 primeras
+   * y «Más», que abre las demás (y Perfil) en una lista encima de la barra. En el ordenador, el menú de la izquierda las
+   * lleva todas (la lista de «Más» se deshace con display: contents y el botón no se ve). */
+  var MAX_BARRA = 5;
+  function partirMenu(ss) {
+    return ss.length > MAX_BARRA ? { barra: ss.slice(0, MAX_BARRA - 1), resto: ss.slice(MAX_BARRA - 1) } : { barra: ss, resto: [] };
+  }
   function htmlMenu() {
     var plegado = false;
     try { plegado = localStorage.getItem(MENU_CLAVE) === '1'; } catch (e) {}
     document.body.classList.toggle('u-menu-plegado', plegado);
-    var et = plegado ? 'Desplegar el menú' : 'Plegar el menú';
-    return '<nav class="sx u-sx" aria-label="Secciones"><div class="sx-in"><div class="sx-cab"><span class="sx-marca">' + texto(C.nombreApp || cred.negocio || '') + '</span>' +
+    var et = plegado ? 'Desplegar el menú' : 'Plegar el menú', p = partirMenu(menu());
+    function enlace(s) {
+      return '<a href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '" title="' + texto(s.titulo) + '">' +
+        '<svg viewBox="0 0 24 24" aria-hidden="true">' + (s.icono || ICONO_SECCION) + '</svg><span>' + texto(s.titulo) +
+        (s.id === 'PERFIL' ? '<span class="sx-quien">' + texto(cred.persona) + '</span>' : '') + '</span>' +
+        (s.cifra ? '<span class="bj-n hay" data-cifra="' + texto(s.id) + '" hidden></span>' : '') + '</a>'; // T0412
+    }
+    return '<nav class="sx u-sx' + (p.resto.length ? ' sx-mucho' : '') + '" aria-label="Secciones"><div class="sx-in"><div class="sx-cab"><span class="sx-marca">' + texto(C.nombreApp || cred.negocio || '') + '</span>' +
       '<button type="button" class="sx-plegar" id="n-plegar" aria-label="' + et + '" title="' + et + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button></div>' +
-      menu().map(function (s) {
-        return '<a href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '" title="' + texto(s.titulo) + '">' +
-          '<svg viewBox="0 0 24 24" aria-hidden="true">' + (s.icono || ICONO_SECCION) + '</svg><span>' + texto(s.titulo) +
-          (s.id === 'PERFIL' ? '<span class="sx-quien">' + texto(cred.persona) + '</span>' : '') + '</span>' +
-          (s.cifra ? '<span class="bj-n hay" data-cifra="' + texto(s.id) + '" hidden></span>' : '') + '</a>'; // T0412
-      }).join('') + '</div></nav>';
+      p.barra.map(enlace).join('') +
+      (p.resto.length ? '<div class="sx-resto" id="n-sx-resto">' + p.resto.map(enlace).join('') + '</div>' +
+        '<button type="button" class="sx-mas" id="n-sx-mas" aria-expanded="false" aria-controls="n-sx-resto" title="Más secciones">' +
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>' +
+        '<span>Más</span><span class="bj-n hay" id="n-sx-mas-n" hidden></span></button>' : '') + '</div></nav>';
+  }
+  /** T0629 · Abre o cierra la lista de «Más» (si la barra la tiene). */
+  function verMas(si) {
+    var b = $('n-sx-mas');
+    if (!b) return;
+    b.setAttribute('aria-expanded', si ? 'true' : 'false');
+    b.parentNode.parentNode.classList.toggle('sx-abierto', !!si);
+  }
+  /** Marca en el menú la sección abierta; si está dentro de «Más», «Más» también se ve marcado (T0629). */
+  function marcarMenu(marcada) {
+    [].forEach.call(document.querySelectorAll('.sx a[data-sx]'), function (a) {
+      if (a.getAttribute('data-sx') === marcada) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    var b = $('n-sx-mas');
+    if (b) b.classList.toggle('sx-dentro', !!document.querySelector('#n-sx-resto a[aria-current]'));
+  }
+  /** T0629 · Las cifras de lo que va dentro de «Más», sumadas en el botón, para que no se pierdan en el móvil. */
+  function cifraMas() {
+    var b = $('n-sx-mas-n');
+    if (!b) return;
+    var n = 0;
+    [].forEach.call(document.querySelectorAll('#n-sx-resto [data-cifra]'), function (c) { if (!c.hidden) n += +c.textContent || 0; });
+    b.textContent = n ? String(n) : ''; b.hidden = !n;
+  }
+
+  function plegar() {
+    var p = document.body.classList.toggle('u-menu-plegado');
+    this.setAttribute('aria-label', p ? 'Desplegar el menú' : 'Plegar el menú'); this.title = this.getAttribute('aria-label');
+    try { if (p) localStorage.setItem(MENU_CLAVE, '1'); else localStorage.removeItem(MENU_CLAVE); } catch (e) {}
   }
 
   /** Pinta el marco entero y abre la sección de la URL (o la primera). */
@@ -321,15 +406,11 @@
     cred = c;
     document.body.className = 'u u-con-barra' + (cred.como ? ' n-viendo-como' : '') + (sinPerfil() ? ' n-perfil-arriba' : '');
     document.body.innerHTML = bandaDev(cred.dev) + htmlMenu() +
-      '<div id="sx-panel">' + htmlComo() + '<header class="u-cab n-cab"><h1 id="n-titulo"></h1>' +
+      '<div id="sx-panel">' + htmlComo() + htmlAviso() + '<header class="u-cab n-cab"><h1 id="n-titulo"></h1>' +
       '<a class="n-quien" href="?s=perfil" data-sx="PERFIL"><span>' + texto(cred.persona) + '</span>' + (cred.perfil ? '<small>' + texto(cred.perfil) + '</small>' : '') + '</a></header>' +
       '<main class="u-main n-main" id="n-sec"></main></div>' +
       '<div class="u-aviso" id="n-aviso" role="status" hidden></div>';
-    $('n-plegar').onclick = function () {
-      var p = document.body.classList.toggle('u-menu-plegado');
-      this.setAttribute('aria-label', p ? 'Desplegar el menú' : 'Plegar el menú'); this.title = this.getAttribute('aria-label');
-      try { if (p) localStorage.setItem(MENU_CLAVE, '1'); else localStorage.removeItem(MENU_CLAVE); } catch (e) {}
-    };
+    $('n-plegar').onclick = plegar;
     tope();
     abrir(pedida() || menu()[0].id, false);
     avisarVersiones();
@@ -354,6 +435,7 @@
       b.parentNode.title = s.titulo + (n ? ' · ' + n + (c.que ? ' ' + c.que : '') : '');
       b.parentNode.setAttribute('aria-label', b.parentNode.title);
     });
+    cifraMas();
   }
   function cifras() {
     cifrasDirecto.forEach(function (d) { try { d.cerrar(); } catch (e) {} });
@@ -373,7 +455,7 @@
 
   /* ---------- T0283 · versión y novedades ---------- */
 
-  // La última versión cuyas novedades se han visto aquí. DEV (dev-rama/) comparte dirección con producción: va aparte.
+  // La última versión cuyas novedades se han visto aquí. DEV (dev-rama/, dev-ramas/) comparte dirección con producción: va aparte.
   function vista() { return 'nucleo_version_vista_' + (cred && cred.dev ? 'dev_' : '') + (C.clave || 'negocio'); }
   function leerVista() { try { return localStorage.getItem(vista()); } catch (e) { return null; } }
   function marcarVista() { var v = cred && cred.versiones && cred.versiones[0]; if (v) try { localStorage.setItem(vista(), v.v); } catch (e) {} }
@@ -570,10 +652,8 @@
     abierta = null;
     oyentes[actual] = [];
     actual = s.id;
-    var marcada = s.enPerfil ? 'PERFIL' : s.id; // una sección de dentro de Perfil marca Perfil en el menú (T0269)
-    [].forEach.call(document.querySelectorAll('.sx a[data-sx]'), function (a) {
-      if (a.getAttribute('data-sx') === marcada) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
-    });
+    marcarMenu(s.enPerfil ? 'PERFIL' : s.id); // una sección de dentro de Perfil marca Perfil en el menú (T0269)
+    verMas(false);
     $('n-titulo').textContent = s.titulo;
     document.title = s.titulo + ' · ' + (C.nombreApp || cred.negocio || '');
     if (push) {
@@ -616,16 +696,19 @@
 
   /** El JS de una sección, una vez. */
   function cargar(s) {
-    if (DEF[s.id]) return Promise.resolve(DEF[s.id]);
-    if (cargas[s.id]) return cargas[s.id];
-    cargas[s.id] = new Promise(function (ok, ko) {
+    // T0599: una sección que sale varias veces en el menú (Seguimiento y Clientes, las dos de Listado) lleva en «base» el id
+    // con el que se registra su JS, que se carga una sola vez.
+    var k = s.base || s.id;
+    if (DEF[k]) return Promise.resolve(DEF[k]);
+    if (cargas[k]) return cargas[k];
+    cargas[k] = new Promise(function (ok, ko) {
       var sc = document.createElement('script');
       sc.src = RAIZ + s.web + '?v=' + encodeURIComponent(s.version || '1');
-      sc.onload = function () { if (DEF[s.id]) ok(DEF[s.id]); else ko(new Error('La sección ' + s.id + ' no se ha registrado.')); };
-      sc.onerror = function () { delete cargas[s.id]; ko(new Error('No se ha podido cargar la sección.')); };
+      sc.onload = function () { if (DEF[k]) ok(DEF[k]); else ko(new Error('La sección ' + k + ' no se ha registrado.')); };
+      sc.onerror = function () { delete cargas[k]; ko(new Error('No se ha podido cargar la sección.')); };
       document.head.appendChild(sc);
     });
-    return cargas[s.id];
+    return cargas[k];
   }
 
   /**
@@ -761,7 +844,7 @@
       Array.prototype.forEach.call(caja.querySelectorAll('[data-n-buzon]'), function (b) {
         b.onclick = function () {
           window.UG.buzon(b.getAttribute('data-n-buzon')).then(function (ms) {
-            aviso2 = !ms ? 'Aquí no hay buzón de pruebas para ese correo.' : !ms.length ? 'No ha llegado nada a ese correo.' : 'Buzón de pruebas: ' + ms[0].asunto;
+            aviso2 = !ms ? 'Aquí no hay buzón de pruebas para ese correo' + (window.UG.entorno === 'dev' ? ' (en DEV, solo después de entrar con tu Google en la app Utilo DEV).' : '.') : !ms.length ? 'No ha llegado nada a ese correo.' : 'Buzón de pruebas: ' + ms[0].asunto;
             pintar(lista);
           });
         };
@@ -895,6 +978,9 @@
   /* ---------- navegación ---------- */
 
   document.addEventListener('click', function (e) {
+    // T0629: «Más» abre o cierra su lista; pulsar en cualquier otro sitio la cierra (y lo pulsado sigue su camino).
+    if (e.target.closest && e.target.closest('#n-sx-mas')) { verMas($('n-sx-mas').getAttribute('aria-expanded') !== 'true'); return; }
+    verMas(false);
     // T0273: «Entrar como otra persona» (en Perfil) y «Volver a mi cuenta» (franja y Perfil), estén donde estén.
     var b = e.target.closest && e.target.closest('[data-n-como], [data-n-volver], [data-n-versiones]');
     if (b && cred) { e.preventDefault(); if (b.hasAttribute('data-n-volver')) volver(); else if (b.hasAttribute('data-n-versiones')) verVersiones(); else verComo(); return; }
@@ -905,6 +991,7 @@
     if (a.getAttribute('data-sx') === 'PERFIL' && sinPerfil() && (seccion('PERFIL') || {}).propia) { verPerfil(); return; }
     abrir(a.getAttribute('data-sx'), true, a.getAttribute('href'));
   });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && $('n-sx-mas') && $('n-sx-mas').getAttribute('aria-expanded') === 'true') { verMas(false); $('n-sx-mas').focus(); } }); // T0629
   try { history.scrollRestoration = 'manual'; } catch (e) {} // T0420: dónde estabas lo pone abrir() (alSitio)
   window.addEventListener('popstate', function () { if (cred) abrir(pedida() || menu()[0].id, false); });
 

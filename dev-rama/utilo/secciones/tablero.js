@@ -7,7 +7,7 @@
  * - Lee la vista TABLERO (public.tablero: cada tarea con su entrega corta y en manos de quién está) con la capa de tablas,
  *   que va a Supabase con la sesión de quien ha entrado: lo que se ve lo dicen sus roles (reglas por fila).
  * - Vista (arriba): «8 columnas» (todas menos Aplazada y Descartada), «Todas» (los diez estados) o «Agrupadas» (Necesita tu
- *   respuesta con Bloqueada y Para revisar con Aprobada; el estado exacto, en la tarjeta). La primera vez, la de
+ *   respuesta con Bloqueada; el estado exacto, en la tarjeta). T0440: Aprobada se llama «Por publicar», en su columna. La primera vez, la de
  *   config.VISTA; después, la última de este dispositivo. Entregadas y Descartadas, solo las de los últimos días (Filtros).
  * - En directo: con Supabase, lo que cambie otra persona (o el agente) sale solo en un segundo (Realtime); sin ↻ (T0422).
  * - Ordenar a mano: arrastrada dentro de su columna, la tarjeta se queda donde se suelta (el mismo orden para todos; las que no
@@ -18,12 +18,22 @@
  * - Se pinta al momento con lo guardado en el dispositivo y se refresca por detrás.
  * - Mover (arrastrando en el ordenador, con el desplegable en el móvil o desde la ficha): solo a los estados a los que se
  *   puede pasar, y pide lo que exige cada uno (Bloqueada, el motivo; Necesita tu respuesta, la pregunta; Aplazada, la fecha;
- *   Descartada y rechazar, el motivo). La tarjeta cambia al momento y lo escribe mover_tarea(); si la base dice que no, vuelve.
+ *   Descartada, el motivo). La tarjeta cambia al momento y lo escribe mover_tarea(); si la base dice que no, vuelve.
+ * - T0440 · Aprobar: en la ficha de una tarea Para revisar (o llevándola a Por publicar), quien la revisa (o lleva la
+ *   iniciativa) la aprueba: la función del servidor aprobar mira su PR en GitHub («Pruebas» ✅ y sin conflictos), la fusiona
+ *   y la deja en Aprobada, que aquí se llama «Por publicar» y tiene su columna (Entregada si no lleva nada que publicar).
+ * - T0449 · Pedir cambios (sustituye a «rechazar»): en la ficha de una tarea Para revisar o Aprobada, o llevándola a En cola,
+ *   quien la revisa (o lleva la iniciativa) escribe qué hay que cambiar y pedir_cambios() la devuelve a la cola con la marca
+ *   (la tarjeta lo dice), el bloque «Cambios pedidos» en Qué hay que hacer y su línea en la bitácora. Si es autónoma, el aviso
+ *   lleva a «Que lo haga Claude».
  * - En el móvil, mantener pulsada una tarjeta la coge para llevarla con el dedo a otra columna o a otro sitio de la suya.
  * - Ficha: cada dato (título, etiquetas, fechas, personas, «espera a», textos) se cambia pulsándolo; lo que no tiene valor, con
  *   «Añadir». «Editar tarea» sigue para cambiar varios a la vez.
  * - Crear y editar escriben TAREAS (y sus DEPENDENCIAS) con la capa de tablas; la tarjeta sale al momento con «Guardando».
  *   Una nota va a la bitácora con anotar(). Después se trae el tablero (en manos de, lo que la base mueve sola).
+ * - T0466 · Por publicar: la ficha dice qué falta para llegar a producción (qué botón: «Publicar» de qué proyecto, «Supabase»
+ *   de qué iniciativa en producción, o a mano) y qué ya está; y la columna las agrupa por los botones que les faltan. Lo
+ *   calcula herramientas/entregar.js al fusionar y al publicar (TAREAS.POR_PUBLICAR); aquí solo se lee.
  * - T0387 · Una tarea en Necesita tu respuesta se responde en su ficha (responder() de la base, como en Para mí): quien la
  *   pidió o quien lleva la iniciativa. Lo escrito se guarda aunque la ficha se repinte.
  */
@@ -44,6 +54,9 @@
   var COLOR = { 'Esperando': 'x', 'En cola': 'ni', 'En curso': 'ec', 'Necesita tu respuesta': 'pr', 'Bloqueada': 'bl', 'Para revisar': 'pr', 'Aprobada': 'co',
     'Entregada': 'co', 'Aplazada': 'x', 'Descartada': 'x' };
   var CERRADOS = ['Entregada', 'Descartada'];
+  /** T0440 · Cómo se llama cada estado en la pantalla: Aprobada es «Por publicar» (fusionada, falta llevarla a producción). */
+  var NOMBRE = { 'Aprobada': 'Por publicar' };
+  function nom(e) { return NOMBRE[e] || e; }
   /** A qué estados se puede pasar desde cada uno (los de gestion.pasos() de la base, que es la que manda). */
   var PASOS = {
     'Esperando': ['En cola', 'Aplazada', 'Descartada'],
@@ -51,8 +64,8 @@
     'En curso': ['Para revisar', 'Necesita tu respuesta', 'Bloqueada', 'En cola', 'Aplazada', 'Descartada'],
     'Necesita tu respuesta': ['En cola', 'Aplazada', 'Descartada'],
     'Bloqueada': ['En cola', 'Aplazada', 'Descartada'],
-    'Para revisar': ['Aprobada', 'En curso', 'Descartada'],
-    'Aprobada': ['Entregada'],
+    'Para revisar': ['Aprobada', 'En cola', 'Descartada'],   // T0449: a En cola, pidiendo cambios (rechazar a En curso, ya no)
+    'Aprobada': ['Entregada', 'En cola'],
     'Aplazada': ['En cola', 'Esperando', 'Descartada']
   };
   /** Qué abarca cada estado: sale al pasar el ratón por la cabecera de su columna. */
@@ -62,28 +75,31 @@
     'En curso': 'Alguien está trabajando en ella ahora.',
     'Necesita tu respuesta': 'Parada hasta que quien la pidió conteste una pregunta concreta.',
     'Bloqueada': 'Parada por algo de fuera: material del cliente, un acceso, un problema técnico o un tercero.',
-    'Para revisar': 'Hecha: falta que quien la revisa la mire.',
-    'Aprobada': 'Revisada y bien: falta publicarla o entregarla.',
+    'Para revisar': 'Hecha: falta que quien la revisa la mire y la apruebe (Aprobar fusiona su PR) o pida cambios.',
+    'Aprobada': 'Aprobada y fusionada: falta publicarla o enviarla. Si no lleva nada que publicar, pasa sola a Entregada.',
     'Entregada': 'Hecha y funcionando. Se cierra con su fecha.',
     'Aplazada': 'Se deja para más adelante: se vuelve a mirar en la fecha que diga.',
     'Descartada': 'No se va a hacer.'
   };
   /** El texto de la cabecera de una columna: el de su estado o, si junta varios, el de cada uno. */
   function queEs(c) {
-    return c.estados.length === 1 ? QUE_ES[c.estados[0]] || '' : c.estados.map(function (e) { return e + ': ' + (QUE_ES[e] || ''); }).join('\n');
+    return c.estados.length === 1 ? QUE_ES[c.estados[0]] || '' : c.estados.map(function (e) { return nom(e) + ': ' + (QUE_ES[e] || ''); }).join('\n');
   }
   var MOTIVOS_BLOQUEO = ['Falta material del cliente', 'Falta un acceso', 'Problema técnico', 'Un tercero'];
+  /** T0449 · Lo que pasa al pedir cambios (la ventanita del tablero). */
+  var AYUDA_CAMBIOS = 'Vuelve a la cola con lo que escribas, tal cual: queda en Qué hay que hacer y en la bitácora, y quien la coja lo ve lo primero.';
   var HERRAMIENTAS = ['Chat', 'Cowork', 'Claude Code'];
   /** Las columnas de cada vista: [{ id, titulo, estados }]. */
   var VISTAS = {
-    ocho: { titulo: '8 columnas', cols: ESTADOS.filter(function (e) { return e !== 'Aplazada' && e !== 'Descartada'; }).map(function (e) { return { id: e, titulo: e, estados: [e] }; }) },
-    todas: { titulo: 'Todas', cols: ESTADOS.map(function (e) { return { id: e, titulo: e, estados: [e] }; }) },
+    ocho: { titulo: '8 columnas', cols: ESTADOS.filter(function (e) { return e !== 'Aplazada' && e !== 'Descartada'; }).map(function (e) { return { id: e, titulo: nom(e), estados: [e] }; }) },
+    todas: { titulo: 'Todas', cols: ESTADOS.map(function (e) { return { id: e, titulo: nom(e), estados: [e] }; }) },
     agrupadas: { titulo: 'Agrupadas', cols: [
       { id: 'Esperando', titulo: 'Esperando', estados: ['Esperando'] },
       { id: 'En cola', titulo: 'En cola', estados: ['En cola'] },
       { id: 'En curso', titulo: 'En curso', estados: ['En curso'] },
       { id: 'Atascadas', titulo: 'Atascadas', estados: ['Necesita tu respuesta', 'Bloqueada'], color: 'bl' },
-      { id: 'En revisión', titulo: 'En revisión', estados: ['Para revisar', 'Aprobada'], color: 'pr' },
+      { id: 'Para revisar', titulo: 'Para revisar', estados: ['Para revisar'] },
+      { id: 'Aprobada', titulo: 'Por publicar', estados: ['Aprobada'] },   // T0440: en su propia columna
       { id: 'Entregada', titulo: 'Entregada', estados: ['Entregada'] }
     ] }
   };
@@ -91,7 +107,7 @@
     ENTREGA: 'Entrega', DEADLINE: 'Fecha límite', DISPONIBLE_DESDE: 'No empezar antes del', FECHA_CIERRE: 'Cerrada el', REVISAR_EL: 'Se vuelve a mirar el',
     DESCRIPCION: 'Qué hay que hacer', DOCUMENTOS_RELEVANTES: 'Documentos', CONCLUSIONES: 'Conclusiones', PREGUNTA: 'Pregunta', MOTIVO: 'Motivo',
     MOTIVO_BLOQUEO: 'Motivo del bloqueo', HERRAMIENTA: 'Herramienta', EMPLEADO: 'Empleado IA', TITULO: 'Título', DEPENDE: 'Espera a',
-    AUTONOMA: 'Autónoma' };
+    AUTONOMA: 'Autónoma', QUE_MIRAR: 'Qué mirar', PLAN_PRUEBAS: 'Plan de pruebas' };
   var OBLIGA = { TITULO: 'Título', DESCRIPCION: 'Qué hay que hacer', INICIATIVA: 'Iniciativa', ASIGNADO: 'Asignada a', P: 'Prioridad', T: 'Tamaño' };
   /** T0074: la épica que se sugiere a una tarea nueva de la entrega e: la que más llevan sus tareas (sin las descartadas); a
    *  igualdad, la de la tarea más reciente. '' sin entrega o si ninguna de sus tareas tiene épica. */
@@ -228,6 +244,7 @@
    * [{ tit, fecha?, anadido?, cosas: [{ p } | { hecho } | { li, quien } | { intro, pasos }] }]
    * - «SOLICITUD:», «DECISIONES:», «ABIERTO:»… (APARTADOS), solos o al empezar la línea: un apartado con su título.
    * - «Añadido después (fecha, quién): …»: un apartado aparte, con lo de los paréntesis como fecha.
+   * - T0449 · «Cambios pedidos (fecha, quién): …»: lo mismo, marcado como cambios pedidos (cambios: true).
    * - Un párrafo, una frase por línea; «Está bien hecho cuando …», aparte; «1) … 2) …», numerada.
    * - «- …»: lista; «(Javi)» al final, a quién le toca.
    */
@@ -253,6 +270,7 @@
         return;
       }
       if ((m = /^Añadido después\s*(?:\(([^)]*)\))?\s*:\s*(.*)$/i.exec(l))) { nuevo('Añadido después', { anadido: true, fecha: m[1] || '' }); if (m[2]) parrafo(m[2]); return; }
+      if ((m = /^Cambios pedidos\s*(?:\(([^)]*)\))?\s*:\s*(.*)$/i.exec(l))) { nuevo('Cambios pedidos', { anadido: true, cambios: true, fecha: m[1] || '' }); if (m[2]) parrafo(m[2]); return; }
       if ((m = /^([A-ZÁÉÍÓÚÑ_]+):\s*(.*)$/.exec(l)) && m[1] in APARTADOS) { nuevo(APARTADOS[m[1]]); if (m[2]) parrafo(m[2]); return; }
       parrafo(l);
     });
@@ -286,10 +304,168 @@
       });
       if (lista) h += '</ul>';
       var tit = x.tit ? '<h4>' + texto(x.tit) + (x.fecha ? ' <span>' + texto(x.fecha) + '</span>' : '') + '</h4>' : '';
-      return '<div class="fx-parte' + (x.anadido ? ' fx-anadido' : '') + '">' + tit + h + '</div>';
+      return '<div class="fx-parte' + (x.anadido ? ' fx-anadido' : '') + (x.cambios ? ' fx-cambios' : '') + '">' + tit + h + '</div>';
     }).join('');
   }
-  var CALC = { frases: frases, numerada: numerada, partesTexto: partesTexto, htmlTexto: htmlTexto, conEnlaces: conEnlaces };
+  /**
+   * T0439 · «Que lo haga Claude»: por qué el agente autónomo no puede coger esta tarea, con las palabras de la base
+   * (preparar_autonomo, que es la que manda y además mira la fase y el tope de 3 por revisar). [] si, por lo que se ve aquí,
+   * puede. o: { yo (persona), deps: [{ id, estado }] (las que espera, las que se sepan), hoy (aaaa-mm-dd), nombre(persona) }.
+   * El tamaño M lo deja pasar: depende de la fase, que sabe la función del servidor.
+   */
+  function motivoClaude(t, o) {
+    o = o || {};
+    var m = [], est = t.ESTADO, desde = String(t.DISPONIBLE_DESDE || '').slice(0, 10);
+    var faltan = (o.deps || []).filter(function (d) { return CERRADOS.indexOf(d.estado) < 0; }).map(function (d) { return d.id; });
+    if (est !== 'En cola') {
+      m.push(est === 'Esperando' && faltan.length ? 'espera a ' + faltan.join(', ')
+        : est === 'Esperando' && desde && o.hoy && desde > o.hoy ? 'no se puede empezar hasta el ' + desde.split('-').reverse().join('/')
+        : CERRADOS.indexOf(est) >= 0 ? 'está cerrada (' + est + ')'
+        : 'está ' + est + ': el agente solo coge las que están En cola');
+    }
+    if (!t.HERRAMIENTA) m.push('no tiene herramienta: el agente solo hace las de Claude Code');
+    else if (t.HERRAMIENTA !== 'Claude Code') m.push('se hace con ' + t.HERRAMIENTA + ': el agente solo hace las de Claude Code');
+    if (!t.T) m.push('no tiene tamaño');
+    else if (['XS', 'S', 'M'].indexOf(t.T) < 0) m.push('es ' + t.T + ': el agente solo hace XS y S (y M desde la fase 3)');
+    if (o.yo && t.ASIGNADO && t.ASIGNADO !== o.yo) m.push('está asignada a ' + ((o.nombre && o.nombre(t.ASIGNADO)) || 'otra persona') + ': el agente solo hace las tuyas');
+    return m;
+  }
+  /** Con qué estados sale «Que lo haga Claude» en la ficha: los de antes de empezar (en los demás ya la lleva alguien o está hecha). */
+  var ANTES_DE_EMPEZAR = ['Esperando', 'En cola', 'Necesita tu respuesta', 'Bloqueada', 'Aplazada'];
+
+  /* ---------- T0450 · Dónde se comprueba y «Verlo en DEV» ---------- */
+  var APP_DEV = 'https://utilo-digital.github.io/utilo-web/dev-ramas/';
+  /** Dónde lo miras, dicho para quien revisa (T0450, Javi: se lee, no se elige; lo decide Claude con las reglas). */
+  var COMPROBAR = { Nada: 'no hace falta: basta la PR en verde', DEV: 'en DEV, antes de aprobar', 'Producción': 'tras publicar' };
+  /** Con qué estados sale el bloque «Qué mirar» (T0450, Javi: en curso aún no hay nada que mirar): en revisión y, tras
+   *  aprobarla, para lo que se mira al publicar. «Verlo en DEV», solo Para revisar: al aprobar se fusiona y sale de DEV. */
+  var EN_REVISION = ['Para revisar', 'Aprobada'];
+  var VER_EN_DEV = ['Para revisar'];
+  /** T0462 · Las tareas sin código también tienen algo que mirar: el bloque sale en revisión aunque esté vacío (con
+   *  «+ Qué mirar»), sin «Dónde lo miras» (no tienen COMPROBAR) ni «Verlo en DEV». */
+  var SIN_CODIGO = ['Chat', 'Cowork'];
+  /** El enlace de «Verlo en DEV»: la app «Utilo DEV» ya en la rama de la tarea, su web y su persona (VER_EN_DEV,
+   *  «dev/plataforma/ como gestora@ejemplo.com»). Igual que enlaceDev de herramientas/revision.js (probar-plataforma.js
+   *  comprueba que dan lo mismo). */
+  function enlaceDev(id, verEnDev) {
+    var s = String(verEnDev || ''), m = /^\s*(\S+?)\/?(?:\s+como\s+(\S+))?\s*$/i.exec(s);
+    var v = m && s.trim() ? { ruta: m[1].replace(/^\/+/, '') + '/', como: (m[2] || '').toLowerCase() } : null;
+    return APP_DEV + '?probar&tarea=' + encodeURIComponent(id) + (v ? '&web=' + encodeURIComponent(v.ruta) + (v.como ? '&como=' + encodeURIComponent(v.como) : '') : '');
+  }
+  /**
+   * T0457 · Lo que copia «Copiar» del plan de pruebas, para pegárselo a Claude en Chrome: qué abrir (el enlace de «Verlo en
+   * DEV»), cómo probar, qué contar y el plan. Igual que textoParaChrome de herramientas/revision.js (probar-plataforma.js
+   * comprueba que dan lo mismo).
+   */
+  function textoParaChrome(t) {
+    t = t || {};
+    var id = String(t.ID || t.id || ''), tit = t.TITULO || t.titulo || '';
+    return [
+      'Prueba en Chrome la tarea ' + id + (tit ? ' · ' + tit : '') + ', que está para revisar en DEV.',
+      'Ábrela con este enlace: la app «Utilo DEV» ya en su rama, sus datos de ejemplo y su persona: ' + enlaceDev(id, t.VER_EN_DEV || t.ver_en_dev),
+      'Haz cada caso del plan, tal cual y en orden, primero con la ventana de ordenador (1280 px de ancho) y después de móvil (390 px).',
+      'Para entrar como otra persona: toca abajo la línea «DEV · rama · persona», y en «Entrar como» elige la de prueba (@ejemplo.com) y «Abrir». Nunca con una cuenta de verdad, y no toques nada que el plan no diga.',
+      'Al acabar, una lista: cada caso con ✅ o ❌, en ordenador y en móvil, y lo que has visto; de lo que falle, una captura y qué esperabas.',
+      '',
+      'Plan de pruebas',
+      String(t.PLAN_PRUEBAS || t.plan_pruebas || '').trim()
+    ].join('\n');
+  }
+
+  /* ---------- T0466 · Qué falta por publicar ---------- */
+  var PR_GITHUB = /https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/pull\/\d+/;
+  /**
+   * Lo que le falta a una tarea Por publicar, de POR_PUBLICAR (el JSON que apunta entregar.js):
+   *   { que: 'calculado', faltan: [{ donde, con: [botón] }], ya: [versión], dudas: [texto], el }
+   *   { que: 'sin-pr' }        sin PR en DOCUMENTOS_RELEVANTES: se envía o se publica a mano
+   *   { que: 'sin-calcular' }  aún no lo ha calculado nadie (se acaba de aprobar) o no se entiende
+   */
+  function porPublicar(t) {
+    if (!t || !PR_GITHUB.test(String(t.DOCUMENTOS_RELEVANTES || ''))) return { que: 'sin-pr' };
+    var v = null;
+    try { v = t.POR_PUBLICAR ? (typeof t.POR_PUBLICAR === 'string' ? JSON.parse(t.POR_PUBLICAR) : t.POR_PUBLICAR) : null; } catch (e) { v = null; }
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return { que: 'sin-calcular' };
+    var l = function (x) { return Array.isArray(x) ? x : []; };
+    return { que: 'calculado', el: v.el || '', ya: l(v.ya).map(String), dudas: l(v.dudas).map(String),
+      faltan: l(v.faltan).filter(function (f) { return f && l(f.con).length; }).map(function (f) { return { donde: String(f.donde || ''), con: l(f.con).map(String), por: String(f.por || '') }; }) };
+  }
+  /** Un instante ISO, como dd/mm/aaaa hh:mm en la hora de quien mira ('' si no se entiende). */
+  function horaLocal(iso) {
+    var d = new Date(iso), z = function (n) { return ('0' + n).slice(-2); };
+    return iso && !isNaN(d.getTime()) ? z(d.getDate()) + '/' + z(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()) : '';
+  }
+  /** La acción de GitHub de un botón, con las opciones ya puestas (boton-*.yml): solo hay que pulsar «Run workflow». '' para
+   *  los de «A mano». Igual que accionDe de herramientas/entregar.js (probar-plataforma.js comprueba que dan lo mismo). */
+  function enlaceBoton(b) {
+    var m = /^Publicar · ([a-z0-9_-]+)(?:\/([a-z0-9_-]+))?$/.exec(b), a = m ? 'boton-publicar-' + m[1] + (m[2] ? '-' + m[2] : '') + '.yml' : ''; // T0631: «Publicar · telas»
+    if (!a && (m = /^Supabase · ([a-z0-9_-]+) · Producción$/.exec(b))) a = 'boton-supabase-' + m[1] + '.yml';
+    return a ? 'https://github.com/UTILO-DIGITAL/utilo-apps/actions/workflows/' + a : '';
+  }
+  /**
+   * T0613 · Los botones que hay que pulsar: los menos que cubren todo lo que falta (un sitio que sale con cualquiera de varios,
+   * como UTILO_CORE, no suma uno más). A igual número, los que tienen botón antes que los de «A mano». Por botón, lo que solo
+   * lleva él (propios); los sitios que sale con cualquiera de los elegidos, en comunes.
+   * → { botones: [{ boton, propios: [falta] }] (por nombre), comunes: [falta] }
+   */
+  function botonesQuePulsar(faltan) {
+    var cand = [];
+    faltan.forEach(function (f) { f.con.forEach(function (b) { if (cand.indexOf(b) < 0) cand.push(b); }); });
+    var aMano = function (b) { return /^A mano/.test(b) ? 1 : 0; };
+    var cubre = function (sel) { return faltan.every(function (f) { return f.con.some(function (b) { return sel.indexOf(b) >= 0; }); }); };
+    var mejor = null;
+    if (cand.length <= 12) {
+      for (var k = 1; k <= cand.length && !mejor; k++) {
+        (function elegir(desde, sel) {
+          if (sel.length === k) {
+            var n = sel.filter(aMano).length;
+            if (cubre(sel) && (!mejor || n < mejor.n)) mejor = { sel: sel.slice(), n: n };
+            return;
+          }
+          for (var i = desde; i < cand.length; i++) { sel.push(cand[i]); elegir(i + 1, sel); sel.pop(); }
+        })(0, []);
+      }
+    }
+    var sel = mejor ? mejor.sel : []; // muchos (no pasa): uno a uno, el primero de cada sitio que aún no está cubierto
+    if (!mejor) faltan.forEach(function (f) { if (!f.con.some(function (b) { return sel.indexOf(b) >= 0; })) sel.push(f.con[0]); });
+    sel.sort();
+    var cuantos = function (f) { return f.con.filter(function (b) { return sel.indexOf(b) >= 0; }).length; };
+    return {
+      botones: sel.map(function (b) { return { boton: b, propios: faltan.filter(function (f) { return cuantos(f) === 1 && f.con.indexOf(b) >= 0; }) }; }),
+      comunes: faltan.filter(function (f) { return cuantos(f) > 1; })
+    };
+  }
+  /** T0613 · Un sitio y su porqué, en palabras: «un proyecto de konamigas: solo cambia la versión de base.css…». */
+  function sitioTexto(f, boton) {
+    var donde = f.donde && String(boton || '').indexOf(f.donde) < 0 ? f.donde : '';
+    return donde && f.por ? donde + ': ' + f.por : donde || f.por || '';
+  }
+  /**
+   * La columna «Por publicar», agrupada por lo que les falta (T0466, Javi: de un vistazo, qué saldría con cada botón):
+   * [{ clave, titulo, nota, ts }], primero las que salen con un solo botón; cada tarea, en un grupo. ts en el orden recibido.
+   */
+  function gruposPorPublicar(ts) {
+    var g = {}, orden = [];
+    (ts || []).forEach(function (t) {
+      var p = porPublicar(t), k, tit, nota, peso;
+      if (p.que === 'sin-pr') { k = '~sin-pr'; tit = 'Sin PR: se envía o se publica a mano'; nota = 'Cuando esté, pásala a Entregada.'; peso = 90; }
+      else if (p.que === 'sin-calcular') { k = '~sin-calcular'; tit = 'Calculando qué les falta'; nota = 'Sale en un minuto, al fusionar su PR.'; peso = 80; }
+      else if (!p.faltan.length && p.dudas.length) { k = '~dudas'; tit = 'Algo no cuadra con su PR'; nota = 'Lo dice su ficha.'; peso = 70; }
+      else if (!p.faltan.length) { k = '~ya'; tit = 'Ya están en su sitio'; nota = 'Pasan solas a Entregada con la próxima publicación.'; peso = 60; }
+      else {
+        var bs = botonesQuePulsar(p.faltan).botones.map(function (x) { return x.boton; });
+        k = bs.join(' + '); tit = 'Con ' + bs.join(', ').replace(/, (?=[^,]*$)/, ' y '); peso = bs.length;
+        nota = bs.length > 1 ? 'Hacen falta los ' + (bs.length === 2 ? 'dos' : bs.length) + ' botones; con el último, pasan a Entregada.' : 'Al acabar, pasan solas a Entregada.';
+        if (bs.some(function (b) { return /^A mano/.test(b); })) { nota = 'Lo de «A mano» se le pide a Claude.'; peso += 10; } // después de las de botón
+      }
+      if (!g[k]) { g[k] = { clave: k, titulo: tit, nota: nota, peso: peso, ts: [] }; orden.push(g[k]); }
+      g[k].ts.push(t);
+    });
+    return orden.sort(function (a, b) { return a.peso - b.peso || a.clave.localeCompare(b.clave); });
+  }
+
+  var CALC = { frases: frases, numerada: numerada, partesTexto: partesTexto, htmlTexto: htmlTexto, conEnlaces: conEnlaces, motivoClaude: motivoClaude, ANTES_DE_EMPEZAR: ANTES_DE_EMPEZAR,
+    enlaceDev: enlaceDev, textoParaChrome: textoParaChrome, COMPROBAR: COMPROBAR, EN_REVISION: EN_REVISION, VER_EN_DEV: VER_EN_DEV, SIN_CODIGO: SIN_CODIGO,
+    porPublicar: porPublicar, gruposPorPublicar: gruposPorPublicar, enlaceBoton: enlaceBoton, botonesQuePulsar: botonesQuePulsar, sitioTexto: sitioTexto };
   // En las pruebas (node, sin navegador), solo las cuentas.
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
@@ -477,9 +653,11 @@
         if (t.EPICA) m.push(t.EPICA);
         if (t.P) m.push(t.P);
         if (varias) m.push(iniciativa(t.INICIATIVA));
-        if (col.estados.length > 1) x.push('<div class="x"><b>' + texto(t.ESTADO) + '</b></div>');
+        if (col.estados.length > 1) x.push('<div class="x"><b>' + texto(nom(t.ESTADO)) + '</b></div>');
         if (t.ESTADO === 'Necesita tu respuesta' && t.PREGUNTA) x.push('<div class="x">Pregunta: ' + texto(t.PREGUNTA) + '</div>');
         if (t.ESTADO === 'Aplazada' && t.REVISAR_EL) x.push('<div class="x">Se vuelve a mirar el ' + fechaEs(t.REVISAR_EL) + '</div>');
+        // T0449: con cambios pedidos que nadie ha cogido todavía.
+        if (t.CAMBIOS_PEDIDOS && (t.ESTADO === 'En cola' || t.ESTADO === 'Esperando')) x.push('<div class="x tb-cambios">Cambios pedidos</div>');
         if (CERRADOS.indexOf(t.ESTADO) >= 0) { if (t.FECHA_CIERRE) x.push('<div class="x">Cerrada el ' + fechaEs(t.FECHA_CIERRE) + '</div>'); }
         else {
           var d = dias(t.DEADLINE);
@@ -488,10 +666,10 @@
         if (t._nueva) id = '';
         var pasos = PASOS[t.ESTADO] || [], puede = id && !SOLO_LEE && !t._pendiente && pasos.length;
         var mover = TACTIL && puede ? '<div class="mover"><span>Estado</span><select data-mover="' + texto(id) + '" aria-label="Estado de ' + texto(id) + '">' +
-          [t.ESTADO].concat(pasos).map(function (e) { return '<option' + (e === t.ESTADO ? ' selected' : '') + '>' + texto(e) + '</option>'; }).join('') + '</select></div>' : '';
+          [t.ESTADO].concat(pasos).map(function (e) { return '<option value="' + texto(e) + '"' + (e === t.ESTADO ? ' selected' : '') + '>' + texto(nom(e)) + '</option>'; }).join('') + '</select></div>' : '';
         return '<div class="card ' + cls(t.ESTADO) + '-b' + (t._pendiente ? ' guardando' : '') + '"' + (puede && !TACTIL ? ' draggable="true"' : '') + ' data-id="' + texto(id) + '">' +
           '<a class="card-link" href="?s=' + texto(ctx.id.toLowerCase()) + '&amp;t=' + encodeURIComponent(id) + '" data-abrir="' + texto(id) + '">' +
-          '<div class="top"><span class="id">' + (id ? texto(id) : 'Creando…') + (t.AUTONOMA && CERRADOS.indexOf(t.ESTADO) < 0 ? ICO_AUTO : '') + '</span>' +
+          '<div class="top"><span class="id">' + (id ? texto(id) : 'Creando…') + (t.AUTONOMA ? ICO_AUTO : '') /* también en las cerradas: si no, con el filtro de autónomas no se ve en ninguna (Javi) */ + '</span>' +
           (t.ENTREGA_CORTA ? '<span class="u-chip" title="Entrega">' + texto(t.ENTREGA_CORTA) + '</span>' : '') + (t._pendiente ? '<span class="u-chip">Guardando</span>' : '') + '</div>' +
           '<div class="t">' + texto(t.TITULO) + '</div>' +
           (m.length ? '<div class="m">' + texto(m.join(' · ')) + '</div>' : '') + x.join('') + '</a>' + mover + '</div>';
@@ -507,7 +685,13 @@
           return '<section class="col' + (pl ? ' plegada' : '') + '" data-est="' + texto(c.id) + '">' +
             '<h2 class="' + cls(c.estados[0], c) + ' ch" title="' + texto(queEs(c)) + '" role="button" tabindex="0" aria-expanded="' + (pl ? 'false' : 'true') + '" data-plegar="' + texto(c.id) + '">' + texto(c.titulo) +
             '<span class="n">' + ts.length + '</span><span class="fl"></span></h2>' +
-            '<div class="lista">' + (ts.length ? ts.map(function (t) { return tarjeta(t, c); }).join('') : '<div class="vacio">Ninguna tarea con estos filtros.</div>') + '</div></section>';
+            '<div class="lista">' + (!ts.length ? '<div class="vacio">Ninguna tarea con estos filtros.</div>'
+              // T0466: Por publicar, agrupadas por los botones que les faltan.
+              : c.estados.length === 1 && c.estados[0] === 'Aprobada' ? gruposPorPublicar(ts).map(function (g) {
+                return '<div class="tb-pp" title="' + texto(g.nota) + '"><b>' + texto(g.titulo) + '</b><span>' + texto(g.nota) + '</span></div>' +
+                  g.ts.map(function (t) { return tarjeta(t, c); }).join('');
+              }).join('')
+              : ts.map(function (t) { return tarjeta(t, c); }).join('')) + '</div></section>';
         }).join('');
       }
 
@@ -690,19 +874,31 @@
       /** Lo que pide la base para pasar a ese estado: '' si nada. */
       function pide(de, a) {
         return a === 'Bloqueada' ? 'bloqueo' : a === 'Necesita tu respuesta' ? 'pregunta' : a === 'Aplazada' ? 'aplazar' : a === 'Descartada' ? 'descartar' :
-          de === 'Para revisar' && a === 'En curso' ? 'rechazar' : '';
+          (de === 'Para revisar' || de === 'Aprobada') && a === 'En cola' ? 'cambios' : '';
       }
       function mover(id, nuevo) {
         var t = tarea(id);
         if (!t || t.ESTADO === nuevo) return;
         if ((PASOS[t.ESTADO] || []).indexOf(nuevo) < 0) {
           ctx.aviso(CERRADOS.indexOf(t.ESTADO) >= 0 ? id + ' está ' + t.ESTADO.toLowerCase() + ': no se reabre. Si hace falta más, crea otra que espere a esta.' :
-            'De ' + t.ESTADO + ' no se pasa a ' + nuevo + (PASOS[t.ESTADO] ? ': puede ir a ' + PASOS[t.ESTADO].join(', ') + '.' : '.'));
+            'De ' + nom(t.ESTADO) + ' no se pasa a ' + nom(nuevo) + (PASOS[t.ESTADO] ? ': puede ir a ' + PASOS[t.ESTADO].map(nom).join(', ') + '.' : '.'));
           pintarTablero(); if (abiertaId) pintarFicha(); return;
         }
-        var q = pide(t.ESTADO, nuevo);
+        // T0440: a Por publicar se llega con Aprobar (mira y fusiona su PR): se abre la ficha y se mira la PR.
+        if (t.ESTADO === 'Para revisar' && nuevo === 'Aprobada') {
+          pintarTablero();
+          if (abiertaId !== id) abrirFicha(id); else pintarFicha();
+          pedirAprobar(id, true);
+          return;
+        }
+        // T0462: una de Chat o Cowork sin qué mirar lo pide al pasar a Para revisar (la base no la deja pasar sin él).
+        var q = faltaQueMirar(t, nuevo) ? 'quemirar' : pide(t.ESTADO, nuevo);
         if (q) { pedirDatos(t, nuevo, q); pintarTablero(); if (abiertaId) pintarFicha(); return; }
         enviar(t, nuevo, {});
+      }
+      /** T0462 · Las de Chat y Cowork no pasan a Para revisar sin QUE_MIRAR: se pide en la ventanita, como el motivo. */
+      function faltaQueMirar(t, nuevo) {
+        return nuevo === 'Para revisar' && SIN_CODIGO.indexOf(t.HERRAMIENTA) >= 0 && !String(t.QUE_MIRAR || '').trim();
       }
       function enviar(t, nuevo, x) {
         var id = String(t.ID), args = { tarea: id, estado: nuevo }, local = { ESTADO: nuevo };
@@ -722,19 +918,22 @@
       /** La ventanita con lo que pide el estado: motivo del bloqueo, pregunta, fecha, motivo. */
       function pedirDatos(t, nuevo, q) {
         var id = String(t.ID), h = '';
-        var tit = { bloqueo: 'Bloquear ' + id, pregunta: 'Preguntar a quien la pidió', aplazar: 'Aplazar ' + id, descartar: 'Descartar ' + id, rechazar: 'Rechazar ' + id }[q];
+        var tit = { bloqueo: 'Bloquear ' + id, pregunta: 'Preguntar a quien la pidió', aplazar: 'Aplazar ' + id, descartar: 'Descartar ' + id, cambios: 'Pedir cambios en ' + id, quemirar: 'Qué mirar en ' + id }[q];
         var ayuda = { bloqueo: 'Pasa a Bloqueada: la mueve alguien de fuera o algo técnico.', pregunta: 'Pasa a Necesita tu respuesta, en manos de ' + (nombre(t.PIDE) || 'quien la pidió') + '.',
           aplazar: 'Nadie la mueve hasta esa fecha; entonces se decide.', descartar: 'Se cierra y no se reabre. Las que la esperan dejan de esperarla.',
-          rechazar: 'Vuelve a En curso con lo que hay que cambiar.' }[q];
+          cambios: AYUDA_CAMBIOS, quemirar: 'Pasa a Para revisar. Di qué tiene que mirar quien la revisa: qué partes son nuevas, qué decisión espera.' }[q];
         if (q === 'bloqueo') h = '<div class="campo"><label class="lab" for="tb-d-mb">Por qué</label><select id="tb-d-mb" required><option value="">Elige…</option>' +
           MOTIVOS_BLOQUEO.map(function (m) { return '<option>' + texto(m) + '</option>'; }).join('') + '</select></div>' +
           '<div class="campo"><label class="lab" for="tb-d-mo">Qué pasa <span class="opc">(opcional)</span></label><textarea id="tb-d-mo" rows="2"></textarea></div>';
         if (q === 'pregunta') h = '<div class="campo"><label class="lab" for="tb-d-pr">La pregunta, concreta</label><textarea id="tb-d-pr" rows="3" required></textarea></div>';
         if (q === 'aplazar') h = '<div class="campo"><label class="lab" for="tb-d-re">Se vuelve a mirar el</label><input type="date" id="tb-d-re" min="' + hoyISO() + '" required></div>' +
           '<div class="campo"><label class="lab" for="tb-d-mo">Por qué <span class="opc">(opcional)</span></label><textarea id="tb-d-mo" rows="2"></textarea></div>';
-        if (q === 'descartar' || q === 'rechazar') h = '<div class="campo"><label class="lab" for="tb-d-mo">' + (q === 'rechazar' ? 'Qué hay que cambiar' : 'Por qué se descarta') + '</label><textarea id="tb-d-mo" rows="3" required></textarea></div>';
+        if (q === 'descartar') h = '<div class="campo"><label class="lab" for="tb-d-mo">Por qué se descarta</label><textarea id="tb-d-mo" rows="3" required></textarea></div>';
+        if (q === 'quemirar') h = '<div class="campo"><label class="lab" for="tb-d-qm">Qué mirar</label><textarea id="tb-d-qm" rows="4" required ' +
+          'placeholder="1) El apartado 3 es nuevo.&#10;2) Decide si va el precio."></textarea></div>';
+        if (q === 'cambios') h = '<div class="campo"><label class="lab" for="tb-d-ca">Qué hay que cambiar</label><textarea id="tb-d-ca" rows="4" required></textarea></div>';
         altaForm.innerHTML = '<h2>' + texto(tit) + '</h2><p class="u-nota">' + texto(ayuda) + '</p><div class="edit">' + h + '</div><div id="alta-error" role="alert"></div>' +
-          '<div class="botones"><button type="button" class="sec" data-cancelar-alta>Cancelar</button><button type="submit" class="pri">' + texto(q === 'rechazar' ? 'Rechazar' : 'Pasar a ' + nuevo) + '</button></div>';
+          '<div class="botones"><button type="button" class="sec" data-cancelar-alta>Cancelar</button><button type="submit" class="pri">' + texto(q === 'cambios' ? 'Pedir cambios' : 'Pasar a ' + nuevo) + '</button></div>';
         abrirVelo();
         altaForm.onsubmit = function (e) {
           e.preventDefault();
@@ -742,11 +941,20 @@
           var x = { motivo_bloqueo: v('tb-d-mb'), pregunta: v('tb-d-pr'), revisar_el: v('tb-d-re'), motivo: v('tb-d-mo') };
           var mal = q === 'bloqueo' && !x.motivo_bloqueo ? 'Elige por qué está bloqueada.' : q === 'pregunta' && !x.pregunta ? 'Escribe la pregunta.' :
             q === 'aplazar' && !x.revisar_el ? 'Pon la fecha en que se vuelve a mirar.' : q === 'aplazar' && x.revisar_el < hoyISO() ? 'La fecha ya ha pasado.' :
-            (q === 'descartar' || q === 'rechazar') && !x.motivo ? (q === 'rechazar' ? 'Di qué hay que cambiar.' : 'Di por qué se descarta.') : '';
+            q === 'descartar' && !x.motivo ? 'Di por qué se descarta.' : q === 'cambios' && !v('tb-d-ca') ? 'Di qué hay que cambiar.' : q === 'quemirar' && !v('tb-d-qm') ? 'Di qué tiene que mirar quien la revisa.' : '';
           if (mal) { var er = altaForm.querySelector('#alta-error'); er.textContent = mal; er.style.display = 'block'; return; }
           cerrarVelo();
-          enviar(t, nuevo, x);
+          if (q === 'cambios') pedirCambios(String(t.ID), v('tb-d-ca'));
+          else if (q === 'quemirar') guardarYEnviar(t, nuevo, { QUE_MIRAR: v('tb-d-qm') });
+          else enviar(t, nuevo, x);
         };
+      }
+      /** T0462 · Primero el qué mirar y, guardado, el estado (si no se guarda, no se mueve). */
+      function guardarYEnviar(t, nuevo, cambios) {
+        var id = String(t.ID), antes = {};
+        Object.keys(cambios).forEach(function (k) { antes[k] = t[k] == null ? '' : t[k]; });
+        ctx.tablas.actualizar(T, id, cambios, { fn: 'tablasActualizar', args: ['TAREAS', id, cambios, { antes: antes }] })
+          .then(function () { enviar(tarea(id) || t, nuevo, {}); }, function () {});
       }
       function abrirVelo() {
         altaVelo.classList.add('abierto');
@@ -940,7 +1148,7 @@
 
       /* ---------- cambiar un dato pulsándolo en la ficha (T0386) ---------- */
 
-      var LARGO = { DESCRIPCION: 6, DOCUMENTOS_RELEVANTES: 4, CONCLUSIONES: 4 }; // textos de varias líneas: se guardan con «Guardar»
+      var LARGO = { DESCRIPCION: 6, DOCUMENTOS_RELEVANTES: 4, CONCLUSIONES: 4, QUE_MIRAR: 3, PLAN_PRUEBAS: 10 }; // textos de varias líneas: se guardan con «Guardar»
       var epicaNueva = false; // T0420: en la ficha, se está escribiendo una épica que aún no existe
       function ocupado() { return editando || !!cambiando; }
       function puedeCambiar(t) { return !SOLO_LEE && !t._nueva && CERRADOS.indexOf(t.ESTADO) < 0; }
@@ -1055,11 +1263,167 @@
         ctx.llamar('responder', [{ tarea: id, texto: txt }]).then(function (estado) {
           delete respuestas[id];
           if (ctx.abierta()) ctx.aviso('Respondida: ' + id + ' vuelve a ' + (typeof estado === 'string' && estado ? estado : 'la cola') + '.' +
-            (auto && estado === 'En cola' ? ' Es autónoma: lanza «Autónomo» en GitHub para que siga.' : ''));
+            (auto && estado === 'En cola' ? ' Es autónoma: pulsa «Que lo haga Claude» para que siga.' : ''));
           return Promise.all([ctx.tablas.refrescar([T], true), abiertaId === id ? bitacora(id, true) : null]);
         }, function (e) {
           if (ctx.abierta()) ctx.aviso('No se ha enviado la respuesta: ' + String(e.message).replace(/^\w+:\s*/, ''));
           b.disabled = false; b.textContent = 'Responder';
+        }).then(function () { if (ctx.abierta() && abiertaId === id && !ocupado()) pintarFicha(); });
+      }
+
+      /**
+       * T0449 · Pedir cambios en una tarea Para revisar o Aprobada: pedir_cambios() de la base, el mismo camino que DEV, daily.js
+       * y los chats. Lo pide quien la revisa o quien lleva la iniciativa; el texto va tal cual. La tarjeta pasa a En cola al
+       * momento y, si la base dice que no, vuelve.
+       */
+      var cambiosTxt = {};   // lo escrito en «Pedir cambios» de cada tarea, para que repintar la ficha no lo borre
+      var planAbierto = {};  // T0457: el plan de pruebas desplegado, para que repintar la ficha no lo pliegue
+      function puedePedirCambios(t) {
+        return (t.ESTADO === 'Para revisar' || t.ESTADO === 'Aprobada') && !SOLO_LEE && !t._nueva && !t._pendiente &&
+          (ctx.admin || (ctx.personaId && t.REVISA === ctx.personaId) || /^responsable/.test(ctx.perfil || ''));
+      }
+      function pedirCambios(id, txt, b) {
+        var t = tarea(id), auto = !!(t || {}).AUTONOMA;
+        if (b) { b.disabled = true; b.textContent = 'Enviando…'; }
+        return ctx.tablas.actualizar(T, id, { ESTADO: 'En cola', CAMBIOS_PEDIDOS: new Date().toISOString() }, { fn: 'pedir_cambios', args: [{ tarea: id, texto: txt }] }).then(function (estado) {
+          delete cambiosTxt[id];
+          if (ctx.abierta()) ctx.aviso('Cambios pedidos: ' + id + ' vuelve a ' + (typeof estado === 'string' && estado ? estado : 'la cola') + '.' +
+            (auto ? ' Es autónoma: pulsa «Que lo haga Claude» para que la rehaga.' : ' Quien la coja verá lo pedido lo primero.'));
+          return alDia(id);
+        }, function () {
+          // El aviso de lo que dice la base ya lo da la capa de tablas; lo escrito se queda para volver a enviarlo.
+          if (b) { b.disabled = false; b.textContent = 'Pedir cambios'; }
+        }).then(function () { if (ctx.abierta() && abiertaId === id && !ocupado()) pintarFicha(); });
+      }
+
+      /**
+       * T0440 · Aprobar una tarea Para revisar: la función del servidor aprobar (la misma que la línea de DEV) mira sus PR en
+       * GitHub («Pruebas» ✅ y sin conflictos con main), las fusiona y la pasa a Aprobada, «Por publicar» (Entregada, si no
+       * lleva nada que publicar). En dos pasos, como «Que lo haga Claude»: primero mira (probar) y enseña cada PR; después,
+       * «Aprobar y fusionar». Si no se puede, dice por qué. Lo mismo al llevar la tarjeta a Por publicar. Quien la revisa o
+       * quien lleva la iniciativa (la base lo vuelve a mirar).
+       */
+      var aprob = {};   // por tarea: { paso: 'mirando' | 'confirmar' | 'aprobando' | 'no', r: lo que ha dicho la función }
+      function puedeAprobar(t) {
+        return t.ESTADO === 'Para revisar' && !SOLO_LEE && !t._nueva && !t._pendiente &&
+          (ctx.admin || (ctx.personaId && t.REVISA === ctx.personaId) || /^responsable/.test(ctx.perfil || ''));
+      }
+      function lineaPr(p) {
+        var como = p.estado === 'fusionada' ? 'ya fusionada' : p.estado === 'cerrada' ? 'cerrada sin fusionar' :
+          (p.pruebas === 'bien' ? '«Pruebas» ✅' : p.pruebas === 'mal' ? '«Pruebas» ❌' : p.pruebas === 'en marcha' ? '«Pruebas» sin acabar' : 'sin «Pruebas»') +
+          ' · ' + (p.conflictos === false ? 'sin conflictos' : p.conflictos ? 'con conflictos' : 'conflictos sin mirar');
+        return '<li><a href="' + texto(p.url) + '" target="_blank" rel="noopener">PR ' + texto(p.repo + ' #' + p.numero) + '</a> · ' + texto(como) + '</li>';
+      }
+      function htmlAprobar(t) {
+        var id = String(t.ID), a = aprob[id] || {}, r = a.r || {}, prs = r.prs || [];
+        var bot = function (txt, attr, c) { return '<button type="button" class="u-btn ' + (c || '') + '" ' + attr + '>' + texto(txt) + '</button>'; };
+        var abiertas = prs.filter(function (p) { return p.estado === 'abierta'; }).length;
+        var lista = prs.length ? '<ul class="fap-prs">' + prs.map(lineaPr).join('') + '</ul>' : '';
+        var h;
+        if (a.paso === 'no') {
+          h = '<p class="fcl-no"><b>Aún no se puede aprobar:</b> ' + texto((r.motivos || []).join('; ')) + '.</p>' + lista +
+            '<div class="fcl-b">' + bot('Volver a mirar', 'data-aprobar') + '</div>';
+        } else if (a.paso === 'confirmar' || a.paso === 'aprobando') {
+          var entrega = r.publicar === false || (r.publicar == null && !t.PUBLICAR);
+          h = lista + '<p>' + (abiertas ? (abiertas === 1 ? 'Se fusiona la PR' : 'Se fusionan las ' + abiertas + ' PR') + ' y ' + id : (prs.length ? '' : 'No tiene PR: ') + id) +
+            (entrega ? ' pasa a Entregada: no lleva nada que publicar.' : ' pasa a Por publicar.') + '</p>' +
+            '<div class="fcl-b">' + bot(a.paso === 'aprobando' ? (abiertas ? 'Fusionando…' : 'Aprobando…') : (abiertas ? 'Aprobar y fusionar' : 'Aprobar'),
+              'data-aprobar-si' + (a.paso === 'aprobando' ? ' disabled' : ''), 'u-btn-accion') +
+            (a.paso === 'aprobando' ? '' : bot('Ahora no', 'data-aprobar-no', 'u-btn-texto')) + '</div>';
+        } else {
+          h = '<div class="fcl-b">' + bot(a.paso === 'mirando' ? 'Mirando la PR…' : 'Aprobar', 'data-aprobar' + (a.paso === 'mirando' ? ' disabled' : ''), 'u-btn-accion') + '</div>';
+        }
+        return '<div class="bloque fcl fap' + (a.paso === 'no' ? ' fcl-off' : '') + '">' + h + '</div>';
+      }
+      /** T0457 · Copia el plan de pruebas, listo para Claude en Chrome. Sin permiso del portapapeles, con el truco de siempre. */
+      function copiarPlan(t, boton) {
+        if (!t) return;
+        var txt = textoParaChrome(t);
+        var bien = function () { boton.textContent = 'Copiado'; setTimeout(function () { boton.textContent = 'Copiar'; }, 2000); ctx.aviso('Copiado: pégaselo a Claude en Chrome.'); };
+        var aMano = function () {
+          var a = document.createElement('textarea');
+          a.value = txt; a.setAttribute('readonly', ''); a.style.position = 'fixed'; a.style.opacity = '0';
+          document.body.appendChild(a); a.select();
+          var ok = false;
+          try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+          document.body.removeChild(a);
+          if (ok) bien(); else ctx.aviso('No se ha podido copiar: abre «Plan de pruebas» y cópialo a mano.');
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(bien, aMano); else aMano();
+      }
+      /** T0617 · Si, al quedar Por publicar, la función ha lanzado «Por publicar» para ver si ya está publicada. */
+      function porPublicarYa(r) {
+        return r.estado === 'Aprobada' && r.comprobar === 'lanzada' ? ' Si ya está publicada, pasa a Entregada en un par de minutos.' : '';
+      }
+      function pedirAprobar(id, probar) {
+        var a = aprob[id] = { paso: probar ? 'mirando' : 'aprobando', r: (aprob[id] || {}).r };
+        if (abiertaId === id) pintarFicha();
+        return ctx.llamar('aprobar', [{ tarea: id, probar: !!probar }]).then(function (r) {
+          if (aprob[id] !== a) return;
+          r = r || {};
+          if (probar) { aprob[id] = { paso: r.puede ? 'confirmar' : 'no', r: r }; return; }
+          delete aprob[id];
+          var n = r.fusionadas || 0;
+          if (ctx.abierta()) ctx.aviso(id + ' aprobada' + (n ? ' y ' + (n === 1 ? 'su PR, fusionada' : 'sus ' + n + ' PR, fusionadas') : '') +
+            (r.estado === 'Entregada' ? ': no lleva nada que publicar, queda Entregada.' : ': queda Por publicar.') + porPublicarYa(r) + (r.simulada ? ' (En local no sale nada hacia GitHub.)' : ''));
+          return alDia(id);
+        }, function (e) {
+          if (aprob[id] !== a) return;
+          var m = sinPrefijo(e), por = /^No se puede aprobar T\d+: (.*?)\.?$/.exec(m);
+          if (por) { aprob[id] = { paso: 'no', r: { prs: (a.r || {}).prs || [], motivos: por[1].split('; ') } }; return; }
+          delete aprob[id];
+          if (ctx.abierta()) ctx.aviso((probar ? 'No se ha podido mirar la PR: ' : 'No se ha aprobado: ') + m);
+          if (!probar) return alDia(id);
+        }).then(function () { if (ctx.abierta() && abiertaId === id && !ocupado()) pintarFicha(); });
+      }
+
+      /**
+       * T0439 · «Que lo haga Claude»: la marca autónoma y lanza «Autónomo» con ella (la función del servidor lanzar_autonomo,
+       * con la llave de GitHub). Lo lanza quien administra Utilo. En dos pasos: el primero pregunta a la base si el agente la
+       * puede coger (fase, tope y todo lo demás: probar) y el segundo, tras «Lanzar», la lanza. Si no puede, dice por qué.
+       */
+      var claude = {};   // por tarea: { paso: 'comprobando' | 'confirmar' | 'lanzando' | 'lanzada' | 'no', texto, ver, simulada }
+      function puedeClaude(t) { return ctx.admin && !SOLO_LEE && !t._nueva && ANTES_DE_EMPEZAR.indexOf(t.ESTADO) >= 0; }
+      function motivoAqui(t) {
+        var deps = esperaA(String(t.ID)).filter(function (x) { return tarea(x); }).map(function (x) { return { id: x, estado: tarea(x).ESTADO }; });
+        return motivoClaude(t, { yo: ctx.personaId, deps: deps, hoy: hoyISO(), nombre: nombre });
+      }
+      function sinPrefijo(e) { return String((e && e.message) || e).replace(/^\w+:\s*/, ''); }
+      function htmlClaude(t) {
+        var id = String(t.ID), c = claude[id] || {}, no = motivoAqui(t);
+        var bot = function (txt, attr, cls) { return '<button type="button" class="u-btn ' + (cls || '') + '" ' + attr + '>' + txt + '</button>'; };
+        var h = '';
+        if (c.paso === 'lanzada') {
+          h = '<p><b>Lanzada.</b> El agente la coge en un par de minutos, la hace en su rama y te avisa cuando esté para revisar o si tiene una duda.' +
+            (c.simulada ? ' <i>(En local no sale nada hacia GitHub.)</i>' : '') + '</p>' +
+            '<div class="fcl-b"><a class="u-btn u-btn-claro" href="' + texto(c.ver) + '" target="_blank" rel="noopener">Ver en GitHub</a></div>';
+        } else if (no.length || c.paso === 'no') {
+          h = '<p class="fcl-no"><b>Claude no puede hacerla:</b> ' + texto(no.length ? no.join('; ') : c.texto) + '.</p>';
+        } else if (c.paso === 'confirmar' || c.paso === 'lanzando') {
+          h = '<p>' + (t.AUTONOMA ? '' : 'Pasa a autónoma y ') + (t.AUTONOMA ? 'E' : 'e') + 'l agente la hace solo en su rama: la deja en Para revisar con su PR, o te pregunta. ' +
+            'Si cambia algo que se ve, de momento te pregunta antes.</p>' +
+            '<div class="fcl-b">' + bot(c.paso === 'lanzando' ? 'Lanzando…' : 'Lanzar', 'data-claude-si' + (c.paso === 'lanzando' ? ' disabled' : ''), 'u-btn-accion') +
+            (c.paso === 'lanzando' ? '' : bot('Ahora no', 'data-claude-no', 'u-btn-texto')) + '</div>';
+        } else {
+          h = '<div class="fcl-b">' + bot(ICO_AUTO.replace(' role="img" aria-label="Autónoma"', ' aria-hidden="true"').replace(/<title>.*?<\/title>/, '') + (c.paso === 'comprobando' ? 'Comprobando…' : 'Que lo haga Claude'), 'data-claude' + (c.paso === 'comprobando' ? ' disabled' : '')) + '</div>';
+        }
+        return '<div class="bloque fcl' + (no.length || c.paso === 'no' ? ' fcl-off' : '') + '">' + h + '</div>';
+      }
+      function pedirClaude(id, probar) {
+        var c = claude[id] = { paso: probar ? 'comprobando' : 'lanzando' };
+        pintarFicha();
+        return ctx.llamar('lanzar_autonomo', [{ tarea: id, probar: !!probar }]).then(function (r) {
+          if (claude[id] !== c) return;
+          claude[id] = probar ? { paso: 'confirmar' } : { paso: 'lanzada', ver: (r && r.ver) || '', simulada: !!(r && r.simulada) };
+          if (!probar && ctx.abierta()) ctx.aviso(id + ': lanzado el agente autónomo.');
+          if (!probar) return Promise.all([ctx.tablas.refrescar([T], true), abiertaId === id ? bitacora(id, true) : null]);
+        }, function (e) {
+          if (claude[id] !== c) return;
+          var m = sinPrefijo(e), por = /^Claude no puede hacer T\d+: (.*?)\.?$/.exec(m);
+          if (por) { claude[id] = { paso: 'no', texto: por[1] }; return; }
+          delete claude[id];
+          if (ctx.abierta()) ctx.aviso((probar ? 'No se ha podido comprobar: ' : 'No se ha lanzado: ') + m);
+          if (!probar && abiertaId === id) return bitacora(id, true);
         }).then(function () { if (ctx.abierta() && abiertaId === id && !ocupado()) pintarFicha(); });
       }
 
@@ -1079,6 +1443,8 @@
       function abrirFicha(id, sinUrl) {
         if (!tarea(id)) return;
         abiertaId = id; editando = false; cambiando = '';
+        if (claude[id] && claude[id].paso !== 'lanzando') delete claude[id]; // T0439: al volver a abrirla, se comprueba otra vez
+        if (aprob[id] && aprob[id].paso !== 'aprobando' && aprob[id].paso !== 'mirando') delete aprob[id]; // T0440: igual
         pintarFicha();
         fv.classList.add('abierto');
         document.documentElement.classList.add('fv-abierta');
@@ -1132,12 +1498,28 @@
         if (d && !e.target.closest('a')) { abrirCampo(d.getAttribute('data-ed')); return; }
         if (e.target.closest('[data-editar]')) { editando = true; cambiando = ''; pintarFicha(); return; }
         if (e.target.closest('[data-cancelar]')) { editando = false; pintarFicha(); return; }
+        if (e.target.closest('[data-claude]')) { pedirClaude(abiertaId, true); return; }
+        if (e.target.closest('[data-claude-si]')) { pedirClaude(abiertaId, false); return; }
+        if (e.target.closest('[data-claude-no]')) { delete claude[abiertaId]; pintarFicha(); return; }
+        if (e.target.closest('[data-aprobar]')) { pedirAprobar(abiertaId, true); return; }
+        if (e.target.closest('[data-aprobar-si]')) { pedirAprobar(abiertaId, false); return; }
+        if (e.target.closest('[data-aprobar-no]')) { delete aprob[abiertaId]; pintarFicha(); return; }
+        var cp = e.target.closest('[data-copiar-plan]');
+        if (cp) { copiarPlan(tarea(abiertaId), cp); return; }
+        var pc0 = e.target.closest('[data-pedir-cambios]');
+        if (pc0) { var pa = caja.querySelector('#tb-cambios'), pt = pa ? pa.value.trim() : ''; if (pt) pedirCambios(abiertaId, pt, pc0); else if (pa) { pa.focus(); ctx.aviso('Di qué hay que cambiar.'); } return; }
         var rb = e.target.closest('[data-responder]');
         if (rb) { var ra = caja.querySelector('#tb-resp'), rt = ra ? ra.value.trim() : ''; if (rt) responder(abiertaId, rt, rb); else if (ra) { ra.focus(); ctx.aviso('Escribe la respuesta antes de enviarla.'); } return; }
         var b = e.target.closest('[data-anotar]');
         if (b) { var a = caja.querySelector('#tb-nota'), txt = a ? a.value.trim() : ''; if (txt) anotar(abiertaId, txt, b); else if (a) a.focus(); }
       });
-      fv.addEventListener('input', function (e) { if (e.target.id === 'tb-resp' && abiertaId) respuestas[abiertaId] = e.target.value; });
+      fv.addEventListener('toggle', function (e) { // T0457: no sube como los demás: se coge al bajar
+        if (abiertaId && e.target.matches && e.target.matches('.fplan details')) planAbierto[abiertaId] = e.target.open;
+      }, true);
+      fv.addEventListener('input', function (e) {
+        if (e.target.id === 'tb-resp' && abiertaId) respuestas[abiertaId] = e.target.value;
+        if (e.target.id === 'tb-cambios' && abiertaId) cambiosTxt[abiertaId] = e.target.value;
+      });
       fv.addEventListener('change', function (e) {
         if (e.target.id === 'kb-f-est') { mover(abiertaId, e.target.value); return; }
         if (e.target.id === 'fed' && cambiando && (e.target.tagName === 'SELECT' || (TACTIL && e.target.type === 'date'))) guardarCampo(cambiando, e.target.value);
@@ -1175,13 +1557,38 @@
       function rel(id) {
         var x = tarea(id), st = x ? x.ESTADO : 'No la ves';
         return '<a class="frel" href="?s=' + texto(ctx.id.toLowerCase()) + '&amp;t=' + encodeURIComponent(id) + '" data-rel="' + texto(id) + '">' +
-          '<span class="fpill ' + cls(st) + '">' + texto(st) + '</span><span class="frid">' + texto(id) + '</span><span class="frtit">' + texto(x ? x.TITULO : '') + '</span></a>';
+          '<span class="fpill ' + cls(st) + '">' + texto(nom(st)) + '</span><span class="frid">' + texto(id) + '</span><span class="frtit">' + texto(x ? x.TITULO : '') + '</span></a>';
       }
       function fechaCaja(lab, val, pista, c, attrs) {
         return '<div class="ffecha ' + (c || '') + '"' + (attrs || '') + '><small>' + texto(lab) + '</small><strong>' + texto(val || '—') + '</strong>' + (pista ? '<span class="fpista">' + texto(pista) + '</span>' : '') + '</div>';
       }
       function quien(b) { return b.QUIEN || nombre(b.PERSONA) || (b.EMPLEADO ? b.EMPLEADO : 'Sistema'); }
 
+      /** T0466 · El bloque «Para entregarla» de una tarea Por publicar. */
+      function htmlPorPublicar(t) {
+        var p = porPublicar(t), h = '';
+        if (p.que === 'sin-pr') h = '<p>No tiene PR: falta enviarla o publicarla a mano. Cuando esté, pásala a Entregada.</p>';
+        else if (p.que === 'sin-calcular') h = '<p>Calculando qué le falta: sale en un minuto, al fusionar su PR.</p>';
+        else {
+          // T0613 · Los botones que hay que pulsar (los menos), cada uno con lo que solo lleva él y por qué.
+          var q = botonesQuePulsar(p.faltan), nb = q.botones.length;
+          if (nb) h += '<p>' + (nb === 1 ? 'Falta pulsar:' : 'Faltan ' + (nb === 2 ? 'dos' : nb) + ' botones:') + '</p><ul class="fpp-lista">' + q.botones.map(function (x) {
+            var u = enlaceBoton(x.boton), b = '<b>' + texto(x.boton) + '</b>';
+            var por = x.propios.map(function (f) { return sitioTexto(f, x.boton); }).filter(Boolean).join('; ');
+            return '<li>' + (u ? '<a href="' + texto(u) + '" target="_blank" rel="noopener" title="Abre la acción en GitHub con todo puesto: pulsa «Run workflow»">' + b + '</a>' : b) +
+              (por ? ' <span>— ' + texto(por) + '</span>' : '') + '</li>';
+          }).join('') + '</ul>';
+          if (q.comunes.length) h += '<p>' + (nb === 2 ? 'Con cualquiera de los dos' : 'Con cualquiera de ellos') + ' sale también ' +
+            texto(q.comunes.map(function (f) { return sitioTexto(f, ''); }).join('; ')) + '.</p>';
+          if (p.ya.length) h += '<p><b>Ya está:</b> ' + texto(p.ya.join(', ')) + '</p>';
+          if (p.dudas.length) h += p.dudas.map(function (d) { return '<p class="fpp-duda"><b>Ojo:</b> ' + texto(d) + '</p>'; }).join('');
+          if (!p.faltan.length && !p.dudas.length) h += '<p>Ya está en todos sus sitios: pasa sola a Entregada con la próxima publicación.</p>';
+          else if (p.faltan.length) h += '<p class="u-nota">' + (q.botones.some(function (x) { return /^A mano/.test(x.boton); })
+            ? 'Lo de «A mano» se le pide a Claude. ' : '') + (q.botones.some(function (x) { return enlaceBoton(x.boton); })
+            ? 'Cada botón abre su acción en GitHub con todo puesto: pulsa «Run workflow». ' : '') + 'Cuando esté todo, pasa sola a Entregada.' + (horaLocal(p.el) ? ' Mirado el ' + texto(horaLocal(p.el)) + '.' : '') + '</p>';
+        }
+        return '<div class="bloque fpp"><h3>Para entregarla</h3>' + h + '</div>';
+      }
       function pintarFicha() {
         var t = tarea(abiertaId);
         if (!t) { cerrarFicha(); return; }
@@ -1236,8 +1643,8 @@
         var manos = enManos(t);
         var pasos = PASOS[t.ESTADO] || [], mueve = !SOLO_LEE && pasos.length && !t._nueva;
         var estado = '<div class="est ' + cls(t.ESTADO) + '">' + (mueve ? '<label for="kb-f-est">Estado</label><select id="kb-f-est"' + (t._pendiente ? ' disabled' : '') + '>' +
-            [t.ESTADO].concat(pasos).map(function (e) { return '<option' + (e === t.ESTADO ? ' selected' : '') + '>' + texto(e) + '</option>'; }).join('') + '</select>'
-            : '<span class="fpill">' + texto(t.ESTADO) + '</span>') +
+            [t.ESTADO].concat(pasos).map(function (e) { return '<option value="' + texto(e) + '"' + (e === t.ESTADO ? ' selected' : '') + '>' + texto(nom(e)) + '</option>'; }).join('') + '</select>'
+            : '<span class="fpill">' + texto(nom(t.ESTADO)) + '</span>') +
           (t._pendiente ? '<span class="msg">Guardando…</span>' : manos ? '<span class="msg">' + texto(t.EN_MANOS_TIPO === 'espera' ? manos : t.EN_MANOS_TIPO === 'fuera' ? 'Depende de fuera: ' + manos : 'En manos de ' + manos) + '</span>' : '') + '</div>';
         var personas = ['ASIGNADO', 'PIDE', 'REVISA'].map(function (k) {
           if (ab(k)) return '<p class="fed-abierto"><b>' + texto(ETIQUETA[k]) + ':</b> ' + control(t, k) + '</p>';
@@ -1259,14 +1666,42 @@
         if (puedeResponder(t)) motivo.push('<div class="fresp"><label class="u-oculto" for="tb-resp">Tu respuesta</label>' +
           '<textarea id="tb-resp" rows="3" placeholder="Tu respuesta…">' + texto(respuestas[id] || '') + '</textarea>' +
           '<div class="pie"><button type="button" class="u-btn" data-responder>Responder</button></div></div>');
+        // T0449: los cambios pedidos que nadie ha cogido (lo pedido, en Qué hay que hacer) y pedirlos.
+        if (t.CAMBIOS_PEDIDOS && (t.ESTADO === 'En cola' || t.ESTADO === 'Esperando'))
+          motivo.push('<p class="fcambios"><b>Cambios pedidos</b> el ' + texto(fechaEs(String(t.CAMBIOS_PEDIDOS).slice(0, 10))) + ': están en Qué hay que hacer y esperan a que alguien la coja.</p>');
+        if (puedePedirCambios(t)) motivo.push('<div class="fresp fpedir"><label class="lab" for="tb-cambios">¿Hay que cambiar algo?</label>' +
+          '<textarea id="tb-cambios" rows="3" placeholder="Qué hay que cambiar, tal cual…">' + texto(cambiosTxt[id] || '') + '</textarea>' +
+          '<div class="pie"><button type="button" class="u-btn" data-pedir-cambios>Pedir cambios</button></div></div>');
         if (t.MOTIVO_BLOQUEO) motivo.push('<p><b>Bloqueada:</b> ' + texto(t.MOTIVO_BLOQUEO) + '</p>');
+        // T0450: cómo se revisa: qué mirar, dónde se comprueba y «Verlo en DEV» (la app DEV ya en su rama, web y persona).
+        // Solo en revisión (EN_REVISION) y si lo tiene (o es de Chat o Cowork, T0462): dónde lo miras (se lee) y qué mirar.
+        var revision = '';
+        if (EN_REVISION.indexOf(t.ESTADO) >= 0 && (t.COMPROBAR || t.QUE_MIRAR || SIN_CODIGO.indexOf(t.HERRAMIENTA) >= 0)) {
+          var qm = ab('QUE_MIRAR') ? '<div class="fed-abierto"><div class="edit">' + control(t, 'QUE_MIRAR') + '</div></div>'
+            : t.QUE_MIRAR ? '<div class="fx"' + pulsa(t, 'QUE_MIRAR') + '>' + htmlTexto(t.QUE_MIRAR) + '</div>'
+            : pc ? '<button type="button" class="fmas" data-ed="QUE_MIRAR">+ Qué mirar</button>' : '';
+          var cmp = t.COMPROBAR ? '<p class="fcomprobar"><b>Dónde lo miras:</b> ' + texto(COMPROBAR[t.COMPROBAR] || t.COMPROBAR) + '</p>' : '';
+          // Ya dentro de la app DEV (una rama en dev-ramas/), el botón volvería a abrirla: no sale (Javi).
+          var ver = t.COMPROBAR === 'DEV' && VER_EN_DEV.indexOf(t.ESTADO) >= 0 && !/\/dev-ramas\//.test(location.pathname)
+            ? '<div class="pie"><a class="u-btn fver-dev" href="' + texto(enlaceDev(id, t.VER_EN_DEV)) + '" target="_blank" rel="noopener">Verlo en DEV</a></div>' : '';
+          // T0457 · El plan de pruebas, plegado (es para Claude en Chrome, no para leerlo): «Copiar» lo deja listo para pegárselo.
+          // Solo Para revisar, como «Verlo en DEV»: al aprobar se fusiona, la rama sale de DEV y su enlace ya no lleva a nada.
+          var plan = ab('PLAN_PRUEBAS') ? '<div class="fplan"><h4>Plan de pruebas</h4><div class="fed-abierto"><div class="edit">' + control(t, 'PLAN_PRUEBAS') + '</div></div></div>'
+            : t.PLAN_PRUEBAS && VER_EN_DEV.indexOf(t.ESTADO) >= 0 ? '<div class="fplan"><details' + (planAbierto[id] ? ' open' : '') + '><summary>Plan de pruebas, para Claude en Chrome</summary><div class="fx"' + pulsa(t, 'PLAN_PRUEBAS') + '>' + htmlTexto(t.PLAN_PRUEBAS) + '</div></details>' +
+              '<div class="pie"><button type="button" class="sec" data-copiar-plan>Copiar</button></div></div>' : '';
+          if (cmp || qm || plan || ver) revision = '<div class="bloque frevision"><h3>Qué mirar</h3>' + cmp + qm + plan + ver + '</div>';
+        }
         if (t.MOTIVO) motivo.push('<p><b>Motivo:</b> ' + texto(t.MOTIVO) + '</p>');
+        // T0466: qué le falta para llegar a producción y con qué botón (lo calcula entregar.js al fusionar y al publicar).
+        var publicar = t.ESTADO === 'Aprobada' ? htmlPorPublicar(t) : '';
         caja.innerHTML =
           '<div class="barra"><button type="button" class="volver" data-cerrar>' + ICO_VOLVER + texto(vieneDe ? 'Volver a ' + vieneDe.titulo : 'Volver al tablero') + '</button></div>' +
           '<div class="cab"><div class="id"><span class="n">' + texto(id) + '</span></div>' +
             (ab('TITULO') ? '<h1 id="kb-f-tit" class="fed-abierto">' + control(t, 'TITULO') + '</h1>' : '<h1 id="kb-f-tit"' + pulsa(t, 'TITULO') + '>' + texto(t.TITULO) + '</h1>') + '</div>' +
           '<div class="fmeta">' + tags.join('') + '</div>' + estado +
-          (motivo.length ? '<div class="bloque">' + motivo.join('') + '</div>' : '') +
+          publicar + (motivo.length ? '<div class="bloque">' + motivo.join('') + '</div>' : '') + revision +
+          (puedeAprobar(t) || aprob[id] ? htmlAprobar(t) : '') +
+          (puedeClaude(t) ? htmlClaude(t) : '') +
           '<div class="datos"><div class="fila"><b>Fechas</b><div class="ffechas">' + fs.join('') + '</div></div></div>' +
           largoFx('DESCRIPCION') +
           (personas.length ? '<div class="bloque"><h3>Personas</h3>' + personas.join('') + '</div>' : '') +
@@ -1311,7 +1746,7 @@
       });
       gente().catch(function () {});
 
-      // T0386: en directo. Cuando alguien (otra persona, el agente, Telegram) cambia una tarea, sus dependencias o la bitácora,
+      // T0386: en directo. Cuando alguien (otra persona, el agente) cambia una tarea, sus dependencias o la bitácora,
       // la base avisa (Realtime) y el tablero se pone al día solo, en un segundo; si es la de la ficha abierta, también su bitácora.
       // Los avisos de un momento se juntan en una lectura; mientras se arrastra una tarjeta, espera a que se suelte.
       var directo = null, tDirecto = null, pendiente = {};
