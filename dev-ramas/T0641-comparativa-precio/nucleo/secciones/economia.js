@@ -390,7 +390,8 @@
     if (typeof v === 'number') return v;
     var s = String(v == null ? '' : v).trim(); if (!s) return NaN;
     var pc = /%$/.test(s); s = s.replace(/[€₹%\s]/g, '');
-    if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, '');
+    if (/^-?[1-9]\d{0,2}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g, ''); // T0645: «1,020» es mil veinte, como en el listado
+    else if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, '');
     s = s.replace(',', '.');
     var n = /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : NaN;
     return pc ? n / 100 : n;
@@ -469,6 +470,8 @@
       var nom = [].concat(art.nombre || []).map(function (c) { return String(seguirRuta(art, D, art.tabla, f, c) || '').trim(); }).filter(Boolean).join(' · ') || cod;
       var det = [].concat(art.detalle || []).map(function (o) { return detalleDe(art, D, f, o); }).filter(Boolean).join(' · ');
       var pr = art._precio ? calcArt(art, D, art._precio, f, val) : art.precio ? aNum(f[art.precio]) : NaN;
+      // T0645: un envío a 0 no es un envío: sin precio recomendado, como «Falta el envío» en Mis telas.
+      if (art._envio && ![].concat(art._envio).some(function (e) { return calcArt(art, D, e, f, val) > 0; })) pr = NaN;
       if (!isNaN(pr)) pr = Math.round(pr * 100) / 100;
       return { codigo: cod, nombre: nom, detalle: det, unidad: String(art.unidad || ''), precio: isNaN(pr) || pr < 0 ? NaN : pr, _b: normArt(nom + ' ' + cod + ' ' + det) };
     }).filter(function (a) { return a.codigo; }).sort(function (a, b) { return a.codigo.localeCompare(b.codigo, 'es'); });

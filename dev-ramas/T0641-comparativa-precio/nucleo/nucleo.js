@@ -250,6 +250,7 @@
       version: r.version || '', versiones: Array.isArray(r.versiones) ? r.versiones : [] }; // T0283
     if (r.persona_id) o.persona_id = r.persona_id; // T0387: con Supabase, el id de la persona (acceso.personas)
     if (Array.isArray(r.roles)) o.roles = r.roles; // T0394: con Supabase, sus roles (ctx.roles); antes se perdían aquí
+    if (r.aviso) o.aviso = String(r.aviso); // T0639: el aviso de arriba (config.json · nucleo.aviso)
     if (r.perfilEnMenu === false) o.perfilEnMenu = false; // T0415: Perfil fuera del menú (se abre con el nombre de la cabecera)
     if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
     return o;
@@ -260,6 +261,13 @@
   function bandaDev(t) {
     return t && !APP_DEV ? '<div role="status" style="position:sticky;top:0;z-index:99999;padding:6px 12px;font:600 13px/1.35 system-ui,sans-serif;text-align:center;' +
       'color:#1C1C1C;background:#FFE08A;border-bottom:2px solid #B88A00;overflow-wrap:anywhere">' + texto(t) + '</div>' : '';
+  }
+
+  /** T0639 · El aviso del proyecto (config.json · nucleo.aviso), arriba en todas las secciones; sin él, nada. No se queda
+   *  fijo al bajar: no tapa nada. */
+  function htmlAviso() {
+    return cred.aviso ? '<p class="n-aviso-app" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/>' +
+      '<path d="M12 11v5M12 8h.01"/></svg><span>' + texto(cred.aviso) + '</span></p>' : '';
   }
 
   /* ---------- el marco ---------- */
@@ -398,7 +406,7 @@
     cred = c;
     document.body.className = 'u u-con-barra' + (cred.como ? ' n-viendo-como' : '') + (sinPerfil() ? ' n-perfil-arriba' : '');
     document.body.innerHTML = bandaDev(cred.dev) + htmlMenu() +
-      '<div id="sx-panel">' + htmlComo() + '<header class="u-cab n-cab"><h1 id="n-titulo"></h1>' +
+      '<div id="sx-panel">' + htmlComo() + htmlAviso() + '<header class="u-cab n-cab"><h1 id="n-titulo"></h1>' +
       '<a class="n-quien" href="?s=perfil" data-sx="PERFIL"><span>' + texto(cred.persona) + '</span>' + (cred.perfil ? '<small>' + texto(cred.perfil) + '</small>' : '') + '</a></header>' +
       '<main class="u-main n-main" id="n-sec"></main></div>' +
       '<div class="u-aviso" id="n-aviso" role="status" hidden></div>';

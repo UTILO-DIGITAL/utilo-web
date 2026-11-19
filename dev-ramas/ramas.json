@@ -1204,12 +1204,12 @@
   },
   "T0641-comparativa-precio": {
    "tarea": "T0641",
-   "titulo": "la Comparativa en la ficha de cada marca y lo que cuesta cada tela puesta en España",
-   "pr": null,
-   "commit": "332956b",
-   "ultimo": "T0641: la Comparativa en la ficha de cada marca y lo que cuesta cada tela puesta en España",
+   "titulo": "La ficha de cada marca enseña su comparativa y Mis telas lo que cuesta cada tela",
+   "pr": 346,
+   "commit": "4d9fa0c",
+   "ultimo": "Merge remote-tracking branch 'origin/main' into T0641-comparativa-precio",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T09:22:55.383Z",
+   "fecha": "2026-11-19T09:24:56.338Z",
    "toca": [
     "konamigas",
     "utilo"
