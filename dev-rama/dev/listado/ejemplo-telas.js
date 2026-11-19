@@ -98,10 +98,10 @@
   // T0652 · El resumen de con quién es cada tarea (el mismo en Hoy y en Seguimiento). Lo hecho: lo cerrado y las notas.
   var CONTEXTO_SEG = { campo: 'CON_QUIEN', notas: 'NOTAS', hecho: [{ o: [{ campo: 'ID_ESTADO', es: ['Hecha'] }, { campo: 'ID_TIPO', es: ['Nota'] }] }],
     de: {
-      ID_MARCA: { tabla: 'MARCAS', seccion: 'clientes', sub: ['CIUDAD', 'QUE_FABRICAN'], chips: ['ID_FASE', { campo: 'ID_PRIORIDAD', antes: 'Prioridad' }], nota: 'NOTA',
+      ID_MARCA: { tabla: 'MARCAS', seccion: 'clientes', sub: ['CIUDAD', 'QUE_FABRICAN'], chips: [{ campo: 'ID_FASE', sinNumero: true }, { campo: 'ID_PRIORIDAD', antes: 'Prioridad' }], nota: 'NOTA',
         lineas: [{ titulo: 'Buscan', tabla: 'NECESIDADES', campo: 'ID_MARCA', columnas: ['MATERIAL', { campo: 'PAGAN_HOY', antes: 'pagan hoy', despues: ' €/m' }, { campo: 'PRECIO_OBJETIVO', antes: 'objetivo', despues: ' €/m' }] },
           { titulo: 'Hablar con', tabla: 'PERSONAS', campo: 'ID_MARCA', columnas: ['NOMBRE', 'CARGO', 'TELEFONO'] }] },
-      ID_PROVEEDOR: { tabla: 'PROVEEDORES', seccion: 'proveedores', sub: ['ZONA', 'QUE_TIENEN'], chips: ['ID_ESTADO', { campo: 'ID_PRIORIDAD', antes: 'Prioridad' }], nota: 'OJO',
+      ID_PROVEEDOR: { tabla: 'PROVEEDORES', seccion: 'proveedores', sub: ['ZONA', 'QUE_TIENEN'], chips: [{ campo: 'ID_ESTADO', sinNumero: true }, { campo: 'ID_PRIORIDAD', antes: 'Prioridad' }], nota: 'OJO',
         lineas: [{ titulo: 'Hablar con', tabla: 'PERSONAS', campo: 'ID_PROVEEDOR', columnas: ['NOMBRE', 'CARGO', 'TELEFONO'] }] } } };
   var seg = [
     [dia(-9), 'Tarea', 'Clientes', 'Pendiente', 'Mandar la propuesta de lino lavado', 'Piden 3 colores y precio puesto en su taller de Valencia.', { ID_MARCA: 'M-001' }],
@@ -253,7 +253,7 @@
     seguimiento: { modulo: 'listado', titulo: 'Seguimiento', icono: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9l2 2 4-4M8 15h8"/>', config: mezcla(COMUN, {
       TABLA: 'SEGUIMIENTO', CODIGO: 'ID', NOMBRE: 'DETALLE', ORDEN: 'FECHA', TEXTO: 'Tus tareas, reuniones y notas.', FILAS: ['tarea', 'tareas'],
       COLUMNAS: ['FECHA', 'ID_TIPO', 'CON_QUIEN', 'DETALLE', 'ID_ESTADO'], DETALLE: ['CON_QUIEN', 'FECHA', 'ID_ESTADO'],
-      CAMPOS: { CON_QUIEN: { titulo: 'Con quién', primero: ['ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO'] }, ID_TIPO: { titulo: 'Tipo' }, ID_TEMA: { titulo: 'Área' }, ID_FORMATO: { titulo: 'Formato' },
+      CAMPOS: { CON_QUIEN: { titulo: 'Con quién', primero: ['ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO'], grupos: { ID_MARCA: 'Marcas', ID_PROVEEDOR: 'Proveedores', ID_OTRO: 'Otros' } }, ID_TIPO: { titulo: 'Tipo' }, ID_TEMA: { titulo: 'Área' }, ID_FORMATO: { titulo: 'Formato' },
         ID_MARCA: { titulo: 'Marca' }, ID_PROVEEDOR: { titulo: 'Proveedor' }, ID_OTRO: { titulo: 'Otro contacto' }, DETALLE: { titulo: 'Qué hay que hacer o qué pasó' },
         ID_ESTADO: { titulo: 'Estado', colores: COLORES_TAREA }, NOTAS: { titulo: 'Notas y enlaces', tipo: 'nota' } },
       FICHA: [{ titulo: '', campos: ['ID_ESTADO', 'FECHA', 'DETALLE', 'ID_TIPO', 'ID_TEMA', 'ID_FORMATO', 'NOTAS'] }, { titulo: 'Con quién', campos: ['ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO'] }],
@@ -274,7 +274,7 @@
       // T0643: cerrar y pasar en un toque, el siguiente paso al cerrar con una marca o un proveedor, el alta con el texto primero y el área puesta sola.
       RAPIDAS: { HECHA: { campo: 'ID_ESTADO', valor: 'Hecha' }, PASAR: 'FECHA', SI: [{ campo: 'ID_TIPO', no: ['Nota'] }, NO_HECHAS],
         SIGUIENTE: { con: ['ID_MARCA', 'ID_PROVEEDOR'], copia: ['ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO', 'ID_TEMA'], pone: { ID_TIPO: 'Tarea', ID_ESTADO: 'Pendiente' } } },
-      ALTA: { campos: ['DETALLE', 'CON_QUIEN', 'FECHA', 'ID_TEMA'], mas: ['ID_TIPO', 'ID_FORMATO', 'NOTAS'] },
+      ALTA: { titulo: 'Nueva tarea', campos: ['DETALLE', 'CON_QUIEN', 'FECHA', 'ID_TEMA'], mas: ['ID_TIPO', 'ID_FORMATO', 'NOTAS'] },
       DEDUCIR: { ID_TEMA: { ID_MARCA: 'Clientes', ID_PROVEEDOR: 'Proveedores' } },
       // T0652: el nombre de con quién es abre lo último con esa marca o ese proveedor, lo que queda y su ficha en dos líneas.
       CONTEXTO: CONTEXTO_SEG,

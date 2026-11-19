@@ -102,6 +102,40 @@ window.NUCLEO_MONTAJE = {
     ],
     "que": "por atender"
    }
+  },
+  {
+   "id": "USO",
+   "modulo": "uso",
+   "titulo": "Uso",
+   "icono": "<path d=\"M4 20V10\"/><path d=\"M10 20V4\"/><path d=\"M16 20v-7\"/><path d=\"M22 20H2\"/>",
+   "web": "utilo/secciones/uso.js",
+   "version": "d475154e0a",
+   "perfiles": [
+    "admin",
+    "responsable"
+   ],
+   "config": {
+    "NO_CUENTAN": [
+     "utilo.digital@gmail.com",
+     "javier.canela3@gmail.com"
+    ],
+    "SECCIONES": {
+     "telas": [
+      "Hoy",
+      "Seguimiento",
+      "Clientes",
+      "Prospección",
+      "Proveedores",
+      "Mis telas",
+      "Calcular precio",
+      "Economía"
+     ]
+    }
+   },
+   "api": [
+    "uso_apps",
+    "uso_de"
+   ]
   }
  ],
  "perfilEnMenu": false,

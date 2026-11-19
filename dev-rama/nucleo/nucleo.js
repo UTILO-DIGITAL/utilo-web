@@ -101,6 +101,7 @@
 
   /** Entrar con Google: el motor dice el nombre del negocio y si tiene sesión larga (T0209); después, «entrar». */
   function acceso(aviso) {
+    usoParar(); // T0682: en la pantalla de entrada no hay nadie a quien apuntar
     cargando('Conectando…');
     inicio().then(function (ini) {
       if (window.UG.configurar) window.UG.configurar(ini);
@@ -253,6 +254,7 @@
     if (r.aviso) o.aviso = String(r.aviso); // T0639: el aviso de arriba (config.json · nucleo.aviso)
     if (r.perfilEnMenu === false) o.perfilEnMenu = false; // T0415: Perfil fuera del menú (se abre con el nombre de la cabecera)
     if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
+    if (r.uso && r.uso.app && r.uso.url) o.uso = { app: String(r.uso.app), url: String(r.uso.url), clave: String(r.uso.clave || '') }; // T0682
     if (r.ocultar && Array.isArray(r.ocultar.tablas)) o.ocultar = { tablas: r.ocultar.tablas, refs: r.ocultar.refs || {}, filas: r.ocultar.filas || {}, columnas: r.ocultar.columnas || {} }; // T0650; T0671: columnas
     return o;
   }
@@ -418,6 +420,7 @@
       '<div class="u-aviso" id="n-aviso" role="status" hidden></div>';
     $('n-plegar').onclick = plegar;
     tope();
+    usoSegun(cred); // T0682: antes de abrir, para que la primera sección cuente
     abrir(pedida() || menu()[0].id, false);
     avisarVersiones();
     cifras();
@@ -660,6 +663,7 @@
     actual = s.id;
     marcarMenu(s.enPerfil ? 'PERFIL' : s.id); // una sección de dentro de Perfil marca Perfil en el menú (T0269)
     verMas(false);
+    usar(function (u) { u.seccion(s.id, s.titulo); }); // T0682
     $('n-titulo').textContent = s.titulo;
     ponerAviso(s);
     document.title = s.titulo + ' · ' + (C.nombreApp || cred.negocio || '');
@@ -767,6 +771,51 @@
       // T0386: con Supabase, enDirecto(tablas, f): f(tabla) en cuanto cambia algo en esas tablas de la base (null si no se puede).
       enDirecto: window.UG && typeof window.UG.enDirecto === 'function' ? function (ts, f) { return window.UG.enDirecto(ts, f); } : null
     };
+  }
+
+  /* ---------- T0682 · el uso de la app (nucleo/uso.js) ----------
+   * Si «entrar» trae uso ({ app, url, clave }: config.json · nucleo.uso) y no se está viendo como otra persona, se carga
+   * nucleo/uso.js cuando la sección ya está pintada y apunta quién entra, las secciones, los avisos en rojo, los errores y las
+   * esperas del motor, y cuándo sale. Lo de antes de que cargue espera en usoPend. Otra persona o sin uso: se para. */
+  var usoAhora = null, usoPend = [], usoCargando = false, usoOyentes = false;
+  function usar(f) { if (usoAhora) { try { f(usoAhora); } catch (e) {} } else if (usoCargando) usoPend.push(f); }
+  function usoParar() { if (usoAhora) usoAhora.parar(); usoAhora = null; usoPend = []; usoCargando = false; }
+  function usoSegun(c) {
+    if (!c || !c.uso || c.como || !c.correo) { usoParar(); return; }
+    if (usoAhora && usoAhora.correo === c.correo) return;
+    if (usoCargando && usoCargando === c.correo) return;
+    usoParar();
+    usoCargando = c.correo;
+    var listo = function () {
+      if (usoCargando !== c.correo || !window.NUCLEO_USO) return;
+      var U = window.NUCLEO_USO;
+      usoAhora = U.crear({
+        app: c.uso.app, url: c.uso.url, clave: c.uso.clave, correo: c.correo, persona: c.persona, perfil: c.perfil, version: c.version,
+        aparato: U.aparato(navigator, window.innerWidth),
+        local: /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) || location.protocol === 'file:'
+      });
+      usoCargando = false;
+      var p = usoPend; usoPend = [];
+      p.forEach(usar);
+      U.envolver(window.UG, function () { return usoAhora; });
+      if (!usoOyentes) {
+        usoOyentes = true;
+        U.vigilarAvisos(document, function () { return usoAhora; });
+        document.addEventListener('visibilitychange', function () { usar(function (u) { if (document.visibilityState === 'hidden') u.salir(); else u.volver(); }); });
+        window.addEventListener('pagehide', function () { usar(function (u) { u.salir(); }); });
+        window.addEventListener('error', function (e) { usar(function (u) { u.falloPagina(e && (e.message || e.error)); }); });
+      }
+    };
+    if (window.NUCLEO_USO) { listo(); return; }
+    // Cuando la página ya está pintada: no compite con lo que se ve al entrar.
+    setTimeout(function () {
+      if (usoCargando !== c.correo) return;
+      var sc = document.createElement('script');
+      sc.src = RAIZ + 'nucleo/uso.js?v=1';
+      sc.onload = listo;
+      sc.onerror = function () { if (usoCargando === c.correo) { usoCargando = false; usoPend = []; } };
+      document.head.appendChild(sc);
+    }, 1200);
   }
 
   var tAviso = 0;
