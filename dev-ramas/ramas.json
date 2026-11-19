@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "00c250ef",
-   "ultimo": "Merge pull request #362 from UTILO-DIGITAL/T0672-aviso-economia",
+   "commit": "64f64b8c",
+   "ultimo": "Merge pull request #363 from UTILO-DIGITAL/T0669-dev-telas",
    "quien": "",
-   "fecha": "2026-11-19T16:28:00.231Z",
+   "fecha": "2026-11-19T16:58:53.895Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -172,6 +172,21 @@
        "nombre": "Admin"
       }
      ],
+     "cambia": true
+    },
+    {
+     "ruta": "dev/telas/",
+     "nombre": "App con Excel de prueba",
+     "iniciativa": "telas",
+     "proyecto": "",
+     "carga": [
+      "web/estilos/base.css",
+      "web/kanban4/google.js",
+      "web/kanban4/tablas.js",
+      "web/nucleo/nucleo.js",
+      "web/telas/marca.css"
+     ],
+     "local": true,
      "cambia": true
     }
    ],
