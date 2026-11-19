@@ -589,14 +589,12 @@
    "tarea": "T0628",
    "titulo": "Ventas en la Economía de Marta: lo que tiene en juego, lo que gana y lo que le falta por recuperar",
    "pr": 352,
-   "commit": "2fbcf39",
+   "commit": "1885995",
    "ultimo": "T0628: al día con main",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T13:53:16.692Z",
+   "fecha": "2026-11-19T14:07:09.559Z",
    "toca": [
-    "konamigas",
-    "telas",
-    "utilo"
+    "telas"
    ],
    "comun": true,
    "paginas": [
