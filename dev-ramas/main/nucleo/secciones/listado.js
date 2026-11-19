@@ -225,6 +225,48 @@
       nueva: cfg.NUEVA || {}, obligatorias: cfg.OBLIGATORIAS || [], filtros: cfg.FILTROS || [], filas: cfg.FILAS && cfg.FILAS.length ? cfg.FILAS : null,
       acciones: cfg.ACCIONES || [] };
   }
+  /**
+   * T0650 · La configuración sin lo que el perfil de quien mira no ve (ctx.ocultar, de config.json · nucleo.ocultar): ni las
+   * tablas ocultas (lo que se lee de ellas: VALORES, lo relacionado, los campos con «de», sus referencias) ni, en las demás, las
+   * columnas que apuntan a ellas (Con quién = proveedor). Así la sección no las pide, que el motor diría «no tienes permiso», ni
+   * enseña esos campos. Con «filas» ({ TABLA: { COLUMNA: [valores] } }), esos valores no salen en los desplegables de su tabla.
+   * No cambia cfg. Sin nada que ocultar, la misma.
+   */
+  function quitada(vs, n) { var k = String(n).trim().toLowerCase(); return vs.some(function (v) { return String(v).trim().toLowerCase() === k; }); }
+  function sinOcultas(cfg, oc) {
+    var ts = (oc && oc.tablas) || [], fs = ((oc && oc.filas) || {})[cfg && cfg.TABLA] || {};
+    if ((!ts.length && !Object.keys(fs).length) || !cfg) return cfg;
+    var c = JSON.parse(JSON.stringify(cfg)), refs = (oc && oc.refs) || {}, fuera = (refs[c.TABLA] || []).slice();
+    // Las opciones con las que dejaría de ver la fila (el área «Proveedores»), fuera de los desplegables: el motor no dejaría guardarla.
+    Object.keys(fs).forEach(function (k) {
+      var d = (c.CAMPOS = c.CAMPOS || {})[k] = c.CAMPOS[k] || {};
+      d._quitar = fs[k].slice();
+      if (Array.isArray(d.opciones)) d.opciones = d.opciones.filter(function (n) { return !quitada(fs[k], n); });
+    });
+    var oculta = function (t) { return ts.indexOf(t) >= 0; };
+    Object.keys(c.CAMPOS || {}).forEach(function (k) { var d = c.CAMPOS[k]; if (d && d.de && oculta(d.de.tabla)) fuera.push(k); });
+    var vale = function (x) { return typeof x !== 'string' || fuera.indexOf(x.replace(/^-/, '').split('.')[0]) < 0; };
+    var limpiar = function (a) { return Array.isArray(a) ? a.filter(vale) : a; };
+    fuera.forEach(function (k) { if (c.CAMPOS) delete c.CAMPOS[k]; if (c.NUEVA) delete c.NUEVA[k]; });
+    Object.keys(c.CAMPOS || {}).forEach(function (k) { if (c.CAMPOS[k].primero) c.CAMPOS[k].primero = limpiar(c.CAMPOS[k].primero); });
+    ['COLUMNAS', 'DETALLE', 'BUSCAR', 'EDITAR', 'OBLIGATORIAS', 'FILTROS'].forEach(function (k) { if (k in c) c[k] = limpiar(c[k]); });
+    if (!vale(c.ORDEN)) c.ORDEN = '';
+    if (c.FICHA) c.FICHA = c.FICHA.map(function (g) { if (g.campos) g.campos = limpiar(g.campos); return g; }).filter(function (g) { return !g.campos || g.campos.length; });
+    (c.VISTAS || []).forEach(function (v) {
+      if (v.columnas) v.columnas = limpiar(v.columnas);
+      if (v.orden && !vale(v.orden)) delete v.orden;
+      if (v.agrupar && !vale(v.agrupar.campo || v.agrupar)) delete v.agrupar;
+      if (v.tablero && !vale(v.tablero.campo)) delete v.tablero;
+    });
+    if (c.RELACIONADOS) c.RELACIONADOS = c.RELACIONADOS.filter(function (r) { return !oculta(r.tabla); });
+    Object.keys(c.VALORES || {}).forEach(function (k) { var v = c.VALORES[k]; if (v && typeof v === 'object' && oculta(v.tabla)) delete c.VALORES[k]; });
+    var r = c._refs || {};
+    Object.keys(r).forEach(function (t) {
+      if (oculta(t)) { delete r[t]; return; }
+      Object.keys(r[t]).forEach(function (k) { if (oculta(r[t][k])) delete r[t][k]; });
+    });
+    return c;
+  }
   /** El campo de un apartado, con su título y tipo por defecto (una columna FECHA… es una fecha; ESTADO, un estado). */
   function campo(ap, c) {
     var d = (ap.campos || {})[c] || {};
@@ -313,6 +355,11 @@
       d._ids = {};
       var ops = fs.map(function (x) { var n = nombreDe(D, t, x.ID !== undefined ? x.ID : x[Object.keys(x)[0]]); d._ids[n] = x.ID !== undefined ? x.ID : x[Object.keys(x)[0]]; return n; });
       if (!d.opciones) d.opciones = ops;
+      // T0650: lo que dejaría sin ver la fila (nucleo.ocultar · filas), fuera de las opciones y del desplegable del formulario.
+      if (d._quitar) {
+        d.opciones = d.opciones.filter(function (n) { return !quitada(d._quitar, n); });
+        Object.keys(d._ids).forEach(function (n) { if (quitada(d._quitar, n)) delete d._ids[n]; });
+      }
       d.ref = t;
     });
     return a;
@@ -806,7 +853,7 @@
   var SIN_FOTO = { corto: 'No se ve', largo: 'No se puede ver la foto aquí. Para que se vea en la app (también en el móvil), su carpeta de Drive tiene que estar compartida como «Cualquier persona con el enlace».' };
 
   var CALC = { textoVuelta: textoVuelta, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, cumple: cumple, calcular: calcular, usa: usa,
-    valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, campo: campo,
+    valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
     relacionadas: relacionadas, verTexto: verTexto, cuando: cuando, comparar: comparar,
@@ -828,7 +875,7 @@
 
   window.UN.registrar('LISTADO', {
     abrir: function (el, ctx) {
-      var T = ctx.tablas, cfg = ctx.config || {}, PROHIB = cfg.PROHIBIDO === undefined ? PROHIB_DEFECTO : cfg.PROHIBIDO;
+      var T = ctx.tablas, cfg = sinOcultas(ctx.config || {}, ctx.ocultar), PROHIB = cfg.PROHIBIDO === undefined ? PROHIB_DEFECTO : cfg.PROHIBIDO;
       var BASE = apartado(cfg, ctx.id, ctx.titulo), PREF = cfg.PREFERENCIAS || '';
       var puedePersonalizar = !!ctx.admin || (cfg.PERSONALIZAN || []).indexOf(ctx.perfil) >= 0;
       var K = 'li_' + ctx.id + '_';
