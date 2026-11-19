@@ -2,9 +2,10 @@
  * Calcular precio · Telas (T0653) · clientes/telas/modulos/precio de utilo-apps
  *
  * La calculadora de Marta: lo que le cuesta una tela (de Mis telas o escribiendo el coste) con el envío y el precio para un
- * cliente, poniendo el margen o el precio, al lado de lo que ese cliente paga hoy (su Comparativa). Avisa si baja de su
- * mínimo (AJUSTES.MARGEN_MINIMO; vacío, sin aviso) o de lo que le cuesta. No guarda nada. Lo que le cuesta es el mismo
- * cálculo que «Te cuesta puesta en España» de Mis telas; el margen, sobre lo que le cuesta (como su Excel).
+ * cliente, poniendo lo que quiere ganar o el precio, al lado de lo que ese cliente paga hoy (su Comparativa). Avisa si el
+ * precio no cubre lo que le cuesta. No guarda nada. Lo que le cuesta es el mismo cálculo que «Te cuesta puesta en España» de
+ * Mis telas. T0657: lo que gana va en euros por metro, sin porcentajes ni mínimo (Marta, 19/11/2026: «Mi margen es precio de
+ * venta − (precio de coste + transporte). Por eso no quiero definir un %»).
  */
 (function () {
   'use strict';
@@ -16,7 +17,7 @@
   function aNum(v) {
     if (typeof v === 'number') return v;
     var s = String(v == null ? '' : v).trim(); if (!s) return NaN;
-    s = s.replace(/[€₹%\s]/g, '');
+    s = s.replace(/[€₹%\s]/g, '').replace(/^[\u2212\u2013]/, '-'); // T0657: «−2,27» (como lo pinta cifra) se lee como -2,27
     if (/^-?[1-9]\d{0,2}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g, '');
     else if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, '');
     s = s.replace(',', '.');
@@ -30,14 +31,12 @@
     s[0] = s[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     return (n < 0 ? '−' : '') + s.join(',');
   }
-  /** El valor de un porcentaje de AJUSTES: 0,25 o «25 %» → 0,25; 25 → 0,25. Vacío: NaN. */
-  function fraccion(v) { var n = aNum(v); if (isNaN(n)) return NaN; return /%/.test(String(v)) || n > 1 ? n / 100 : n; }
 
   /** Las tablas en un objeto { filas(t), fila(t, id) } (el de ctx.tablas, o uno de prueba). */
   function nombre(D, t, id) { var f = id ? D.fila(t, id) : null; return f ? String(f.NOMBRE || id) : ''; }
   function ajustes(D) {
     var a = D.fila('AJUSTES', 'AJUSTES') || {};
-    return { rupias: aNum(a.RUPIAS_POR_EURO), envio: aNum(a.ENVIO_ARANCEL), minimo: fraccion(a.MARGEN_MINIMO) };
+    return { rupias: aNum(a.RUPIAS_POR_EURO), envio: aNum(a.ENVIO_ARANCEL) };
   }
   /** Las telas que se pueden elegir (sin las descartadas), por código: { id, nombre, diseno, inr, ancho }. */
   function telas(D) {
@@ -60,9 +59,9 @@
     if (e.modo === 'pedido') { var tot = aNum(e.total), m = aNum(e.metros); return tot >= 0 && m > 0 ? tot / m : NaN; }
     var n = aNum(e.metro); return n >= 0 ? n : NaN;
   }
-  /** El margen, sobre lo que cuesta (como su Excel: 12 € → 18 € es un 50 %). m en tanto por uno. */
-  function precioDe(coste, m) { return r2(coste * (1 + m)); }
-  function margenDe(coste, precio) { return coste > 0 ? (precio - coste) / coste : NaN; }
+  /** Lo que gana, en euros por metro: precio = lo que le cuesta + lo que gana (12 € + 6 € = 18 €). */
+  function precioDe(coste, gana) { return r2(coste + gana); }
+  function ganaDe(coste, precio) { return r2(precio - coste); }
 
   /**
    * Lo que paga hoy la marca, de su Comparativa: { misma: [la que compara con este diseño], otras: [las demás] }, cada una
@@ -81,34 +80,30 @@
   }
 
   /**
-   * Todo lo que enseña la pantalla, de lo que hay escrito: s = { tela (la de la lista, con eur si es «otra»), envio, margen o
-   * precio y modo (el último que se ha escrito: 'margen' o 'precio') }, a = ajustes(D).
-   * → { coste (con envío), base (sin envío), envio, precio, margen, queda, bajoMinimo, minimo, precioMinimo, perdida }
+   * Todo lo que enseña la pantalla, de lo que hay escrito: s = { tela (la de la lista, con eur si es «otra»), envio, gana
+   * (euros por metro) o precio y modo (el último que se ha escrito: 'gana' o 'precio') }, a = ajustes(D).
+   * → { coste (con envío), base (sin envío), envio, precio, gana (negativo: pierde), perdida }
    */
   function calcular(s, a) {
-    var base = costeEur(s.tela, a.rupias), envio = envioMetro(s.envio), r = { base: base, envio: envio, coste: NaN, precio: NaN, margen: NaN };
+    var base = costeEur(s.tela, a.rupias), envio = envioMetro(s.envio), r = { base: base, envio: envio, coste: NaN, precio: NaN, gana: NaN };
     if (isNaN(base) || isNaN(envio)) return r;
     r.coste = r2(base + envio);
-    if (s.modo === 'margen') {
-      var m = aNum(s.margen);
-      if (!isNaN(m)) { r.margen = m / 100; r.precio = precioDe(r.coste, r.margen); }
+    if (s.modo === 'gana') {
+      var g = aNum(s.gana);
+      if (!isNaN(g)) { r.precio = precioDe(r.coste, g); r.gana = ganaDe(r.coste, r.precio); }
     } else {
       var p = aNum(s.precio);
-      if (!isNaN(p)) { r.precio = r2(p); r.margen = margenDe(r.coste, r.precio); }
+      if (!isNaN(p)) { r.precio = r2(p); r.gana = ganaDe(r.coste, r.precio); }
     }
     if (isNaN(r.precio)) return r;
-    r.queda = r2(r.precio - r.coste);
-    r.perdida = r.queda < 0;
-    r.minimo = a.minimo;
-    r.bajoMinimo = !r.perdida && a.minimo >= 0 && r.margen < a.minimo - 1e-9;
-    if (r.bajoMinimo) r.precioMinimo = precioDe(r.coste, a.minimo);
+    r.perdida = r.gana < 0;
     return r;
   }
   /** Diez por ciento menos de lo que paga, si cubre lo que te cuesta; si no, NaN. */
   function ofrecer(su, coste) { var p = r2(su * 0.9); return p > coste ? p : NaN; }
 
-  var CALC = { aNum: aNum, cifra: cifra, fraccion: fraccion, ajustes: ajustes, telas: telas, costeEur: costeEur, envioMetro: envioMetro,
-    precioDe: precioDe, margenDe: margenDe, comparativa: comparativa, calcular: calcular, ofrecer: ofrecer };
+  var CALC = { aNum: aNum, cifra: cifra, ajustes: ajustes, telas: telas, costeEur: costeEur, envioMetro: envioMetro,
+    precioDe: precioDe, ganaDe: ganaDe, comparativa: comparativa, calcular: calcular, ofrecer: ofrecer };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -139,10 +134,10 @@
             '<div class="pr-dos" id="pr-env-p" hidden><span class="pr-ud"><input id="pr-etotal" inputmode="decimal" autocomplete="off" aria-label="Envío del pedido entero"><i>€</i></span>' +
               '<span class="pr-ud"><input id="pr-metros" inputmode="decimal" autocomplete="off" aria-label="Metros del pedido"><i>m</i></span></div>' +
             '<span class="u-nota" id="pr-env-nota"></span></div>' +
-          '<div class="pr-par"><label class="u-campo" id="pr-c-margen"><span class="u-etiqueta">Margen</span><span class="pr-ud"><input id="pr-margen" inputmode="decimal" autocomplete="off"><i>%</i></span></label>' +
+          '<div class="pr-par"><label class="u-campo" id="pr-c-gana"><span class="u-etiqueta">Ganas</span><span class="pr-ud"><input id="pr-gana" inputmode="decimal" autocomplete="off"><i>€/m</i></span></label>' +
             '<span class="pr-o">o</span>' +
             '<label class="u-campo" id="pr-c-precio"><span class="u-etiqueta">Precio</span><span class="pr-ud"><input id="pr-precio" inputmode="decimal" autocomplete="off"><i>€/m</i></span></label></div>' +
-          '<p class="u-nota">Pon uno de los dos y sale el otro. El margen, sobre lo que te cuesta.</p>' +
+          '<p class="u-nota">Pon lo que quieres ganar por metro o el precio, y sale el otro.</p>' +
         '</section>' +
         '<div class="pr-lado"><section class="pr-caja" id="pr-res" aria-live="polite"></section><section class="pr-caja" id="pr-comp"></section></div>' +
         '</div>';
@@ -183,13 +178,13 @@
           ? (isNaN(em) ? 'El envío de todo el pedido y cuántos metros lleva: sale por metro.' : 'Sale a ' + eur(em) + '.')
           : (!isNaN(a.envio) && Math.abs(aNum(env.metro) - a.envio) < 0.005 ? 'El de tus ajustes. Cámbialo si este envío sale distinto.'
             : isNaN(a.envio) ? 'En tus ajustes no hay envío: ponlo aquí.' : 'En tus ajustes es ' + eur(a.envio) + '. Solo cambia para esta cuenta.');
-        $('pr-c-margen').classList.toggle('pr-activo', S.modo === 'margen');
+        $('pr-c-gana').classList.toggle('pr-activo', S.modo === 'gana');
         $('pr-c-precio').classList.toggle('pr-activo', S.modo === 'precio');
 
-        var r = calcular({ tela: t, envio: env, margen: $('pr-margen').value, precio: $('pr-precio').value, modo: S.modo }, a);
+        var r = calcular({ tela: t, envio: env, gana: $('pr-gana').value, precio: $('pr-precio').value, modo: S.modo }, a);
         // El otro de los dos, al momento (sin tocar el que se está escribiendo).
-        if (desde !== 'margen' && S.modo === 'precio') $('pr-margen').value = isNaN(r.margen) ? '' : cifra(r.margen * 100, 0);
-        if (desde !== 'precio' && S.modo === 'margen') $('pr-precio').value = isNaN(r.precio) ? '' : cifra(r.precio);
+        if (desde !== 'gana' && S.modo === 'precio') $('pr-gana').value = isNaN(r.gana) ? '' : cifra(r.gana);
+        if (desde !== 'precio' && S.modo === 'gana') $('pr-precio').value = isNaN(r.precio) ? '' : cifra(r.precio);
 
         var marca = S.marca ? D.fila('MARCAS', S.marca) : null, para = marca ? String(marca.NOMBRE || marca.ID) : 'el cliente', h = '';
         h += '<span class="u-etiqueta">Precio para ' + texto(para) + '</span>';
@@ -197,18 +192,15 @@
         else if (isNaN(r.base)) h += '<p class="u-vacio">' + (t.otra ? 'Escribe el coste del proveedor.' : isNaN(t.inr) ? 'Esta tela aún no tiene el coste del proveedor en Mis telas. Elige «Otra: escribo el coste» y ponlo.' : 'Falta el cambio de rupias en tus ajustes.') + '</p>';
         else if (isNaN(r.envio)) h += '<p class="u-vacio">Falta el envío.</p>';
         else {
-          if (isNaN(r.precio)) h += '<p class="pr-grande pr-nada">— <small>pon un margen o un precio</small></p>';
+          if (isNaN(r.precio)) h += '<p class="pr-grande pr-nada">— <small>pon lo que quieres ganar o un precio</small></p>';
           else {
             h += '<p class="pr-grande u-cifra">' + cifra(r.precio) + ' <small>€/m sin IVA</small></p>';
-            h += r.perdida ? '<p class="u-mal">Pierdes ' + eur(-r.queda) + '</p>'
-              : '<p class="u-cifra">Te quedan <b>' + eur(r.queda) + '</b> · margen ' + cifra(r.margen * 100, 0) + ' %</p>';
+            h += r.perdida ? '<p class="u-mal">Pierdes ' + eur(-r.gana) + '</p>' : '<p class="u-cifra">Ganas <b>' + eur(r.gana) + '</b></p>';
             if (r.perdida) h += '<p class="pr-aviso pr-mal">Por debajo de lo que te cuesta (' + eur(r.coste) + ').</p>';
-            else if (r.bajoMinimo) h += '<p class="pr-aviso">Por debajo de tu mínimo (' + cifra(r.minimo * 100, 0) + ' %). Con el ' + cifra(r.minimo * 100, 0) + ' %: ' + eur(r.precioMinimo) +
-              '. <button type="button" class="u-btn u-btn-texto" data-poner="' + r.precioMinimo + '">Ponerlo</button></p>';
           }
           var origen = !isNaN(t.inr) && isNaN(t.eur) ? cifra(t.inr, 0) + ' ₹ → ' + eur(r.base, false) : eur(r.base, false);
           h += '<p class="pr-cuentas u-cifra">Te cuesta <b>' + eur(r.coste) + '</b>: ' + origen + ' + envío ' + eur(r.envio, false) +
-            (!isNaN(r.precio) && !r.perdida ? ' · + ' + cifra(r.margen * 100, 0) + ' % = ' + eur(r.precio) : '') + '</p>';
+            (!isNaN(r.precio) && !r.perdida ? ' · + ganas ' + eur(r.gana, false) + ' = ' + eur(r.precio) : '') + '</p>';
           if (factura && !isNaN(r.precio) && t.id) {
             var href = '?s=economia&factura=nueva&articulo=' + encodeURIComponent(t.id) + '&precio=' + encodeURIComponent(r.precio) + (S.marca ? '&cliente=' + encodeURIComponent('ID_MARCA:' + S.marca) : '');
             h += '<a class="u-btn pr-fac" href="' + texto(href) + '" data-sx="ECONOMIA">Llevar a una factura</a>';
@@ -258,7 +250,7 @@
       });
       el.addEventListener('input', function (e) {
         var id = e.target.id;
-        if (id === 'pr-margen') { S.modo = 'margen'; pintar('margen'); }
+        if (id === 'pr-gana') { S.modo = 'gana'; pintar('gana'); }
         else if (id === 'pr-precio') { S.modo = 'precio'; pintar('precio'); }
         else if (id === 'pr-envio') { S.envioTocado = true; pintar(); }
         else if (['pr-etotal', 'pr-metros', 'pr-mcoste', 'pr-mancho'].indexOf(id) >= 0) pintar();

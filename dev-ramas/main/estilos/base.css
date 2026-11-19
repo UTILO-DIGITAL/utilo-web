@@ -2211,6 +2211,7 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .eco-lin textarea { resize: none; overflow: hidden; line-height: 1.35; }
 
 /* T0653 · Calcular precio (Telas): datos a la izquierda; el precio y lo que paga hoy la marca a la derecha (debajo en el móvil). */
+.u .pr-caja.u-campos { grid-template-columns: 1fr; } /* T0657: los datos, siempre uno debajo de otro (a 600-820 px, u-campos los partía en dos) */
 .u .pr-calc { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--e4); align-items: start; }
 .u .pr-lado { display: grid; gap: var(--e4); min-width: 0; }
 .u .pr-caja { background: var(--color-superficie); border: 1px solid var(--color-linea); border-radius: var(--radio); padding: var(--e4); display: grid; gap: var(--e2); align-content: start; min-width: 0; }
