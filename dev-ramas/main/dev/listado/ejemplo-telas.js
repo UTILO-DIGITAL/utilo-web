@@ -288,8 +288,6 @@
       RELACIONADOS: [{ titulo: 'Marcas interesadas', tabla: 'INTERESES', campo: 'ID_TELA', con: 'ID', seccion: 'clientes', clave: 'ID_MARCA', columnas: ['ID_MARCA'], nombre: 'ID_MARCA', campos: { ID_MARCA: { titulo: 'Marca' } } }],
       VISTAS: [
         { id: 'CATALOGO', titulo: 'Mi catálogo', filtro: [{ campo: 'ID_ESTADO', no: ['Descartada'] }] },
-        { id: 'ENSENAR', titulo: 'Para enseñar', texto: '', cliente: true, filtro: [{ campo: 'ID_ESTADO', no: ['Descartada'] }],
-          columnas: ['ENLACE_FOTO', 'ID_DISENO.ID_TECNICA', 'COLOR', 'ID_DISENO.ANCHO', 'ID_DISENO.GSM', 'ID_DISENO.MARTINDALE', 'PRECIO_TALLER'] },
         { id: 'MUESTRAS', titulo: 'Muestras', filtro: [{ campo: 'ID_ESTADO', es: ['Muestra pedida', 'Muestra recibida'] }] },
         { id: 'TODAS', titulo: 'Todas', agrupar: 'ID_DISENO.ID_TECNICA' }
       ],
