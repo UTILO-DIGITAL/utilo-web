@@ -38,7 +38,7 @@
   var FASES = dimension('FA', ['Por contactar', '1 Contactado', '2 Interesado', '3 Reunión hecha', '4 Cuestionario enviado', '5 Cuestionario recibido', '6 Propuesta enviada',
     '7 Muestras enviadas', '8 Primer pedido', '9 Cliente habitual', 'En pausa', 'Descartado']);
   var ESTADOS_TAREA = dimension('ET', ['Pendiente', 'En curso', 'Esperando respuesta', 'Hecha', 'Descartada']);
-  var TIPOS_SEGUIMIENTO = dimension('TS', ['Tarea', 'Reunión']);
+  var TIPOS_SEGUIMIENTO = dimension('TS', ['Tarea', 'Reunión', 'Próximo paso', 'Nota']);
   var TEMAS = dimension('TE', ['Clientes', 'Proveedores', 'Telas', 'Pedidos', 'Empresa', 'Envíos', 'Ferias', 'Formación', 'Marca propia']);
   var FORMATOS = dimension('FO', ['Videollamada', 'Llamada', 'Presencial', 'WhatsApp', 'Email', 'Visita a taller', 'Feria']);
   var PRIORIDADES = dimension('PR', ['Alta', 'Media', 'Baja']);
@@ -56,7 +56,7 @@
   /* ---------- marcas (clientes y prospección juntos: ser cliente es la fase), proveedores y otros ---------- */
   var MARCAS = tabla(['ID', 'NOMBRE', 'ID_FASE', 'ID_TIPO_MARCA', 'ID_PRIORIDAD', 'ID_VIA', 'CIUDAD', 'DIRECCION', 'WEB', 'INSTAGRAM', 'QUE_FABRICAN', 'NOTA', 'NOTAS'], [
     { ID: 'M-001', NOMBRE: 'Casa Albero', ID_FASE: f('6 Propuesta enviada'), ID_TIPO_MARCA: 'TM01', ID_PRIORIDAD: 'PR01', ID_VIA: 'VI01', CIUDAD: 'Valencia', DIRECCION: 'Polígono Sur, nave 4 (Valencia)',
-      WEB: 'https://casaalbero.example', INSTAGRAM: '@casaalbero', QUE_FABRICAN: 'Sofás y cabeceros', NOTAS: 'Quieren ver colores tierra.' },
+      WEB: 'https://casaalbero.example', INSTAGRAM: '@casaalbero', QUE_FABRICAN: 'Sofás y cabeceros', NOTA: 'Quieren ver colores tierra.', NOTAS: 'Les gusta el lino lavado.' },
     { ID: 'M-002', NOMBRE: 'Nido Sur', ID_FASE: f('3 Reunión hecha'), ID_TIPO_MARCA: 'TM02', ID_PRIORIDAD: 'PR01', ID_VIA: 'VI02', CIUDAD: 'Sevilla', QUE_FABRICAN: 'Cojines y ropa de cama' },
     { ID: 'M-003', NOMBRE: 'Lumbre Estudio', ID_FASE: f('8 Primer pedido'), ID_TIPO_MARCA: 'TM01', ID_PRIORIDAD: 'PR01', ID_VIA: 'VI03', CIUDAD: 'Madrid', QUE_FABRICAN: 'Tapicería a medida',
       NOTAS: 'Pagan por transferencia a la cuenta ES91 2100 0418 4502 0005 1332' },
@@ -95,6 +95,14 @@
   ], 'ID_MARCA');
 
   /* ---------- seguimiento: tareas y reuniones, cada una con su ID ---------- */
+  // T0652 · El resumen de con quién es cada tarea (el mismo en Hoy y en Seguimiento). Lo hecho: lo cerrado y las notas.
+  var CONTEXTO_SEG = { campo: 'CON_QUIEN', notas: 'NOTAS', hecho: [{ o: [{ campo: 'ID_ESTADO', es: ['Hecha'] }, { campo: 'ID_TIPO', es: ['Nota'] }] }],
+    de: {
+      ID_MARCA: { tabla: 'MARCAS', seccion: 'clientes', sub: ['CIUDAD', 'QUE_FABRICAN'], chips: ['ID_FASE', { campo: 'ID_PRIORIDAD', antes: 'Prioridad' }], nota: 'NOTA',
+        lineas: [{ titulo: 'Buscan', tabla: 'NECESIDADES', campo: 'ID_MARCA', columnas: ['MATERIAL', { campo: 'PAGAN_HOY', antes: 'pagan hoy', despues: ' €/m' }, { campo: 'PRECIO_OBJETIVO', antes: 'objetivo', despues: ' €/m' }] },
+          { titulo: 'Hablar con', tabla: 'PERSONAS', campo: 'ID_MARCA', columnas: ['NOMBRE', 'CARGO', 'TELEFONO'] }] },
+      ID_PROVEEDOR: { tabla: 'PROVEEDORES', seccion: 'proveedores', sub: ['ZONA', 'QUE_TIENEN'], chips: ['ID_ESTADO', { campo: 'ID_PRIORIDAD', antes: 'Prioridad' }], nota: 'OJO',
+        lineas: [{ titulo: 'Hablar con', tabla: 'PERSONAS', campo: 'ID_PROVEEDOR', columnas: ['NOMBRE', 'CARGO', 'TELEFONO'] }] } } };
   var seg = [
     [dia(-9), 'Tarea', 'Clientes', 'Pendiente', 'Mandar la propuesta de lino lavado', 'Piden 3 colores y precio puesto en su taller de Valencia.', { ID_MARCA: 'M-001' }],
     [diaBarras(-4), 'Tarea', 'Proveedores', 'Esperando respuesta', 'Pedir la carta de colores del ikat', 'Escrito por WhatsApp; suelen tardar.', { ID_PROVEEDOR: 'P-002' }],
@@ -114,10 +122,15 @@
     [dia(-12), 'Tarea', 'Proveedores', 'Hecha', 'Pedir muestras de block print', '', { ID_PROVEEDOR: 'P-001' }],
     [diaBarras(-20), 'Reunión', 'Clientes', 'Hecha', 'Llamada de presentación', '', { ID_MARCA: 'M-002' }],
     [dia(-30), 'Tarea', 'Clientes', 'Descartada', 'Propuesta de jacquard', 'No les cuadra el pedido mínimo.', { ID_MARCA: 'M-005' }],
-    [dia(-6), 'Tarea', 'Proveedores', 'Hecha', 'Pedir muestras de rayas de telar', '', { ID_PROVEEDOR: 'P-003' }]
+    [dia(-6), 'Tarea', 'Proveedores', 'Hecha', 'Pedir muestras de rayas de telar', '', { ID_PROVEEDOR: 'P-003' }],
+    // T0643: una nota (sin estado: ni círculo ni «Pasar»), un próximo paso y una tarea con marca y sin área (como en su
+    // Excel: al guardar su ficha, el área se pone sola).
+    [dia(-3), 'Nota', 'Proveedores', '', 'El ikat destiñe un poco al lavarlo a 40°', '', { ID_PROVEEDOR: 'P-002' }],
+    [dia(1), 'Próximo paso', 'Clientes', 'Pendiente', 'Llamar para ver si les cuadra el precio', '', { ID_MARCA: 'M-002' }],
+    [dia(4), 'Tarea', '', 'Pendiente', 'Mandarles la carta de colores', '', { ID_MARCA: 'M-003' }]
   ];
   var SEGUIMIENTO = tabla(['ID', 'FECHA', 'ID_TIPO', 'ID_TEMA', 'ID_ESTADO', 'ID_FORMATO', 'DETALLE', 'NOTAS', 'ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO'], seg.map(function (r, i) {
-    var x = { ID: 'S-' + ('000' + (i + 2)).slice(-4), FECHA: r[0], ID_TIPO: idDe(TIPOS_SEGUIMIENTO, r[1]), ID_TEMA: te(r[2]), ID_ESTADO: et(r[3]), DETALLE: r[4], NOTAS: r[5] };
+    var x = { ID: 'S-' + ('000' + (i + 2)).slice(-4), FECHA: r[0], ID_TIPO: idDe(TIPOS_SEGUIMIENTO, r[1]), ID_TEMA: r[2] ? te(r[2]) : '', ID_ESTADO: r[3] ? et(r[3]) : '', DETALLE: r[4], NOTAS: r[5] };
     Object.keys(r[6]).forEach(function (k) { x[k] = r[6][k]; });
     return x;
   }));
@@ -256,7 +269,15 @@
         { id: 'ESPERANDO', titulo: 'Esperando respuesta hace días', texto: 'Para insistir.', nivel: 'medio', dias: 3, si: [{ campo: 'ID_ESTADO', es: 'Esperando respuesta' }, { campo: 'FECHA', hasta: '-dias' }] }
       ],
       EDITAR: ['FECHA', 'ID_TIPO', 'ID_ESTADO', 'ID_TEMA', 'ID_FORMATO', 'DETALLE', 'NOTAS', 'ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO'], CREAR: true,
-      NUEVA: { ID_ESTADO: 'Pendiente', ID_TIPO: 'Tarea', FECHA: 'hoy' }, OBLIGATORIAS: ['DETALLE', 'ID_ESTADO'], _refs: refsDesde('SEGUIMIENTO') }) },
+      NUEVA: { ID_ESTADO: 'Pendiente', ID_TIPO: 'Tarea', FECHA: 'hoy' }, OBLIGATORIAS: ['DETALLE', 'ID_ESTADO'],
+      // T0643: cerrar y pasar en un toque, el siguiente paso al cerrar con una marca o un proveedor, el alta con el texto primero y el área puesta sola.
+      RAPIDAS: { HECHA: { campo: 'ID_ESTADO', valor: 'Hecha' }, PASAR: 'FECHA', SI: [{ campo: 'ID_TIPO', no: ['Nota'] }, NO_HECHAS],
+        SIGUIENTE: { con: ['ID_MARCA', 'ID_PROVEEDOR'], copia: ['ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO', 'ID_TEMA'], pone: { ID_TIPO: 'Próximo paso', ID_ESTADO: 'Pendiente' } } },
+      ALTA: { campos: ['DETALLE', 'CON_QUIEN', 'FECHA', 'ID_TEMA'], mas: ['ID_TIPO', 'ID_FORMATO', 'NOTAS'] },
+      DEDUCIR: { ID_TEMA: { ID_MARCA: 'Clientes', ID_PROVEEDOR: 'Proveedores' } },
+      // T0652: el nombre de con quién es abre lo último con esa marca o ese proveedor, lo que queda y su ficha en dos líneas.
+      CONTEXTO: CONTEXTO_SEG,
+      _refs: refsDesde('SEGUIMIENTO') }) },
 
     clientes: { modulo: 'listado', titulo: 'Clientes', icono: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.6.9 2.6 2.6 3 5.2"/>', config: mezcla(COMUN, {
       TABLA: 'MARCAS', CODIGO: 'ID', NOMBRE: 'NOMBRE', ORDEN: 'NOMBRE', TEXTO: 'Las marcas: las que ya son clientes y las de prospección, según su fase.', FILAS: ['cliente', 'clientes'],

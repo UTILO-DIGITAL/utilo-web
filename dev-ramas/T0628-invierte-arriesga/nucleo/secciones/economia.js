@@ -26,7 +26,7 @@
  *             de lo real del periodo anterior (por MEDIDAS, si las hay) y confirmación; los demás solo lo miran.
  *   Ventas    T0628 · con VENTAS (la tabla del desglose): cada venta, de que la marca la pide a que la paga, con sus
  *             movimientos (los que la eligen). Arriba, lo que tiene en juego (pagado y sin cobrar), lo ganado en las cobradas
- *             (avisa de la que queda bajo MARGEN_MINIMO) y lo que falta por recuperar de lo invertido (los gastos sin venta);
+ *             (en euros; con MARGEN_MINIMO, también el % y el aviso de la que queda por debajo) y lo que falta por recuperar de lo invertido (los gastos sin venta);
  *             cada cifra se toca y dice de dónde sale. Cada venta abre sus pasos, sus cuentas y sus movimientos, y se da de
  *             alta y se cambia aquí. Desde el principio, no por periodo; sin IVA.
  *
@@ -1819,7 +1819,7 @@
             '<table class="u-tabla eco-tabla"><thead><tr><th>Venta</th><th class="num">Has ganado</th></tr></thead><tbody>' + V.cobradas.map(function (x) {
               return '<tr tabindex="0" data-venta="' + texto(x.v.ID) + '"><td class="u-tabla-t">' + texto(nombreVenta(x.v)) + '<span class="eco-paso">' + pasoTxt(x) + '</span></td>' +
                 '<td class="num"><span class="u-cifra' + (x.ganado < 0 ? ' u-mal' : x.bajo ? '' : ' eco-bien') + '">' + eur0(x.ganado) + '</span>' +
-                (x.margen !== null ? '<div class="u-nota' + (x.bajo ? ' u-mal' : '') + '">' + pc(x.margen) + (x.bajo ? ': por debajo del ' + pc(m) : '') + '</div>' : '') + '</td></tr>';
+                (m && x.margen !== null ? '<div class="u-nota' + (x.bajo ? ' u-mal' : '') + '">' + pc(x.margen) + (x.bajo ? ': por debajo del ' + pc(m) : '') + '</div>' : '') + '</td></tr>';
             }).join('') + '</tbody></table>';
         }
         return h + '<p class="u-nota">Toca una venta para ver sus cuentas y sus movimientos.</p>';
@@ -1849,12 +1849,12 @@
             V.cobradas.map(function (x) {
               return '<tr><td class="u-tabla-t">' + texto(nombreVenta(x.v)) + '<div class="u-nota">' + (x.pagado ? 'Costó ' + costesTxt(x) : 'Sin gastos apuntados') +
                 '<span class="u-solo-movil"> · te pagó ' + eur0(x.cobrado) + '</span></div></td><td class="num u-solo-ancho">' + eur0(x.cobrado) + '</td><td class="num u-solo-ancho">' + eur0(x.pagado) + '</td>' +
-                '<td class="num">' + eur0(x.ganado) + (x.margen !== null ? '<div class="u-nota' + (x.bajo ? ' u-mal' : '') + '">' + pc(x.margen) + '</div>' : '') + '</td></tr>';
+                '<td class="num">' + eur0(x.ganado) + (m && x.margen !== null ? '<div class="u-nota' + (x.bajo ? ' u-mal' : '') + '">' + pc(x.margen) + '</div>' : '') + '</td></tr>';
             }).join('') + '<tr class="eco-total"><td class="u-tabla-t">Total</td><td class="num u-solo-ancho">' + eur0(V.cobradas.reduce(function (s, x) { return s + x.cobrado; }, 0)) + '</td>' +
             '<td class="num u-solo-ancho">' + eur0(V.cobradas.reduce(function (s, x) { return s + x.pagado; }, 0)) + '</td><td class="num">' + eur0(V.ganado) + '</td></tr></tbody></table>' +
-            '<p class="u-nota"><b>El %</b> es lo que ganas sobre lo que te cuesta' + (bajo ? ': en ' + texto(nombreVenta(bajo.v)) + ', ' + eur0(bajo.ganado) + ' sobre ' + eur0(bajo.pagado) + ' es un ' + pc(bajo.margen) + '.' : '.') +
-            (m ? ' <b>Tu mínimo es el ' + pc(m) + '</b>' + (bajo ? '; para llegar, esa venta tendría que haber sido de ' + eur(bajo.paraMinimo) + ' en lugar de ' + eur(bajo.cobrado) + '.' : ', y todas llegan.') :
-              ' Sin un margen mínimo apuntado no te avisa de la que se quede corta.') + '</p></div>';
+            (m ? '<p class="u-nota"><b>El %</b> es lo que ganas sobre lo que te cuesta' + (bajo ? ': en ' + texto(nombreVenta(bajo.v)) + ', ' + eur0(bajo.ganado) + ' sobre ' + eur0(bajo.pagado) + ' es un ' + pc(bajo.margen) + '.' : '.') +
+              ' <b>Tu mínimo es el ' + pc(m) + '</b>' + (bajo ? '; para llegar, esa venta tendría que haber sido de ' + eur(bajo.paraMinimo) + ' en lugar de ' + eur(bajo.cobrado) + '.' : ', y todas llegan.') + '</p>' :
+              '<p class="u-nota">Lo que ganas en cada venta es lo que te paga la marca menos lo que te cuesta (taller, envío, aduanas…).</p>') + '</div>';
         }
         h += (V.falta > 0 ? 'Te falta por recuperar: ' + eur0(V.falta) : 'Lo invertido: ' + eur0(V.invertido)) + cerrarB +
           '<p class="u-nota"><b>Lo invertido</b> son los gastos que no son de ninguna venta: lo que cuesta montar y mover el negocio. Se recupera con lo que ganas en las ventas.</p>';
@@ -1870,7 +1870,7 @@
       /** Una venta por dentro: dónde está, sus cuentas y sus movimientos. */
       function htmlVenta(v) {
         var m = minimo(), x = venta(d, v, DS, m), c = v.ID_CONTRAPARTE ? nombre('ctr', v.ID_CONTRAPARTE) : 'La marca';
-        var sub = x.cobrada ? 'Te pagó ' + eur0(x.cobrado) + ' y te costó ' + eur0(x.pagado) + (x.margen !== null ? ': un ' + pc(x.margen) + ' sobre lo que te costó.' : '.') +
+        var sub = x.cobrada ? 'Te pagó ' + eur0(x.cobrado) + ' y te costó ' + eur0(x.pagado) + (m && x.margen !== null ? ': un ' + pc(x.margen) + ' sobre lo que te costó.' : '.') +
             (x.bajo ? ' <b>Por debajo de tu mínimo del ' + pc(m) + '</b>: para llegar, ' + eur(x.paraMinimo) + '.' : '') :
           'Has pagado ' + eur0(x.pagado) + ' y ' + texto(c) + ' te ha pagado ' + eur0(x.cobrado) + '. ' +
             (x.debe === null ? 'Aún sin precio cerrado: apunta lo que paga la marca en «Editar la venta».' :
@@ -1889,7 +1889,7 @@
           '<tr><td class="u-tabla-t">Lo que paga la marca<div class="u-nota">' + (x.importe === null ? 'Sin precio cerrado' : 'Te ha pagado ' + eur0(x.cobrado)) + '</div></td><td class="num">' + (x.importe === null ? '—' : eur0(x.importe)) + '</td></tr>' +
           x.costes.map(function (k) { return '<tr><td class="u-tabla-t">' + texto(k.nombre) + '</td><td class="num">− ' + eur0(k.base) + '</td></tr>'; }).join('') +
           (x.importe === null ? '' : '<tr class="eco-total"><td class="u-tabla-t">' + (x.cobrada ? 'Has ganado' : 'Ganarás, si no hay más gastos') +
-            (x.pagado ? '<div class="u-nota">' + pc(gan / x.pagado) + ' sobre lo que te cuesta</div>' : '') + '</td><td class="num"><span class="u-cifra' +
+            (m && x.pagado ? '<div class="u-nota">' + pc(gan / x.pagado) + ' sobre lo que te cuesta</div>' : '') + '</td><td class="num"><span class="u-cifra' +
             (gan < 0 ? ' u-mal' : ' eco-bien') + '">' + eur0(gan) + '</span></td></tr>') +
           '</tbody></table><p class="u-nota">Sin IVA.' + (x.anticipo ? ' Anticipo pactado: ' + pc(x.anticipo) + (x.importe !== null ? ' (' + eur0(Math.round(x.importe * x.anticipo)) + ')' : '') + '.' : '') + '</p>';
         h += '<h2 class="n-grupo">Sus movimientos</h2>' + (x.movs.length ? '<table class="u-tabla eco-tabla"><thead><tr><th>Movimiento</th><th class="num u-solo-ancho">Cuenta</th><th class="num">Importe</th></tr></thead><tbody>' +

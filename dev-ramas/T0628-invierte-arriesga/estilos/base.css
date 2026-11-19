@@ -2226,6 +2226,7 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .eco-lin textarea { resize: none; overflow: hidden; line-height: 1.35; }
 
 /* T0653 · Calcular precio (Telas): datos a la izquierda; el precio y lo que paga hoy la marca a la derecha (debajo en el móvil). */
+.u .pr-caja.u-campos { grid-template-columns: 1fr; } /* T0657: los datos, siempre uno debajo de otro (a 600-820 px, u-campos los partía en dos) */
 .u .pr-calc { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--e4); align-items: start; }
 .u .pr-lado { display: grid; gap: var(--e4); min-width: 0; }
 .u .pr-caja { background: var(--color-superficie); border: 1px solid var(--color-linea); border-radius: var(--radio); padding: var(--e4); display: grid; gap: var(--e2); align-content: start; min-width: 0; }
@@ -2260,3 +2261,87 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .pr-otras summary { cursor: pointer; font-size: 13.5px; color: var(--color-principal-oscuro); padding-top: var(--e1); }
 @media (max-width: 820px) { .u .pr-calc { grid-template-columns: 1fr; } }
 @media (max-width: 420px) { .u .pr-par { grid-template-columns: 1fr; } .u .pr-o { display: none; } }
+/* T0643 · Sección Listado: cerrar, pasar y apuntar en un toque. El círculo cierra una fila (como en una lista de tareas) y
+   «Pasar» la lleva a otro día; en el móvil, los dos van encima de la tarjeta (no dentro: un botón no va dentro de otro). */
+.u .li-circ { width: 26px; height: 26px; flex: none; padding: 0; border-radius: 50%; border: 1.5px solid var(--color-suave); background: var(--color-superficie);
+  color: transparent; display: inline-grid; place-items: center; cursor: pointer; }
+.u .li-circ .u-icono { width: 16px; height: 16px; }
+.u .li-circ:hover, .u .li-circ:focus-visible { border-color: var(--color-bien); color: var(--color-bien); background: color-mix(in srgb, var(--color-bien) 10%, var(--color-superficie)); }
+.u .li-pasar { min-height: 32px; padding: 0 var(--e2); font-size: 14px; gap: var(--e1); white-space: nowrap; }
+.u .li-pasar .u-icono { width: 16px; height: 16px; }
+.u .u-tabla th.li-td-ci, .u .u-tabla td.li-td-ci { width: 1%; padding-right: 0; }
+.u .u-tabla td.li-td-ci { vertical-align: top; }
+.u .u-tabla th.li-td-pa, .u .u-tabla td.li-td-pa { width: 1%; white-space: nowrap; text-align: right; }
+.u .li-t-rap { position: relative; }
+.u .li-t-rap .li-circ { position: absolute; left: var(--e3); top: var(--e3); width: 30px; height: 30px; z-index: 1; }
+.u .li-t-rap .li-pasar { position: absolute; right: var(--e2); top: var(--e2); z-index: 1; }
+.u .li-t-ci .li-tarjeta { padding-left: calc(var(--e3) * 2 + 30px); }
+.u .li-t-pa .li-tarjeta > strong, .u .li-t-pa .li-t-txt > strong { padding-right: 84px; } /* solo el título deja sitio a «Pasar»; el resto, el ancho entero */
+.u .li-menu { position: fixed; z-index: 70; display: grid; min-width: 200px; padding: var(--e1); background: var(--color-superficie);
+  border: 1px solid var(--color-linea); border-radius: var(--radio); box-shadow: var(--sombra-flota, 0 6px 18px rgba(0, 0, 0, .15)); }
+.u .li-menu button { display: flex; justify-content: space-between; gap: var(--e3); align-items: baseline; text-align: left; border: 0; background: none;
+  padding: var(--e2) var(--e3); border-radius: var(--radio-peq); font: 400 15px/1.3 var(--fuente-texto); color: var(--color-texto); cursor: pointer; }
+.u .li-menu button:hover, .u .li-menu button:focus-visible { background: var(--color-bloque); }
+.u .li-menu small, .u .li-dia small { color: var(--color-suave); font-size: 13px; }
+.u .li-deshacer { display: flex; align-items: center; gap: var(--e3); }
+.u .li-deshacer[hidden] { display: none; }
+.u .li-deshacer button { border: 0; background: none; color: inherit; font: 700 15px/1 var(--fuente-texto); text-decoration: underline; text-underline-offset: 3px; padding: var(--e1); cursor: pointer; }
+/* Ficha: cerrarla o pasarla, arriba. */
+.u .li-rapidas { display: flex; flex-wrap: wrap; gap: var(--e2); padding-bottom: var(--e3); border-bottom: 1px solid var(--color-linea); }
+.u .li-r-hecha { color: var(--color-bien); border-color: color-mix(in srgb, var(--color-bien) 40%, var(--color-superficie)); }
+.u .li-r-hecha .u-icono { width: 18px; height: 18px; }
+/* El siguiente paso, al cerrar. */
+.u .li-sig-ok { margin: 0; display: flex; align-items: center; gap: var(--e1); color: var(--color-bien); font-weight: 600; overflow-wrap: anywhere; }
+.u .li-sig-ok .u-icono { width: 18px; height: 18px; flex: none; }
+/* Días de un toque (el siguiente paso y la fecha del alta). */
+.u .li-dias { border: 0; padding: 0; margin: 0; }
+.u .li-dias > div, .u div.li-dias { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e2); margin-top: var(--e1); }
+.u .li-dia { border: 1px solid var(--color-linea); background: var(--color-superficie); color: var(--color-texto); border-radius: 999px; min-height: 34px;
+  padding: 0 var(--e3); font: 400 14px/1 var(--fuente-texto); cursor: pointer; }
+.u .li-dia[aria-pressed="true"] { background: var(--color-principal-oscuro); border-color: var(--color-principal-oscuro); color: var(--color-sobre-principal, #fff); }
+.u .li-dia[aria-pressed="true"] small { color: inherit; }
+/* El alta: lo de más, plegado. */
+.u .li-mas { border-top: 1px dashed var(--color-linea); padding-top: var(--e3); }
+.u .li-mas summary { cursor: pointer; color: var(--color-principal-oscuro); font-weight: 600; }
+.u .li-mas > .u-campos { margin-top: var(--e3); }
+/* T0652 · Sección Listado: el resumen de con quién es una tarea (lo último que se hizo con el cliente, lo que queda y su
+   ficha en dos líneas), sin salir de la lista. Al lado en el ordenador; desde abajo en el móvil. */
+.u .li-ctx-b { border: 0; background: none; padding: 2px var(--e1); margin: -2px calc(var(--e1) * -1); border-radius: var(--radio-peq); font: inherit; color: var(--color-principal-oscuro);
+  font-weight: 600; text-align: left; cursor: pointer; }
+.u .li-ctx-b:hover, .u .li-ctx-b:focus-visible, .u .li-ctx-b[aria-expanded="true"] { background: var(--color-bloque); }
+.u .li-ctx-b > span[aria-hidden] { font-weight: 400; opacity: .7; }
+.u .li-t-ctx .li-tarjeta { padding-bottom: calc(var(--e3) + 30px); }
+.u .li-t-ctx > .li-ctx-b { position: absolute; left: calc(var(--e3) + var(--e1)); bottom: var(--e2); z-index: 1; font-size: 14px; }
+.u .li-t-ci.li-t-ctx > .li-ctx-b { left: calc(var(--e3) * 2 + 30px + var(--e1)); }
+.u .li-ctx { position: fixed; z-index: 55; top: var(--tope, 0px); right: 0; bottom: 0; width: min(380px, 100%); overflow-y: auto; display: grid; align-content: start;
+  gap: var(--e3); padding: var(--e4, 20px) var(--e4, 20px) calc(var(--e4, 20px) + env(safe-area-inset-bottom, 0px)); background: var(--color-superficie);
+  border-left: 1px solid var(--color-linea); box-shadow: var(--sombra-flota); }
+.u .li-ctx[hidden] { display: none; }
+@media (max-width: 639px) {
+  .u .li-ctx { top: auto; left: 0; width: 100%; max-height: 80vh; border-left: 0; border-top: 1px solid var(--color-linea); border-radius: var(--radio) var(--radio) 0 0;
+    padding-left: max(var(--e3), env(safe-area-inset-left, 0px)); padding-right: max(var(--e3), env(safe-area-inset-right, 0px)); }
+}
+.u .li-ctx-cab { display: flex; gap: var(--e2); align-items: flex-start; justify-content: space-between; }
+.u .li-ctx-cab h2 { margin: 0; font-size: 20px; }
+.u .li-ctx-cab h2:focus { outline: none; }
+.u .li-ctx-sub { margin: 2px 0 0; color: var(--color-suave); font-size: 14px; }
+.u .li-ctx-chips { display: flex; flex-wrap: wrap; gap: var(--e1); margin: 0; }
+.u .li-ctx-nota { margin: 0; }
+.u .li-ctx-bl { display: grid; gap: var(--e1); }
+.u .li-ctx-bl h4 { margin: 0; }
+.u .li-ctx-bl .u-nota { margin: 0; }
+.u .li-ctx-l { list-style: none; margin: 0; padding: 0; display: grid; }
+.u .li-ctx-ev { width: 100%; display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: var(--e2); align-items: start; text-align: left; border: 0; background: none;
+  padding: var(--e1); margin: 0 calc(var(--e1) * -1); border-radius: var(--radio-peq); font: 400 15px/1.35 var(--fuente-texto); color: var(--color-texto); cursor: pointer; }
+.u .li-ctx-ev:hover, .u .li-ctx-ev:focus-visible { background: var(--color-bloque); }
+.u .li-ctx-f { color: var(--color-suave); font-size: 13px; font-variant-numeric: tabular-nums; padding-top: 2px; }
+.u .li-ctx-q { min-width: 0; overflow-wrap: anywhere; }
+.u .li-ctx-q small { display: block; color: var(--color-suave); font-size: 13px; }
+.u .li-ctx-q small.li-ctx-tarde { color: var(--color-vencido); font-weight: 600; }
+.u .li-ctx-ok { display: inline-flex; vertical-align: -3px; margin-right: 4px; color: var(--color-bien); }
+.u .li-ctx-ok .u-icono { width: 16px; height: 16px; }
+.u .li-ctx-lin { margin: 0; overflow-wrap: anywhere; }
+.u .li-ctx-lin .u-etiqueta { display: inline; margin-right: var(--e1); }
+.u .li-ctx-ir { text-decoration: none; }
+.u .li-ctx-ficha { display: grid; gap: var(--e2); }
+.u .li-ctx-ficha .li-fg-t { margin-bottom: 0; }
