@@ -203,6 +203,29 @@ body.u { margin: 0; background: var(--color-fondo); color: var(--color-texto);
 .sx.u-sx a[data-sx=BANDEJA] { position: relative; }
 .sx.u-sx a .bj-n { position: absolute; top: 4px; left: calc(50% + 6px); min-width: 18px; margin: 0; padding: 0 5px; font-size: 11px; line-height: 18px; }
 body.u-con-barra { padding-bottom: calc(var(--alto-barra) + var(--e1) + env(safe-area-inset-bottom, 0px)) !important; }
+/* T0629: en el móvil, como mucho 5 botones abajo. Con más secciones, «Más» (.sx-mas) abre las demás (.sx-resto) en una lista
+   encima de la barra; marcado (.sx-dentro) si la sección abierta está dentro. Los nombres van en una línea. */
+@media (max-width: 899px) {
+  .sx.u-sx a, .sx.u-sx .sx-mas { min-width: 0; }
+  .sx.u-sx a > span, .sx.u-sx .sx-mas > span:not(.bj-n) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sx.u-sx .sx-mas { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; position: relative;
+    min-height: 56px; padding: var(--e1) 2px; border: 0; border-top: 3px solid transparent; background: transparent; color: var(--color-suave);
+    font: 700 12px/1.2 var(--fuente-texto); cursor: pointer; }
+  .sx.u-sx .sx-mas.sx-dentro, .sx.u-sx .sx-mas[aria-expanded=true] { color: var(--color-principal-oscuro); }
+  .sx.u-sx .sx-mas.sx-dentro { border-top-color: var(--color-principal); }
+  .sx.u-sx .sx-mas:focus-visible { outline: 3px solid var(--color-principal-oscuro); outline-offset: -3px; }
+  .sx.u-sx .sx-mas svg { fill: currentColor; stroke: none; }
+  .sx.u-sx .sx-mas .bj-n { position: absolute; top: 4px; left: calc(50% + 6px); min-width: 18px; margin: 0; padding: 0 5px; font-size: 11px; line-height: 18px; }
+  .sx.u-sx .sx-resto { display: none; position: absolute; left: 0; right: 0; bottom: 100%; max-height: calc(100vh - var(--alto-barra) - 96px); overflow-y: auto;
+    padding: var(--e2) env(safe-area-inset-right, 0px) var(--e2) env(safe-area-inset-left, 0px); background: var(--color-fondo);
+    border-top: 1px solid var(--color-linea); box-shadow: 0 -8px 24px rgba(0, 0, 0, .12); }
+  .sx.u-sx.sx-abierto .sx-resto { display: block; }
+  .sx.u-sx .sx-resto a { flex-direction: row; justify-content: flex-start; gap: var(--e3); max-width: 640px; min-height: 48px; margin: 0 auto;
+    padding: 0 var(--e4); border-top: 0; border-left: 3px solid transparent; font-size: 15px; color: var(--color-texto); }
+  .sx.u-sx .sx-resto a[aria-current=page] { color: var(--color-principal-oscuro); border-left-color: var(--color-principal); background: var(--color-bloque); }
+  .sx.u-sx .sx-resto a .bj-n { position: static; margin-left: auto; }
+}
+@media (min-width: 900px) { .sx.u-sx .sx-resto { display: contents; } .sx.u-sx .sx-mas { display: none; } }
 /* T0224: en el móvil la página (html) no se mueve y el scroll lo hace el body. Así iOS no desplaza la barra fija con el
    rebote ni al esconder sus barras, y lo que va debajo de la barra nunca se queda a la vista. */
 @media (max-width: 899px) {
@@ -322,6 +345,12 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .n-ventana h2 { font-size: 20px; }
 .u .n-ventana textarea { width: 100%; }
 .u .n-botones { display: flex; flex-wrap: wrap; gap: var(--e2); }
+/* T0639 · El aviso del proyecto (nucleo.aviso): una línea arriba del panel, en todas las secciones; no se queda fija. */
+.u .n-aviso-app { display: flex; align-items: flex-start; gap: var(--e2); margin: 0; padding: var(--e2) var(--e4);
+  background: var(--color-pendiente-fondo); color: var(--color-texto); border-bottom: 1px solid var(--color-linea); font-size: 14px; line-height: 1.35; }
+.u .n-aviso-app svg { flex: none; width: 18px; height: 18px; margin-top: 1px; fill: none; stroke: var(--color-pendiente); stroke-width: 2; stroke-linecap: round; }
+.u .n-aviso-app span { min-width: 0; overflow-wrap: anywhere; }
+@media (min-width: 900px) { .u .n-aviso-app { padding-left: var(--e5); padding-right: var(--e5); } }
 /* T0273 · Viendo como otra persona: la franja de arriba, siempre a la vista, también con una ventana abierta (va por encima
  * de los velos, y --tope, su alto, baja lo que se queda fijo arriba: cabeceras de tabla, barras y ventanas), y la lista de
  * la ventana para elegir a quién. */
@@ -1026,6 +1055,36 @@ body.u-con-barra .rp-toast { bottom: calc(var(--alto-barra, 64px) + var(--e2) + 
 .u #p-lista input { text-align: right; font-variant-numeric: tabular-nums; }
 /* Abrir una factura en Drive (enlace que se abre en otra pestaña) */
 .u .eco-drive { font-weight: 700; white-space: nowrap; }
+/* T0627 · Las líneas de una factura emitida (FACTURA_LINEAS): qué se vende y su detalle, a lo ancho; debajo, la
+   cantidad, la unidad, el precio, «IVA incl.» (su precio ya lleva el IVA), el importe y quitar. */
+.u .eco-lin { display: grid; grid-template-columns: 4.5em 3.2em minmax(5em, 1fr) auto auto auto; gap: var(--e2); align-items: center; padding: var(--e2) 0 var(--e3); border-bottom: 1px solid var(--color-linea); }
+.u .eco-lin input { min-width: 0; }
+.u .eco-lin-c { grid-column: 1 / -1; font-weight: 600; }
+.u .eco-lin-d { grid-column: 1 / -1; }
+.u .eco-lin-iva { display: flex; align-items: center; gap: var(--e1); font-size: 13px; white-space: nowrap; cursor: pointer; }
+.u .eco-lin-t { text-align: right; font-weight: 600; white-space: nowrap; font-size: 14px; min-width: 6.5em; }
+.u .eco-lin-x { min-height: 0; padding: 0 var(--e1); }
+.u .eco-calculada input { background: var(--color-bloque); }
+@media (max-width: 640px) {
+  .u .eco-lin { grid-template-columns: 4.5em 3.2em minmax(0, 1fr) auto; }
+  .u .eco-lin-t { grid-column: 1 / 3; text-align: left; }
+}
+/* T0627 · La vista previa de una factura: flotante, encima de todo, con la hoja (que lleva la marca BORRADOR) a la vista. */
+.u .eco-previa { position: fixed; inset: 0; z-index: 1000; background: rgba(0, 0, 0, .55); display: flex; align-items: center; justify-content: center; padding: var(--e3); }
+.u .eco-previa-caja { background: var(--color-superficie); border-radius: var(--radio); width: min(860px, 100%); height: min(94vh, 1180px); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px rgba(0, 0, 0, .3); }
+.u .eco-previa-cab { display: flex; justify-content: space-between; align-items: center; gap: var(--e3); padding: var(--e2) var(--e3); border-bottom: 1px solid var(--color-linea); }
+.u .eco-previa-hoja { flex: 1; background: #e8e5df; overflow: auto; display: flex; justify-content: center; }
+.u .eco-previa-hoja { align-items: flex-start; }
+.u .eco-previa-hoja iframe { border: 0; width: 794px; height: 1123px; flex: none; background: #fff; margin: var(--e2) 0; box-shadow: 0 2px 12px rgba(0, 0, 0, .15); }
+.u .eco-falta { color: var(--color-vencido); font-weight: 600; }
+/* T0627 · El total de la factura a la vista mientras se hace: base, IVA y el total en grande. */
+.u .eco-tot { margin-top: var(--e2); border: 1px solid var(--color-linea); border-radius: var(--radio); overflow: hidden; color: var(--color-texto); font-size: 15px; }
+.u .eco-tot > div { display: flex; justify-content: space-between; gap: var(--e3); padding: var(--e2) var(--e3); }
+.u .eco-tot > div > span:last-child { font-variant-numeric: tabular-nums; }
+.u .eco-tot .eco-tot-total { background: var(--color-principal); color: var(--color-sobre-principal); font-size: 19px; font-weight: 700; }
+/* T0627 · El número de una factura emitida, que pone la app: como texto, sin caja (no parece que se pueda escribir). */
+.u .eco-numero input:disabled { border-color: transparent; background: transparent; padding-left: 0; opacity: 1; color: var(--color-texto); -webkit-text-fill-color: var(--color-texto); font-weight: 600; box-shadow: none; }
+.u .eco-numero input:disabled::placeholder { color: var(--color-suave); -webkit-text-fill-color: var(--color-suave); font-weight: 400; font-style: italic; }
 /* Añadir movimiento: lo único que flota en la sección, abajo a la derecha, encima de la barra de secciones del móvil */
 .u .eco-fab { position: fixed; right: var(--e4); bottom: calc(var(--e4) + env(safe-area-inset-bottom, 0px)); z-index: 44; min-height: 52px; padding: 0 var(--e5);
   border: 0; border-radius: var(--radio); background: var(--color-accion); color: var(--color-sobre-accion); font: 800 17px/1 var(--fuente-texto); box-shadow: var(--sombra-flota); cursor: pointer; }
@@ -1959,8 +2018,9 @@ html .u .u-velo, html .u .gs5 .gs-velo, html .u #alta-velo, html .u .ver-velo, h
 body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 
 /* ---------- T0599 · Sección Listado (nucleo/secciones/listado.js): listado con ficha y avisos, configurable ----------
- * Los niveles de los avisos y de los estados usan los colores funcionales de los estados del kanban:
- * alto = Bloqueada (rojo), medio = Pendiente de revisión (ámbar), info = En curso (azul), bien = Completada, apagado = suave. */
+ * T0624 · Una señal por cosa. El color de un aviso sale solo en la franja de la fila, en su fecha y en el número de su botón:
+ * alto = vencido (--color-vencido: rojo; en Telas, teja), medio = pendiente (--color-pendiente: ámbar; en Telas, ocre),
+ * info = azul de En curso (sin franja). Los botones de aviso, las etiquetas de estado y las marcas de cada fila, neutros. */
 .u .li-arriba { display: flex; align-items: flex-end; gap: var(--e2); margin: 0 0 var(--e3); }
 .u .li-pers { flex: none; text-decoration: none; }
 .u .li-n { display: inline-block; min-width: 20px; padding: 0 var(--e1); margin-left: var(--e1); border-radius: 999px; text-align: center;
@@ -1971,11 +2031,13 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
   background: color-mix(in srgb, var(--estado-ec) 10%, var(--color-superficie)); border-left: 4px solid var(--estado-ec); }
 .u .li-avisos { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); margin: 0 0 var(--e3); }
 .u .li-av { min-height: 36px; padding: 0 var(--e3); border-radius: var(--radio); cursor: pointer; text-align: left;
-  border: 1.5px solid var(--li-c, var(--estado-pr)); background: color-mix(in srgb, var(--li-c, var(--estado-pr)) 9%, var(--color-superficie)); color: var(--color-texto); font: 600 14px/1.2 var(--fuente-texto); }
-.u .li-av b { color: var(--li-c, var(--estado-pr)); font-variant-numeric: tabular-nums; }
-.u .li-av[aria-pressed=true] { background: var(--li-c, var(--estado-pr)); color: #fff; }
-.u .li-av[aria-pressed=true] b { color: #fff; }
-.u .li-alto { --li-c: var(--estado-bl); } .u .li-medio { --li-c: var(--estado-pr); } .u .li-info { --li-c: var(--estado-ec); }
+  border: 1px solid var(--color-borde-campo); background: var(--color-superficie); color: var(--color-texto); font: 600 14px/1.2 var(--fuente-texto); }
+.u .li-av b { color: var(--li-c, var(--color-pendiente)); font-variant-numeric: tabular-nums; }
+.u .li-av:hover { border-color: var(--li-c, var(--color-pendiente)); }
+.u .li-av[aria-pressed=true] { background: var(--li-fondo, var(--color-pendiente-fondo)); border: 1.5px solid var(--li-c, var(--color-pendiente)); }
+.u .li-alto { --li-c: var(--color-vencido); --li-fondo: var(--color-vencido-fondo); }
+.u .li-medio { --li-c: var(--color-pendiente); --li-fondo: var(--color-pendiente-fondo); }
+.u .li-info { --li-c: var(--estado-ec); --li-fondo: color-mix(in srgb, var(--estado-ec) 9%, #FFFFFF); }
 .u .li-bien { --li-c: var(--color-bien); } .u .li-apagado { --li-c: var(--color-suave); }
 .u .li-grupo { margin: 0 0 var(--e4); }
 .u .li-grupo .n-grupo { margin-top: var(--e3); }
@@ -1989,15 +2051,17 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-tabla tbody tr:last-child td { border-bottom: 0; }
 .u .li-tabla tbody:not(:last-child) tr:last-child td { border-bottom: 1px solid var(--color-linea); }
 .u .li-nada { color: var(--color-suave); }
-.u .li-estado { background: color-mix(in srgb, var(--li-c, var(--color-texto)) 12%, var(--color-superficie)); color: var(--color-texto);
-  border: 1px solid color-mix(in srgb, var(--li-c, var(--color-texto)) 45%, var(--color-superficie)); }
+.u .li-estado { background: var(--color-superficie); color: var(--color-texto); border: 1px solid color-mix(in srgb, var(--color-borde-campo) 45%, var(--color-superficie)); font-weight: 600; }
 .u .li-estado.li-apagado { color: var(--color-suave); }
-.u .li-aviso { display: inline-flex; align-items: center; gap: var(--e1); font: 700 12px/1.4 var(--fuente-texto); color: var(--li-c, var(--estado-pr)); margin-right: var(--e2); }
-.u .li-aviso::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--li-c, var(--estado-pr)); flex: none; }
+/* Los demás avisos de una fila, en palabras y sin color (la franja ya dice el más importante); en la ficha, con el suyo. */
+.u .li-aviso { display: inline-flex; align-items: center; font: 600 12px/1.4 var(--fuente-texto); color: var(--color-suave); margin-right: var(--e2); }
+.u .li-aviso + .li-aviso::before { content: "·"; margin-right: var(--e2); }
+.u .li-ficha-avisos .li-aviso { font-weight: 700; font-size: 13px; color: var(--li-c, var(--color-pendiente)); }
+.u .li-ficha-avisos .li-aviso + .li-aviso::before { color: var(--color-suave); }
 .u .li-marcas { margin-top: var(--e1); font-weight: 400; }
-.u .u-tabla tr.li-con-aviso td:first-child { box-shadow: inset 4px 0 0 var(--li-c, var(--estado-pr)); }
-.u .li-f-alto { --li-c: var(--estado-bl); --li-barra: var(--estado-bl); } .u .li-f-medio { --li-c: var(--estado-pr); --li-barra: var(--estado-pr); }
-.u .li-f-info { --li-c: var(--estado-ec); --li-barra: var(--estado-ec); }
+.u .li-fecha, .u .li-fecha .u-nota { color: var(--li-c); font-weight: 700; }
+.u .u-tabla tr.li-con-aviso td:first-child { box-shadow: inset 4px 0 0 var(--li-barra, transparent); }
+.u .li-f-alto { --li-barra: var(--color-vencido); } .u .li-f-medio { --li-barra: var(--color-pendiente); }
 .u .li-mini { width: 40px; height: 40px; border-radius: var(--radio-peq); object-fit: cover; display: block; border: 1px solid var(--color-linea); }
 .u .li-foto { width: 100%; max-width: 240px; aspect-ratio: 1; border-radius: var(--radio); object-fit: cover; display: block; border: 1px solid var(--color-linea); }
 .u .li-tarjetas { list-style: none; margin: 0; padding: 0; }
@@ -2008,6 +2072,19 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-tarjeta strong { font-weight: 700; display: flex; flex-direction: column; align-items: flex-start; gap: 0; } /* T0610: el código, encima del nombre */
 .u .li-det { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e3); font-size: 14px; color: var(--color-suave); }
 .u .li-det .li-mini { width: 32px; height: 32px; }
+/* T0633: en el móvil, la tarjeta con foto la lleva a la izquierda; sin foto, el hueco igual para que los nombres caigan en línea. */
+.u .li-tarjeta.li-con-foto { flex-direction: row; align-items: flex-start; gap: var(--e3); }
+.u .li-t-img { flex: none; width: 64px; height: 64px; border-radius: var(--radio-peq); }
+.u .li-t-vacia { background: var(--color-fondo); border: 1px solid var(--color-linea); }
+.u .li-t-txt { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: var(--e1); }
+/* T0633: una foto que no se puede ver (de Drive, sin compartir «con el enlace») dice por qué, en vez de dejar un hueco. */
+.u .li-nofoto { display: flex; align-items: center; justify-content: center; text-align: center; width: 40px; height: 40px;
+  border-radius: var(--radio-peq); border: 1px dashed var(--color-linea); background: var(--color-fondo); color: var(--color-suave);
+  font: 400 11px/1.15 var(--fuente-texto); white-space: normal; }
+.u .li-det .li-nofoto, .u .li-rel-f .li-nofoto { width: 32px; height: 32px; font-size: 9px; }
+.u .li-nofoto.li-t-img { width: 64px; height: 64px; font-size: 12px; }
+.u .li-nofoto.li-nofoto-g { width: auto; height: auto; max-width: 420px; justify-content: flex-start; text-align: left; padding: var(--e2) var(--e3);
+  border-radius: var(--radio); font-size: 14px; line-height: 1.4; margin-bottom: var(--e1); }
 .u .li-errores { margin: 0 0 var(--e3); border-left: 4px solid var(--estado-bl); font-size: 14px; }
 .u .li-errores ul { margin: var(--e1) 0 0; padding-left: var(--e4); }
 /* Ficha */
@@ -2065,9 +2142,55 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .u-tabla td.li-td-cod { width: 1%; white-space: nowrap; }
 .u .u-tabla td.li-td-corta { white-space: nowrap; }
 .u .li-ficha-cab h2 .li-cod { font-size: 14px; vertical-align: 3px; }
-.u .li-claude { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e3); margin-top: calc(var(--e2) * -1); }
+.u .li-claude { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e3); padding-top: var(--e3); border-top: 1px solid var(--color-linea); }
+/* T0630 · En la ficha, lo vacío de un apartado, junto en una línea («Sin rellenar: Formato · Notas»); lo que se edita se abre al tocarlo. */
+.u .li-vacios { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e1) var(--e2); margin: 0; font-size: 14px; color: var(--color-suave); }
+.u .li-vacios .u-etiqueta { color: var(--color-suave); margin-right: var(--e1); }
+.u .li-vacios .li-vacio:not(:last-child)::after { content: ' ·'; }
+.u .li-rellenar { min-height: 32px; padding: 0 var(--e2); border: 1px dashed var(--color-linea); border-radius: var(--radio-peq); background: none;
+  color: var(--color-principal-oscuro); font: 400 14px/1 var(--fuente-texto); cursor: pointer; }
+.u .li-rellenar::before { content: '+ '; }
+.u .li-rellenar:hover, .u .li-rellenar:focus-visible { border-style: solid; background: var(--color-superficie); }
 .u .li-claude .u-btn { min-height: 36px; font-size: 14px; padding: 0 var(--e3); }
 .u .li-volver { align-self: flex-start; padding-left: 0; text-decoration: none; margin-bottom: calc(var(--e3) * -1); }
 .u a.li-rel-f { text-decoration: none; }
 .u .li-rel-f .li-ir { margin-left: auto; font-weight: 700; color: var(--color-principal-oscuro); white-space: nowrap; }
 .u div.li-rel-f { cursor: default; }
+/* T0642 · Lo relacionado con cada dato y su título («Qué buscan»), «+ Nueva tarea» debajo y «Copiar para Claude» dentro de «Más». */
+.u .li-rel-datos + .li-rel-datos { margin-top: var(--e3); padding-top: var(--e3); border-top: 1px solid var(--color-linea); }
+.u .li-rel-nueva { margin-top: var(--e2); padding-left: 0; padding-right: 0; justify-content: flex-start; }
+.u .li-mas { border-top: 1px solid var(--color-linea); padding-top: var(--e2); }
+.u .li-mas > summary { cursor: pointer; min-height: 40px; display: flex; align-items: center; color: var(--color-suave); font-size: 14px; }
+.u .li-mas[open] .li-claude { border-top: 0; padding-top: var(--e1); }
+.u .li-accion-t { margin: var(--e1) 0 0; }
+/* T0625 · Filtrar en la sección Listado: el botón (con cuántos hay puestos), las etiquetas de los puestos, que se quitan con
+   su ✕ o todas con «Quitar filtros», y en el panel los rangos «de … a …» y «desde … hasta …». */
+.u .li-barra .li-filtrar { font-size: 15px; padding: 0 var(--e3); gap: var(--e1); }
+.u .li-filtrar[aria-pressed=true] { border-color: var(--color-principal-oscuro); color: var(--color-principal-oscuro); }
+.u .li-nf { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px;
+  background: var(--color-principal-oscuro); color: #fff; font: 700 13px/1 var(--fuente-texto); font-variant-numeric: tabular-nums; }
+.u .li-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); margin: calc(var(--e1) * -1) 0 var(--e3); }
+.u .li-fchip { display: inline-flex; align-items: center; gap: var(--e1); min-height: 36px; padding: 0 var(--e2) 0 var(--e3); border-radius: 18px; cursor: pointer;
+  border: 1.5px solid var(--color-principal-oscuro); background: color-mix(in srgb, var(--color-principal-oscuro) 8%, var(--color-superficie));
+  color: var(--color-texto); font: 600 14px/1.2 var(--fuente-texto); text-align: left; }
+.u .li-fchip .u-icono { width: 16px; height: 16px; flex: none; }
+.u .li-fchip:hover .u-icono { color: var(--color-principal-oscuro); }
+.u .li-filtros .li-fquitar { min-height: 36px; font-size: 14px; }
+.u fieldset.li-rango { border: 0; padding: 0; margin: 0; }
+.u .li-rango legend { padding: 0; margin-bottom: var(--e1); }
+.u .li-rango-c { display: flex; align-items: center; gap: var(--e2); }
+.u .li-rango-c input { flex: 1 1 0; min-width: 0; width: auto; }
+.u .li-rango-c .u-nota { margin: 0; white-space: nowrap; }
+@media (max-width: 639px) { .u .li-barra .li-filtrar { order: 2; } }
+/* T0635 · Elegir lo que se vende en una línea (Mis telas): la lista bajo el concepto y el precio recomendado. */
+.u .eco-lin-cw { grid-column: 1 / -1; position: relative; }
+.u .eco-lin-cw .eco-lin-c { width: 100%; }
+.u .eco-lin-op { position: absolute; left: 0; right: 0; top: 100%; z-index: 5; margin-top: 2px; background: var(--color-fondo); border: 1px solid var(--color-linea); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.12); overflow: hidden; }
+.u .eco-lin-o { display: flex; justify-content: space-between; align-items: baseline; gap: var(--e3); width: 100%; padding: var(--e2) var(--e3); border: 0; border-top: 1px solid var(--color-linea); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.u .eco-lin-o:first-child { border-top: 0; }
+.u .eco-lin-o:hover, .u .eco-lin-o-sel { background: color-mix(in srgb, var(--color-texto) 6%, var(--color-fondo)); }
+.u .eco-lin-oc { color: var(--color-suave); font-size: 13px; white-space: nowrap; }
+.u .eco-lin-op-p { white-space: nowrap; font-size: 14px; }
+.u .eco-lin-rec { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--color-suave); }
+.u .eco-lin-pon { min-height: 0; padding: 0 var(--e1); font-size: 13px; }
+.u .eco-lin textarea { resize: none; overflow: hidden; line-height: 1.35; }
