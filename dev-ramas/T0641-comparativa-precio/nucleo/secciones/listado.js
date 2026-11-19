@@ -992,7 +992,7 @@
       function tarjetas(r, otro, rs) {
         var tj = r.tarjeta, cmp = tj.comparar || {}, tits = cmp.titulos || [];
         var nada = function (t) { return t.indexOf('class="li-nada"') >= 0; };
-        return '<ul class="li-tarjetas">' + rs.map(function (x) {
+        return '<ul class="li-rt">' + rs.map(function (x) {
           var trozos = function (cs, cls) {
             var p = (cs || []).map(function (c) { var t = celda(otro, c, x, false); return nada(t) ? '' : '<span>' + t + '</span>'; }).join('');
             return p ? '<div class="' + cls + '">' + p + '</div>' : '';
@@ -1007,8 +1007,8 @@
             var cp = campo(otro, c), t = celda(otro, c, x, true);
             return nada(t) ? '' : '<div class="li-dato' + (cp.tipo === 'nota' ? ' u-ancho' : '') + '"><span class="u-etiqueta">' + texto(cp.titulo) + '</span><span class="li-valor">' + t + '</span></div>';
           }).join('');
-          var mas = cara || det ? '<details class="li-tarj-mas"><summary>' + texto(tj.verMas || 'Ver detalle') + '</summary>' + cara + (det ? '<div class="u-campos">' + det + '</div>' : '') + '</details>' : '';
-          return '<li class="li-tarj"><div class="li-tarj-t">' + celda(otro, tj.titulo || otro.nombre, x, false) + '</div>' + trozos(tj.linea, 'li-tarj-l') + trozos(tj.debajo, 'li-tarj-d') + mas + '</li>';
+          var mas = cara || det ? '<details class="li-rt-mas"><summary>' + texto(tj.verMas || 'Ver detalle') + '</summary>' + cara + (det ? '<div class="u-campos">' + det + '</div>' : '') + '</details>' : '';
+          return '<li class="li-rt-f"><div class="li-rt-t">' + celda(otro, tj.titulo || otro.nombre, x, false) + '</div>' + trozos(tj.linea, 'li-rt-l') + trozos(tj.debajo, 'li-rt-d') + mas + '</li>';
         }).join('') + '</ul>';
       }
       /** El nombre de una fila con su código delante (el de la tarea, para trabajarla en Claude). */

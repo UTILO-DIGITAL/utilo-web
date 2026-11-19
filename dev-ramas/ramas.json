@@ -1206,10 +1206,10 @@
    "tarea": "T0641",
    "titulo": "La ficha de cada marca enseña su comparativa y Mis telas lo que cuesta cada tela",
    "pr": 346,
-   "commit": "4d9fa0c",
-   "ultimo": "Merge remote-tracking branch 'origin/main' into T0641-comparativa-precio",
+   "commit": "9516c34",
+   "ultimo": "T0641: la Comparativa y lo que cuesta cada tela también en el ejemplo de DEV (dev/listado); clases li-rt (li-tarjetas ya era la lista del móvil)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T09:24:56.338Z",
+   "fecha": "2026-11-19T09:34:16.354Z",
    "toca": [
     "konamigas",
     "utilo"
