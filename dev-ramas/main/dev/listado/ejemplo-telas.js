@@ -56,7 +56,7 @@
   /* ---------- marcas (clientes y prospección juntos: ser cliente es la fase), proveedores y otros ---------- */
   var MARCAS = tabla(['ID', 'NOMBRE', 'ID_FASE', 'ID_TIPO_MARCA', 'ID_PRIORIDAD', 'ID_VIA', 'CIUDAD', 'DIRECCION', 'WEB', 'INSTAGRAM', 'QUE_FABRICAN', 'NOTA', 'NOTAS'], [
     { ID: 'M-001', NOMBRE: 'Casa Albero', ID_FASE: f('6 Propuesta enviada'), ID_TIPO_MARCA: 'TM01', ID_PRIORIDAD: 'PR01', ID_VIA: 'VI01', CIUDAD: 'Valencia', DIRECCION: 'Polígono Sur, nave 4 (Valencia)',
-      WEB: 'https://casaalbero.example', INSTAGRAM: '@casaalbero', QUE_FABRICAN: 'Sofás y cabeceros', NOTAS: 'Quieren ver colores tierra.' },
+      WEB: 'https://casaalbero.example', INSTAGRAM: '@casaalbero', QUE_FABRICAN: 'Sofás y cabeceros', NOTA: 'Quieren ver colores tierra.', NOTAS: 'Les gusta el lino lavado.' },
     { ID: 'M-002', NOMBRE: 'Nido Sur', ID_FASE: f('3 Reunión hecha'), ID_TIPO_MARCA: 'TM02', ID_PRIORIDAD: 'PR01', ID_VIA: 'VI02', CIUDAD: 'Sevilla', QUE_FABRICAN: 'Cojines y ropa de cama' },
     { ID: 'M-003', NOMBRE: 'Lumbre Estudio', ID_FASE: f('8 Primer pedido'), ID_TIPO_MARCA: 'TM01', ID_PRIORIDAD: 'PR01', ID_VIA: 'VI03', CIUDAD: 'Madrid', QUE_FABRICAN: 'Tapicería a medida',
       NOTAS: 'Pagan por transferencia a la cuenta ES91 2100 0418 4502 0005 1332' },
@@ -95,6 +95,14 @@
   ], 'ID_MARCA');
 
   /* ---------- seguimiento: tareas y reuniones, cada una con su ID ---------- */
+  // T0652 · El resumen de con quién es cada tarea (el mismo en Hoy y en Seguimiento). Lo hecho: lo cerrado y las notas.
+  var CONTEXTO_SEG = { campo: 'CON_QUIEN', notas: 'NOTAS', hecho: [{ o: [{ campo: 'ID_ESTADO', es: ['Hecha'] }, { campo: 'ID_TIPO', es: ['Nota'] }] }],
+    de: {
+      ID_MARCA: { tabla: 'MARCAS', seccion: 'clientes', sub: ['CIUDAD', 'QUE_FABRICAN'], chips: ['ID_FASE', { campo: 'ID_PRIORIDAD', antes: 'Prioridad' }], nota: 'NOTA',
+        lineas: [{ titulo: 'Buscan', tabla: 'NECESIDADES', campo: 'ID_MARCA', columnas: ['MATERIAL', { campo: 'PAGAN_HOY', antes: 'pagan hoy', despues: ' €/m' }, { campo: 'PRECIO_OBJETIVO', antes: 'objetivo', despues: ' €/m' }] },
+          { titulo: 'Hablar con', tabla: 'PERSONAS', campo: 'ID_MARCA', columnas: ['NOMBRE', 'CARGO', 'TELEFONO'] }] },
+      ID_PROVEEDOR: { tabla: 'PROVEEDORES', seccion: 'proveedores', sub: ['ZONA', 'QUE_TIENEN'], chips: ['ID_ESTADO', { campo: 'ID_PRIORIDAD', antes: 'Prioridad' }], nota: 'OJO',
+        lineas: [{ titulo: 'Hablar con', tabla: 'PERSONAS', campo: 'ID_PROVEEDOR', columnas: ['NOMBRE', 'CARGO', 'TELEFONO'] }] } } };
   var seg = [
     [dia(-9), 'Tarea', 'Clientes', 'Pendiente', 'Mandar la propuesta de lino lavado', 'Piden 3 colores y precio puesto en su taller de Valencia.', { ID_MARCA: 'M-001' }],
     [diaBarras(-4), 'Tarea', 'Proveedores', 'Esperando respuesta', 'Pedir la carta de colores del ikat', 'Escrito por WhatsApp; suelen tardar.', { ID_PROVEEDOR: 'P-002' }],
@@ -267,6 +275,8 @@
         SIGUIENTE: { con: ['ID_MARCA', 'ID_PROVEEDOR'], copia: ['ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO', 'ID_TEMA'], pone: { ID_TIPO: 'Próximo paso', ID_ESTADO: 'Pendiente' } } },
       ALTA: { campos: ['DETALLE', 'CON_QUIEN', 'FECHA', 'ID_TEMA'], mas: ['ID_TIPO', 'ID_FORMATO', 'NOTAS'] },
       DEDUCIR: { ID_TEMA: { ID_MARCA: 'Clientes', ID_PROVEEDOR: 'Proveedores' } },
+      // T0652: el nombre de con quién es abre lo último con esa marca o ese proveedor, lo que queda y su ficha en dos líneas.
+      CONTEXTO: CONTEXTO_SEG,
       _refs: refsDesde('SEGUIMIENTO') }) },
 
     clientes: { modulo: 'listado', titulo: 'Clientes', icono: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.6.9 2.6 2.6 3 5.2"/>', config: mezcla(COMUN, {

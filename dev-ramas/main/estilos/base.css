@@ -2289,3 +2289,44 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-mas { border-top: 1px dashed var(--color-linea); padding-top: var(--e3); }
 .u .li-mas summary { cursor: pointer; color: var(--color-principal-oscuro); font-weight: 600; }
 .u .li-mas > .u-campos { margin-top: var(--e3); }
+/* T0652 · Sección Listado: el resumen de con quién es una tarea (lo último que se hizo con el cliente, lo que queda y su
+   ficha en dos líneas), sin salir de la lista. Al lado en el ordenador; desde abajo en el móvil. */
+.u .li-ctx-b { border: 0; background: none; padding: 2px var(--e1); margin: -2px calc(var(--e1) * -1); border-radius: var(--radio-peq); font: inherit; color: var(--color-principal-oscuro);
+  font-weight: 600; text-align: left; cursor: pointer; }
+.u .li-ctx-b:hover, .u .li-ctx-b:focus-visible, .u .li-ctx-b[aria-expanded="true"] { background: var(--color-bloque); }
+.u .li-ctx-b > span[aria-hidden] { font-weight: 400; opacity: .7; }
+.u .li-t-ctx .li-tarjeta { padding-bottom: calc(var(--e3) + 30px); }
+.u .li-t-ctx > .li-ctx-b { position: absolute; left: calc(var(--e3) + var(--e1)); bottom: var(--e2); z-index: 1; font-size: 14px; }
+.u .li-t-ci.li-t-ctx > .li-ctx-b { left: calc(var(--e3) * 2 + 30px + var(--e1)); }
+.u .li-ctx { position: fixed; z-index: 55; top: var(--tope, 0px); right: 0; bottom: 0; width: min(380px, 100%); overflow-y: auto; display: grid; align-content: start;
+  gap: var(--e3); padding: var(--e4, 20px) var(--e4, 20px) calc(var(--e4, 20px) + env(safe-area-inset-bottom, 0px)); background: var(--color-superficie);
+  border-left: 1px solid var(--color-linea); box-shadow: var(--sombra-flota); }
+.u .li-ctx[hidden] { display: none; }
+@media (max-width: 639px) {
+  .u .li-ctx { top: auto; left: 0; width: 100%; max-height: 80vh; border-left: 0; border-top: 1px solid var(--color-linea); border-radius: var(--radio) var(--radio) 0 0;
+    padding-left: max(var(--e3), env(safe-area-inset-left, 0px)); padding-right: max(var(--e3), env(safe-area-inset-right, 0px)); }
+}
+.u .li-ctx-cab { display: flex; gap: var(--e2); align-items: flex-start; justify-content: space-between; }
+.u .li-ctx-cab h2 { margin: 0; font-size: 20px; }
+.u .li-ctx-cab h2:focus { outline: none; }
+.u .li-ctx-sub { margin: 2px 0 0; color: var(--color-suave); font-size: 14px; }
+.u .li-ctx-chips { display: flex; flex-wrap: wrap; gap: var(--e1); margin: 0; }
+.u .li-ctx-nota { margin: 0; }
+.u .li-ctx-bl { display: grid; gap: var(--e1); }
+.u .li-ctx-bl h4 { margin: 0; }
+.u .li-ctx-bl .u-nota { margin: 0; }
+.u .li-ctx-l { list-style: none; margin: 0; padding: 0; display: grid; }
+.u .li-ctx-ev { width: 100%; display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: var(--e2); align-items: start; text-align: left; border: 0; background: none;
+  padding: var(--e1); margin: 0 calc(var(--e1) * -1); border-radius: var(--radio-peq); font: 400 15px/1.35 var(--fuente-texto); color: var(--color-texto); cursor: pointer; }
+.u .li-ctx-ev:hover, .u .li-ctx-ev:focus-visible { background: var(--color-bloque); }
+.u .li-ctx-f { color: var(--color-suave); font-size: 13px; font-variant-numeric: tabular-nums; padding-top: 2px; }
+.u .li-ctx-q { min-width: 0; overflow-wrap: anywhere; }
+.u .li-ctx-q small { display: block; color: var(--color-suave); font-size: 13px; }
+.u .li-ctx-q small.li-ctx-tarde { color: var(--color-vencido); font-weight: 600; }
+.u .li-ctx-ok { display: inline-flex; vertical-align: -3px; margin-right: 4px; color: var(--color-bien); }
+.u .li-ctx-ok .u-icono { width: 16px; height: 16px; }
+.u .li-ctx-lin { margin: 0; overflow-wrap: anywhere; }
+.u .li-ctx-lin .u-etiqueta { display: inline; margin-right: var(--e1); }
+.u .li-ctx-ir { text-decoration: none; }
+.u .li-ctx-ficha { display: grid; gap: var(--e2); }
+.u .li-ctx-ficha .li-fg-t { margin-bottom: 0; }
