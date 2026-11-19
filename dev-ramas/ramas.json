@@ -1134,11 +1134,13 @@
    "tarea": "T0673",
    "titulo": "Facturas como tarjeta en el móvil, «Te cuesta …» al elegir la tela y el cliente una sola vez en Movimientos",
    "pr": null,
-   "commit": "bff1b1c",
-   "ultimo": "T0673: Facturas como tarjeta en el móvil, «Te cuesta …» al elegir la tela y el cliente una sola vez en Movimientos",
+   "commit": "1fc67575",
+   "ultimo": "T0673: El capital, aparte en Caja, y una venta pagada por adelantado no cuenta como ganada hasta pagar al taller",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T15:52:56.178Z",
-   "toca": [],
+   "fecha": "2026-11-19T16:12:34.116Z",
+   "toca": [
+    "telas"
+   ],
    "comun": true,
    "paginas": [
     {
@@ -1302,7 +1304,7 @@
        "nombre": "Admin"
       }
      ],
-     "cambia": false
+     "cambia": true
     }
    ],
    "migraciones": {

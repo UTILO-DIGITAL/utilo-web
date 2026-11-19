@@ -41,6 +41,7 @@
  *   PESTANAS, AYUDA            pestañas que se ven y texto de ayuda
  *   VENTAS, MARGEN_MINIMO      T0628 · tabla de las ventas (la del DESGLOSE) y el margen mínimo (un número o una fila de otra tabla)
  *   CUENTAS_PERSONALES         T0646 · tipos de CUENTAS que son lo que pone una persona: en Caja, aparte («Lo que te debe la empresa»)
+ *   CUENTAS_CAPITAL            T0673 · tipos de CUENTAS que son el capital de la empresa: en Caja, aparte («Capital que has puesto»), sin deuda
  *   CLIENTES                   T0646 · de dónde salen los clientes de una factura emitida (las MARCAS), con su dirección
  *   _refs                      (lo pone montar.js) la tabla a la que apunta PERIODO y DESGLOSE, para sus nombres
  * Las cuentas, categorías y contrapartes son filas del Excel de cada negocio.
@@ -550,11 +551,12 @@
    * (la base): lo que ha pagado (gastos: taller, envío, aduanas) y lo que le ha pagado la marca (ingresos: anticipo, cobro).
    *   enJuego  lo pagado que aún no ha recuperado (pagado − cobrado, nunca menos de 0); en una venta cobrada, 0
    *   debe     lo que le falta por pagar a la marca (IMPORTE − cobrado); sin IMPORTE, no se sabe (null)
-   *   cobrada  la marca ha pagado todo el IMPORTE
+   *   cobrada  la marca ha pagado todo el IMPORTE y ella ya ha pagado algo (T0673: hasta pagar al taller no se sabe lo ganado)
+   *   adelantado  la marca lo ha pagado todo y ella aún no ha pagado nada (paso «Cobrada por adelantado»): ni ganado ni en juego
    *   ganado   en una cobrada, cobrado − pagado; margen = ganado / pagado (sobre lo que cuesta, como la calculadora)
    *   bajo     cobrada y por debajo del mínimo (minimo, fracción: 0,2 = 20 %; 0, sin aviso)
-   *   paso     Cobrada, Entregada (FECHA_ENTREGA), En camino (FECHA_ENVIO), Pagada al taller (algún gasto) o Pedida
-   *   dias     de su primer pago al cobro que completa el IMPORTE
+   *   paso     Cobrada, Cobrada por adelantado, Entregada (FECHA_ENTREGA), En camino (FECHA_ENVIO), Pagada al taller (algún gasto) o Pedida
+   *   dias     de su primer pago al cobro que completa el IMPORTE (0 si cobró antes de pagar)
    * Lo invertido: los gastos que no son de ninguna venta (sin el REPARTO); se recupera con lo ganado en las cobradas. */
   function fraccion(v) {
     var n = typeof v === 'number' ? v : parseFloat(String(v == null ? '' : v).replace('%', '').replace(',', '.'));
@@ -586,13 +588,14 @@
         if (!cobro && imp !== null && cobrado >= imp) cobro = String(m.FECHA || '');
       }
     });
-    var cobrada = imp !== null && cobrado >= imp;
+    // T0673 · Pagada entera antes de pagar al taller: aún no es ganado (Javi, 19/11/2026); se da por cobrada al pagar algo.
+    var entera = imp !== null && cobrado >= imp, cobrada = entera && pagado > 0, adelantado = entera && !cobrada;
     var ganado = cobrada ? cobrado - pagado : null;
     var margen = cobrada && pagado > 0 ? ganado / pagado : null;
-    var paso = cobrada ? 'Cobrada' : v.FECHA_ENTREGA ? 'Entregada' : v.FECHA_ENVIO ? 'En camino' : pagado > 0 ? 'Pagada al taller' : 'Pedida';
-    var fechaPaso = { Cobrada: cobro, Entregada: v.FECHA_ENTREGA, 'En camino': v.FECHA_ENVIO, 'Pagada al taller': primerPago, Pedida: v.FECHA }[paso] || '';
+    var paso = cobrada ? 'Cobrada' : adelantado ? 'Cobrada por adelantado' : v.FECHA_ENTREGA ? 'Entregada' : v.FECHA_ENVIO ? 'En camino' : pagado > 0 ? 'Pagada al taller' : 'Pedida';
+    var fechaPaso = { Cobrada: cobro, 'Cobrada por adelantado': cobro, Entregada: v.FECHA_ENTREGA, 'En camino': v.FECHA_ENVIO, 'Pagada al taller': primerPago, Pedida: v.FECHA }[paso] || '';
     return {
-      v: v, movs: ms, importe: imp, pagado: pagado, cobrado: cobrado, cobrada: cobrada, anticipo: fraccion(v.ANTICIPO),
+      v: v, movs: ms, importe: imp, pagado: pagado, cobrado: cobrado, cobrada: cobrada, adelantado: adelantado, anticipo: fraccion(v.ANTICIPO),
       enJuego: cobrada ? 0 : Math.max(0, pagado - cobrado), debe: imp === null ? null : Math.max(0, imp - cobrado),
       ganado: ganado, margen: margen, bajo: !!(minimo && margen !== null && margen < minimo - 1e-9),
       // Lo que tendría que haber cobrado para llegar al mínimo, redondeado al céntimo.
@@ -601,7 +604,7 @@
       previsto: imp === null ? null : imp - pagado,
       costes: ordenC.map(function (k) { return { nombre: k, base: costes[k] }; }),
       paso: paso, fechaPaso: fechaPaso, primerPago: primerPago, primerCobro: primerCobro, cobro: cobro,
-      dias: cobrada && primerPago && cobro ? diasEntre(primerPago, cobro) : null
+      dias: cobrada && primerPago && cobro ? Math.max(0, diasEntre(primerPago, cobro)) : null
     };
   }
   function ventas(d, filas, DS, minimo) {
@@ -644,12 +647,14 @@
 
   /** La caja partida: lo de la empresa (las cuentas que no son de los tipos de «personales») y lo que la empresa debe a
    *  cada persona (sus cuentas, en positivo: su saldo es negativo con lo que ha puesto). Sin las cuentas a cero, si no se piden. */
-  function cajaPartes(cue, sal, personales, ceros) {
-    var r = { empresa: [], total: 0, personas: [], debe: 0, ceros: 0 };
+  function cajaPartes(cue, sal, personales, ceros, capital) {
+    var r = { empresa: [], total: 0, personas: [], debe: 0, capital: [], puesto: 0, ceros: 0 };
     (cue || []).forEach(function (c) {
       var v = sal[c.ID] || 0;
       if (!v) { r.ceros++; if (!ceros) return; }
-      if ((personales || []).indexOf(String(c.TIPO || '')) >= 0) { r.personas.push({ c: c, v: -v }); r.debe -= v; }
+      // T0673 · El capital (tipos de CUENTAS_CAPITAL): lo que puso para crear la empresa, en positivo; no es una deuda.
+      if ((capital || []).indexOf(String(c.TIPO || '')) >= 0) { r.capital.push({ c: c, v: -v }); r.puesto -= v; }
+      else if ((personales || []).indexOf(String(c.TIPO || '')) >= 0) { r.personas.push({ c: c, v: -v }); r.debe -= v; }
       else { r.empresa.push({ c: c, v: v }); r.total += v; }
     });
     return r;
@@ -970,23 +975,25 @@
       // suma al dinero de la empresa: van aparte, en positivo, como lo que la empresa le debe a esa persona.
       var PERSONALES = String(cfg.CUENTAS_PERSONALES || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
       function esPersonal(c) { return PERSONALES.indexOf(String(c.TIPO || '')) >= 0; }
+      // T0673 · Con CUENTAS_CAPITAL (p. ej. «Capital»), el capital de la empresa va aparte: ni dinero de la empresa ni lo que te debe.
+      var CAPITAL = String(cfg.CUENTAS_CAPITAL || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
       function htmlCaja() {
         if (S.caja.cue && ix.cue[S.caja.cue]) return htmlCuenta(ix.cue[S.caja.cue]);
-        var sal = saldos(d), x = cajaPartes(d.cue, sal, PERSONALES, S.caja.ceros), tipos = [], por = {}, tot = x.total, ceros = x.ceros, pers = x.personas, debe = x.debe;
+        var sal = saldos(d), x = cajaPartes(d.cue, sal, PERSONALES, S.caja.ceros, CAPITAL), tipos = [], por = {}, tot = x.total, ceros = x.ceros, pers = x.personas, debe = x.debe;
         x.empresa.forEach(function (y) { var t = String(y.c.TIPO || 'Otras'); if (!por[t]) { por[t] = []; tipos.push(t); } por[t].push(y.c); });
         function fila(c, v, nota) {
           return '<tr tabindex="0" data-cuenta="' + texto(c.ID) + '"><td class="u-tabla-t">' + texto(c.NOMBRE) + (nota ? '<div class="u-nota">' + texto(nota) + '</div>' : '') +
             '</td><td class="num">' + cifra(v, true) + ' <span class="eco-ir" aria-hidden="true">›</span></td></tr>';
         }
         var h = '<p class="u-nota">El dinero que hay en cada cuenta, con todos los movimientos (no solo los de ' + texto(nomPeriodo()) + '). Toca una para ver lo que entra y sale.</p>';
-        if (!tipos.length && !pers.length) return h + '<p class="u-vacio">Todas las cuentas están a cero.</p>';
+        if (!tipos.length && !pers.length && !x.capital.length) return h + '<p class="u-vacio">Todas las cuentas están a cero.</p>';
         if (PERSONALES.length) {
           var cs = []; tipos.forEach(function (t) { cs = cs.concat(por[t]); });
           h += '<h2 class="n-grupo">Dinero de la empresa</h2>' + (cs.length ? '<table class="u-tabla eco-tabla"><tbody>' + cs.map(function (c) { return fila(c, sal[c.ID] || 0); }).join('') +
             (cs.length > 1 ? '<tr class="eco-total"><td class="u-tabla-t">Total de la empresa</td><td class="num">' + cifra(tot, true) + '</td></tr>' : '') + '</tbody></table>'
             : '<p class="u-vacio">La empresa no tiene dinero en ninguna cuenta.</p>');
           if (pers.length) {
-            h += '<h2 class="n-grupo">Lo que te debe la empresa</h2><p class="u-nota">Lo que has pagado tú o has metido en la empresa y todavía no te ha devuelto.</p>' +
+            h += '<h2 class="n-grupo">Lo que te debe la empresa</h2><p class="u-nota">Lo que has pagado tú por la empresa (o le has prestado) y todavía no te ha devuelto.</p>' +
               '<table class="u-tabla eco-tabla"><tbody>' + pers.map(function (y) {
                 return fila(y.c, y.v, y.v < 0 ? 'Te ha devuelto más de lo que pusiste' : '');
               }).join('') + (pers.length > 1 ? '<tr class="eco-total"><td class="u-tabla-t">Total</td><td class="num">' + cifra(debe, true) + '</td></tr>' : '') + '</tbody></table>';
@@ -998,6 +1005,11 @@
               (por[t].length > 1 ? '<tr class="eco-total"><td class="u-tabla-t">Total ' + texto(t.toLowerCase()) + '</td><td class="num">' + cifra(st, true) + '</td></tr>' : '') + '</tbody></table>';
           });
           h += '<table class="u-tabla eco-tabla"><tbody><tr class="eco-total"><td class="u-tabla-t">Total de todas las cuentas</td><td class="num">' + cifra(tot, true) + '</td></tr></tbody></table>';
+        }
+        if (x.capital.length) {
+          h += '<h2 class="n-grupo">Capital que has puesto</h2><p class="u-nota">Lo que pusiste para crear la empresa. No es una deuda: lo recuperas con lo que gane la empresa.</p>' +
+            '<table class="u-tabla eco-tabla"><tbody>' + x.capital.map(function (y) { return fila(y.c, y.v); }).join('') +
+            (x.capital.length > 1 ? '<tr class="eco-total"><td class="u-tabla-t">Total</td><td class="num">' + cifra(x.puesto, true) + '</td></tr>' : '') + '</tbody></table>';
         }
         if (ceros) h += '<button type="button" class="u-btn u-btn-texto" data-accion="ceroscaja">' + (S.caja.ceros ? 'Ocultar las cuentas a cero' : 'Ver también las ' + ceros + ' cuentas a cero') + '</button>';
         return h;
@@ -1952,6 +1964,7 @@
       function pasoTxt(x) {
         var h = '<b>' + texto(x.paso) + '</b>' + (x.fechaPaso ? (x.paso === 'En camino' ? ' desde el ' : ' el ') + texto(fecha(x.fechaPaso)) : '');
         if (x.cobrada) return h;
+        if (x.adelantado) return h + ' · aún sin pagar al taller';
         if (x.debe === null) return h + ' · sin precio cerrado';
         if (!x.cobrado) return h + ' · te debe los ' + eur0(x.importe) + (x.anticipo ? ', aún sin el anticipo del ' + pc(x.anticipo) : ', sin anticipo');
         return h + ' · te debe ' + eur0(x.debe) + ' de ' + eur0(x.importe);
@@ -2047,12 +2060,13 @@
         var m = minimo(), x = venta(d, v, DS, m), c = v.ID_CONTRAPARTE ? nombre('ctr', v.ID_CONTRAPARTE) : 'La marca';
         var sub = x.cobrada ? 'Te pagó ' + eur0(x.cobrado) + ' y te costó ' + eur0(x.pagado) + (m && x.margen !== null ? ': un ' + pc(x.margen) + ' sobre lo que te costó.' : '.') +
             (x.bajo ? ' <b>Por debajo de tu mínimo del ' + pc(m) + '</b>: para llegar, ' + eur(x.paraMinimo) + '.' : '') :
+          x.adelantado ? texto(c) + ' te ha pagado los ' + eur0(x.cobrado) + ' por adelantado y aún no has pagado al taller: lo que ganas sale cuando lo pagues.' :
           'Has pagado ' + eur0(x.pagado) + ' y ' + texto(c) + ' te ha pagado ' + eur0(x.cobrado) + '. ' +
             (x.debe === null ? 'Aún sin precio cerrado: apunta lo que paga la marca en «Editar la venta».' :
               'Te debe ' + (x.cobrado ? 'otros ' : '') + eur0(x.debe) + ': cuando pague, habrás ganado ' + eur0(x.previsto) + ', si no hay más gastos.');
         var h = '<button type="button" class="u-btn u-btn-texto eco-volver" data-accion="todasventas">‹ Todas las ventas</button>' +
           '<div class="eco-kpis"><div class="eco-kpi eco-grande"><b>' + texto(nombreVenta(v)) + '</b><span class="eco-val">' +
-          (x.cobrada ? eur0(x.ganado) + ' ganados' : eur0(x.enJuego) + ' en juego') + '</span><span class="eco-sub">' + sub + '</span></div></div>';
+          (x.cobrada ? eur0(x.ganado) + ' ganados' : x.adelantado ? 'Cobrada por adelantado' : eur0(x.enJuego) + ' en juego') + '</span><span class="eco-sub">' + sub + '</span></div></div>';
         var pasos = [['Pedida', v.FECHA]];
         if (x.anticipo) pasos.push(['Anticipo cobrado · ' + pc(x.anticipo), x.primerCobro]);
         pasos.push(['Pagada al taller', x.primerPago], ['En camino', v.FECHA_ENVIO], ['Entregada', v.FECHA_ENTREGA], ['Cobrada', x.cobro]);
@@ -2063,7 +2077,8 @@
         h += '<h2 class="n-grupo">Las cuentas</h2><table class="u-tabla eco-tabla"><tbody>' +
           '<tr><td class="u-tabla-t">Lo que paga la marca<div class="u-nota">' + (x.importe === null ? 'Sin precio cerrado' : 'Te ha pagado ' + eur0(x.cobrado)) + '</div></td><td class="num">' + (x.importe === null ? '—' : eur0(x.importe)) + '</td></tr>' +
           x.costes.map(function (k) { return '<tr><td class="u-tabla-t">' + texto(k.nombre) + '</td><td class="num">− ' + eur0(k.base) + '</td></tr>'; }).join('') +
-          (x.importe === null ? '' : '<tr class="eco-total"><td class="u-tabla-t">' + (x.cobrada ? 'Has ganado' : 'Ganarás, si no hay más gastos') +
+          (x.adelantado ? '<tr class="eco-total"><td class="u-tabla-t">Lo que ganas<div class="u-nota">Sale cuando pagues al taller: lo que te pagó menos lo que te cueste</div></td><td class="num">—</td></tr>' :
+           x.importe === null ? '' : '<tr class="eco-total"><td class="u-tabla-t">' + (x.cobrada ? 'Has ganado' : 'Ganarás, si no hay más gastos') +
             (m && x.pagado ? '<div class="u-nota">' + pc(gan / x.pagado) + ' sobre lo que te cuesta</div>' : '') + '</td><td class="num"><span class="u-cifra' +
             (gan < 0 ? ' u-mal' : ' eco-bien') + '">' + eur0(gan) + '</span></td></tr>') +
           '</tbody></table><p class="u-nota">Sin IVA.' + (x.anticipo ? ' Anticipo pactado: ' + pc(x.anticipo) + (x.importe !== null ? ' (' + eur0(Math.round(x.importe * x.anticipo)) + ')' : '') + '.' : '') + '</p>';
