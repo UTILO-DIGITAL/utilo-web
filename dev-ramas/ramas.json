@@ -1379,10 +1379,10 @@
    "tarea": "T0669",
    "titulo": "Telas se prueba en DEV con datos inventados, y Ayuda vuelve a ver Hoy y Seguimiento",
    "pr": 363,
-   "commit": "f2ffda93",
-   "ultimo": "T0669: Cómo se prueba Telas en DEV, en dev/README.md y su CLAUDE.md",
+   "commit": "58db27e6",
+   "ultimo": "Merge remote-tracking branch 'origin/main' into T0669-dev-telas",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T16:09:31.422Z",
+   "fecha": "2026-11-19T16:11:15.555Z",
    "toca": [
     "telas"
    ],
