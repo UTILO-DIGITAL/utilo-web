@@ -53,7 +53,9 @@
 
   function etiqueta() {
     var rama = a && a.tarea ? a.tarea + (a.titulo ? ' ' + a.titulo : '') : CARPETA;
-    var quien = !a ? '' : a.publica ? 'sin entrar' : a.como && a.como.tipo === 'prueba' ? (a.como.nombre || a.como.correo) + (a.como.rol ? ' · ' + a.como.rol : '') : 'Yo';
+    // T0654 · En una página sin Supabase, la persona que tiene ahora (su #, que cambia su propio selector).
+    var local = a && a.local ? ((a.personas || []).filter(function (q) { return '#' + q.id === location.hash; })[0] || (a.como && a.como.id ? a.como : (a.personas || [])[0])) : null;
+    var quien = !a ? '' : a.local ? (local && local.nombre) || '' : a.publica ? 'sin entrar' : a.como && a.como.tipo === 'prueba' ? (a.como.nombre || a.como.correo) + (a.como.rol ? ' · ' + a.como.rol : '') : 'Yo';
     return ['DEV', rama, quien].filter(Boolean).join(' · ');
   }
 
