@@ -76,6 +76,18 @@
     return isFinite(n) ? n : 0;
   }
   /** T0627 · Un precio escrito («22,5», «18,595») → euros, sin redondear (el de sin IVA puede llevar hasta 4 decimales). */
+  /**
+   * T0681 · Un IBAN tal como se escribe → { ok, texto }: sin espacios ni guiones, en mayúsculas, con sus dígitos de control
+   * comprobados (ISO 13616, módulo 97) y agrupado de 4 en 4 («ES91 2100 0418 4502 0005 1332»). Vacío: ok, ''.
+   */
+  function iban(v) {
+    var x = String(v === undefined || v === null ? '' : v).toUpperCase().replace(/[\s.-]+/g, '');
+    if (!x) return { ok: true, texto: '' };
+    if (!/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(x)) return { ok: false, texto: x };
+    var num = (x.slice(4) + x.slice(0, 4)).replace(/[A-Z]/g, function (c) { return String(c.charCodeAt(0) - 55); }), r = 0;
+    for (var i = 0; i < num.length; i++) r = (r * 10 + Number(num[i])) % 97;
+    return { ok: r === 1, texto: x.replace(/(.{4})(?=.)/g, '$1 ') };
+  }
   function precio(v) {
     if (v === '' || v == null) return 0;
     var n = typeof v === 'number' ? v : Number(String(v).replace(/\s|€/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'));
@@ -702,7 +714,7 @@
     anteriores: anteriores, movDe: movDe, facDe: facDe, preDe: preDe, resumen: resumen, saldos: saldos, cuenta: cuenta, pendientes: pendientes,
     sinFactura: sinFactura, presupuesto: presupuesto, grupos: grupos, estadoLinea: estadoLinea, avisos: avisos, cruzados: cruzados,
     desglose: desglose, recomendar: recomendar, esReparto: esReparto, problemasMov: problemasMov,
-    cantidad: cantidad, precio: precio, sinIva: sinIva, conIvaPrecio: conIvaPrecio, importeLinea: importeLinea, baseLineas: baseLineas, lineasDe: lineasDe,
+    cantidad: cantidad, precio: precio, iban: iban, sinIva: sinIva, conIvaPrecio: conIvaPrecio, importeLinea: importeLinea, baseLineas: baseLineas, lineasDe: lineasDe,
     articulos: articulos, buscarArt: buscarArt, artDe: artDe, ultimoPrecio: ultimoPrecio, precioOpcion: precioOpcion, conQuien: conQuien,
     fraccion: fraccion, diasEntre: diasEntre, venta: venta, ventas: ventas, minimoDe: minimoDe };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
@@ -781,7 +793,7 @@
           cfg: cfg, mov: T.filas('MOVIMIENTOS'), cat: T.filas('CATEGORIAS'), cue: T.filas('CUENTAS'), ctr: T.filas('CONTRAPARTES'),
           fac: T.filas('FACTURAS'), pre: T.filas('PRESUPUESTOS'), per: R.PERIODO ? T.filas(R.PERIODO) : [], des: R.DESGLOSE ? T.filas(R.DESGLOSE) : [],
           colsPre: T.columnas ? T.columnas('PRESUPUESTOS') : [], colsMov: T.columnas ? T.columnas('MOVIMIENTOS') : [],
-          lin: LINEAS ? T.filas('FACTURA_LINEAS') : [], emp: LINEAS ? T.filas('EMPRESA')[0] || null : null, colsCtr: T.columnas ? T.columnas('CONTRAPARTES') : []
+          lin: LINEAS ? T.filas('FACTURA_LINEAS') : [], emp: LINEAS ? T.filas('EMPRESA')[0] || null : null, colsEmp: LINEAS && T.columnas ? T.columnas('EMPRESA') || [] : [], colsCtr: T.columnas ? T.columnas('CONTRAPARTES') : []
         };
       }
       var d, lista, per, ix;
@@ -1390,14 +1402,17 @@
           c('Email', 'EMAIL', '<input type="email" id="e-EMAIL" value="%v" maxlength="120">') +
           c('Web', 'WEB', '<input type="text" id="e-WEB" value="%v" maxlength="120">') +
           c('Forma de pago', 'FORMA_PAGO', '<textarea id="e-FORMA_PAGO" rows="2" placeholder="P. ej. Transferencia a 30 días">%v</textarea>', 'u-ancho') +
+          // T0681: la cuenta en la que te pagan: sale en la factura, bajo la forma de pago (Javi, 19/11/2026).
+          (d.colsEmp.indexOf('IBAN') >= 0 ? c('IBAN de la cuenta en la que te pagan', 'IBAN', '<input type="text" id="e-IBAN" value="%v" maxlength="42" autocomplete="off" placeholder="ES00 0000 0000 0000 0000 0000">', 'u-ancho') : '') +
           c('Pie de la factura (opcional)', 'PIE', '<textarea id="e-PIE" rows="2">%v</textarea>', 'u-ancho') + '</div>' +
           '<p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="e-guardar">Guardar</button><button type="button" class="u-btn" data-cerrar>Cancelar</button></div>',
         function () {
           vent.querySelector('#e-guardar').onclick = function () {
             var nv = {};
-            ['NOMBRE', 'NIF', 'DIRECCION', 'EMAIL', 'TELEFONO', 'WEB', 'FORMA_PAGO', 'PIE'].forEach(function (k) { nv[k] = val('e-' + k); });
+            ['NOMBRE', 'NIF', 'DIRECCION', 'EMAIL', 'TELEFONO', 'WEB', 'FORMA_PAGO', 'PIE'].concat(d.colsEmp.indexOf('IBAN') >= 0 ? ['IBAN'] : []).forEach(function (k) { nv[k] = val('e-' + k); });
             nv.NIF = nv.NIF.toUpperCase().replace(/\s+/g, '');
             if (nv.EMAIL && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(nv.EMAIL)) { verError(['El email no parece bien escrito.']); return; }
+            if ('IBAN' in nv) { var ib = iban(nv.IBAN); if (!ib.ok) { verError(['El IBAN no cuadra: revisa que esté entero y sin cambiar ningún número.']); return; } nv.IBAN = ib.texto; }
             cerrar();
             var p = d.emp ? T.actualizar('EMPRESA', d.emp.ID, cambios(d.emp, nv)) : T.crear('EMPRESA', nv);
             p.then(function () { if (ctx.abierta()) ctx.aviso('Datos de tu empresa guardados en el Excel.'); }, function () {});
@@ -1789,27 +1804,38 @@
             }).then(function (r) {
               var x = r && r.fila ? r.fila : null, id = (f && f.ID) || (r && r.id) || (x && x.ID), numero = (x && x.NUMERO) || nv.NUMERO || (f && f.NUMERO) || '';
               if (movId && id) T.actualizar('MOVIMIENTOS', movId, { ID_FACTURA: id }).then(function () {}, function () {});
-              if (lin && id) guardarLineas(id, ls);
               if (cliNuevo && cli.ID) ctx.llamar('economiaClienteDatos', [cli.ID, cliNuevo]).then(function () { T.refrescar(['CONTRAPARTES'], true); }, function (e) { ctx.aviso(String((e && e.message) || e)); });
-              return { id: id, numero: numero, nueva: !f && em };
+              var res = { id: id, numero: numero, nueva: !f && em };
+              // T0681: la factura no está guardada hasta que lo están sus líneas (reabierta antes, salía a medias).
+              return lin && id ? guardarLineas(id, ls).then(function () { return res; }) : res;
             });
           }
-          /** Las líneas de la factura en FACTURA_LINEAS: las nuevas se crean, las cambiadas se actualizan y las quitadas se borran. */
+          /**
+           * Las líneas de la factura en FACTURA_LINEAS: las cambiadas se actualizan, las quitadas se borran y las nuevas se
+           * crean todas en una llamada, en su orden (T0681: economiaLineasCrear; una a una, reabierta antes de acabar, la
+           * factura salía a medias). Devuelve una promesa que acaba cuando está todo.
+           */
           function guardarLineas(id, ls) {
-            var antes = lineasDe(d.lin, id), vistas = {}, altas = Promise.resolve();
+            var antes = lineasDe(d.lin, id), vistas = {}, nuevas = [], va = [];
             ls.forEach(function (l) {
               var fila = { ID_FACTURA: id, CONCEPTO: l.CONCEPTO, DETALLE: l.DETALLE, CANTIDAD: l.CANTIDAD, UNIDAD: l.UNIDAD, PRECIO: l.PRECIO, IVA_INCLUIDO: !!l.IVA_INCLUIDO };
               var a = l.ID && antes.filter(function (x) { return String(x.ID) === String(l.ID); })[0];
-              if (a) { vistas[a.ID] = 1; var c = cambios(a, fila); if (Object.keys(c).length) T.actualizar('FACTURA_LINEAS', a.ID, c).then(function () {}, function () {}); }
-              // T0669: las nuevas, una tras otra: a la vez, el ID (que da el orden) salía según llegaban y la factura las ponía al revés.
-              else altas = altas.then(function () { return T.crear('FACTURA_LINEAS', fila); }).then(function () {}, function () {});
+              if (a) { vistas[a.ID] = 1; var c = cambios(a, fila); if (Object.keys(c).length) va.push(T.actualizar('FACTURA_LINEAS', a.ID, c)); }
+              else nuevas.push(fila);
             });
-            antes.forEach(function (a) { if (!vistas[a.ID]) T.borrar('FACTURA_LINEAS', a.ID).then(function () {}, function () {}); });
+            antes.forEach(function (a) { if (!vistas[a.ID]) va.push(T.borrar('FACTURA_LINEAS', a.ID)); });
+            if (nuevas.length) va.push(ctx.llamar('economiaLineasCrear', [id, nuevas]).then(function () { return T.refrescar(['FACTURA_LINEAS'], true); }));
+            return Promise.all(va.map(function (p) { return Promise.resolve(p).then(null, function (e) { ctx.aviso('Alguna línea no se ha guardado: ' + String((e && e.message) || e)); }); }));
           }
           vent.querySelector('#f-guardar').onclick = function () {
-            var p = guardar(); if (!p) return;
-            cerrar();
-            p.then(function (r) { if (ctx.abierta()) ctx.aviso(r.nueva ? 'Factura ' + r.numero + ' guardada en el Excel.' : 'Factura guardada en el Excel.'); }, function () {});
+            var lin = porLineas(), p = guardar(); if (!p) return;
+            // T0681: con líneas, la ventana espera a que estén guardadas (si se cerrara antes, se podría reabrir a medias).
+            var bg = vent.querySelector('#f-guardar');
+            if (lin) { bg.disabled = true; bg.textContent = 'Guardando…'; } else cerrar();
+            p.then(function (r) {
+              if (lin) cerrar();
+              if (ctx.abierta()) ctx.aviso(r.nueva ? 'Factura ' + r.numero + ' guardada en el Excel.' : 'Factura guardada en el Excel.');
+            }, function () { if (lin) { bg.disabled = false; bg.textContent = 'Guardar factura'; } });
           };
           var bver = vent.querySelector('#f-ver');
           if (bver) bver.onclick = function () {
@@ -1847,11 +1873,14 @@
             ctx.llamar('economiaFacturaVer', [doc]).then(function (r) {
               if (r.faltan && r.faltan.length) { bpdf.disabled = false; bpdf.textContent = 'Guardar y sacar el PDF'; verError(['Antes de sacar el PDF falta ' + r.faltan.join(', ') + '.']); return; }
               var p = guardar(); if (!p) { bpdf.disabled = false; bpdf.textContent = 'Guardar y sacar el PDF'; return; }
-              cerrar();
-              ctx.aviso('Sacando el PDF de la factura ' + numFac(f) + '…');
-              p.then(function () { return ctx.llamar('economiaFacturaPdf', [doc]); }).then(function (x) {
+              // T0681: la ventana se cierra cuando la factura y sus líneas están guardadas (antes, se podía reabrir a medias).
+              p.then(function () {
+                cerrar();
+                ctx.aviso('Sacando el PDF de la factura ' + numFac(f) + '…');
+                return ctx.llamar('economiaFacturaPdf', [doc]);
+              }).then(function (x) {
                 return T.actualizar('FACTURAS', f.ID, { ARCHIVO_URL: x.url }).then(function () { if (ctx.abierta()) ctx.aviso('PDF de la factura ' + numFac(f) + ' guardado en Drive y enlazado.'); });
-              }, function (e) { if (ctx.abierta()) ctx.aviso(String((e && e.message) || e).replace(/^[A-Z]+: /, '')); });
+              }, function (e) { bpdf.disabled = false; bpdf.textContent = 'Guardar y sacar el PDF'; if (ctx.abierta()) ctx.aviso(String((e && e.message) || e).replace(/^[A-Z]+: /, '')); });
             }, function (e) { bpdf.disabled = false; bpdf.textContent = 'Guardar y sacar el PDF'; verError([String((e && e.message) || e)]); });
           };
           var ba = vent.querySelector('#f-apuntar');
