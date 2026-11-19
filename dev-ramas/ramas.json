@@ -887,12 +887,12 @@
   },
   "T0646-retocar-economia": {
    "tarea": "T0646",
-   "titulo": "Economía de Marta: la caja separa su dinero de lo que le debe la empresa y la factura se hace eligiendo solo clientes",
-   "pr": null,
-   "commit": "ca7212e",
-   "ultimo": "T0646: Economía de Marta: la caja separa su dinero de lo que le debe la empresa y la factura se hace eligiendo solo clientes",
+   "titulo": "En Economía de Telas, la caja separa el dinero de la empresa de lo que te debe y la factura se hace eligiendo solo clientes",
+   "pr": 355,
+   "commit": "8f13b68",
+   "ultimo": "T0646: Al día con main (Hoy y Mis telas en el móvil, T0644; el siguiente paso como Tarea, T0661); base.css ?v=109",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T13:15:44.252Z",
+   "fecha": "2026-11-19T13:49:26.527Z",
    "toca": [
     "konamigas",
     "telas",
