@@ -1021,12 +1021,12 @@
   },
   "T0655-dev-otros-repos": {
    "tarea": "T0655",
-   "titulo": "Los proyectos de otros repos, en la app DEV con datos inventados",
-   "pr": null,
-   "commit": "8c6b494",
-   "ultimo": "T0655: Los proyectos de otros repos, en la app DEV con datos inventados",
+   "titulo": "Los proyectos de otros repositorios salen en la app DEV, con datos inventados",
+   "pr": 350,
+   "commit": "610b3a5",
+   "ultimo": "T0655: «Verlo en DEV» abre la rama de la tarea que cambia alguna web (la de Casa Abuela, no la de utilo-apps)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T10:36:04.551Z",
+   "fecha": "2026-11-19T11:20:40.741Z",
    "toca": [],
    "comun": true,
    "paginas": [

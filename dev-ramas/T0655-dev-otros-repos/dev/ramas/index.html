@@ -540,8 +540,10 @@
   /** La rama subida de esa tarea (la más reciente, si hay varias), o ''. */
   function ramaDeTarea(id) {
     var rs = datos.ramas || {};
+    // T0655 · Una tarea puede tener rama en utilo-apps y en un proyecto suelto: primero la que cambia alguna web.
+    var cambia = function (c) { return (rs[c].paginas || []).some(function (p) { return p.cambia !== false; }) ? 1 : 0; };
     return Object.keys(rs).filter(function (c) { return !esMain(c) && rs[c].tarea === id; })
-      .sort(function (a, b) { return String(rs[b].fecha).localeCompare(String(rs[a].fecha)); })[0] || '';
+      .sort(function (a, b) { return cambia(b) - cambia(a) || String(rs[b].fecha).localeCompare(String(rs[a].fecha)); })[0] || '';
   }
   /** La elección que pide el enlace, o { error }. */
   function eleccionPedida(P) {
