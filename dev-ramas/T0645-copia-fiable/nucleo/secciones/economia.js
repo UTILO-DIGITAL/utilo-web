@@ -383,11 +383,116 @@
     return mal;
   }
 
+  /* ---------- T0635 · lo que se vende (ARTICULOS, p. ej. Mis telas) ----------
+   * art: la configuración ARTICULOS ya montada (con _refs de los YAML y, si sale de una sección Listado, _precio y _valores).
+   * D: { filas(t), fila(t, id) }, las tablas al momento. */
+  function aNum(v) {
+    if (typeof v === 'number') return v;
+    var s = String(v == null ? '' : v).trim(); if (!s) return NaN;
+    var pc = /%$/.test(s); s = s.replace(/[€₹%\s]/g, '');
+    if (/^-?[1-9]\d{0,2}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g, ''); // T0645: «1,020» es mil veinte, como en el listado
+    else if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, '');
+    s = s.replace(',', '.');
+    var n = /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : NaN;
+    return pc ? n / 100 : n;
+  }
+  function nombreFila(D, t, id) {
+    var f = id === '' || id == null ? null : D.fila(t, id);
+    if (!f) return id == null ? '' : String(id);
+    var n = ['NOMBRE', 'TITULO', 'DETALLE'].filter(function (k) { return f[k] !== '' && f[k] != null; })[0];
+    return n ? String(f[n]) : String(id);
+  }
+  /** El valor de una ruta («ID_DISENO.ANCHO») desde una fila de t, siguiendo las referencias; al final, el nombre si es una ref (crudo: el código). */
+  function seguirRuta(art, D, t, f, ruta, crudo) {
+    var ps = String(ruta).split('.'), rs = art._refs || {}, fila = f, tt = t;
+    for (var i = 0; i < ps.length - 1; i++) {
+      var r = (rs[tt] || {})[ps[i]];
+      if (!r || !fila || fila[ps[i]] === '' || fila[ps[i]] == null) return '';
+      fila = D.fila(r, fila[ps[i]]); tt = r;
+    }
+    if (!fila) return '';
+    var ult = ps[ps.length - 1], rr = (rs[tt] || {})[ult];
+    return rr && !crudo ? nombreFila(D, rr, fila[ult]) : fila[ult];
+  }
+  /** El mismo cálculo que la sección Listado (el precio de Mis telas): números, columnas o rutas, «$VALOR» y [op, …]. Un hueco da NaN. */
+  function calcArt(art, D, e, f, val) {
+    if (typeof e === 'number') return e;
+    if (typeof e === 'string') return aNum(e.charAt(0) === '$' ? val[e.slice(1)] : seguirRuta(art, D, art.tabla, f, e, true));
+    if (!Array.isArray(e) || !e.length) return NaN;
+    var op = e[0], a = e.slice(1);
+    if (op === 'o') { for (var i = 0; i < a.length; i++) { var x = calcArt(art, D, a[i], f, val); if (!isNaN(x)) return x; } return NaN; }
+    if (op === 'redondear') { var r = calcArt(art, D, a[0], f, val), p = Math.pow(10, a[1] || 0); return Math.round(r * p) / p; }
+    var ns = a.map(function (y) { return calcArt(art, D, y, f, val); });
+    if (ns.some(isNaN)) return NaN;
+    if (op === '+') return ns.reduce(function (s, n) { return s + n; }, 0);
+    if (op === '*') return ns.reduce(function (s, n) { return s * n; }, 1);
+    if (op === '-') return ns.length === 1 ? -ns[0] : ns.slice(1).reduce(function (s, n) { return s - n; }, ns[0]);
+    if (op === '/') return ns[1] === 0 ? NaN : ns[0] / ns[1];
+    return NaN;
+  }
+  /** Una parte del detalle: un campo o ruta (con su unidad) o, con «tabla», las filas de otra tabla que le tocan, con su parte («52 % Viscosa · 48 % Algodón»). */
+  function detalleDe(art, D, f, o) {
+    if (typeof o === 'string') o = { campo: o };
+    if (o.tabla) {
+      var de = String(seguirRuta(art, D, art.tabla, f, o.con || art.codigo || 'ID', true));
+      if (!de) return '';
+      var xs = (D.filas(o.tabla) || []).filter(function (x) { return String(x[o.campo]) === de; }).map(function (x) {
+        var n = aNum(x[o.porcentaje]); if (n > 1) n = n / 100;
+        var nom = (((art._refs || {})[o.tabla] || {})[o.nombre]) ? nombreFila(D, art._refs[o.tabla][o.nombre], x[o.nombre]) : String(x[o.nombre] == null ? '' : x[o.nombre]);
+        return { n: n, t: (isNaN(n) ? '' : Math.round(n * 100) + ' % ') + nom };
+      }).filter(function (x) { return x.t.trim(); });
+      xs.sort(function (a, b) { return (isNaN(b.n) ? -1 : b.n) - (isNaN(a.n) ? -1 : a.n); });
+      return xs.map(function (x) { return x.t; }).join(' · ');
+    }
+    var v = String(seguirRuta(art, D, art.tabla, f, o.campo) == null ? '' : seguirRuta(art, D, art.tabla, f, o.campo)).trim();
+    return v ? v + (o.unidad ? ' ' + o.unidad : '') : '';
+  }
+  /** ¿Pasa la fila los filtros? ({ campo, no: […] } o { campo, es: […] }, con los nombres como se ven). */
+  function pasaArt(art, D, f) {
+    return (art.filtro || []).every(function (c) {
+      var v = String(seguirRuta(art, D, art.tabla, f, c.campo));
+      if (c.no) return [].concat(c.no).indexOf(v) < 0;
+      if (c.es) return [].concat(c.es).indexOf(v) >= 0;
+      return true;
+    });
+  }
+  function normArt(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  /** Lo que se puede vender, por código: [{ codigo, nombre, detalle, unidad, precio (sin IVA; NaN si falta algo para calcularlo) }]. */
+  function articulos(art, D) {
+    if (!art || !art.tabla) return [];
+    var val = {};
+    Object.keys(art._valores || {}).forEach(function (k) {
+      var v = art._valores[k];
+      if (v && typeof v === 'object') { var f = D.fila(v.tabla, v.fila); val[k] = f ? f[v.columna || 'VALOR'] : ''; } else val[k] = v;
+    });
+    return (D.filas(art.tabla) || []).filter(function (f) { return pasaArt(art, D, f); }).map(function (f) {
+      var cod = String(f[art.codigo || 'ID'] == null ? '' : f[art.codigo || 'ID']).trim();
+      var nom = [].concat(art.nombre || []).map(function (c) { return String(seguirRuta(art, D, art.tabla, f, c) || '').trim(); }).filter(Boolean).join(' · ') || cod;
+      var det = [].concat(art.detalle || []).map(function (o) { return detalleDe(art, D, f, o); }).filter(Boolean).join(' · ');
+      var pr = art._precio ? calcArt(art, D, art._precio, f, val) : art.precio ? aNum(f[art.precio]) : NaN;
+      // T0645: un envío a 0 no es un envío: sin precio recomendado, como «Falta el envío» en Mis telas.
+      if (art._envio && ![].concat(art._envio).some(function (e) { return calcArt(art, D, e, f, val) > 0; })) pr = NaN;
+      if (!isNaN(pr)) pr = Math.round(pr * 100) / 100;
+      return { codigo: cod, nombre: nom, detalle: det, unidad: String(art.unidad || ''), precio: isNaN(pr) || pr < 0 ? NaN : pr, _b: normArt(nom + ' ' + cod + ' ' + det) };
+    }).filter(function (a) { return a.codigo; }).sort(function (a, b) { return a.codigo.localeCompare(b.codigo, 'es'); });
+  }
+  /** Los que tienen todas las palabras de q (en el nombre, el código o el detalle), como mucho max. Sin palabras, ninguno. */
+  function buscarArt(arts, q, max) {
+    var ws = normArt(q).split(/\s+/).filter(Boolean);
+    return ws.length ? arts.filter(function (a) { return ws.every(function (w) { return a._b.indexOf(w) >= 0; }); }).slice(0, max || 6) : [];
+  }
+  /** El artículo de una línea guardada: el código al final de su concepto («… · BOR-004-01»). */
+  function artDe(arts, concepto) {
+    var m = String(concepto || '').match(/·\s*([^·]+)$/), c = m ? m[1].trim() : '';
+    return c ? arts.filter(function (a) { return a.codigo === c; })[0] || null : null;
+  }
+
   var CALC = { cts: cts, pct: pct, importe: importe, baseDeTotal: baseDeTotal, eur: eur, eur0: eur0, fecha: fecha, periodos: periodos, periodoActual: periodoActual,
     anteriores: anteriores, movDe: movDe, facDe: facDe, preDe: preDe, resumen: resumen, saldos: saldos, cuenta: cuenta, pendientes: pendientes,
     sinFactura: sinFactura, presupuesto: presupuesto, grupos: grupos, estadoLinea: estadoLinea, avisos: avisos, cruzados: cruzados,
     desglose: desglose, recomendar: recomendar, esReparto: esReparto, problemasMov: problemasMov,
-    cantidad: cantidad, precio: precio, sinIva: sinIva, conIvaPrecio: conIvaPrecio, importeLinea: importeLinea, baseLineas: baseLineas, lineasDe: lineasDe };
+    cantidad: cantidad, precio: precio, sinIva: sinIva, conIvaPrecio: conIvaPrecio, importeLinea: importeLinea, baseLineas: baseLineas, lineasDe: lineasDe,
+    articulos: articulos, buscarArt: buscarArt, artDe: artDe };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -417,6 +522,10 @@
       var LINEAS = cfg.FACTURA_LINEAS === 'Sí';
       // y los datos de la empresa para el documento salen de la tabla EMPRESA, que se cambia desde aquí (Datos de tu empresa).
       var tablas = TABLAS.concat(LINEAS ? ['FACTURA_LINEAS', 'EMPRESA'] : [], R.PERIODO ? [R.PERIODO] : [], R.DESGLOSE && R.DESGLOSE !== R.PERIODO ? [R.DESGLOSE] : []);
+      // T0635: con ARTICULOS (Mis telas), en cada línea se elige lo que se vende y sale su precio recomendado.
+      var ART = LINEAS && cfg.ARTICULOS && cfg.ARTICULOS.tabla ? cfg.ARTICULOS : null;
+      if (ART) [ART.tabla].concat(Object.keys(ART._refs || {}), Object.keys(ART._valores || {}).map(function (k) { var v = ART._valores[k]; return v && v.tabla; }))
+        .forEach(function (t) { if (t && tablas.indexOf(t) < 0) tablas.push(t); });
       var pest = String(cfg.PESTANAS || Object.keys(PESTANAS).join(',')).split(',').map(function (s) { return s.trim().toUpperCase(); })
         .filter(function (s) { return PESTANAS[s]; });
       if (!pest.length) pest = Object.keys(PESTANAS);
@@ -435,6 +544,12 @@
         '<button type="button" class="eco-fab" data-accion="apuntar">Añadir movimiento</button>' +
         '<div class="u-velo" id="eco-velo"><div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="eco-vt"><div class="n-ventana" id="eco-vent"></div></div></div>';
       var cont = el.querySelector('#eco-cont'), velo = el.querySelector('#eco-velo'), vent = el.querySelector('#eco-vent'), selPer = el.querySelector('#eco-per');
+
+      function filaDe(t, id) {
+        if (id === '' || id == null) return null;
+        if (T.fila) return T.fila(t, id);
+        return (T.filas(t) || []).filter(function (x) { return String(x.ID) === String(id); })[0] || null;
+      }
 
       /* ---------- datos ---------- */
 
@@ -997,6 +1112,7 @@
         var movs = f ? d.mov.filter(function (m) { return String(m.ID_FACTURA) === String(f.ID); }) : [];
         var pagado = 0; movs.forEach(function (m) { pagado += importe(m).total; });
         var lin0 = f && LINEAS ? lineasDe(d.lin, f.ID) : [];
+        var ARTS = ART ? articulos(ART, { filas: function (t) { return T.filas(t) || []; }, fila: filaDe }) : [];
         var datosCli = LINEAS && d.colsCtr.indexOf('NIF') >= 0 && d.colsCtr.indexOf('DIRECCION') >= 0;
         var pdf = LINEAS && !!String(cfg.FACTURA_CARPETA || '').trim();
         var html = '<h2 id="eco-vt">' + (f ? 'Factura ' + texto(numFac(f)) : movId ? (v.TIPO === 'Emitida' ? 'Hacer la factura' : 'Añadir su factura') : 'Añadir factura') + '</h2>' +
@@ -1045,15 +1161,72 @@
             var div = document.createElement('div');
             div.className = 'eco-lin';
             if (l.ID) div.setAttribute('data-id', l.ID);
-            div.innerHTML = '<input type="text" class="eco-lin-c" aria-label="Concepto" placeholder="Qué (p. ej. Lino Celosía BOR-004-01)" value="' + texto(l.CONCEPTO) + '">' +
-              '<input type="text" class="eco-lin-d" aria-label="Detalle" placeholder="Detalle (opcional)" value="' + texto(l.DETALLE) + '">' +
+            div.innerHTML = (ARTS.length
+              ? '<div class="eco-lin-cw"><textarea rows="1" class="eco-lin-c" aria-label="Concepto" autocomplete="off" role="combobox" aria-expanded="false" placeholder="Busca en ' + texto(ART.titulo || 'la lista') + ' por nombre o código, o escribe (el envío)">' + texto(l.CONCEPTO) + '</textarea>' +
+                '<div class="eco-lin-op" role="listbox" hidden></div></div>'
+              : '<textarea rows="1" class="eco-lin-c" aria-label="Concepto" placeholder="Qué (p. ej. Lino Celosía BOR-004-01)">' + texto(l.CONCEPTO) + '</textarea>') +
+              '<textarea rows="1" class="eco-lin-d" aria-label="Detalle" placeholder="Detalle (opcional)">' + texto(l.DETALLE) + '</textarea>' +
               '<input type="text" inputmode="decimal" class="eco-lin-n" aria-label="Cantidad" placeholder="Cant." value="' + texto(n(l.CANTIDAD)) + '">' +
               '<input type="text" class="eco-lin-u" aria-label="Unidad" placeholder="m" maxlength="8" value="' + texto(l.UNIDAD) + '">' +
               '<input type="text" inputmode="decimal" class="eco-lin-p" aria-label="Precio" placeholder="Precio" value="' + texto(n(pv)) + '" data-precio="' + texto(l.PRECIO == null ? '' : l.PRECIO) + '">' +
               '<label class="eco-lin-iva" title="El precio que has puesto ya lleva el IVA"><input type="checkbox" class="eco-lin-ci"' + (ci ? ' checked' : '') + '> IVA incl.</label>' +
-              '<span class="eco-lin-t u-cifra"></span><button type="button" class="u-btn u-btn-texto eco-lin-x" aria-label="Quitar la línea">Quitar</button>';
+              '<span class="eco-lin-t u-cifra"></span><button type="button" class="u-btn u-btn-texto eco-lin-x" aria-label="Quitar la línea">Quitar</button>' +
+              (ARTS.length ? '<p class="eco-lin-rec" hidden></p>' : '');
             cajaLin.appendChild(div);
+            crecer(div);
+            if (ARTS.length) {
+              // Una línea guardada de un artículo (su código al final del concepto) sigue con su recomendado.
+              var a0 = artDe(ARTS, l.CONCEPTO);
+              if (a0) div.setAttribute('data-art', a0.codigo);
+              pintaRec(div);
+            }
           }
+          /* T0635 · Elegir lo que se vende de ARTICULOS (Mis telas): se busca por nombre o código y la línea se rellena
+           * con su nombre y código, el detalle, la unidad y el precio recomendado sin IVA (se puede cambiar). */
+          /** T0635 · El concepto y el detalle crecen con el texto (en el móvil, una tela con su código no cabe en una línea). */
+          function crecer(r) {
+            Array.prototype.forEach.call(r.querySelectorAll('textarea.eco-lin-c, textarea.eco-lin-d'), function (t) {
+              t.style.height = 'auto'; if (t.scrollHeight) t.style.height = t.scrollHeight + 'px';
+            });
+          }
+          function artPorCodigo(c) { return ARTS.filter(function (a) { return a.codigo === c; })[0] || null; }
+          function eurPrecio(n) { return n.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' €'; }
+          function pintaRec(r) {
+            var p = r.querySelector('.eco-lin-rec'); if (!p) return;
+            var a = artPorCodigo(r.getAttribute('data-art') || '');
+            p.hidden = !a;
+            if (!a) { p.innerHTML = ''; return; }
+            var u = a.unidad ? '/' + a.unidad : '';
+            var dp = r.querySelector('.eco-lin-p').getAttribute('data-precio'), sinPrecio = dp === '' || dp == null;
+            // Sin recomendado (en Mis telas le falta el coste): en rojo solo mientras la línea no tiene precio.
+            if (isNaN(a.precio)) { p.innerHTML = sinPrecio ? '<span class="u-mal">Sin precio recomendado: en ' + texto(ART.titulo || 'la lista') + ' le falta el coste. Ponlo tú.</span>' : 'Sin precio recomendado: en ' + texto(ART.titulo || 'la lista') + ' le falta el coste.'; return; }
+            var igual = !sinPrecio && Math.abs(Number(dp) - a.precio) < 0.005;
+            p.innerHTML = 'Recomendado: <b>' + eurPrecio(a.precio) + texto(u) + '</b> sin IVA' + (igual ? '' : ' · <button type="button" class="u-btn u-btn-texto eco-lin-pon">Ponerlo</button>');
+          }
+          function sugerir(r, q) {
+            var caja = r.querySelector('.eco-lin-op'), inp = r.querySelector('.eco-lin-c'), hay = buscarArt(ARTS, q, 6);
+            caja.hidden = !hay.length; inp.setAttribute('aria-expanded', hay.length ? 'true' : 'false');
+            caja.innerHTML = hay.map(function (a, i) {
+              return '<button type="button" role="option" class="eco-lin-o' + (i ? '' : ' eco-lin-o-sel') + '" data-cod="' + texto(a.codigo) + '">' +
+                '<span class="eco-lin-on">' + texto(a.nombre) + ' <span class="eco-lin-oc">' + texto(a.codigo) + '</span></span>' +
+                '<span class="eco-lin-op-p">' + (isNaN(a.precio) ? 'sin precio' : eurPrecio(a.precio) + (a.unidad ? '/' + texto(a.unidad) : '')) + '</span></button>';
+            }).join('');
+          }
+          function elegir(r, a) {
+            r.querySelector('.eco-lin-c').value = a.nombre + ' · ' + a.codigo;
+            r.querySelector('.eco-lin-d').value = a.detalle;
+            if (a.unidad) r.querySelector('.eco-lin-u').value = a.unidad;
+            r.querySelector('.eco-lin-ci').checked = false;
+            var pi = r.querySelector('.eco-lin-p');
+            pi.value = isNaN(a.precio) ? '' : String(a.precio).replace('.', ',');
+            leerPrecio(pi);
+            r.setAttribute('data-art', a.codigo);
+            cerrarOp(r);
+            crecer(r);
+            pintaLineas(); pintaTot();
+            var cant = r.querySelector('.eco-lin-n'); if (cant) cant.focus();
+          }
+          function cerrarOp(r) { var c = r.querySelector('.eco-lin-op'); if (c) { c.hidden = true; c.innerHTML = ''; r.querySelector('.eco-lin-c').setAttribute('aria-expanded', 'false'); } }
           /**
            * T0627 · Cada precio guarda en data-precio el sin IVA exacto. Lo escrito se queda tal cual en pantalla: la casilla
            * «IVA incl.» de su línea solo dice cómo se lee (100 con IVA → 82,6446 sin IVA). Lo que no se toca se queda como
@@ -1080,6 +1253,7 @@
               // El importe de cada línea, como su precio: con IVA si su casilla está marcada, sin IVA si no.
               var ci = linIva(r);
               r.querySelector('.eco-lin-t').textContent = vacia ? '' : eur(importeLinea({ CANTIDAD: q('.eco-lin-n'), PRECIO: q('.eco-lin-p') })) + (ci ? ' con IVA' : '');
+              pintaRec(r);
             });
             vent.querySelector('#f-lin-nota').textContent = 'Precio por unidad (metro, pieza…), sin IVA. Si el que sabes ya lleva el IVA, ponlo tal cual y marca «IVA incl.» en esa línea: la factura lo pone sin IVA y el total cuadra.';
             var b = vent.querySelector('#f-BASE');
@@ -1137,7 +1311,50 @@
           if (cajaLin) {
             lin0.forEach(filaLin);
             if (!lin0.length && f && f.TIPO === 'Emitida' && cts(f.BASE)) filaLin({ CONCEPTO: '', CANTIDAD: 1, PRECIO: f.BASE }); // una de antes, sin líneas
-            cajaLin.addEventListener('input', function (e) { if (e.target.classList.contains('eco-lin-p')) leerPrecio(e.target); pintaLineas(); pintaTot(); });
+            cajaLin.addEventListener('input', function (e) {
+              if (e.target.classList.contains('eco-lin-p')) leerPrecio(e.target);
+              if (e.target.tagName === 'TEXTAREA') {
+                if (/\n/.test(e.target.value)) e.target.value = e.target.value.replace(/\s*\n+\s*/g, ' '); // una sola línea (al pegar)
+                crecer(e.target.closest('.eco-lin'));
+              }
+              if (ARTS.length && e.target.classList.contains('eco-lin-c')) {
+                var r = e.target.closest('.eco-lin'), a = artDe(ARTS, e.target.value);
+                if (a) r.setAttribute('data-art', a.codigo); else r.removeAttribute('data-art');
+                sugerir(r, e.target.value);
+              }
+              pintaLineas(); pintaTot();
+            });
+            // Intro no parte el concepto ni el detalle en dos líneas (con la lista abierta, elige).
+            cajaLin.addEventListener('keydown', function (e) {
+              if (e.key !== 'Enter' || e.target.tagName !== 'TEXTAREA') return;
+              var op = e.target.closest('.eco-lin').querySelector('.eco-lin-op');
+              if (!op || op.hidden) e.preventDefault();
+            });
+            if (ARTS.length) {
+              // Con el teclado: flechas para moverse, Intro elige, Esc cierra. Con el ratón o el dedo, al tocar.
+              cajaLin.addEventListener('keydown', function (e) {
+                if (!e.target.classList.contains('eco-lin-c')) return;
+                var r = e.target.closest('.eco-lin'), caja = r.querySelector('.eco-lin-op');
+                if (caja.hidden) return;
+                var os = Array.prototype.slice.call(caja.querySelectorAll('.eco-lin-o')), i = os.findIndex(function (o) { return o.classList.contains('eco-lin-o-sel'); });
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  if (os[i]) os[i].classList.remove('eco-lin-o-sel');
+                  i = (i + (e.key === 'ArrowDown' ? 1 : os.length - 1)) % os.length; os[i].classList.add('eco-lin-o-sel');
+                } else if (e.key === 'Enter' && os[i]) { e.preventDefault(); elegir(r, artPorCodigo(os[i].getAttribute('data-cod'))); }
+                else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrarOp(r); }
+              });
+              cajaLin.addEventListener('mousedown', function (e) { if (e.target.closest('.eco-lin-o')) e.preventDefault(); });
+              cajaLin.addEventListener('focusout', function (e) { if (e.target.classList.contains('eco-lin-c')) cerrarOp(e.target.closest('.eco-lin')); });
+              cajaLin.addEventListener('click', function (e) {
+                var o = e.target.closest('.eco-lin-o'); if (o) { elegir(o.closest('.eco-lin'), artPorCodigo(o.getAttribute('data-cod'))); return; }
+                var pon = e.target.closest('.eco-lin-pon'); if (!pon) return;
+                var r = pon.closest('.eco-lin'), a = artPorCodigo(r.getAttribute('data-art') || ''); if (!a) return;
+                r.querySelector('.eco-lin-ci').checked = false;
+                var pi = r.querySelector('.eco-lin-p'); pi.value = String(a.precio).replace('.', ','); leerPrecio(pi);
+                pintaLineas(); pintaTot();
+              });
+            }
             // Marcar «IVA incl.» en una línea cambia cómo se lee su precio (el número escrito no cambia); las demás, igual.
             cajaLin.addEventListener('change', function (e) {
               if (!e.target.classList.contains('eco-lin-ci')) return;

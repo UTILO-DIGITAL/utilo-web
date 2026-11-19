@@ -775,10 +775,10 @@
    "tarea": "T0645",
    "titulo": "La copia del Excel de Marta no mete precios equivocados y dice en el Perfil cómo va",
    "pr": 342,
-   "commit": "6089829",
-   "ultimo": "T0645: La copia del Excel de Marta no mete precios ni porcentajes equivocados y dice en el Perfil cuándo fue la última y qué ha visto raro",
+   "commit": "926c58f",
+   "ultimo": "T0645: Al día con main; Economía recomienda el precio con el coste del color, sin envío a 0 y con «1,020» de la India",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T07:18:02.588Z",
+   "fecha": "2026-11-19T08:22:41.509Z",
    "toca": [],
    "comun": true,
    "paginas": [
