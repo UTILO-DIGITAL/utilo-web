@@ -1023,10 +1023,10 @@
    "tarea": "T0655",
    "titulo": "Los proyectos de otros repositorios salen en la app DEV, con datos inventados",
    "pr": 350,
-   "commit": "610b3a5",
-   "ultimo": "T0655: «Verlo en DEV» abre la rama de la tarea que cambia alguna web (la de Casa Abuela, no la de utilo-apps)",
+   "commit": "e9ddb26",
+   "ultimo": "T0655: En el móvil, la línea DEV corta la rama y no la persona; los botones flotantes de un proyecto suelto, encima de ella",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T11:20:40.741Z",
+   "fecha": "2026-11-19T11:43:09.222Z",
    "toca": [],
    "comun": true,
    "paginas": [
