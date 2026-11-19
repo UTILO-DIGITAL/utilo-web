@@ -2209,3 +2209,39 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .eco-lin-rec { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--color-suave); }
 .u .eco-lin-pon { min-height: 0; padding: 0 var(--e1); font-size: 13px; }
 .u .eco-lin textarea { resize: none; overflow: hidden; line-height: 1.35; }
+
+/* T0653 · Calcular precio (Telas): datos a la izquierda; el precio y lo que paga hoy la marca a la derecha (debajo en el móvil). */
+.u .pr-calc { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--e4); align-items: start; }
+.u .pr-lado { display: grid; gap: var(--e4); min-width: 0; }
+.u .pr-caja { background: var(--color-superficie); border: 1px solid var(--color-linea); border-radius: var(--radio); padding: var(--e4); display: grid; gap: var(--e2); align-content: start; min-width: 0; }
+.u .pr-caja > p { margin: 0; }
+.u .pr-manual { display: grid; gap: var(--e3); }
+.u .pr-dos { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e2); }
+.u .pr-ud { position: relative; display: block; }
+.u .pr-ud input:not([type=checkbox]):not([type=radio]) { width: 100%; padding-right: 44px; text-align: right; }
+.u .pr-ud i { position: absolute; right: var(--e3); top: 50%; transform: translateY(-50%); font-style: normal; font-size: 13px; color: var(--color-suave); pointer-events: none; }
+.u .pr-seg { display: inline-flex; width: max-content; max-width: 100%; border: 1px solid var(--color-borde-campo); border-radius: var(--radio); overflow: hidden; }
+.u .pr-seg button { font: inherit; font-size: 14px; min-height: 36px; padding: 0 var(--e3); border: 0; background: transparent; color: var(--color-texto); cursor: pointer; }
+.u .pr-seg button[aria-pressed=true] { background: var(--color-principal-oscuro); color: var(--color-sobre-principal); }
+.u .pr-par { display: grid; grid-template-columns: 1fr auto 1fr; gap: var(--e2); align-items: end; }
+.u .pr-o { padding-bottom: var(--e3); color: var(--color-suave); font-size: 13px; }
+.u .pr-activo input { border-color: var(--color-principal-oscuro); box-shadow: 0 0 0 1px var(--color-principal-oscuro); }
+.u .pr-grande { font-size: 30px; font-weight: 500; line-height: 1.15; }
+.u .pr-grande small, .u .pr-nada { font-size: 15px; font-weight: 400; color: var(--color-suave); }
+.u .pr-nada { font-size: 24px; }
+.u .pr-aviso { border-radius: var(--radio); padding: var(--e2) var(--e3); font-size: 14px; background: var(--color-pendiente-fondo); color: var(--color-pendiente); }
+.u .pr-aviso.pr-mal { background: var(--color-vencido-fondo); color: var(--color-vencido); }
+.u .pr-aviso .u-btn-texto { min-height: 0; padding: 0; font-size: 14px; }
+.u .pr-cuentas { font-size: 13.5px; color: var(--color-suave); border-top: 1px dashed var(--color-linea); padding-top: var(--e2); }
+.u .pr-cuentas b { color: var(--color-texto); font-weight: 500; }
+.u .pr-fac { width: max-content; }
+.u .pr-h { margin: 0; font-size: 15px; font-weight: 500; }
+.u .pr-cmp { display: grid; gap: 2px; padding: var(--e2) 0; border-top: 1px solid var(--color-linea); }
+.u .pr-h + .pr-cmp { border-top: 0; padding-top: 0; }
+.u .pr-cmp-t { font-weight: 500; }
+.u .pr-cmp .u-btn-texto { min-height: 0; padding: 0; font-size: 13.5px; }
+.u .pr-bien { color: var(--color-bien); font-weight: 500; }
+.u .pr-cmp .u-mal { font-weight: 500; }
+.u .pr-otras summary { cursor: pointer; font-size: 13.5px; color: var(--color-principal-oscuro); padding-top: var(--e1); }
+@media (max-width: 820px) { .u .pr-calc { grid-template-columns: 1fr; } }
+@media (max-width: 420px) { .u .pr-par { grid-template-columns: 1fr; } .u .pr-o { display: none; } }
