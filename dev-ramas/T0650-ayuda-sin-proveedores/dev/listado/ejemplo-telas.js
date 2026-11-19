@@ -171,7 +171,9 @@
   };
   var COLORES_TAREA = { 'Pendiente': 'medio', 'En curso': 'info', 'Esperando respuesta': 'info', 'Hecha': 'bien', 'Descartada': 'apagado' };
   function suSeguimiento(col) {
-    return { titulo: 'Su seguimiento', tabla: 'SEGUIMIENTO', seccion: 'seguimiento', campo: col, con: 'ID', orden: '-FECHA', columnas: ['FECHA', 'DETALLE', 'ID_ESTADO'], codigo: 'ID', nombre: 'DETALLE',
+    // T0642: «+ Nueva tarea» debajo, que abre Seguimiento con una nueva ya puesta con esta marca o proveedor.
+    var nueva = { titulo: 'Nueva tarea', poner: {} }; nueva.poner[col] = 'ID';
+    return { nueva: nueva, titulo: 'Su seguimiento', tabla: 'SEGUIMIENTO', seccion: 'seguimiento', campo: col, con: 'ID', orden: '-FECHA', columnas: ['FECHA', 'DETALLE', 'ID_ESTADO'], codigo: 'ID', nombre: 'DETALLE',
       campos: { ID_ESTADO: { titulo: 'Estado', colores: COLORES_TAREA } } };
   }
   function mezcla() { var r = {}; [].forEach.call(arguments, function (o) { Object.keys(o).forEach(function (k) { r[k] = o[k]; }); }); return r; }
@@ -181,8 +183,8 @@
       TABLA: 'SEGUIMIENTO', CODIGO: 'ID', NOMBRE: 'DETALLE', ORDEN: 'FECHA', TEXTO: 'Tus tareas, reuniones y notas.', FILAS: ['tarea', 'tareas'],
       COLUMNAS: ['FECHA', 'ID_TIPO', 'CON_QUIEN', 'DETALLE', 'ID_ESTADO'], DETALLE: ['CON_QUIEN', 'FECHA', 'ID_ESTADO'],
       CAMPOS: { CON_QUIEN: { titulo: 'Con quién', primero: ['ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO'] }, ID_TIPO: { titulo: 'Tipo' }, ID_TEMA: { titulo: 'Área' }, ID_FORMATO: { titulo: 'Formato' },
-        ID_MARCA: { titulo: 'Marca' }, ID_PROVEEDOR: { titulo: 'Proveedor' }, ID_OTRO: { titulo: 'Otro contacto' }, DETALLE: { titulo: 'Qué hay que hacer / qué pasó' },
-        ID_ESTADO: { titulo: 'Estado', colores: COLORES_TAREA }, NOTAS: { titulo: 'Notas / enlace', tipo: 'nota' } },
+        ID_MARCA: { titulo: 'Marca' }, ID_PROVEEDOR: { titulo: 'Proveedor' }, ID_OTRO: { titulo: 'Otro contacto' }, DETALLE: { titulo: 'Qué hay que hacer o qué pasó' },
+        ID_ESTADO: { titulo: 'Estado', colores: COLORES_TAREA }, NOTAS: { titulo: 'Notas y enlaces', tipo: 'nota' } },
       FICHA: [{ titulo: '', campos: ['ID_ESTADO', 'FECHA', 'DETALLE', 'ID_TIPO', 'ID_TEMA', 'ID_FORMATO', 'NOTAS'] }, { titulo: 'Con quién', campos: ['ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO'] }],
       VISTAS: [
         { id: 'HOY', titulo: 'Hoy', texto: 'Lo que tienes por hacer, de lo más retrasado a lo de los próximos días.', filtro: [NO_HECHAS], agrupar: { campo: 'FECHA', por: 'plazo' }, orden: 'FECHA' },
@@ -202,9 +204,9 @@
     clientes: { modulo: 'listado', titulo: 'Clientes', icono: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.6.9 2.6 2.6 3 5.2"/>', config: mezcla(COMUN, {
       TABLA: 'MARCAS', CODIGO: 'ID', NOMBRE: 'NOMBRE', ORDEN: 'NOMBRE', TEXTO: 'Las marcas: las que ya son clientes y las de prospección, según su fase.', FILAS: ['cliente', 'clientes'],
       COLUMNAS: ['NOMBRE', 'ID_FASE', 'CIUDAD', 'PROXIMO_PASO', 'FECHA_PASO'], DETALLE: ['ID_FASE', 'PROXIMO_PASO'],
-      CAMPOS: { NOMBRE: { titulo: 'Marca' }, ID_FASE: { titulo: 'Fase', tipo: 'estado', colores: { '8 Primer pedido': 'bien', '9 Cliente habitual': 'bien', 'En pausa': 'apagado', 'Descartado': 'apagado', 'Por contactar': 'medio' } },
-        ID_TIPO_MARCA: { titulo: 'Tipo' }, ID_PRIORIDAD: { titulo: 'Prioridad', colores: { 'Alta': 'alto' } }, ID_VIA: { titulo: 'Vía' }, WEB: { tipo: 'enlace' }, DIRECCION: { titulo: 'Dirección (envíos)' },
-        NOTA: { titulo: 'Nota (una línea)' }, NOTAS: { tipo: 'nota' }, QUE_FABRICAN: { titulo: 'Qué fabrican' },
+      CAMPOS: { NOMBRE: { titulo: 'Marca' }, ID_FASE: { titulo: 'Fase', tipo: 'estado', sinNumero: true, colores: { '8 Primer pedido': 'bien', '9 Cliente habitual': 'bien', 'En pausa': 'apagado', 'Descartado': 'apagado', 'Por contactar': 'medio' } },
+        ID_TIPO_MARCA: { titulo: 'Tipo' }, ID_PRIORIDAD: { titulo: 'Prioridad', colores: { 'Alta': 'alto' } }, ID_VIA: { titulo: 'Primer contacto por' }, WEB: { tipo: 'enlace' }, INSTAGRAM: { titulo: 'Instagram', tipo: 'instagram' },
+        DIRECCION: { titulo: 'Dirección (envíos)' }, NOTA: { titulo: 'Resumen' }, NOTAS: { tipo: 'nota' }, QUE_FABRICAN: { titulo: 'Qué fabrican' },
         PROXIMO_PASO: { titulo: 'Próximo paso', de: { tabla: 'SEGUIMIENTO', campo: 'ID_MARCA', filtro: [NO_HECHAS], orden: 'FECHA', columna: 'DETALLE' } },
         FECHA_PASO: { titulo: 'Fecha del próximo paso', tipo: 'fecha', de: { tabla: 'SEGUIMIENTO', campo: 'ID_MARCA', filtro: [NO_HECHAS], orden: 'FECHA', columna: 'FECHA' } } },
       FICHA: [
@@ -213,13 +215,18 @@
       ],
       RELACIONADOS: [
         { titulo: 'Personas de contacto', tabla: 'PERSONAS', campo: 'ID_MARCA', con: 'ID', columnas: ['NOMBRE', 'CARGO', 'EMAIL', 'TELEFONO'], nombre: 'NOMBRE', campos: { EMAIL: { tipo: 'email' }, TELEFONO: { tipo: 'telefono' } } },
-        { titulo: 'Qué buscan', tabla: 'NECESIDADES', campo: 'ID_MARCA', con: 'ID', columnas: ['QUE_TELAS', 'PAGAN_HOY', 'PRECIO_OBJETIVO', 'CANTIDADES', 'ID_ANTICIPO'], clave: 'ID_MARCA', nombre: 'QUE_TELAS',
+        { titulo: 'Qué buscan', datos: true, tabla: 'NECESIDADES', campo: 'ID_MARCA', con: 'ID', columnas: ['QUE_TELAS', 'PAGAN_HOY', 'PRECIO_OBJETIVO', 'CANTIDADES', 'ID_ANTICIPO'], clave: 'ID_MARCA', nombre: 'QUE_TELAS',
           campos: { PAGAN_HOY: { titulo: 'Pagan hoy (€/m)' }, PRECIO_OBJETIVO: { titulo: 'Precio objetivo (€/m)' }, ID_ANTICIPO: { titulo: '¿Anticipo 50 %?' } } },
+        { titulo: 'Telas que le interesan', tabla: 'INTERESES', seccion: 'telas', campo: 'ID_MARCA', con: 'ID', clave: 'ID_TELA', nombre: 'ID_TELA', columnas: ['ID_TELA', 'ID_TELA.COLOR'],
+          campos: { ID_TELA: { titulo: 'Tela' }, 'ID_TELA.COLOR': { titulo: 'Color' } }, vacio: 'Ninguna todavía.' },
         suSeguimiento('ID_MARCA')
       ],
       VISTAS: [
         { id: 'EN_MARCHA', titulo: 'En marcha', filtro: [{ campo: 'ID_FASE', no: ['Por contactar', 'En pausa', 'Descartado'] }] },
-        { id: 'EMBUDO', titulo: 'Embudo', tablero: { campo: 'ID_FASE', columnas: ['1 Contactado', '2 Interesado', '3 Reunión hecha', '4 Cuestionario enviado', '5 Cuestionario recibido', '6 Propuesta enviada', '7 Muestras enviadas', '8 Primer pedido', '9 Cliente habitual'] } },
+        { id: 'EMBUDO', titulo: 'Embudo', texto: 'Tus clientes en tres columnas: por empezar, hablando y comprando. Cada uno dice en qué fase está.', tablero: { campo: 'ID_FASE', columnas: [
+          { titulo: 'Por empezar', valores: ['1 Contactado', '2 Interesado'] },
+          { titulo: 'Hablando', valores: ['3 Reunión hecha', '4 Cuestionario enviado', '5 Cuestionario recibido', '6 Propuesta enviada', '7 Muestras enviadas'] },
+          { titulo: 'Comprando', valores: ['8 Primer pedido', '9 Cliente habitual'] }] } },
         { id: 'PROSPECCION', titulo: 'Prospección', filtro: [{ campo: 'ID_FASE', es: ['Por contactar', '1 Contactado'] }], columnas: ['NOMBRE', 'ID_FASE', 'ID_PRIORIDAD', 'ID_TIPO_MARCA', 'CIUDAD', 'NOTA'] },
         { id: 'TODAS', titulo: 'Todas', agrupar: 'ID_FASE' }
       ],
@@ -234,10 +241,10 @@
       TABLA: 'PROVEEDORES', CODIGO: 'ID', NOMBRE: 'NOMBRE', ORDEN: 'NOMBRE', FILAS: ['proveedor', 'proveedores'],
       COLUMNAS: ['NOMBRE', 'ID_ESTADO', 'ID_PRIORIDAD', 'ZONA', 'ID_TIPO', 'N_DISENOS', 'PROXIMO_PASO'], DETALLE: ['ID_ESTADO', 'ZONA', 'PROXIMO_PASO'],
       CAMPOS: { NOMBRE: { titulo: 'Proveedor', privado: true }, ID_ESTADO: { titulo: 'Estado', colores: { 'Aprobado': 'bien', 'Muestras pedidas': 'medio', 'En pausa': 'apagado', 'Descartado': 'apagado' } },
-        ID_PRIORIDAD: { titulo: 'Prioridad', colores: { 'Alta': 'alto' } }, ID_TIPO: { titulo: 'Tipo' }, ID_REGION: { titulo: 'Estado (India)' }, ID_VIA: { titulo: 'Vía' }, ZONA: { titulo: 'Ciudad / zona' },
-        QUE_TIENEN: { titulo: 'Qué tienen' }, BASES: { titulo: 'Bases (algodón, lino…)' }, ANCHO: { titulo: 'Ancho (cm)' }, PESO: { titulo: 'Peso (GSM)' }, PEDIDO_MINIMO: { titulo: 'Pedido mínimo', unidad: 'm' },
+        ID_PRIORIDAD: { titulo: 'Prioridad', colores: { 'Alta': 'alto' } }, ID_TIPO: { titulo: 'Tipo' }, ID_REGION: { titulo: 'Región' }, ID_VIA: { titulo: 'Primer contacto por' }, ZONA: { titulo: 'Ciudad / zona' },
+        QUE_TIENEN: { titulo: 'Qué tienen' }, BASES: { titulo: 'Bases (algodón, lino…)' }, ANCHO: { titulo: 'Ancho (cm)' }, PESO: { titulo: 'Peso (g/m²)' }, PEDIDO_MINIMO: { titulo: 'Pedido mínimo', unidad: 'm' },
         PRECIO_30: { titulo: 'Coste a 30 m (sin envío)', unidad: '₹/m', privado: true }, PRECIO_100: { titulo: 'Coste a 100 m (sin envío)', unidad: '₹/m', privado: true },
-        PLAZO: { titulo: 'Plazo de producción' }, ENVIA_ESPANA: { titulo: '¿Envía a España?' }, OJO: { titulo: 'Pega / ojo' }, CARPETA: { titulo: 'Carpeta en Drive', tipo: 'enlace' }, NOTAS: { tipo: 'nota' },
+        PLAZO: { titulo: 'Plazo de producción' }, ENVIA_ESPANA: { titulo: '¿Envía a España?' }, OJO: { titulo: 'A tener en cuenta' }, CARPETA: { titulo: 'Carpeta en Drive', tipo: 'enlace' }, NOTAS: { tipo: 'nota' },
         N_DISENOS: { titulo: 'Diseños', de: { tabla: 'DISENOS', campo: 'ID_PROVEEDOR' } },
         PROXIMO_PASO: { titulo: 'Próximo paso', de: { tabla: 'SEGUIMIENTO', campo: 'ID_PROVEEDOR', filtro: [NO_HECHAS], orden: 'FECHA', columna: 'DETALLE' } },
         FECHA_PASO: { titulo: 'Fecha del próximo paso', tipo: 'fecha', de: { tabla: 'SEGUIMIENTO', campo: 'ID_PROVEEDOR', filtro: [NO_HECHAS], orden: 'FECHA', columna: 'FECHA' } } },
@@ -270,7 +277,7 @@
         ENLACE_FOTO: { titulo: 'Foto', tipo: 'foto' }, COLOR: { titulo: 'Color' }, ID_DISENO: { titulo: 'Diseño' },
         'ID_DISENO.ID_TECNICA': { titulo: 'Técnica' }, 'ID_DISENO.ANCHO': { titulo: 'Ancho', unidad: 'cm' }, 'ID_DISENO.GSM': { titulo: 'Peso', unidad: 'g/m²' },
         'ID_DISENO.MARTINDALE': { titulo: 'Martindale' }, 'ID_DISENO.USO': { titulo: 'Uso' },
-        'ID_DISENO.ID_PROVEEDOR': { titulo: 'Proveedor', privado: true }, REF_PROVEEDOR: { titulo: 'Ref. del proveedor', privado: true },
+        'ID_DISENO.ID_PROVEEDOR': { titulo: 'Proveedor', privado: true }, REF_PROVEEDOR: { titulo: 'Referencia del proveedor', privado: true },
         'ID_DISENO.COSTE_INR': { titulo: 'Coste del proveedor (sin envío)', tipo: 'numero', unidad: '₹/m', privado: true },
         'ID_DISENO.MARGEN': { titulo: 'Margen del diseño', tipo: 'porcentaje', privado: true, ayuda: 'Vacío: el margen de Ajustes.' },
         PRECIO_TALLER: { titulo: 'Precio puesto en taller', tipo: 'importe', unidad: '€/m', precio: { envio: ['$ENVIO'] },

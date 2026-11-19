@@ -992,10 +992,10 @@
    "tarea": "T0650",
    "titulo": "Quien ayuda a Marta ya no ve proveedores ni costes",
    "pr": 345,
-   "commit": "7238b96",
-   "ultimo": "T0650: El área Proveedores no se ofrece a Ayuda al añadir o cambiar una tarea",
+   "commit": "2b1c419",
+   "ultimo": "T0650: Al día con main (aviso de prueba, T0639; fichas de Marta, T0642; copia fiable, T0645)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T08:56:03.317Z",
+   "fecha": "2026-11-19T09:08:42.732Z",
    "toca": [],
    "comun": true,
    "paginas": [
