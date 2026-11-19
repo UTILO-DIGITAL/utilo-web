@@ -1267,6 +1267,57 @@
     ]
    },
    "rama": "T0628-invierte-arriesga"
+  },
+  "casa-abuela.T0655-dev-datos-inventados": {
+   "tarea": "T0655",
+   "titulo": "Casa Abuela se prueba en la app DEV con datos inventados",
+   "pr": 124,
+   "commit": "cbfb666",
+   "ultimo": "T0655: DEV con parentescos, el cumple de Luis en su día, #datos-nuevos sin recargar y los botones flotantes encima de la línea DEV",
+   "quien": "Javi Canela",
+   "fecha": "2026-11-19T12:06:36.527Z",
+   "toca": [
+    "personal"
+   ],
+   "comun": false,
+   "paginas": [
+    {
+     "ruta": "",
+     "nombre": "Casa Abuela",
+     "iniciativa": "personal",
+     "proyecto": "",
+     "repo": "casa-abuela",
+     "carga": [],
+     "local": true,
+     "cambia": true,
+     "personas": [
+      {
+       "id": "carmen",
+       "nombre": "Carmen · lleva la web"
+      },
+      {
+       "id": "abuela",
+       "nombre": "Abuela"
+      },
+      {
+       "id": "pablo",
+       "nombre": "Pablo · nieto"
+      },
+      {
+       "id": "luis",
+       "nombre": "Luis · pareja de Carmen"
+      },
+      {
+       "id": "rosa",
+       "nombre": "Rosa · servicio"
+      }
+     ]
+    }
+   ],
+   "migraciones": {},
+   "principal": false,
+   "rama": "T0655-dev-datos-inventados",
+   "repo": "casa-abuela"
   }
  },
  "bases": {
