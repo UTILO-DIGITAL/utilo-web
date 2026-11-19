@@ -74,8 +74,15 @@
     return pc ? n / 100 : n;
   }
 
-  /** ¿Es un teléfono («+91 98200 12345», «(93) 555-12-34»)? «Formulario en la web» no: sale como texto, sin enlace (T0645). */
-  function esTelefono(v) { var s = String(v || '').trim(); return /^\+?[\d\s().\-\/]+$/.test(s) && s.replace(/\D/g, '').length >= 6; }
+  /**
+   * ¿Es un teléfono («+91 98200 12345», «(93) 555-12-34», «+91 78699 57726 (WhatsApp)», «619 060 112 / 670 943 907»)? Lo
+   * que va entre paréntesis con letras es una nota y no cuenta (T0656). «Formulario en la web» no: sale como texto, sin
+   * enlace (T0645).
+   */
+  function sinNotas(v) { return String(v == null ? '' : v).replace(/\([^)]*[A-Za-zÀ-ÿ][^)]*\)/g, ' ').trim(); }
+  function esTelefono(v) { var s = sinNotas(v); return /^\+?[\d\s().\-\/+]+$/.test(s) && s.replace(/\D/g, '').length >= 6; }
+  /** El número al que llama el enlace: el primero si hay varios («… / …»), solo con sus cifras y el «+». */
+  function telDe(v) { return sinNotas(v).split('/')[0].replace(/[^\d+]/g, ''); }
 
   /* ---------- condiciones (filtros de las vistas y avisos) ----------
    * Una lista de condiciones que se cumplen todas: { campo, es | no | vacio | contiene | desde | hasta | mayor | menor }.
@@ -472,6 +479,14 @@
         if (!env.length) errores.push(donde + 'el precio «' + c + '» no dice cuál es su envío (precio.envio).');
         else if (!env.some(function (e) { return usa(d.calculo).indexOf(e) >= 0; })) errores.push(donde + 'el precio «' + c + '» no suma su envío (' + env.join(' o ') + '): se vería un precio sin envío.');
       }
+    });
+    // T0656: los calculados de lo relacionado (la Comparativa en la ficha de una marca) también sacan sus $ de VALORES.
+    lista(ap.relacionados).forEach(function (r) {
+      Object.keys(r.campos || {}).forEach(function (c) {
+        usa((r.campos[c] || {}).calculo).forEach(function (u) {
+          if (u.charAt(0) === '$' && (!cfg.VALORES || !(u.slice(1) in cfg.VALORES))) errores.push(donde + '«' + c + '» de «' + (r.titulo || r.tabla) + '» usa ' + u + ', que no está en VALORES.');
+        });
+      });
     });
     lista(ap.filtro).forEach(function (cnd) { if (cnd.campo) hay(cnd.campo, 'el FILTRO usa'); });
     Object.keys(ap.nueva).forEach(function (c) { hay(c, 'NUEVA pone'); });
@@ -934,7 +949,7 @@
    *  móvil no hay sesión de Google, o quien mira no tiene permiso). En la ficha, el porqué entero; en una miniatura, corto. */
   var SIN_FOTO = { corto: 'No se ve', largo: 'No se puede ver la foto aquí. Para que se vea en la app (también en el móvil), su carpeta de Drive tiene que estar compartida como «Cualquier persona con el enlace».' };
 
-  var CALC = { textoVuelta: textoVuelta, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, cumple: cumple, calcular: calcular, usa: usa,
+  var CALC = { textoVuelta: textoVuelta, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
@@ -1022,7 +1037,7 @@
           if (cp.tipo === 'enlace' && /^https?:\/\//i.test(String(v))) return '<a href="' + texto(v) + '" target="_blank" rel="noopener">Abrir ↗</a>';
           if (cp.tipo === 'instagram' && instagramUrl(v)) return '<a href="' + texto(instagramUrl(v)) + '" target="_blank" rel="noopener">' + texto(cuentaInstagram(v)) + ' ↗</a>';
           if (cp.tipo === 'email' && /@/.test(String(v))) return '<a href="mailto:' + texto(v) + '">' + texto(v) + '</a>';
-          if (cp.tipo === 'telefono' && esTelefono(v)) return '<a href="tel:' + texto(String(v).replace(/[^\d+]/g, '')) + '">' + texto(v) + '</a>';
+          if (cp.tipo === 'telefono' && esTelefono(v)) return '<a href="tel:' + texto(telDe(v)) + '">' + texto(v) + '</a>';
           if (cp.tipo === 'foto' && imagen(v)) return '<img class="li-foto" src="' + texto(imagen(v)) + '" alt="" referrerpolicy="no-referrer" data-li-foto>' +
             (/^https?:/i.test(String(v)) ? ' <a class="u-nota li-verfoto" href="' + texto(v) + '" target="_blank" rel="noopener">Ver foto ↗</a>' : '');
         }

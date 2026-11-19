@@ -1022,13 +1022,14 @@
   "T0653-calculadora-precios": {
    "tarea": "T0653",
    "titulo": "Calcular precio en la app de Marta y facturas con el último precio a cada cliente",
-   "pr": null,
-   "commit": "ae427e5",
-   "ultimo": "T0653: Calcular precio en la app de Marta y facturas con el último precio a cada cliente",
+   "pr": 349,
+   "commit": "7839b11",
+   "ultimo": "T0653: Al día con main (teléfonos sin persona y VALORES de Clientes y Prospección, T0656; app DEV, T0654)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T10:18:19.588Z",
+   "fecha": "2026-11-19T10:19:46.105Z",
    "toca": [
     "konamigas",
+    "telas",
     "utilo"
    ],
    "comun": true,
@@ -1163,6 +1164,37 @@
       "nombre": "konamigas-dev"
      },
      "publica": true,
+     "cambia": true
+    },
+    {
+     "ruta": "dev/listado/",
+     "nombre": "App de ejemplo",
+     "iniciativa": "telas",
+     "proyecto": "",
+     "carga": [
+      "web/' + window.LI_MARCA + '/marca.css",
+      "web/dev/listado/ejemplo-telas.js",
+      "web/dev/listado/motor-falso.js",
+      "web/estilos/base.css",
+      "web/kanban4/tablas.js",
+      "web/nucleo/nucleo.js",
+      "web/nucleo/secciones/listado.js"
+     ],
+     "local": true,
+     "personas": [
+      {
+       "id": "duena",
+       "nombre": "Marta · Dueña"
+      },
+      {
+       "id": "ayudante",
+       "nombre": "Ayudante"
+      },
+      {
+       "id": "admin",
+       "nombre": "Admin"
+      }
+     ],
      "cambia": true
     }
    ],
