@@ -550,8 +550,10 @@
     });
     // T0643 · Lo de un toque (RAPIDAS), el alta (ALTA) y lo que se pone solo (DEDUCIR).
     var edTodo = ap.editar === true, sePuede = function (c) { return edTodo || ed.indexOf(c) >= 0; };
+    // T0662: el motor pone {} a lo que la sección no dice (el defecto de modulo.json): eso no es un error, es que no lo usa.
+    var puesto = function (x) { return !!x && (typeof x !== 'object' || Object.keys(x).length > 0); };
     var rp = ap.rapidas;
-    if (cfg.RAPIDAS && !rp) errores.push(donde + 'RAPIDAS no dice ni HECHA ni PASAR.');
+    if (puesto(cfg.RAPIDAS) && !rp) errores.push(donde + 'RAPIDAS no dice ni HECHA ni PASAR.');
     if (rp) {
       if (cfg.RAPIDAS.HECHA && !rp.hecha) errores.push(donde + 'RAPIDAS.HECHA no dice su columna (campo).');
       if (rp.hecha) {
@@ -574,7 +576,7 @@
         }
       }
     }
-    if (cfg.ALTA && !ap.alta) errores.push(donde + 'ALTA no dice sus campos (campos).');
+    if (puesto(cfg.ALTA) && !ap.alta) errores.push(donde + 'ALTA no dice sus campos (campos).');
     if (ap.alta) ap.alta.campos.concat(ap.alta.mas).forEach(function (c) {
       var d = ap.campos[c];
       if (d && d.primero) { d.primero.forEach(function (p) { hay(p, 'ALTA usa'); if (!sePuede(p)) errores.push(donde + 'ALTA pide «' + c + '», pero «' + p + '» no está en EDITAR.'); }); return; }
@@ -587,7 +589,7 @@
       Object.keys(ap.deducir[c] || {}).forEach(function (o) { hay(o, 'DEDUCIR mira'); });
     });
     // T0652: el resumen de con quién es la fila.
-    if (cfg.CONTEXTO && !ap.contexto) errores.push(donde + 'CONTEXTO no dice en «de» de qué tablas sale el resumen.');
+    if (puesto(cfg.CONTEXTO) && !ap.contexto) errores.push(donde + 'CONTEXTO no dice en «de» de qué tablas sale el resumen.');
     if (ap.contexto) {
       var cx = ap.contexto, cn = function (p) { return typeof p === 'string' ? p : (p && p.campo); };
       if (!cx.campo) errores.push(donde + 'CONTEXTO no dice en «campo» qué columna lleva al resumen.');

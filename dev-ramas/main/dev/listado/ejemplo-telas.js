@@ -415,7 +415,15 @@
     mas.forEach(function (t) { var x = refsDesde(t); Object.keys(x).forEach(function (k) { c._refs[k] = c._refs[k] || x[k]; }); });
   });
 
-  var E = { nucleo: { perfiles: ['Dueña', 'Ayudante'], secciones: SECCIONES }, tablas: TABLAS, refs: REFS };
+  // T0662 · Lo que la sección no dice llega a la web con el defecto de motor/modulos/listado/modulo.json, como lo monta
+  // montar.js (RAPIDAS, ALTA y CONTEXTO, {}): así se ve aquí lo mismo que en la app de verdad. probar-listado.js comprueba que son esos.
+  var DEFECTOS = {"TABLA":"","CLAVE":"ID","CODIGO":"","NOMBRE":"","COLUMNAS":[],"DETALLE":[],"ORDEN":"","FILTRO":[],"BUSCAR":[],"CAMPOS":{},"FICHA":[],"RELACIONADOS":[],"VISTAS":[],"AVISOS":[],"EDITAR":[],"CREAR":false,"ACCIONES":[],"NUEVA":{},"RAPIDAS":{},"ALTA":{},"DEDUCIR":{},"CONTEXTO":{},"OBLIGATORIAS":[],"TEXTO":"","FILAS":[],"VACIO":"","VALORES":{},"PROHIBIDO":["CONTRASENA","CUENTA","DNI"],"PERSONALIZAN":[],"PREFERENCIAS":""};
+  Object.keys(SECCIONES).forEach(function (n) {
+    var c = SECCIONES[n].config;
+    Object.keys(DEFECTOS).forEach(function (k) { if (!(k in c)) c[k] = JSON.parse(JSON.stringify(DEFECTOS[k])); });
+  });
+
+  var E = { nucleo: { perfiles: ['Dueña', 'Ayudante'], secciones: SECCIONES }, tablas: TABLAS, refs: REFS, defectos: DEFECTOS };
   if (typeof module !== 'undefined' && module.exports) module.exports = E;
   if (typeof window !== 'undefined') window.LISTADO_EJEMPLO = E;
 })();
