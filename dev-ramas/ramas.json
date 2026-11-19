@@ -887,12 +887,12 @@
   },
   "T0661-quitar-proximo-paso": {
    "tarea": "T0661",
-   "titulo": "El siguiente paso de una tarea se guarda como Tarea; «Próximo paso» deja de ser un tipo",
-   "pr": null,
-   "commit": "569cdcc",
-   "ultimo": "T0661: El siguiente paso de una tarea se guarda como Tarea; «Próximo paso» deja de ser un tipo",
+   "titulo": "«Próximo paso» deja de ser un tipo de Seguimiento: el siguiente paso se guarda como Tarea",
+   "pr": 354,
+   "commit": "307f74b",
+   "ultimo": "T0661: El plan de pruebas vale con el «Entrar como» de una página de DEV sin Supabase",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T13:05:46.952Z",
+   "fecha": "2026-11-19T13:22:22.129Z",
    "toca": [
     "telas"
    ],
