@@ -900,10 +900,10 @@
    "tarea": "T0673",
    "titulo": "Economía de Marta: facturas en el móvil, el capital aparte y las ventas por adelantado",
    "pr": 364,
-   "commit": "cd0c1a1c",
-   "ultimo": "T0673: Al día con main (DEV de Telas, T0669; aviso de Economía, T0672)",
+   "commit": "da8fd5f4",
+   "ultimo": "T0673: Preparar los Excel de prueba de DEV olvida la caché del servidor, y la app enseña lo nuevo al momento",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T17:19:07.391Z",
+   "fecha": "2026-11-19T17:47:58.285Z",
    "toca": [
     "telas"
    ],
