@@ -883,12 +883,12 @@
   },
   "T0673-pulir-economia": {
    "tarea": "T0673",
-   "titulo": "Facturas como tarjeta en el móvil, «Te cuesta …» al elegir la tela y el cliente una sola vez en Movimientos",
-   "pr": null,
-   "commit": "1fc67575",
-   "ultimo": "T0673: El capital, aparte en Caja, y una venta pagada por adelantado no cuenta como ganada hasta pagar al taller",
+   "titulo": "Economía de Marta: facturas en el móvil, el capital aparte y las ventas por adelantado",
+   "pr": 364,
+   "commit": "f0eca0db",
+   "ultimo": "T0673: El tipo de factura en tres botones y el capital, fuera de Caja",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T16:12:34.116Z",
+   "fecha": "2026-11-19T16:37:17.004Z",
    "toca": [
     "telas"
    ],

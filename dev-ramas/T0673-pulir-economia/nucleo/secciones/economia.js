@@ -41,7 +41,7 @@
  *   PESTANAS, AYUDA            pestañas que se ven y texto de ayuda
  *   VENTAS, MARGEN_MINIMO      T0628 · tabla de las ventas (la del DESGLOSE) y el margen mínimo (un número o una fila de otra tabla)
  *   CUENTAS_PERSONALES         T0646 · tipos de CUENTAS que son lo que pone una persona: en Caja, aparte («Lo que te debe la empresa»)
- *   CUENTAS_CAPITAL            T0673 · tipos de CUENTAS que son el capital de la empresa: en Caja, aparte («Capital que has puesto»), sin deuda
+ *   CUENTAS_CAPITAL            T0673 · tipos de CUENTAS que son el capital de la empresa: Caja no las enseña (no es deuda ni dinero de la empresa)
  *   CLIENTES                   T0646 · de dónde salen los clientes de una factura emitida (las MARCAS), con su dirección
  *   _refs                      (lo pone montar.js) la tabla a la que apunta PERIODO y DESGLOSE, para sus nombres
  * Las cuentas, categorías y contrapartes son filas del Excel de cada negocio.
@@ -651,10 +651,11 @@
     var r = { empresa: [], total: 0, personas: [], debe: 0, capital: [], puesto: 0, ceros: 0 };
     (cue || []).forEach(function (c) {
       var v = sal[c.ID] || 0;
+      // T0673 · El capital (tipos de CUENTAS_CAPITAL): lo que puso para crear la empresa, en positivo. No es una deuda ni dinero
+      // de la empresa, y es una cifra que no se mueve: Caja no lo enseña (ni entre las cuentas a cero), solo lo aparta.
+      if ((capital || []).indexOf(String(c.TIPO || '')) >= 0) { r.capital.push({ c: c, v: -v }); r.puesto -= v; return; }
       if (!v) { r.ceros++; if (!ceros) return; }
-      // T0673 · El capital (tipos de CUENTAS_CAPITAL): lo que puso para crear la empresa, en positivo; no es una deuda.
-      if ((capital || []).indexOf(String(c.TIPO || '')) >= 0) { r.capital.push({ c: c, v: -v }); r.puesto -= v; }
-      else if ((personales || []).indexOf(String(c.TIPO || '')) >= 0) { r.personas.push({ c: c, v: -v }); r.debe -= v; }
+      if ((personales || []).indexOf(String(c.TIPO || '')) >= 0) { r.personas.push({ c: c, v: -v }); r.debe -= v; }
       else { r.empresa.push({ c: c, v: v }); r.total += v; }
     });
     return r;
@@ -975,7 +976,7 @@
       // suma al dinero de la empresa: van aparte, en positivo, como lo que la empresa le debe a esa persona.
       var PERSONALES = String(cfg.CUENTAS_PERSONALES || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
       function esPersonal(c) { return PERSONALES.indexOf(String(c.TIPO || '')) >= 0; }
-      // T0673 · Con CUENTAS_CAPITAL (p. ej. «Capital»), el capital de la empresa va aparte: ni dinero de la empresa ni lo que te debe.
+      // T0673 · Con CUENTAS_CAPITAL (p. ej. «Capital»), el capital no sale en Caja: ni dinero de la empresa ni lo que te debe.
       var CAPITAL = String(cfg.CUENTAS_CAPITAL || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
       function htmlCaja() {
         if (S.caja.cue && ix.cue[S.caja.cue]) return htmlCuenta(ix.cue[S.caja.cue]);
@@ -986,7 +987,7 @@
             '</td><td class="num">' + cifra(v, true) + ' <span class="eco-ir" aria-hidden="true">›</span></td></tr>';
         }
         var h = '<p class="u-nota">El dinero que hay en cada cuenta, con todos los movimientos (no solo los de ' + texto(nomPeriodo()) + '). Toca una para ver lo que entra y sale.</p>';
-        if (!tipos.length && !pers.length && !x.capital.length) return h + '<p class="u-vacio">Todas las cuentas están a cero.</p>';
+        if (!tipos.length && !pers.length) return h + '<p class="u-vacio">Todas las cuentas están a cero.</p>';
         if (PERSONALES.length) {
           var cs = []; tipos.forEach(function (t) { cs = cs.concat(por[t]); });
           h += '<h2 class="n-grupo">Dinero de la empresa</h2>' + (cs.length ? '<table class="u-tabla eco-tabla"><tbody>' + cs.map(function (c) { return fila(c, sal[c.ID] || 0); }).join('') +
@@ -1005,11 +1006,6 @@
               (por[t].length > 1 ? '<tr class="eco-total"><td class="u-tabla-t">Total ' + texto(t.toLowerCase()) + '</td><td class="num">' + cifra(st, true) + '</td></tr>' : '') + '</tbody></table>';
           });
           h += '<table class="u-tabla eco-tabla"><tbody><tr class="eco-total"><td class="u-tabla-t">Total de todas las cuentas</td><td class="num">' + cifra(tot, true) + '</td></tr></tbody></table>';
-        }
-        if (x.capital.length) {
-          h += '<h2 class="n-grupo">Capital que has puesto</h2><p class="u-nota">Lo que pusiste para crear la empresa. No es una deuda: lo recuperas con lo que gane la empresa.</p>' +
-            '<table class="u-tabla eco-tabla"><tbody>' + x.capital.map(function (y) { return fila(y.c, y.v); }).join('') +
-            (x.capital.length > 1 ? '<tr class="eco-total"><td class="u-tabla-t">Total</td><td class="num">' + cifra(x.puesto, true) + '</td></tr>' : '') + '</tbody></table>';
         }
         if (ceros) h += '<button type="button" class="u-btn u-btn-texto" data-accion="ceroscaja">' + (S.caja.ceros ? 'Ocultar las cuentas a cero' : 'Ver también las ' + ceros + ' cuentas a cero') + '</button>';
         return h;
@@ -1416,6 +1412,12 @@
        * suma), con el CIF y la dirección del cliente (CONTRAPARTES, si el negocio tiene esas columnas), y se puede ver como
        * documento («Ver la factura») y, con FACTURA_CARPETA, guardar su PDF en Drive («Guardar y sacar el PDF»).
        */
+      /** T0673 · Los tipos de factura, en botones al añadirla: [valor, lo que dice el botón] y lo que es cada uno, debajo. */
+      var TIPOS_FAC = [['Emitida', 'Emitida'], ['Recibida', 'Recibida'], ['Ticket', 'Ticket']];
+      function notaTipoFac(t) {
+        return { Emitida: 'La haces tú, a un cliente.', Recibida: 'Te la manda un proveedor, el taller o la gestoría: pon el número que trae.',
+          Ticket: 'Un ticket de una compra pequeña (un taxi, la entrada a una feria).' }[t] || '';
+      }
       /** T0646 · Las fichas de CLIENTES (las marcas). */
       function fichasCli() { return CLI ? (T.filas(CLI.tabla) || []) : []; }
       /** Quién se puede elegir en una factura: en una emitida con CLIENTES, solo clientes (los que ya lo son y las fichas que
@@ -1441,8 +1443,11 @@
           (f && LINEAS && f.TIPO === 'Emitida' ? '<p>' + (f.ARCHIVO_URL ? '<a class="eco-drive" href="' + texto(f.ARCHIVO_URL) + '" target="_blank" rel="noopener" data-fuera>Abrir el PDF ↗</a>' : '<span class="u-nota">Todavía sin PDF' + (pdf ? ': «Guardar y sacar el PDF» lo hace.' : '.') + '</span>') + '</p>'
             : f ? '<p>' + enlaceDrive(f) + '</p>' : '') +
           (movId ? '<p class="u-nota">Con los datos del movimiento. ' + (v.TIPO === 'Emitida' ? 'La fecha es la de hoy, que es cuando se emite; el número lo pone el Excel al guardarla.' : 'Pon el número que trae la factura.') + ' Al guardarla queda enlazada al movimiento.</p>' : '') +
+          // T0673 · El tipo, arriba y a la vista (como «Entra / Sale / Entre cuentas» en Movimientos), no en un desplegable.
+          (f ? '' : '<div class="eco-sw" role="group" aria-label="Qué factura es">' + TIPOS_FAC.map(function (t) {
+            return '<button type="button" data-tipo="' + t[0] + '" aria-pressed="' + (t[0] === (v.TIPO || 'Emitida') ? 'true' : 'false') + '">' + t[1] + '</button>';
+          }).join('') + '</div><input type="hidden" id="f-TIPO" value="' + texto(v.TIPO || 'Emitida') + '"><p class="u-nota" id="f-tipo-nota">' + texto(notaTipoFac(v.TIPO || 'Emitida')) + '</p>') +
           '<div class="u-campos">' +
-          (f ? '' : campo('Tipo', '<select id="f-TIPO">' + opciones([['Emitida', 'Emitida (la hacemos nosotros)'], ['Recibida', 'Recibida'], ['Ticket', 'Ticket']], v.TIPO) + '</select>')) +
           campo('Número', '<input type="text" id="f-NUMERO" value="' + texto(v.NUMERO) + '" maxlength="40">', 'eco-numero') +
           '<p class="u-nota u-ancho" id="f-num-nota" hidden></p>' +
           campo('Fecha', '<input type="date" id="f-FECHA" value="' + texto(v.FECHA) + '">') +
@@ -1727,6 +1732,14 @@
             }
           }
           ['f-TIPO', 'f-TIPO_IVA'].forEach(function (id) { var e = vent.querySelector('#' + id); if (e) e.addEventListener('change', function () { refrescar(); pintaCliente(); }); });
+          var sw = vent.querySelector('.eco-sw');
+          if (sw) sw.onclick = function (e) { // T0673: el botón pone el tipo y avisa como lo hacía el desplegable
+            var b = e.target.closest('[data-tipo]'), inp = vent.querySelector('#f-TIPO'); if (!b || !inp) return;
+            inp.value = b.getAttribute('data-tipo');
+            [].forEach.call(sw.querySelectorAll('[data-tipo]'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+            vent.querySelector('#f-tipo-nota').textContent = notaTipoFac(inp.value);
+            inp.dispatchEvent(new Event('change'));
+          };
           // En las líneas con el IVA incluido, cambiar el tipo de IVA deja lo escrito (lo que cobra) y cambia el sin IVA.
           vent.querySelector('#f-TIPO_IVA').addEventListener('change', function () {
             if (!cajaLin) return;
