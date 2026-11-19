@@ -900,12 +900,12 @@
   },
   "T0678-pulir-fichas-telas": {
    "tarea": "T0678",
-   "titulo": "Sin envío no sale ningún coste; la Comparativa, a tu ancho; fichas sin jerga ni repetidos",
-   "pr": null,
-   "commit": "2a0dc465",
-   "ultimo": "T0678: Sin envío no sale ningún coste; la Comparativa, a tu ancho; fichas sin jerga ni repetidos",
+   "titulo": "Pulir fichas, Mis telas y la calculadora de Marta",
+   "pr": 366,
+   "commit": "d3dd9efb",
+   "ultimo": "T0678: Al día con main (Uso, T0682; Economía, T0673; Hoy y Seguimiento, T0677)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-19T17:42:08.883Z",
+   "fecha": "2026-11-19T20:44:08.463Z",
    "toca": [
     "telas"
    ],
@@ -964,7 +964,8 @@
       "web/utilo/secciones/bandeja.js",
       "web/utilo/secciones/entregas.js",
       "web/utilo/secciones/parami.js",
-      "web/utilo/secciones/tablero.js"
+      "web/utilo/secciones/tablero.js",
+      "web/utilo/secciones/uso.js"
      ],
      "clave": "dev-plataforma",
      "supabase": {
@@ -1155,7 +1156,8 @@
      "20261112170000_avisos_sin_telegram.sql",
      "20261112182957_plan_pruebas_tablas.sql",
      "20261112183000_plan_pruebas.sql",
-     "20261112190000_avisos_prueba_diaria.sql"
+     "20261112190000_avisos_prueba_diaria.sql",
+     "20261119200000_uso.sql"
     ]
    },
    "rama": "T0678-pulir-fichas-telas"
