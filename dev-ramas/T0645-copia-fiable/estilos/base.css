@@ -345,6 +345,12 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .n-ventana h2 { font-size: 20px; }
 .u .n-ventana textarea { width: 100%; }
 .u .n-botones { display: flex; flex-wrap: wrap; gap: var(--e2); }
+/* T0639 · El aviso del proyecto (nucleo.aviso): una línea arriba del panel, en todas las secciones; no se queda fija. */
+.u .n-aviso-app { display: flex; align-items: flex-start; gap: var(--e2); margin: 0; padding: var(--e2) var(--e4);
+  background: var(--color-pendiente-fondo); color: var(--color-texto); border-bottom: 1px solid var(--color-linea); font-size: 14px; line-height: 1.35; }
+.u .n-aviso-app svg { flex: none; width: 18px; height: 18px; margin-top: 1px; fill: none; stroke: var(--color-pendiente); stroke-width: 2; stroke-linecap: round; }
+.u .n-aviso-app span { min-width: 0; overflow-wrap: anywhere; }
+@media (min-width: 900px) { .u .n-aviso-app { padding-left: var(--e5); padding-right: var(--e5); } }
 /* T0273 · Viendo como otra persona: la franja de arriba, siempre a la vista, también con una ventana abierta (va por encima
  * de los velos, y --tope, su alto, baja lo que se queda fijo arriba: cabeceras de tabla, barras y ventanas), y la lista de
  * la ventana para elegir a quién. */
@@ -2150,6 +2156,13 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u a.li-rel-f { text-decoration: none; }
 .u .li-rel-f .li-ir { margin-left: auto; font-weight: 700; color: var(--color-principal-oscuro); white-space: nowrap; }
 .u div.li-rel-f { cursor: default; }
+/* T0642 · Lo relacionado con cada dato y su título («Qué buscan»), «+ Nueva tarea» debajo y «Copiar para Claude» dentro de «Más». */
+.u .li-rel-datos + .li-rel-datos { margin-top: var(--e3); padding-top: var(--e3); border-top: 1px solid var(--color-linea); }
+.u .li-rel-nueva { margin-top: var(--e2); padding-left: 0; padding-right: 0; justify-content: flex-start; }
+.u .li-mas { border-top: 1px solid var(--color-linea); padding-top: var(--e2); }
+.u .li-mas > summary { cursor: pointer; min-height: 40px; display: flex; align-items: center; color: var(--color-suave); font-size: 14px; }
+.u .li-mas[open] .li-claude { border-top: 0; padding-top: var(--e1); }
+.u .li-accion-t { margin: var(--e1) 0 0; }
 /* T0625 · Filtrar en la sección Listado: el botón (con cuántos hay puestos), las etiquetas de los puestos, que se quitan con
    su ✕ o todas con «Quitar filtros», y en el panel los rangos «de … a …» y «desde … hasta …». */
 .u .li-barra .li-filtrar { font-size: 15px; padding: 0 var(--e3); gap: var(--e1); }
