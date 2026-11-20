@@ -1924,15 +1924,6 @@
    "quien": "Javi Canela",
    "rama": "T0735-afinar-ferias-documentos",
    "carpeta": "T0735-afinar-ferias-documentos"
-  },
-  "DEV-3": {
-   "cliente": "telas",
-   "modo": "ejemplo",
-   "commit": "b8b38d72",
-   "subido": "20/11/26, 23:46",
-   "quien": "Javi Canela",
-   "rama": "T0728-afinar-calcular-precio",
-   "carpeta": "T0728-afinar-calcular-precio"
   }
  }
 }
