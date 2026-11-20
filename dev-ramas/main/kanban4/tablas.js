@@ -349,6 +349,7 @@
        * op.fn (opcional): una función de la sección que hace el alta en el motor y devuelve lo mismo que tablasCrear
        * ({ id, fila, v }), con otras si ha cambiado más filas. Recibe op.args (T0254) o, si no hay, [valores] (T0257:
        * economiaEmitir, que pone el número de la factura).
+       * T0724 · op.callado: si el motor dice que no, sin el aviso de siempre (quien llama lo dice donde se ve, en palabras).
        */
       crear: function (n, valores, op) {
         op = op || {};
@@ -377,7 +378,7 @@
           delete mm.ids[tmp];
           emitir('cambio', n, { id: tmp, deshecho: true });
           emitir('error', e, { tabla: n, valores: valores });
-          avisar('No se ha creado: ' + limpio(e.message));
+          if (!op.callado) avisar('No se ha creado: ' + limpio(e.message)); // T0724: op.callado, quien llama lo dice a su manera
           throw e;
         });
       },
