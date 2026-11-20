@@ -1618,14 +1618,6 @@
   "ficha": "../utilo/plataforma/?s=tablero&t="
  },
  "huecos": {
-  "DEV-1": {
-   "cliente": "telas",
-   "commit": "bd7b5700",
-   "subido": "20/11/26, 10:51",
-   "quien": "Javi Canela",
-   "rama": "T0686-catalogo-para-marcas",
-   "carpeta": "T0686-catalogo-para-marcas"
-  },
   "DEV-2": {
    "cliente": "telas",
    "modo": "ejemplo",
@@ -1634,6 +1626,15 @@
    "quien": "Javi Canela",
    "rama": "T0702-revision-telas",
    "carpeta": "T0702-revision-telas"
+  },
+  "DEV-1": {
+   "cliente": "telas",
+   "modo": "ejemplo",
+   "commit": "dbc11e62",
+   "subido": "20/11/26, 22:33",
+   "quien": "Javi Canela",
+   "rama": "T0722-motor-seguro-rapido",
+   "carpeta": "T0722-motor-seguro-rapido"
   }
  }
 }
