@@ -1314,6 +1314,15 @@
    "quien": "Javi Canela",
    "rama": "T0688-marcas",
    "carpeta": "T0688-marcas"
+  },
+  "DEV-3": {
+   "cliente": "telas",
+   "modo": "ejemplo",
+   "commit": "856cf8a8+cambios",
+   "subido": "20/11/26, 14:46",
+   "quien": "Javi Canela",
+   "rama": "T0689-facturar-fichas-solas",
+   "carpeta": "T0689-facturar-fichas-solas"
   }
  }
 }
