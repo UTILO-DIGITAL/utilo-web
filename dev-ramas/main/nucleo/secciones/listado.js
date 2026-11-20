@@ -73,6 +73,19 @@
     var n = /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : NaN;
     return pc ? n / 100 : n;
   }
+  /**
+   * T0714 · Un porcentaje se guarda como parte (0,48) y se escribe y se ve en % (48). Lo que ya viene en % (100, de un Excel
+   * escrito así; T0686) se ve igual: más de 1 ya es %. pctVer: lo guardado → el %; pctEscrito: lo escrito («48», «48 %») → la parte.
+   */
+  function pctVer(v) { var n = aNumero(v); return isNaN(n) ? n : Math.round((Math.abs(n) > 1 ? n : n * 100) * 1e6) / 1e6; }
+  function pctEscrito(v) { var n = aNumero(v); return isNaN(n) || /%\s*$/.test(String(v)) ? n : Math.round(n / 100 * 1e8) / 1e8; }
+  /** T0714 · Lo escrito en un campo, como se guarda: un número, como número; un porcentaje, como parte; lo demás, tal cual. */
+  function deEscrito(cp, s) {
+    s = String(s == null ? '' : s).trim();
+    if (s === '' || !/^(importe|numero|porcentaje)$/.test(cp.tipo || '')) return s;
+    var n = cp.tipo === 'porcentaje' ? pctEscrito(s) : aNumero(s);
+    return isNaN(n) ? s : n;
+  }
 
   /**
    * ¿Es un teléfono («+91 98200 12345», «(93) 555-12-34», «+91 78699 57726 (WhatsApp)», «619 060 112 / 670 943 907»)? Lo
@@ -260,7 +273,7 @@
       relacionados: cfg.RELACIONADOS || [], vistas: cfg.VISTAS || [], avisos: cfg.AVISOS || [], editar: cfg.EDITAR || [],
       crear: !!cfg.CREAR, texto: cfg.TEXTO || '', vacio: cfg.VACIO || '', refs: cfg._refs || {}, filtro: cfg.FILTRO || [],
       nueva: cfg.NUEVA || {}, obligatorias: cfg.OBLIGATORIAS || [], filtros: cfg.FILTROS || [], filas: cfg.FILAS && cfg.FILAS.length ? cfg.FILAS : null,
-      rapidas: rapidasDe(cfg.RAPIDAS), alta: cfg.ALTA && lista(cfg.ALTA.campos).length ? { campos: lista(cfg.ALTA.campos), mas: lista(cfg.ALTA.mas), titulo: cfg.ALTA.titulo || '', abrir: !!cfg.ALTA.abrir } : null,
+      rapidas: rapidasDe(cfg.RAPIDAS), alta: cfg.ALTA && lista(cfg.ALTA.campos).length ? { campos: lista(cfg.ALTA.campos), mas: lista(cfg.ALTA.mas), titulo: cfg.ALTA.titulo || '', abrir: !!cfg.ALTA.abrir, nuevo: altaNuevoDe(cfg.ALTA.nuevo) } : null,
       deducir: cfg.DEDUCIR || {}, acciones: cfg.ACCIONES || [], contexto: contextoDe(cfg.CONTEXTO), resumen: resumenCifras(cfg.RESUMEN), arriba: arribaDe(cfg.ARRIBA),
       // T0689: la ficha guarda sola cada campo al cambiarlo; con GUARDAR: "boton", como antes (con «Guardar»). MIAS: Mías / Todas.
       guardar: cfg.GUARDAR === 'boton' ? 'boton' : 'solo', mias: miasDe(cfg.MIAS),
@@ -437,6 +450,35 @@
     });
     return c;
   }
+  /**
+   * T0714 · ALTA.nuevo: al dar de alta, elegir una fila de la tabla a la que apunta un campo o crearla a la vez (el diseño de
+   * una tela nueva, con su proveedor). { campo: "ID_DISENO", titulo: "Diseño nuevo", ya: "Uno que ya tengo", campos: [rutas
+   * de ese campo: "ID_DISENO.ID_PROVEEDOR"…], obligatorias: [de esas], codigo: { segun: "ID_TECNICA", cifras: 3, titulo } }.
+   */
+  function altaNuevoDe(x) {
+    if (!x || typeof x !== 'object' || !x.campo) return null;
+    var c = String(x.campo), k = x.codigo || {}, cs = lista(x.campos).map(String);
+    return { campo: c, titulo: x.titulo || 'Nuevo', ya: x.ya || 'Uno que ya tengo', campos: cs, obligatorias: lista(x.obligatorias).map(String),
+      codigo: { segun: k.segun ? String(k.segun) : '', cifras: Math.max(1, +k.cifras || 3), titulo: k.titulo || 'Letras del código' } };
+  }
+  /**
+   * T0714 · El código de la fila nueva de ALTA.nuevo (un diseño): las letras de los de su mismo «segun» (los otros diseños
+   * de esa técnica: BOR) y el número siguiente entre todos los que empiezan así (BOR-005). Si no hay ninguno de esa técnica
+   * (o no la ha elegido), con las letras escritas («jaq» → JAQ-001). → { codigo, pedir: si hacen falta las letras }.
+   */
+  function codigoAltaNuevo(nv, filasT, valores, letras, clave) {
+    clave = clave || 'ID';
+    var seg = nv.codigo.segun, v = seg && valores ? valores[seg] : '', cuenta = {};
+    if (!vacio(v)) lista(filasT).forEach(function (x) {
+      if (String(x[seg]) !== String(v)) return;
+      var m = /^([A-Za-z]+)-\d+$/.exec(String(x[clave] || '').trim());
+      if (m) { var l = m[1].toUpperCase(); cuenta[l] = (cuenta[l] || 0) + 1; }
+    });
+    var suyas = Object.keys(cuenta).sort(function (p, q) { return cuenta[q] - cuenta[p] || (p < q ? -1 : 1); });
+    var pre = suyas[0] || norm(letras).toUpperCase().replace(/[^A-Z]/g, '');
+    if (!pre) return { codigo: '', pedir: true };
+    return { codigo: nuevoId(pre + '-{n:' + nv.codigo.cifras + '}', {}, lista(filasT).map(function (x) { return x[clave]; })), pedir: !suyas.length };
+  }
   /** El campo de un apartado, con su título y tipo por defecto (una columna FECHA… es una fecha; ESTADO, un estado). */
   function campo(ap, c) {
     var d = (ap.campos || {})[c] || {};
@@ -571,7 +613,7 @@
       d.ref = t;
     });
     // T0651: una ruta que se edita («ID_DISENO.ID_TECNICA») que acaba en otra tabla, con sus opciones como las demás.
-    lista(a.editar).filter(esRuta).forEach(function (c) {
+    lista(a.editar).concat(a.alta && a.alta.nuevo ? a.alta.nuevo.campos : []).filter(esRuta).forEach(function (c) { // T0714: también las del diseño nuevo
       var ps = c.split('.'), tt = a.tabla;
       for (var i = 0; i < ps.length - 1 && tt; i++) tt = refDe(a, tt, ps[i]);
       var t = tt && refDe(a, tt, ps[ps.length - 1]);
@@ -814,6 +856,19 @@
       hay(c, 'ALTA usa');
       if (!sePuede(c)) errores.push(donde + 'ALTA pide «' + c + '», que no está en EDITAR.');
     });
+    // T0714: ALTA.nuevo (el diseño nuevo de una tela): un campo del alta que apunta a otra tabla y lo suyo, rutas de ese campo.
+    if (puesto(cfg.ALTA) && cfg.ALTA.nuevo !== undefined) {
+      var nv = ap.alta && ap.alta.nuevo;
+      if (!nv) errores.push(donde + 'ALTA.nuevo es { "campo": "ID_DISENO", "campos": ["ID_DISENO.ID_PROVEEDOR"…] }.');
+      else {
+        if (ap.alta.campos.indexOf(nv.campo) < 0) errores.push(donde + 'ALTA.nuevo.campo «' + nv.campo + '» no está en ALTA.campos.');
+        if (Object.keys(ap.refs).length && !refDe(ap, ap.tabla, nv.campo)) errores.push(donde + 'ALTA.nuevo.campo «' + nv.campo + '» no apunta a otra tabla.');
+        if (!nv.campos.length) errores.push(donde + 'ALTA.nuevo no dice qué pide (campos).');
+        nv.campos.forEach(function (c) { if (c.indexOf(nv.campo + '.') !== 0 || c.split('.').length !== 2) errores.push(donde + 'ALTA.nuevo.campos: «' + c + '» no es una columna de ' + nv.campo + ' («' + nv.campo + '.ANCHO»).'); });
+        nv.obligatorias.forEach(function (c) { if (nv.campos.indexOf(c) < 0) errores.push(donde + 'ALTA.nuevo.obligatorias: «' + c + '» no está en sus campos.'); });
+        if (nv.codigo.segun && nv.campos.indexOf(nv.campo + '.' + nv.codigo.segun) < 0) errores.push(donde + 'ALTA.nuevo.codigo.segun «' + nv.codigo.segun + '» no se pide en sus campos (' + nv.campo + '.' + nv.codigo.segun + ').');
+      }
+    }
     Object.keys(ap.deducir).forEach(function (c) {
       hay(c, 'DEDUCIR pone');
       if (!sePuede(c)) errores.push(donde + 'DEDUCIR pone «' + c + '», que no está en EDITAR.');
@@ -1015,8 +1070,8 @@
     if (p.length) return { cambios: {}, error: textoProhibido(p) };
     if (s === '' && (a.obligatorias || []).indexOf(c) >= 0) return { cambios: {}, error: 'Falta ' + cp.titulo + ': no se puede quedar vacío.' };
     var esNum = /^(importe|numero|porcentaje)$/.test(cp.tipo || '');
-    var nv = esNum && s !== '' && !isNaN(aNumero(s)) ? aNumero(s) : s;
-    var igual = esNum && s !== '' && antes !== '' && !isNaN(aNumero(s)) && !isNaN(aNumero(antes)) ? aNumero(s) === aNumero(antes) : s === antes;
+    var nv = deEscrito(cp, s), pc = cp.tipo === 'porcentaje'; // T0714: un porcentaje, escrito en % y guardado como parte
+    var igual = esNum && typeof nv === 'number' && antes !== '' && !isNaN(aNumero(antes)) ? (pc ? pctVer(nv) === pctVer(antes) : nv === aNumero(antes)) : s === antes;
     if (igual) return { cambios: {}, error: '' };
     var cambios = {}; cambios[c] = nv;
     var r = {}; Object.keys(crudo).forEach(function (k) { if (k !== '__crudo') r[k] = crudo[k]; }); r[c] = nv;
@@ -1422,7 +1477,7 @@
     var u = cp.unidad ? ' ' + cp.unidad : '';
     if (cp.tipo === 'fecha') return fechaCorta(v);
     if (cp.tipo === 'importe') { var n = aNumero(v); return isNaN(n) ? String(v) : num(n, 2) + (u || ' €'); }
-    if (cp.tipo === 'porcentaje') { var p = aNumero(v); return isNaN(p) ? String(v) : num(p * 100, 0) + ' %'; }
+    if (cp.tipo === 'porcentaje') { var p = pctVer(v); return isNaN(p) ? String(v) : num(p, 0) + ' %'; } // T0714: 100 (ya en %) no es 10.000 %
     if (cp.tipo === 'numero') {
       var m = aNumero(v);
       // T0708: «palabras» [uno, varios, cero]: «1 tela», «82 telas» y, con 0, el tercero (sin él, vacío).
@@ -1809,7 +1864,7 @@
    */
   function borrarDe(x) {
     if (!x || (typeof x === 'object' && !Object.keys(x).length)) return null; // {}: no se borra (el defecto)
-    var o = x === true ? {} : x, uno = function (y) { return y && y.tabla && y.campo ? { tabla: y.tabla, campo: y.campo, clave: y.clave || 'ID', filas: lista(y.filas).length >= 2 ? y.filas : ['fila', 'filas'], si: y.si || null } : null; };
+    var o = x === true ? {} : x, uno = function (y) { return y && y.tabla && y.campo ? { tabla: y.tabla, campo: y.campo, clave: y.clave || 'ID', filas: lista(y.filas).length >= 2 ? y.filas : ['fila', 'filas'], si: y.si || null, alFinal: !!y.alFinal } : null; };
     return { con: lista(o.con).map(uno).filter(Boolean), bloquean: lista(o.bloquean).map(uno).filter(Boolean),
       sino: o.sino && o.sino.poner ? { titulo: o.sino.titulo || 'Descartar', poner: o.sino.poner, hecho: o.sino.hecho || '' } : null, texto: o.texto || '' };
   }
@@ -1825,7 +1880,9 @@
   function queBorra(ap, D, crudo) {
     var b = ap.borrar; if (!b) return null;
     var id = (crudo || {})[ap.clave], de = function (x) {
-      return (D.filas(x.tabla) || []).filter(function (y) { return !vacio(id) && String(y[x.campo]) === String(id) && (!x.si || cumple(y, x.si, {})); });
+      // T0714: con «alFinal», su código al final del texto («… · BOR-004-01», una línea de factura), como en «juntar».
+      var es = function (t) { if (!x.alFinal) return String(t) === String(id); var m = /·\s*([^·]+)$/.exec(String(t == null ? '' : t)); return !!m && norm(m[1]) === norm(id); };
+      return (D.filas(x.tabla) || []).filter(function (y) { return !vacio(id) && es(y[x.campo]) && (!x.si || cumple(y, x.si, {})); });
     };
     return {
       paran: b.bloquean.map(function (x) { var n = de(x).length; return { tabla: x.tabla, n: n, texto: cuantas(n, x.filas) }; }).filter(function (x) { return x.n > 0; }),
@@ -1889,7 +1946,7 @@
   /** T0651 · La palabra pequeña junto a la etiqueta de lo que no se edita en una ficha que sí: «calculado» o la del «ir» de un «de». */
   function sufijoFijo(cp) { return cp.calculo ? 'calculado' : (cp.de && cp.ir && cp.ir.texto ? String(cp.ir.texto) : ''); }
 
-  var CALC = { nuevoId: nuevoId, plantillaPrefijo: plantillaPrefijo, codigoNuevo: codigoNuevo, esRuta: esRuta, destinoDe: destinoDe, avisoRuta: avisoRuta, borrarDe: borrarDe, queBorra: queBorra, cuantas: cuantas, yJuntos: yJuntos, relEdicion: relEdicion, altaRelacionada: altaRelacionada, paraElegir: paraElegir, sufijoFijo: sufijoFijo,
+  var CALC = { pctVer: pctVer, pctEscrito: pctEscrito, deEscrito: deEscrito, nuevoId: nuevoId, altaNuevoDe: altaNuevoDe, codigoAltaNuevo: codigoAltaNuevo, plantillaPrefijo: plantillaPrefijo, codigoNuevo: codigoNuevo, esRuta: esRuta, destinoDe: destinoDe, avisoRuta: avisoRuta, borrarDe: borrarDe, queBorra: queBorra, cuantas: cuantas, yJuntos: yJuntos, relEdicion: relEdicion, altaRelacionada: altaRelacionada, paraElegir: paraElegir, sufijoFijo: sufijoFijo,
     fechaDia: fechaDia, webCorta: webCorta, textoCorto: textoCorto, gruposConQuien: gruposConQuien, nombreCorto: nombreCorto, deshacerEnOrden: deshacerEnOrden, loDiceUnAviso: loDiceUnAviso, contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
     textoVuelta: textoVuelta, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, resumenCifras: resumenCifras, arribaDe: arribaDe, filasArriba: filasArriba, rangoFechas: rangoFechas, lineaArriba: lineaArriba, cifrasResumen: cifrasResumen, seguirCrudo: seguirCrudo, tablasDeRuta: tablasDeRuta, conCamposPropios: conCamposPropios, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
@@ -2638,7 +2695,8 @@
         if (cp.tipo === 'nota') return '<div class="u-campo u-ancho">' + et + '<textarea id="' + id + '" rows="3" data-c="' + texto(c) + '">' + texto(v) + '</textarea>' + nota + '</div>';
         var tipo = cp.tipo === 'fecha' ? 'date' : (cp.tipo === 'email' ? 'email' : (cp.tipo === 'telefono' ? 'tel' : (cp.tipo === 'enlace' || cp.tipo === 'foto' ? 'url' : 'text')));
         var d = cp.tipo === 'fecha' ? aFecha(v) : null;
-        var val = d ? d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()) : (vacio(v) ? '' : String(v));
+        // T0714: un porcentaje se escribe en % (48, no 0,48).
+        var val = d ? d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()) : (vacio(v) ? '' : cp.tipo === 'porcentaje' && !isNaN(pctVer(v)) ? String(pctVer(v)).replace('.', ',') : String(v));
         return '<div class="u-campo">' + et + '<input id="' + id + '" type="' + tipo + '"' + (/importe|numero|porcentaje/.test(cp.tipo) ? ' inputmode="decimal"' : '') + ' data-c="' + texto(c) + '" value="' + texto(val) + '">' + nota + '</div>';
       }
       /** El valor con el que se abrió un campo de la ficha (para guardar solo lo que se ha cambiado). */
@@ -2727,7 +2785,7 @@
           // T0643: el alta con lo que dice ALTA, en su orden (lo primero, qué hay que hacer); lo de «mas», plegado.
           var deEd = function (c) { var cp = campo(a, c); return cp.primero ? cp.primero.some(function (p) { return ed.indexOf(p) >= 0; }) : ed.indexOf(c) >= 0; };
           var mas = a.alta.mas.filter(function (c) { return fuera.indexOf(c) < 0 && deEd(c); });
-          h += '<form id="li-form" class="li-form li-alta" novalidate><div class="u-campos">' + a.alta.campos.filter(function (c) { return fuera.indexOf(c) < 0 && deEd(c); }).map(function (c) { return entradaAlta(a, c, crudo, ed, hoy); }).join('') + '</div>' +
+          h += '<form id="li-form" class="li-form li-alta" novalidate><div class="u-campos">' + a.alta.campos.filter(function (c) { return fuera.indexOf(c) < 0 && deEd(c); }).map(function (c) { return a.alta.nuevo && c === a.alta.nuevo.campo ? altaConNuevo(a, c, crudo, ed, hoy) : entradaAlta(a, c, crudo, ed, hoy); }).join('') + '</div>' +
             (mas.length ? '<details class="li-mas"><summary>Más: ' + texto(mas.map(function (c) { return campo(a, c).titulo.toLowerCase(); }).join(', ').replace(/, ([^,]*)$/, ' y $1')) + '</summary><div class="u-campos">' +
               mas.map(function (c) { return entradaAlta(a, c, crudo, ed, hoy); }).join('') + '</div></details>' : '');
         } else {
@@ -3042,7 +3100,7 @@
           [].forEach.call(cont.querySelectorAll('[data-rc]'), function (i) {
             var c = i.getAttribute('data-rc'), s = String(i.value || '').trim(), cp = campo(ra, c);
             if (prohibido(s, PROHIB).length) { mal = mal.concat(prohibido(s, PROHIB)); i.setAttribute('aria-invalid', 'true'); return; }
-            v[c] = /^(importe|numero|porcentaje)$/.test(cp.tipo) && s !== '' && !isNaN(aNumero(s)) ? aNumero(s) : s;
+            v[c] = deEscrito(cp, s);
           });
           return { valores: v, mal: mal };
         }
@@ -3217,13 +3275,29 @@
             return;
           }
           var err = vent.querySelector('#li-err'), cambios = {}, malos = [], faltan = [];
+          // T0714: con «Diseño nuevo», el diseño no se elige: se crea antes que la tela, con su código.
+          var nvo = nueva && a.alta && a.alta.nuevo && enNuevo(form) ? a.alta.nuevo : null, tNueva = '', filaNueva = null;
           [].forEach.call(form.querySelectorAll('[data-c]'), function (i) {
             var c = i.getAttribute('data-c'), v = i.value.trim(), cp = campo(a, c);
+            if (nvo && c === nvo.campo) return;
             var p = prohibido(v, PROHIB); if (p.length) { malos = malos.concat(p); i.setAttribute('aria-invalid', 'true'); } else i.removeAttribute('aria-invalid');
             if (v === '' && a.obligatorias.indexOf(c) >= 0) { faltan.push(cp.titulo); i.setAttribute('aria-invalid', 'true'); }
             // Al añadir, todo lo que tiene valor (también lo que viene puesto); al editar, solo lo que ha cambiado.
-            if (nueva ? v !== '' : v !== String(inicial(i)).trim()) cambios[c] = cp.tipo === 'importe' || cp.tipo === 'numero' ? (v === '' ? '' : (isNaN(aNumero(v)) ? v : aNumero(v))) : v;
+            if (nueva ? v !== '' : v !== String(inicial(i)).trim()) cambios[c] = deEscrito(cp, v);
           });
+          if (nvo) {
+            tNueva = refDe(a, a.tabla, nvo.campo); filaNueva = valoresNuevo(a, form);
+            [].forEach.call(form.querySelectorAll('[data-nc]'), function (i) {
+              var r = i.getAttribute('data-nc'), v = i.value.trim(), p = prohibido(v, PROHIB), mal = p.length > 0 || (v === '' && nvo.obligatorias.indexOf(r) >= 0);
+              if (p.length) malos = malos.concat(p);
+              if (v === '' && nvo.obligatorias.indexOf(r) >= 0) faltan.push(campo(a, r).titulo);
+              if (mal) i.setAttribute('aria-invalid', 'true'); else i.removeAttribute('aria-invalid');
+            });
+            var le = form.querySelector('[data-letras]'), cd = codigoAltaNuevo(nvo, filas(tNueva), filaNueva, le ? le.value : '');
+            // Sin código: si no ha elegido técnica, que la elija; si es la primera de su técnica, las letras.
+            var segV = nvo.codigo.segun ? filaNueva[nvo.codigo.segun] : '';
+            if (cd.codigo) { filaNueva.ID = cd.codigo; cambios[nvo.campo] = cd.codigo; } else faltan.push(nvo.codigo.segun && vacio(segV) ? campo(a, nvo.campo + '.' + nvo.codigo.segun).titulo : nvo.codigo.titulo);
+          }
           if (nueva) {
             // T0643: «Con quién» del alta (una lista para varias columnas) guarda en la que toca.
             [].forEach.call(form.querySelectorAll('[data-uno]'), function (s) { var v = s.value, k = v.indexOf('|'); if (k > 0) cambios[v.slice(0, k)] = v.slice(k + 1); });
@@ -3244,7 +3318,9 @@
           if (malos.length) { err.textContent = textoProhibido(malos.filter(function (k, i) { return malos.indexOf(k) === i; })); err.hidden = false; return; }
           if (faltan.length) { err.textContent = 'Falta ' + faltan.join(', ').replace(/, ([^,]*)$/, ' y $1') + '.'; err.hidden = false; return; }
           if (!Object.keys(cambios).length) { cerrarVentana(); return; }
-          var p = nueva ? T.crear(a.tabla, cambios) : T.actualizar(a.tabla, id, cambios);
+          // T0714: primero el diseño nuevo y, cuando está, la tela con su código.
+          var p = filaNueva ? Promise.resolve(T.crear(tNueva, filaNueva)).then(function () { return T.crear(a.tabla, cambios); })
+            : nueva ? T.crear(a.tabla, cambios) : T.actualizar(a.tabla, id, cambios);
           cerrarVentana();
           Promise.resolve(p).then(function (out) {
             ctx.aviso(nueva ? 'Añadido.' : 'Guardado.');
@@ -3258,9 +3334,28 @@
           var ponerCodigo = function () {
             var el = vent.querySelector('[data-cod-nuevo]'), v = mezclar(crudo, {});
             [].forEach.call(form.querySelectorAll('[data-c]'), function (i) { v[i.getAttribute('data-c')] = i.value; });
+            // T0714: con «Diseño nuevo», el código del diseño (BOR-005) y el de la tela, su primer color (BOR-005-01).
+            var nv = a.alta && a.alta.nuevo, cd = null;
+            if (nv && enNuevo(form)) {
+              var le = form.querySelector('[data-letras]');
+              var vn = valoresNuevo(a, form);
+              cd = codigoAltaNuevo(nv, filas(refDe(a, a.tabla, nv.campo)), vn, le ? le.value : '');
+              // Las letras, solo si hacen falta: la primera de una técnica ya elegida (sin técnica, primero la técnica).
+              form.querySelector('[data-nuevo-letras]').hidden = !cd.pedir || (!!nv.codigo.segun && vacio(vn[nv.codigo.segun]));
+              v[nv.campo] = cd.codigo;
+            }
             var cn = codigoNuevo(a.nuevoId, a.prefijos, a.tabla, v, filas(a.tabla).map(function (x) { return x[a.clave]; }));
-            el.innerHTML = cn ? 'Tendrá el código <b>' + texto(cn) + '</b>.' : ''; el.hidden = !cn;
+            el.innerHTML = cn ? 'Tendrá el código <b>' + texto(cn) + '</b>' + (cd && cd.codigo ? ', con el ' + texto(campo(a, nv.campo).titulo.toLowerCase()) + ' nuevo <b>' + texto(cd.codigo) + '</b>' : '') + '.' : ''; el.hidden = !cn;
           };
+          // T0714: «Uno que ya tengo» o «Diseño nuevo» (ALTA.nuevo), con sus dos botones.
+          form.addEventListener('click', function (ev) {
+            var b = ev.target.closest && ev.target.closest('[data-nuevo-modo]'); if (!b) return;
+            var nuevo = b.getAttribute('data-nuevo-modo') === 'nuevo', caja = b.closest('[data-nuevo]');
+            caja.querySelector('[data-nuevo-ya]').hidden = nuevo; caja.querySelector('[data-nuevo-bloque]').hidden = !nuevo;
+            [].forEach.call(caja.querySelectorAll('[data-nuevo-modo]'), function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+            var pri = caja.querySelector(nuevo ? '[data-nc]' : '[data-c]'); if (pri) pri.focus();
+            ponerCodigo();
+          });
           form.addEventListener('input', ponerCodigo); form.addEventListener('change', ponerCodigo); ponerCodigo();
         }
         if (alta) {
@@ -3317,6 +3412,34 @@
             return '<option value="' + texto(v) + '"' + (v === sel ? ' selected' : '') + '>' + texto(o.nombre) + '</option>';
           }).join('') + '</optgroup>';
         }).join('');
+      }
+      /**
+       * T0714 · El campo de ALTA.nuevo en el alta (el diseño de una tela): «Uno que ya tengo» (su desplegable) o «Diseño nuevo»
+       * (lo de ALTA.nuevo.campos, con data-nc: no va a esta fila, va a la nueva de su tabla; y, si no se saben, las letras
+       * de su código). Se cambia con los dos botones; de entrada, el que ya tiene si hay alguno.
+       */
+      function altaConNuevo(a, c, crudo, ed, hoy) {
+        var nv = a.alta.nuevo, cp = campo(a, c), hay = cp.ids && Object.keys(cp.ids).length > 0, nuevoYa = !hay;
+        var bot = function (k, t) { return '<button type="button" class="li-dia" data-nuevo-modo="' + k + '" aria-pressed="' + ((k === 'nuevo') === nuevoYa) + '">' + texto(t) + '</button>'; };
+        // Con su unidad en la etiqueta («Ancho (cm)»): aquí no hay un valor al lado que la diga.
+        var nc = function (r) { var u = campo(a, r).unidad; return entrada(a, r, {}).replace(/(id|for)="li-c-/g, '$1="li-n-').replace(/ data-c="/g, ' data-nc="').replace(/(<label class="u-etiqueta"[^>]*>)([^<]*)</, function (m, l, t) { return l + t + (u ? ' (' + texto(u) + ')' : '') + '<'; }); };
+        return '<div class="u-campo u-ancho li-nuevo" data-nuevo="' + texto(c) + '"><span class="u-etiqueta">' + texto(cp.titulo) + '</span>' +
+          (hay ? '<div class="li-dias" role="group" aria-label="' + texto(cp.titulo) + '">' + bot('ya', nv.ya) + bot('nuevo', nv.titulo) + '</div>' : '') +
+          '<div data-nuevo-ya' + (nuevoYa ? ' hidden' : '') + '>' + entradaAlta(a, c, crudo, ed, hoy).replace('<label class="u-etiqueta"', '<label class="u-etiqueta u-oculto"') + '</div>' +
+          '<div class="u-campos" data-nuevo-bloque' + (nuevoYa ? '' : ' hidden') + '>' + nv.campos.map(nc).join('') +
+            '<div class="u-campo" data-nuevo-letras hidden><label class="u-etiqueta" for="li-n-letras">' + texto(nv.codigo.titulo) + '</label><input id="li-n-letras" type="text" autocomplete="off" autocapitalize="characters" maxlength="5" data-letras placeholder="JAQ"><span class="u-nota">Es la primera de esa técnica: escribe las letras de su código.</span></div>' +
+          '</div></div>';
+      }
+      /** T0714 · ¿El alta está con «Diseño nuevo»? */
+      function enNuevo(form) { var b = form && form.querySelector('[data-nuevo-bloque]'); return !!b && !b.hidden; }
+      /** T0714 · Lo escrito para la fila nueva de ALTA.nuevo, por columna de su tabla (sin la ruta), sin lo vacío. */
+      function valoresNuevo(a, form) {
+        var v = {}, pre = a.alta.nuevo.campo + '.';
+        [].forEach.call(form.querySelectorAll('[data-nc]'), function (i) {
+          var r = i.getAttribute('data-nc'), x = i.value.trim(), cp = campo(a, r);
+          if (x !== '') v[r.slice(pre.length)] = deEscrito(cp, x);
+        });
+        return v;
       }
       function entradaAlta(a, c, crudo, ed, hoy) {
         var cp = campo(a, c), id = 'li-c-' + c;

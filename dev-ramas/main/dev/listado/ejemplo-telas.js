@@ -412,7 +412,10 @@
       // dice); una tela nueva, eligiendo su diseño, con el código siguiente de ese diseño (BP-001-03); borrar, en «Más».
       EDITAR: ['COLOR', 'ID_ESTADO', 'MUESTRA_EN_MANO', 'NOTAS', 'REF_PROVEEDOR', 'ID_DISENO', 'ID_DISENO.ID_TECNICA', 'ID_DISENO.ANCHO', 'ID_DISENO.GSM', 'ID_DISENO.MARTINDALE', 'ID_DISENO.USO', 'ID_DISENO.COSTE_INR'],
       CREAR: true, OBLIGATORIAS: ['ID_DISENO', 'COLOR'], NUEVA: { ID_ESTADO: 'Candidata' }, NUEVO_ID: '{ID_DISENO}-{n:2}',
-      ALTA: { titulo: 'Nueva tela', campos: ['ID_DISENO', 'COLOR', 'REF_PROVEEDOR', 'ID_ESTADO'], abrir: true },
+      // T0714: o un diseño nuevo a la vez, con su proveedor; su código, el de los de su técnica (FL-012) o, si es la primera, con sus letras.
+      ALTA: { titulo: 'Nueva tela', campos: ['ID_DISENO', 'COLOR', 'REF_PROVEEDOR', 'ID_ESTADO'], abrir: true,
+        nuevo: { campo: 'ID_DISENO', titulo: 'Diseño nuevo', campos: ['ID_DISENO.ID_PROVEEDOR', 'ID_DISENO.ID_TECNICA', 'ID_DISENO.ANCHO', 'ID_DISENO.GSM', 'ID_DISENO.COSTE_INR'],
+          obligatorias: ['ID_DISENO.ID_PROVEEDOR'], codigo: { segun: 'ID_TECNICA', cifras: 3 } } },
       BORRAR: { con: [{ tabla: 'INTERESES', campo: 'ID_TELA', filas: ['marca interesada', 'marcas interesadas'] }] },
       _refs: refsDesde('TELAS') }) }
   };
