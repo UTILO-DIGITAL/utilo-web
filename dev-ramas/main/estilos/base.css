@@ -2148,6 +2148,10 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-ficha-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e2); }
 .u .li-ficha-cab h2 { overflow-wrap: anywhere; }
 .u .li-ficha-avisos { margin-top: calc(var(--e2) * -1); }
+.u .li-recomienda { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e3); padding: var(--e2) var(--e3);
+  border-radius: var(--radio); background: var(--est-azul-f); border-left: 4px solid var(--est-azul); }
+.u .li-recomienda p { margin: 0; flex: 1 1 16em; font-size: 14px; line-height: 1.4; }
+.u .li-recomienda .u-btn { min-height: 36px; font-size: 14px; padding: 0 var(--e3); }
 .u .li-fgrupo { display: flex; flex-direction: column; gap: var(--e2); }
 .u .li-fg-t { font-size: 15px; color: var(--color-principal-oscuro); border-bottom: 1px solid var(--color-linea); padding-bottom: var(--e1); }
 .u .li-fg-t .u-cifra { font-family: var(--fuente-texto); font-weight: 400; color: var(--color-suave); }
