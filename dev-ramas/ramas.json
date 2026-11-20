@@ -923,10 +923,10 @@
    "tarea": "T0689",
    "titulo": "Hacer la factura desde el pedido con su PDF, gastos con foto del ticket y fichas que guardan solas",
    "pr": 386,
-   "commit": "18532a3a",
-   "ultimo": "T0689: Facturar en un sitio y fichas que guardan solas",
+   "commit": "5dff5c8e",
+   "ultimo": "T0689: Al día con main (T0688: Marcas e Historial)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T13:47:52.163Z",
+   "fecha": "2026-11-20T14:00:19.252Z",
    "toca": [
     "telas"
    ],

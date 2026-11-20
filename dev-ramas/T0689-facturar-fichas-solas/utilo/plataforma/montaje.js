@@ -122,9 +122,8 @@ window.NUCLEO_MONTAJE = {
     "SECCIONES": {
      "telas": [
       "Hoy",
-      "Seguimiento",
-      "Clientes",
-      "Prospección",
+      "Marcas",
+      "Historial",
       "Proveedores",
       "Mis telas",
       "Calcular precio",
