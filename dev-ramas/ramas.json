@@ -1796,5 +1796,15 @@
   "clave": "sb_publishable_It-DNlk9IELXRCEEjH3DOg_PaQ9r0J4",
   "sesion": "sb_utilo-plataforma_prod",
   "ficha": "../utilo/plataforma/?s=tablero&t="
+ },
+ "huecos": {
+  "DEV-1": {
+   "cliente": "telas",
+   "commit": "14592849",
+   "subido": "20/11/26, 7:49",
+   "quien": "Javi Canela",
+   "rama": "T0686-catalogo-para-marcas",
+   "carpeta": "T0686-catalogo-para-marcas"
+  }
  }
 }
