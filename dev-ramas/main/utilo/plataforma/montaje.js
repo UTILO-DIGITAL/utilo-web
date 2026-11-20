@@ -642,6 +642,10 @@ window.NUCLEO_MONTAJE = {
       "tipo": "ref",
       "obligatoria": true,
       "ref": "TAREAS"
+     },
+     {
+      "nombre": "ESPERA_PRODUCCION",
+      "tipo": "booleano"
      }
     ],
     "restricciones": {
