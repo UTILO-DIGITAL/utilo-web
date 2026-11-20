@@ -1829,7 +1829,7 @@
             // Sin recomendado (en Mis telas le falta el coste): en rojo solo mientras la línea no tiene precio.
             else if (ART.precio) partes.push(sinPrecio ? '<span class="u-mal">Sin precio recomendado: en ' + texto(ART.titulo || 'la lista') + ' le falta el coste. Ponlo tú.</span>' : 'Sin precio recomendado: en ' + texto(ART.titulo || 'la lista') + ' le falta el coste.');
             if (ART.coste) {
-              if (a.faltaEnvio) partes.push('<span class="u-mal">Sin coste: falta el envío en tus ajustes.</span>');
+              if (a.faltaEnvio) partes.push('<span class="u-mal">Sin coste: falta el envío en Ajustes.</span>');
               else if (isNaN(a.coste)) partes.push('Sin coste: en ' + texto(ART.titulo || 'la lista') + ' le falta.');
               else if (!isNaN(puesto) && puesto < a.coste - 0.004) partes.push('<span class="u-mal">Por debajo de lo que te cuesta (' + eurPrecio(a.coste) + texto(u) + ')</span>');
               else partes.push('Te cuesta ' + eurPrecio(a.coste) + texto(u));
