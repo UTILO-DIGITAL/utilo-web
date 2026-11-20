@@ -1284,6 +1284,14 @@
    "quien": "Javi Canela",
    "rama": "T0691-muestrario-telas",
    "carpeta": "T0691-muestrario-telas"
+  },
+  "DEV-1": {
+   "cliente": "telas",
+   "commit": "bd7b5700",
+   "subido": "20/11/26, 10:51",
+   "quien": "Javi Canela",
+   "rama": "T0686-catalogo-para-marcas",
+   "carpeta": "T0686-catalogo-para-marcas"
   }
  }
 }
