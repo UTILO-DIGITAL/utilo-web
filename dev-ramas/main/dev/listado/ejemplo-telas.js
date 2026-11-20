@@ -286,18 +286,24 @@
       CAMPOS: { NOMBRE: { titulo: 'Marca' }, ID_FASE: { titulo: 'Fase', tipo: 'estado', sinNumero: true, colores: { '8 Primer pedido': 'bien', '9 Cliente habitual': 'bien', 'En pausa': 'apagado', 'Descartado': 'apagado', 'Por contactar': 'medio' } },
         ID_TIPO_MARCA: { titulo: 'Tipo' }, ID_PRIORIDAD: { titulo: 'Prioridad', colores: { 'Alta': 'alto' } }, ID_VIA: { titulo: 'Primer contacto por' }, WEB: { tipo: 'enlace' }, INSTAGRAM: { titulo: 'Instagram', tipo: 'instagram' },
         DIRECCION: { titulo: 'Dirección (envíos)' }, NOTA: { titulo: 'Resumen' }, NOTAS: { tipo: 'nota' }, QUE_FABRICAN: { titulo: 'Qué fabrican' },
-        PROXIMO_PASO: { titulo: 'Próximo paso', de: { tabla: 'SEGUIMIENTO', campo: 'ID_MARCA', filtro: [NO_HECHAS], orden: 'FECHA', columna: 'DETALLE' } },
-        FECHA_PASO: { titulo: 'Fecha del próximo paso', tipo: 'fecha', de: { tabla: 'SEGUIMIENTO', campo: 'ID_MARCA', filtro: [NO_HECHAS], orden: 'FECHA', columna: 'FECHA' } } },
+        // T0651: no se editan aquí: llevan a su tarea («· en su tarea» y la flecha).
+        PROXIMO_PASO: { titulo: 'Próximo paso', de: { tabla: 'SEGUIMIENTO', campo: 'ID_MARCA', filtro: [NO_HECHAS], orden: 'FECHA', columna: 'DETALLE' }, ir: { seccion: 'seguimiento', texto: 'en su tarea' } },
+        FECHA_PASO: { titulo: 'Fecha del próximo paso', tipo: 'fecha', de: { tabla: 'SEGUIMIENTO', campo: 'ID_MARCA', filtro: [NO_HECHAS], orden: 'FECHA', columna: 'FECHA' }, ir: { seccion: 'seguimiento', texto: 'en su tarea' } } },
       FICHA: [
         { titulo: 'En qué punto está', campos: ['ID_FASE', 'ID_PRIORIDAD', 'PROXIMO_PASO', 'FECHA_PASO'] },
         { titulo: 'La marca', campos: ['ID_TIPO_MARCA', 'QUE_FABRICAN', 'CIUDAD', 'DIRECCION', 'WEB', 'INSTAGRAM', 'ID_VIA', 'NOTA', 'NOTAS'] }
       ],
       RELACIONADOS: [
-        { titulo: 'Personas de contacto', tabla: 'PERSONAS', campo: 'ID_MARCA', con: 'ID', columnas: ['NOMBRE', 'CARGO', 'EMAIL', 'TELEFONO'], nombre: 'NOMBRE', campos: { EMAIL: { tipo: 'email' }, TELEFONO: { tipo: 'telefono' } } },
+        // T0651: las personas se cambian, se añaden y se quitan desde la ficha; lo que buscan, igual (una ficha por marca); las
+        // telas que le interesan se añaden eligiéndolas (con su código: el ID lo pone la tabla) y se quitan con su ✕.
+        { titulo: 'Personas de contacto', tabla: 'PERSONAS', campo: 'ID_MARCA', con: 'ID', columnas: ['NOMBRE', 'CARGO', 'EMAIL', 'TELEFONO'], nombre: 'NOMBRE', campos: { EMAIL: { tipo: 'email' }, TELEFONO: { tipo: 'telefono' } },
+          editar: true, crear: true, quitar: true, obligatorias: ['NOMBRE'], filas: ['persona de contacto', 'personas de contacto'] },
         { titulo: 'Qué buscan', datos: true, tabla: 'NECESIDADES', campo: 'ID_MARCA', con: 'ID', columnas: ['QUE_TELAS', 'PAGAN_HOY', 'PRECIO_OBJETIVO', 'CANTIDADES', 'ID_ANTICIPO'], clave: 'ID_MARCA', nombre: 'QUE_TELAS',
-          campos: { PAGAN_HOY: { titulo: 'Pagan hoy (€/m)' }, PRECIO_OBJETIVO: { titulo: 'Precio objetivo (€/m)' }, ID_ANTICIPO: { titulo: '¿Anticipo 50 %?' } } },
+          campos: { QUE_TELAS: { titulo: 'Qué telas' }, PAGAN_HOY: { titulo: 'Pagan hoy (€/m)' }, PRECIO_OBJETIVO: { titulo: 'Precio objetivo (€/m)' }, CANTIDADES: { titulo: 'Cantidades' }, ID_ANTICIPO: { titulo: '¿Anticipo 50 %?' } },
+          editar: true, crear: true, quitar: true, alta: ['QUE_TELAS', 'PAGAN_HOY'], filas: ['lo que buscan', 'lo que buscan'] },
         { titulo: 'Telas que le interesan', tabla: 'INTERESES', seccion: 'telas', campo: 'ID_MARCA', con: 'ID', clave: 'ID_TELA', nombre: 'ID_TELA', columnas: ['ID_TELA', 'ID_TELA.COLOR'],
-          campos: { ID_TELA: { titulo: 'Tela' }, 'ID_TELA.COLOR': { titulo: 'Color' } }, vacio: 'Ninguna todavía.' },
+          campos: { ID_TELA: { titulo: 'Tela' }, 'ID_TELA.COLOR': { titulo: 'Color' } }, vacio: 'Ninguna todavía.',
+          crear: true, elegir: 'ID_TELA', quitar: true, id: '{ID_TELA}·{ID_MARCA}', filas: ['tela que le interesa', 'telas que le interesan'] },
         COMPARATIVA_REL,
         suSeguimiento('ID_MARCA')
       ],
@@ -315,7 +321,17 @@
         { id: 'SIN_PASO', titulo: 'Sin próximo paso', nivel: 'medio', si: [{ campo: 'ID_FASE', no: ['Por contactar', 'En pausa', 'Descartado'] }, { campo: 'PROXIMO_PASO', vacio: true }] },
         { id: 'ALTA_SIN_CONTACTAR', titulo: 'Prioridad alta sin contactar', nivel: 'medio', si: [{ campo: 'ID_PRIORIDAD', es: 'Alta' }, { campo: 'ID_FASE', es: 'Por contactar' }] }
       ],
-      EDITAR: ['ID_FASE', 'ID_PRIORIDAD', 'NOTA', 'NOTAS'], _refs: refsDesde('MARCAS') }) },
+      // T0651: todo lo suyo se edita tocándolo; «Añadir» con lo justo (y su ficha se abre para seguir); borrar, dentro de «Más».
+      EDITAR: ['NOMBRE', 'ID_FASE', 'ID_PRIORIDAD', 'ID_TIPO_MARCA', 'QUE_FABRICAN', 'CIUDAD', 'DIRECCION', 'WEB', 'INSTAGRAM', 'ID_VIA', 'NOTA', 'NOTAS'], CREAR: true,
+      OBLIGATORIAS: ['NOMBRE'], NUEVA: { ID_FASE: 'Por contactar' },
+      ALTA: { titulo: 'Nueva marca', campos: ['NOMBRE', 'ID_FASE', 'CIUDAD', 'INSTAGRAM', 'WEB'], mas: ['ID_TIPO_MARCA', 'QUE_FABRICAN', 'ID_VIA', 'NOTA'], abrir: true },
+      BORRAR: {
+        con: [{ tabla: 'PERSONAS', campo: 'ID_MARCA', filas: ['persona de contacto', 'personas de contacto'] }, { tabla: 'NECESIDADES', campo: 'ID_MARCA', clave: 'ID_MARCA', filas: ['nota de lo que buscan', 'notas de lo que buscan'] },
+          { tabla: 'INTERESES', campo: 'ID_MARCA', filas: ['tela que le interesa', 'telas que le interesan'] }],
+        bloquean: [{ tabla: 'SEGUIMIENTO', campo: 'ID_MARCA', filas: ['cosa en su seguimiento', 'cosas en su seguimiento'] }, { tabla: 'COMPARATIVA', campo: 'ID_MARCA', filas: ['tela en su comparativa', 'telas en su comparativa'] }],
+        texto: 'Si ya no trabajas con ella, ponla en Descartado: sigue en «Todas».',
+        sino: { titulo: 'Poner en Descartado', poner: { ID_FASE: 'Descartado' }, hecho: 'Está en Descartado: la encontrarás en «Todas».' } },
+      _refs: refsDesde('MARCAS') }) },
 
     proveedores: { modulo: 'listado', titulo: 'Proveedores', perfiles: ['Dueña'], icono: '<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>', config: mezcla(COMUN, {
       TABLA: 'PROVEEDORES', CODIGO: 'ID', NOMBRE: 'NOMBRE', ORDEN: 'NOMBRE', FILAS: ['proveedor', 'proveedores'],
@@ -354,7 +370,7 @@
       COLUMNAS: ['ENLACE_FOTO', 'ID_DISENO.ID_TECNICA', 'COLOR', 'ID_DISENO.ANCHO', 'ID_DISENO.GSM', 'ID_DISENO.ID_PROVEEDOR', 'COSTE_ESPANA', 'ID_ESTADO'],
       DETALLE: ['ID_DISENO.ID_TECNICA', 'COSTE_ESPANA', 'ID_ESTADO'],
       CAMPOS: {
-        ENLACE_FOTO: { titulo: 'Foto', tipo: 'foto' }, COLOR: { titulo: 'Color' }, ID_DISENO: { titulo: 'Diseño' },
+        ENLACE_FOTO: { titulo: 'Foto', tipo: 'foto' }, COLOR: { titulo: 'Color' }, ID_DISENO: { titulo: 'Diseño', soloAlta: true },
         'ID_DISENO.ID_TECNICA': { titulo: 'Técnica' }, 'ID_DISENO.ANCHO': { titulo: 'Ancho', unidad: 'cm' }, 'ID_DISENO.GSM': { titulo: 'Peso', unidad: 'g/m²' },
         'ID_DISENO.MARTINDALE': { titulo: 'Martindale' }, 'ID_DISENO.USO': { titulo: 'Uso' },
         'ID_DISENO.ID_PROVEEDOR': { titulo: 'Proveedor', privado: true }, REF_PROVEEDOR: { titulo: 'Referencia del proveedor', privado: true },
@@ -376,12 +392,13 @@
       },
       FICHA: [
         { titulo: '', campos: ['ENLACE_FOTO', 'ID_ESTADO', 'COSTE_ESPANA'] },
-        { titulo: 'La tela', campos: ['ID_DISENO', 'ID_DISENO.ID_TECNICA', 'COLOR', 'COMPOSICION', 'ID_DISENO.BORDADO_HILO', 'ID_DISENO.ANCHO', 'PESO', 'RAPPORT', 'ID_DISENO.MARTINDALE', 'ID_DISENO.USO',
+        { titulo: 'La tela', campos: ['ID_DISENO', 'ID_DISENO.ID_TECNICA', 'COLOR', 'COMPOSICION', 'ID_DISENO.BORDADO_HILO', 'ID_DISENO.ANCHO', 'ID_DISENO.GSM', 'RAPPORT', 'ID_DISENO.MARTINDALE', 'ID_DISENO.USO',
           'ID_DISENO.LAVABLE', 'ID_DISENO.LIMPIEZA_SECO'] },
         { titulo: 'Proveedor y coste', campos: ['ID_DISENO.ID_PROVEEDOR', 'REF_PROVEEDOR', 'ID_DISENO.MARGEN'] },
         { titulo: 'Con las marcas', campos: ['N_INTERESADAS', 'MUESTRA_EN_MANO', 'NOTAS'] }
       ],
-      RELACIONADOS: [{ titulo: 'Marcas interesadas', tabla: 'INTERESES', campo: 'ID_TELA', con: 'ID', seccion: 'clientes', clave: 'ID_MARCA', columnas: ['ID_MARCA'], nombre: 'ID_MARCA', campos: { ID_MARCA: { titulo: 'Marca' } } }],
+      RELACIONADOS: [{ titulo: 'Marcas interesadas', tabla: 'INTERESES', campo: 'ID_TELA', con: 'ID', seccion: 'clientes', clave: 'ID_MARCA', columnas: ['ID_MARCA'], nombre: 'ID_MARCA', campos: { ID_MARCA: { titulo: 'Marca' } },
+        crear: true, elegir: 'ID_MARCA', quitar: true, id: '{ID_TELA}·{ID_MARCA}', filas: ['marca interesada', 'marcas interesadas'] }],
       VISTAS: [
         { id: 'CATALOGO', titulo: 'Mi catálogo', filtro: [{ campo: 'ID_ESTADO', no: ['Descartada'] }] },
         { id: 'MUESTRAS', titulo: 'Muestras', filtro: [{ campo: 'ID_ESTADO', es: ['Muestra pedida', 'Muestra recibida'] }] },
@@ -391,7 +408,13 @@
         { id: 'SIN_COSTE', titulo: 'Sin coste del proveedor', nivel: 'alto', si: [{ campo: 'ID_DISENO.COSTE_INR', vacio: true }, { campo: 'ID_ESTADO', no: ['Descartada'] }] },
         { id: 'SIN_FOTO', titulo: 'Sin foto', nivel: 'info', si: [{ campo: 'ENLACE_FOTO', vacio: true }, { campo: 'ID_ESTADO', no: ['Descartada'] }] }
       ],
-      EDITAR: ['ID_ESTADO', 'MUESTRA_EN_MANO', 'NOTAS'], _refs: refsDesde('TELAS') }) }
+      // T0651: lo del diseño (ancho, peso, técnica, coste…) se edita desde la tela y cambia en todos sus colores (la ficha lo
+      // dice); una tela nueva, eligiendo su diseño, con el código siguiente de ese diseño (BP-001-03); borrar, en «Más».
+      EDITAR: ['COLOR', 'ID_ESTADO', 'MUESTRA_EN_MANO', 'NOTAS', 'REF_PROVEEDOR', 'ID_DISENO', 'ID_DISENO.ID_TECNICA', 'ID_DISENO.ANCHO', 'ID_DISENO.GSM', 'ID_DISENO.MARTINDALE', 'ID_DISENO.USO', 'ID_DISENO.COSTE_INR'],
+      CREAR: true, OBLIGATORIAS: ['ID_DISENO', 'COLOR'], NUEVA: { ID_ESTADO: 'Candidata' }, NUEVO_ID: '{ID_DISENO}-{n:2}',
+      ALTA: { titulo: 'Nueva tela', campos: ['ID_DISENO', 'COLOR', 'REF_PROVEEDOR', 'ID_ESTADO'], abrir: true },
+      BORRAR: { con: [{ tabla: 'INTERESES', campo: 'ID_TELA', filas: ['marca interesada', 'marcas interesadas'] }] },
+      _refs: refsDesde('TELAS') }) }
   };
   // T0629: como la app de Marta, con Hoy y Prospección (sobre las mismas tablas) y en su orden. Con Perfil, la dueña y quien
   // administra tienen 7 en el menú (en el móvil, 4 abajo y «Más»); la ayudante, Hoy, Seguimiento, Clientes, Prospección y
@@ -418,7 +441,7 @@
 
   // T0662 · Lo que la sección no dice llega a la web con el defecto de motor/modulos/listado/modulo.json, como lo monta
   // montar.js (RAPIDAS, ALTA y CONTEXTO, {}): así se ve aquí lo mismo que en la app de verdad. probar-listado.js comprueba que son esos.
-  var DEFECTOS = {"TABLA":"","CLAVE":"ID","CODIGO":"","NOMBRE":"","COLUMNAS":[],"DETALLE":[],"ORDEN":"","FILTRO":[],"BUSCAR":[],"CAMPOS":{},"FICHA":[],"RELACIONADOS":[],"VISTAS":[],"AVISOS":[],"EDITAR":[],"CREAR":false,"ACCIONES":[],"GUARDAR":"solo","MIAS":{},"NUEVA":{},"RAPIDAS":{},"ALTA":{},"DEDUCIR":{},"CONTEXTO":{},"RESUMEN":{},"ARRIBA":[],"OBLIGATORIAS":[],"FILTROS":[],"TEXTO":"","FILAS":[],"VACIO":"","VALORES":{},"PROHIBIDO":["CONTRASENA","CUENTA","DNI"],"PERSONALIZAN":[],"VENTAS":{},"PREFERENCIAS":""};
+  var DEFECTOS = {"TABLA":"","CLAVE":"ID","CODIGO":"","NOMBRE":"","COLUMNAS":[],"DETALLE":[],"ORDEN":"","FILTRO":[],"BUSCAR":[],"CAMPOS":{},"FICHA":[],"RELACIONADOS":[],"VISTAS":[],"AVISOS":[],"EDITAR":[],"CREAR":false,"NUEVO_ID":"","BORRAR":{},"ACCIONES":[],"GUARDAR":"solo","MIAS":{},"NUEVA":{},"RAPIDAS":{},"ALTA":{},"DEDUCIR":{},"CONTEXTO":{},"RESUMEN":{},"ARRIBA":[],"OBLIGATORIAS":[],"FILTROS":[],"TEXTO":"","FILAS":[],"VACIO":"","VALORES":{},"PROHIBIDO":["CONTRASENA","CUENTA","DNI"],"PERSONALIZAN":[],"VENTAS":{},"PREFERENCIAS":""};
   Object.keys(SECCIONES).forEach(function (n) {
     var c = SECCIONES[n].config;
     Object.keys(DEFECTOS).forEach(function (k) { if (!(k in c)) c[k] = JSON.parse(JSON.stringify(DEFECTOS[k])); });
