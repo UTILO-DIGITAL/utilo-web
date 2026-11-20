@@ -1244,12 +1244,12 @@
   },
   "T0714-editar-alta-telas": {
    "tarea": "T0714",
-   "titulo": "Mis telas se edita entera, con alta (también de un diseño nuevo) y borrar",
-   "pr": null,
-   "commit": "7df7be93",
-   "ultimo": "T0714: Mis telas se edita entera, con alta (también de un diseño nuevo) y borrar",
+   "titulo": "Mis telas se cambia entera, con alta (también de un diseño nuevo) y borrar",
+   "pr": 400,
+   "commit": "f187e0a9",
+   "ultimo": "T0714: Al día con main (T0715)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T18:47:12.761Z",
+   "fecha": "2026-11-20T18:49:07.745Z",
    "toca": [
     "telas"
    ],
