@@ -1207,12 +1207,12 @@
   },
   "T0689-facturar-fichas-solas": {
    "tarea": "T0689",
-   "titulo": "Facturar en un sitio y fichas que guardan solas",
-   "pr": null,
+   "titulo": "Hacer la factura desde el pedido con su PDF, gastos con foto del ticket y fichas que guardan solas",
+   "pr": 386,
    "commit": "18532a3a",
    "ultimo": "T0689: Facturar en un sitio y fichas que guardan solas",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T13:47:12.021Z",
+   "fecha": "2026-11-20T13:47:52.163Z",
    "toca": [
     "telas"
    ],
