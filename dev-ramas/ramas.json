@@ -1244,12 +1244,12 @@
   },
   "T0708-telas-por-color-proveedores": {
    "tarea": "T0708",
-   "titulo": "Proveedores cuenta las telas por color y los diseños, con su resumen",
-   "pr": null,
+   "titulo": "Proveedores cuenta tus telas por color y tus diseños, con un resumen",
+   "pr": 391,
    "commit": "ffc9e331",
    "ultimo": "T0708: Proveedores cuenta las telas por color y los diseños, con su resumen",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T14:58:27.076Z",
+   "fecha": "2026-11-20T15:08:27.147Z",
    "toca": [
     "telas"
    ],
