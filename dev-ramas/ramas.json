@@ -1244,12 +1244,12 @@
   },
   "T0735-afinar-ferias-documentos": {
    "tarea": "T0735",
-   "titulo": "«¿Vas?» y «Fecha confirmada» con Sí o No, vacíos propios y «Por qué te sirve»",
-   "pr": null,
+   "titulo": "En Ferias, «¿Vas?» y «Fecha confirmada» se eligen con Sí o No",
+   "pr": 406,
    "commit": "43e441f4",
    "ultimo": "T0735: «¿Vas?» y «Fecha confirmada» con Sí o No, vacíos propios y «Por qué te sirve»",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T22:39:52.401Z",
+   "fecha": "2026-11-20T22:45:39.348Z",
    "toca": [
     "telas"
    ],
