@@ -961,10 +961,10 @@
    "tarea": "T0719",
    "titulo": "El Claude de Marta sigue las reglas de la app",
    "pr": 408,
-   "commit": "62af6451",
-   "ultimo": "T0719: Foto de GESTION con las columnas LOG (añadidas en producción con permiso de Javi)",
+   "commit": "85133f6b",
+   "ultimo": "T0719: Al día con main (T0729, T0728)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T22:56:15.683Z",
+   "fecha": "2026-11-20T23:05:59.079Z",
    "toca": [
     "telas",
     "utilo"

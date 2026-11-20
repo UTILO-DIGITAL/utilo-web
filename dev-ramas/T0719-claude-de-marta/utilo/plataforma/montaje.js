@@ -131,7 +131,8 @@ window.NUCLEO_MONTAJE = {
       "Documentos",
       "Referentes",
       "Pedidos",
-      "Economía"
+      "Economía",
+      "Ajustes"
      ]
     }
    },

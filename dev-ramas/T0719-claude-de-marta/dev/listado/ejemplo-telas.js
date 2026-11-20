@@ -382,7 +382,7 @@
         ID_ESTADO: { titulo: 'Estado', colores: { 'Aprobada': 'bien', 'Propuesta a marca': 'info', 'Muestra pedida': 'medio', 'Descartada': 'apagado' } },
         MUESTRA_EN_MANO: { titulo: 'Muestra en mano' }, NOTAS: { tipo: 'nota' }, N_INTERESADAS: { titulo: 'Marcas interesadas', de: { tabla: 'INTERESES', campo: 'ID_TELA' } },
         // T0641
-        COSTE_ESPANA: { titulo: 'Te cuesta puesta en España', tipo: 'importe', unidad: '€/m', privado: true, calculo: COSTE, envio: '$ENVIO',
+        COSTE_ESPANA: { titulo: 'Te cuesta con el envío', tipo: 'importe', unidad: '€/m', privado: true, calculo: COSTE, envio: '$ENVIO',
           desglose: [{ calculo: 'ID_DISENO.COSTE_INR', tipo: 'numero', unidad: '₹' }, '→', { calculo: EUROS }, '+ envío', { calculo: '$ENVIO' }],
           ayuda: 'El coste del proveedor en euros más el envío y el arancel de Ajustes. El precio para cada cliente lo pones tú.' },
         COMPOSICION: { titulo: 'Composición', de: COMP_DE },
