@@ -363,7 +363,7 @@
           if (S.per !== '-' && !listaPer.some(function (p) { return p.id === S.per; })) S.per = perAhora ? perAhora.id : '';
         }
       }
-      function vista(v) { S.vista = v; S.q = ''; S.bajas = false; guardado(CLAVE + 'vista', v); pintar(); window.scrollTo(0, 0); }
+      function vista(v) { S.vista = v; S.q = ''; S.bajas = false; guardado(CLAVE + 'vista', v); pintar(); window.scrollTo(0, 0); document.body.scrollTop = 0; }
 
       /* ---------- pintar ---------- */
 
@@ -890,7 +890,7 @@
         if (!x || !el.contains(x)) return;
         if (x.hasAttribute('data-cerrar')) { cerrar(); return; }
         if (x.hasAttribute('data-atras')) { atras(); return; }
-        if (x.hasAttribute('data-inicio')) { guardado(CLAVE + 'inicio', x.getAttribute('data-inicio')); pintar(); window.scrollTo(0, 0); return; }
+        if (x.hasAttribute('data-inicio')) { guardado(CLAVE + 'inicio', x.getAttribute('data-inicio')); pintar(); window.scrollTo(0, 0); document.body.scrollTop = 0; return; }
         if (x.hasAttribute('data-vista')) { vista(x.getAttribute('data-vista')); return; }
         if (x.hasAttribute('data-modo')) { var sm = specDe(S.vista); if (sm) { guardado(CLAVE + 'modo_' + sm.tabla, x.getAttribute('data-modo')); pintar(); } return; }
         if (x.hasAttribute('data-accion')) { vista('A:' + x.getAttribute('data-accion')); return; }
