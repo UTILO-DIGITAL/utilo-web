@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "e8c32034",
-   "ultimo": "Merge pull request #369 from UTILO-DIGITAL/T0679-diseno-nuevo-nucleo",
+   "commit": "b56910bb",
+   "ultimo": "Merge pull request #372 from UTILO-DIGITAL/T0684-elegir-escribiendo",
    "quien": "",
-   "fecha": "2026-11-19T23:30:47.045Z",
+   "fecha": "2026-11-20T06:18:44.895Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -184,6 +184,7 @@
       "web/estilos/base.css",
       "web/kanban4/google.js",
       "web/kanban4/tablas.js",
+      "web/nucleo/elegir.js",
       "web/nucleo/nucleo.js",
       "web/telas/marca.css"
      ],
