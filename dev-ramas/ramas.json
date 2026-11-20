@@ -1819,6 +1819,15 @@
    "quien": "Javi Canela",
    "rama": "T0691-muestrario-telas",
    "carpeta": "T0691-muestrario-telas"
+  },
+  "DEV-2": {
+   "cliente": "telas",
+   "modo": "ejemplo",
+   "commit": "f3419e7e",
+   "subido": "20/11/26, 10:26",
+   "quien": "Javi Canela",
+   "rama": "T0687-calcular-precio-desde-ficha",
+   "carpeta": "T0687-calcular-precio-desde-ficha"
   }
  }
 }
