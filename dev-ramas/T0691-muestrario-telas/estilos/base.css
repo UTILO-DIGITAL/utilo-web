@@ -2958,7 +2958,11 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
 @media (max-width: 639px) {
   /* En el móvil, el filtro rápido solo con tres opciones o menos (más «Todos»); con más, ocuparía varias líneas: está en Filtrar. */
   .u .li-rapido:has(.li-fop:nth-of-type(5)) { display: none; }
+  /* T0691: y entonces lo que tenga puesto sale con los demás filtros puestos, para que se vea y se pueda quitar. */
+  .u .li-rapido:has(.li-fop:nth-of-type(5)) ~ .li-filtros .li-fchip-rap { display: inline-flex; }
 }
+/* El filtro rápido ya se ve en sus pastillas: su etiqueta, escondida (salvo arriba, en el móvil). */
+.u .li-fchip-rap { display: none; }
 /* T0679 · En el móvil, el resumen de con quién es una tarea (al tocar su nombre) sale como las demás ventanas cortas:
  * desde abajo, con su asa, las mismas esquinas, el mismo fondo y lo de detrás oscurecido. */
 @media (max-width: 639px) {

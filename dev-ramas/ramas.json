@@ -921,10 +921,10 @@
    "tarea": "T0691",
    "titulo": "Mis telas como muestrario de fotos, con filtros por cómo es cada tela y sus marcas en la ficha",
    "pr": 371,
-   "commit": "ef6e7485",
-   "ultimo": "T0691: Trae main (huecos de DEV de T0695, elegir escribiendo de T0684); las telas de ejemplo de T0684, también con foto",
+   "commit": "ca3e1f7f",
+   "ultimo": "T0691: En el móvil, el filtro de proveedor puesto sale con los demás filtros (sus pastillas no caben)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T09:26:32.766Z",
+   "fecha": "2026-11-20T10:03:12.890Z",
    "toca": [
     "telas"
    ],
