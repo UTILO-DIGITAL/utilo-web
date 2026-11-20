@@ -77,6 +77,7 @@
   .aviso { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: var(--aviso-fondo); color: var(--aviso);
     font-size: 14px; line-height: 1.4; margin: 0; }
   .aviso a { color: inherit; font-weight: 600; }
+  .aviso code { font-size: 13px; white-space: nowrap; }
   .titulo { font-size: 12px; font-weight: 700; color: var(--suave); text-transform: uppercase; letter-spacing: .05em; padding: 0 4px; margin: 0 0 6px; }
   .nota { margin: 0; padding: 0 4px; font-size: 13px; color: var(--suave); line-height: 1.4; }
   .vacio { text-align: center; color: var(--suave); padding: 32px 8px; margin: 0; }
@@ -126,7 +127,7 @@
   'use strict';
   var CLAVE = 'dev_app';                 // lo que recuerda la app en este dispositivo (lo comparte con marco.js)
   var NOMBRES = { utilo: 'Utilo', konamigas: 'Konamigas' };
-  var VERSION = '36c1e1684f';          // la pone dev-ramas.js selector; ramas.json dice la publicada
+  var VERSION = '92aeb2e343';          // la pone dev-ramas.js selector; ramas.json dice la publicada
   var ACCION = 'https://github.com/UTILO-DIGITAL/utilo-apps/actions/workflows/supabase.yml';
   var PROBAR = /[?&]probar\b/.test(location.search); // se ha venido a elegir (la línea DEV): no se vuelve sola a la última
   /** T0450 · Lo que pide el enlace «Verlo en DEV»: { tarea, web, como } o null. */
@@ -219,6 +220,26 @@
     if (!suyas || !b || !b.migraciones) return null;
     var faltan = suyas.filter(function (m) { return b.migraciones.indexOf(m) < 0; });
     return faltan.length ? { cargada: b.rama === c ? 'una versión anterior de esta rama' : 'la de ' + (b.rama || 'otra rama') } : null;
+  }
+
+  /**
+   * T0695 · El motor de Apps Script de DEV al que llama esa web (si llama a uno): el hueco de la rama o, sin hueco, DEV-1 con
+   * lo que tenga. → { id, suyo, quien: la rama que lo tiene, cuando } o null.
+   */
+  function motor(c, p) {
+    if (!p || !p.motor) return null;
+    var hs = datos.huecos || {}, id = Object.keys(hs).filter(function (k) { return (hs[k] || {}).carpeta === c; })[0];
+    if (id) return { id: id, suyo: true, cuando: [hs[id].subido, hs[id].quien].filter(Boolean).join(' · ') };
+    var d1 = hs['DEV-1'];
+    return { id: 'DEV-1', suyo: false, quien: d1 ? d1.rama : '' };
+  }
+  function htmlMotor(c, p, ini) {
+    var m = motor(c, p);
+    if (!m) return '';
+    if (m.suyo) return '<p class="nota">Motor de DEV: <b>' + texto(m.id) + '</b>, con lo de esta rama' + (m.cuando ? ' (' + texto(m.cuando) + ')' : '') + '.</p>';
+    if (esMain(c)) return '<p class="nota">Motor de DEV: <b>DEV-1</b>, ' + (m.quien ? 'con ' + texto(m.quien) : 'sin ninguna rama') + '.</p>';
+    return '<p class="aviso">' + ICONOS.aviso + '<span>Esta rama no tiene motor en DEV: la web usa DEV-1, ' + (m.quien ? 'con ' + texto(m.quien) : 'sin ninguna rama') + '. ' +
+      'Para el suyo, en su carpeta: <code>npm run dev -- ' + texto(ini) + '</code>.</span></p>';
   }
 
   /* ---------- la elección ---------- */
@@ -522,12 +543,14 @@
         ws.map(function (w) { return '<button type="button" class="chip" data-web="' + texto(w.ruta) + '" aria-pressed="' + (w.ruta === x.ruta) + '">' + texto(w.nombre) + '</button>'; }).join('') + '</span></div>';
     }
     if (p && p.publica) h += '<div class="bloque"><span class="etiqueta">Entrar como</span><span class="valor" style="font-weight:500;font-size:15px">Nadie: es la consulta pública, sin entrar</span></div>';
-    else if (esLocal(p) && !(p.personas || []).length) h += '<div class="bloque"><span class="etiqueta">Entrar como</span><span class="valor" style="font-weight:500;font-size:15px">Tal cual: datos de ejemplo, sin Google ni Supabase</span></div>';
+    else if (esLocal(p) && !(p.personas || []).length) h += '<div class="bloque"><span class="etiqueta">Entrar como</span><span class="valor" style="font-weight:500;font-size:15px">' +
+      (p.motor ? 'Con tu Google: Excel de prueba' : 'Tal cual: datos de ejemplo, sin Google ni Supabase') + '</span></div>'; // T0695
     else if (p) h += fila('Entrar como', quienTexto(x, p), 'como');
     h += '</div>';
     var b = r && base(x.carpeta, x.ini);
     if (b) h += '<p class="aviso">' + ICONOS.aviso + '<span>Esta rama cambia la base de ' + texto(nombre(x.ini)) + ' y DEV tiene ' + texto(b.cargada) + '. ' +
       '<a href="' + ACCION + '" target="_blank" rel="noopener">Cargar la de esta rama</a> con la acción «Supabase» en DEV, rama ' + texto(x.carpeta) + '.</span></p>';
+    if (r) h += htmlMotor(x.carpeta, p, x.ini); // T0695
     if (r && !esMain(x.carpeta) && r.tarea && daily()) h += htmlTarea(r.tarea);
     var rec = (leer().recientes || []).filter(function (y) { return rama(y.carpeta) && pagina(y); });
     if (rec.length) h += '<div><p class="titulo">Recientes</p>' + rec.map(function (y, i) { return '<button type="button" class="reciente" data-reciente="' + i + '">' + texto(recienteTexto(y)) + '</button>'; }).join('') + '</div>';
@@ -888,7 +911,7 @@
           location.replace(location.pathname + (q ? q + '&' : '?') + 'v=' + j.selector);
           return;
         }
-        datos = { ramas: j.ramas || {}, bases: j.bases || {}, daily: j.daily || null };
+        datos = { ramas: j.ramas || {}, bases: j.bases || {}, huecos: j.huecos || {}, daily: j.daily || null };
         // Al abrir la app: vuelve donde se dejó (la página de una rama que sigue subida), salvo si se ha venido a elegir.
         var u = leer().ultima, c = u && (/\/dev-ramas\/([^/]+)\//.exec(u) || [])[1];
         if (primera && !PROBAR && c && u.indexOf(location.pathname) === 0 && rama(decodeURIComponent(c))) { location.replace(u); return; }
