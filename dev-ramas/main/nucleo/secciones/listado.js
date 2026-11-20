@@ -393,6 +393,14 @@
   }
   /** Las vistas de un apartado; sin ninguna, «Todo». */
   function vistasDe(ap) { return ap.vistas && ap.vistas.length ? ap.vistas : [{ id: 'TODO', titulo: 'Todo' }]; }
+  /** T0688 · La vista en la que abrir la ficha de una fila que pide la dirección (?ficha=): la de ahora si la fila está en
+   *  ella y, si no, la primera en la que esté (una marca de Prospección no se abre con la lista de Clientes detrás). */
+  function vistaDeFila(ap, f, actual, hoy) {
+    var vs = vistasDe(ap), esta = function (v) { return !!v && (!v.filtro || cumple(f, v.filtro, { hoy: hoy })); };
+    var ahora = vs.filter(function (v) { return v.id === actual; })[0] || vs[0];
+    if (!f || esta(ahora)) return ahora.id;
+    return (vs.filter(esta)[0] || ahora).id;
+  }
 
   /* ---------- referencias y datos de otras tablas (T0599, para tablas normalizadas como las de GESTION) ----------
    * config._refs (lo pone montar.js desde los YAML): { TABLA: { COLUMNA: tabla a la que apunta } }. Una columna que apunta a
@@ -1433,7 +1441,7 @@
   var CALC = { fechaDia: fechaDia, webCorta: webCorta, textoCorto: textoCorto, gruposConQuien: gruposConQuien, nombreCorto: nombreCorto, deshacerEnOrden: deshacerEnOrden, loDiceUnAviso: loDiceUnAviso, contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
     textoVuelta: textoVuelta, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
-    ocultas: ocultas, vistasDe: vistasDe, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, irA: irA, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir,
+    ocultas: ocultas, vistasDe: vistasDe, vistaDeFila: vistaDeFila, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, irA: irA, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
     relacionadas: relacionadas, juntarDe: juntarDe, partes: partes, verTexto: verTexto, rellenar: rellenar, enPlantilla: enPlantilla, veRelacionado: veRelacionado, expandir: expandir, camposTarjeta: camposTarjeta, desglose: desglose, cuando: cuando, comparar: comparar,
     filtrables: filtrables, aIntervalo: aIntervalo, cumpleFiltros: cumpleFiltros, filtrosQueValen: filtrosQueValen, textoFiltro: textoFiltro, sinVentas: sinVentas, deVentas: deVentas, sinCampos: sinCampos, htmlVentas: htmlVentas,
@@ -2225,10 +2233,12 @@
           var otro = { id: sec, titulo: r.titulo, tabla: r.tabla, refs: a.refs, clave: r.clave || 'ID', codigo: r.codigo || '', nombre: r.nombre || (r.columnas || [r.clave || 'ID'])[0], campos: r.campos || {} };
           var cols = (r.columnas || [otro.nombre]).filter(function (c) { return c !== otro.codigo; });
           // T0642: «+ Nueva tarea» lleva a su sección con una nueva ya puesta con esta (su marca).
-          var nv = r.nueva && va ? (function () {
-            var q = '?s=' + encodeURIComponent(sec.toLowerCase()) + '&nueva=1';
+          // T0688: «nueva.seccion», otra que la de sus filas (en Telas, la tarea nueva va a Hoy: el Historial no la enseña).
+          var secN = r.nueva && r.nueva.seccion ? String(r.nueva.seccion).toUpperCase() : sec;
+          var nv = r.nueva && secN && veo[secN] ? (function () {
+            var q = '?s=' + encodeURIComponent(secN.toLowerCase()) + '&nueva=1';
             Object.keys(r.nueva.poner || {}).forEach(function (k) { q += '&' + encodeURIComponent(k) + '=' + encodeURIComponent((f.__crudo || f)[r.nueva.poner[k]]); });
-            return '<a class="u-btn u-btn-texto li-rel-nueva" href="' + texto(q) + '" data-sx="' + texto(sec) + '">+ ' + texto(r.nueva.titulo || 'Añadir') + '</a>';
+            return '<a class="u-btn u-btn-texto li-rel-nueva" href="' + texto(q) + '" data-sx="' + texto(secN) + '">+ ' + texto(r.nueva.titulo || 'Añadir') + '</a>';
           })() : '';
           var max = r.max || EN_FICHA, resto = rs.length - max; // T0690
           var cab = '<h3 class="li-fg-t">' + texto(r.titulo || r.tabla) + (r.datos ? '' : ' <span class="u-cifra">' + rs.length + '</span>') + '</h3>';
@@ -2739,7 +2749,12 @@
         leerVentas(); // T0692
         // T0644: desde el Perfil («Personalizar»), ?personalizar=1 abre aquí su ventana.
         if (url.get('personalizar') && puedePersonalizar) personalizar();
-        else if (pedida) ficha(pedida);
+        else if (pedida) {
+          // T0688: si la fila pedida no está en la vista que se ve, la de su vista (sin recordarla: la próxima vez, la de siempre).
+          var aP = ap(), fP = filaVista(aP, pedida), vP = fP ? vistaDeFila(aP, fP, vistaActual(aP).id, hoyIso()) : '';
+          if (vP && vP !== vistaActual(aP).id) { S.vista = vP; pintar(); }
+          ficha(pedida);
+        }
         else if (url.get('nueva') && BASE.crear) {
           // T0642: «+ Nueva tarea» desde la ficha de una marca: ?nueva=1&ID_MARCA=M-001 (solo columnas que se editan).
           var puesto = {}, edn = editables(ap());
