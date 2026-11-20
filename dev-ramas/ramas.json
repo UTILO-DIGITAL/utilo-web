@@ -919,12 +919,12 @@
   },
   "T0698-al-dia-con-main": {
    "tarea": "T0698",
-   "titulo": "Poner al día una rama con main en una orden, y en qué orden fusionar las aprobadas",
+   "titulo": "Poner al día una rama con main en una orden, el orden para fusionar las aprobadas y un aviso cuando una PR choca con main",
    "pr": 380,
-   "commit": "b505be59",
-   "ultimo": "T0698: Aviso en la plataforma cuando una PR abierta deja de unirse con main (acción «Al día»)",
+   "commit": "82334bd2",
+   "ultimo": "T0698: La acción «Al día» no falla mientras main no tiene la herramienta",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T11:29:09.828Z",
+   "fecha": "2026-11-20T11:34:04.519Z",
    "toca": [],
    "comun": false,
    "paginas": [
