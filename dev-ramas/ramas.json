@@ -959,14 +959,17 @@
   },
   "T0710-ferias-documentos-referentes": {
    "tarea": "T0710",
-   "titulo": "Merge pull request #394 from UTILO-DIGITAL/T0712-proveedores-claude",
+   "titulo": "Ferias, Documentos y Referentes en la app de Marta, con el aviso 45 días antes de cada feria",
    "pr": null,
-   "commit": "8b63ae82",
-   "ultimo": "Merge pull request #394 from UTILO-DIGITAL/T0712-proveedores-claude",
+   "commit": "eb75dd1e",
+   "ultimo": "T0710: Ferias, Documentos y Referentes en la app de Marta, con el aviso 45 días antes de cada feria",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T15:52:34.509Z",
-   "toca": [],
-   "comun": false,
+   "fecha": "2026-11-20T15:53:13.307Z",
+   "toca": [
+    "telas",
+    "utilo"
+   ],
+   "comun": true,
    "paginas": [
     {
      "ruta": "dev/konamigas/",
@@ -1001,7 +1004,7 @@
       "google",
       "codigo"
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/plataforma/",
@@ -1039,7 +1042,7 @@
      "entrar": [
       "google"
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/area/",
@@ -1074,7 +1077,7 @@
       "codigo",
       "google"
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/konamigas/competiciones/",
@@ -1099,7 +1102,7 @@
       "nombre": "konamigas-dev"
      },
      "publica": true,
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/listado/",
@@ -1130,7 +1133,7 @@
        "nombre": "Admin"
       }
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/",
@@ -1147,7 +1150,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/catalogo/",
@@ -1162,7 +1165,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     }
    ],
    "migraciones": {
