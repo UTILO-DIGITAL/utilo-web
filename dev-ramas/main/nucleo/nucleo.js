@@ -52,6 +52,8 @@
 
   var ICONO_PERFIL = '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"/>';
   var ICONO_SECCION = '<circle cx="12" cy="12" r="3"/>';
+  var ICONO_LUPA = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>';
+  var MAC = /mac|iphone|ipad/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '');
 
   function $(id) { return document.getElementById(id); }
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -255,6 +257,7 @@
     if (r.perfilEnMenu === false) o.perfilEnMenu = false; // T0415: Perfil fuera del menú (se abre con el nombre de la cabecera)
     if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
     if (r.uso && r.uso.app && r.uso.url) o.uso = { app: String(r.uso.app), url: String(r.uso.url), clave: String(r.uso.clave || '') }; // T0682
+    if (r.buscar && Array.isArray(r.buscar.grupos) && r.buscar.grupos.length) o.buscar = r.buscar; // T0685: la lupa (nucleo.buscar)
     if (r.ocultar && Array.isArray(r.ocultar.tablas)) o.ocultar = { tablas: r.ocultar.tablas, refs: r.ocultar.refs || {}, filas: r.ocultar.filas || {}, columnas: r.ocultar.columnas || {} }; // T0650; T0671: columnas
     return o;
   }
@@ -381,6 +384,8 @@
     }
     return '<nav class="sx u-sx' + (p.resto.length ? ' sx-mucho' : '') + '" aria-label="Secciones"><div class="sx-in"><div class="sx-cab"><span class="sx-marca">' + texto(C.nombreApp || cred.negocio || '') + '</span>' +
       '<button type="button" class="sx-plegar" id="n-plegar" aria-label="' + et + '" title="' + et + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button></div>' +
+      (cred.buscar ? '<button type="button" class="sx-buscar" data-n-buscar title="Buscar en toda la app (' + (MAC ? '⌘K' : 'Ctrl+K') + ')">' + ICONO_LUPA +
+        '<span>Buscar</span><kbd>' + (MAC ? '⌘K' : 'Ctrl K') + '</kbd></button>' : '') + // T0685: solo en el ordenador (en el móvil, la lupa de la cabecera)
       p.barra.map(enlace).join('') +
       (p.resto.length ? '<div class="sx-resto" id="n-sx-resto">' + p.resto.map(enlace).join('') + '</div>' +
         '<button type="button" class="sx-mas" id="n-sx-mas" aria-expanded="false" aria-controls="n-sx-resto" title="Más secciones">' +
@@ -425,6 +430,7 @@
     document.body.className = 'u u-con-barra' + (cred.como ? ' n-viendo-como' : '') + (sinPerfil() ? ' n-perfil-arriba' : '');
     document.body.innerHTML = bandaDev(cred.dev) + htmlMenu() +
       '<div id="sx-panel">' + htmlComo() + htmlAviso() + '<header class="u-cab n-cab"><h1 id="n-titulo"></h1>' +
+      (cred.buscar ? '<button type="button" class="n-lupa" data-n-buscar aria-label="Buscar en toda la app" title="Buscar en toda la app">' + ICONO_LUPA + '</button>' : '') + // T0685
       '<a class="n-quien" href="?s=perfil" data-sx="PERFIL"><span>' + texto(cred.persona) + '</span>' + (cred.perfil ? '<small>' + texto(cred.perfil) + '</small>' : '') + '</a></header>' +
       '<main class="u-main n-main" id="n-sec"></main></div>' +
       '<div class="u-aviso" id="n-aviso" role="status" hidden></div>';
@@ -434,6 +440,7 @@
     abrir(pedida() || menu()[0].id, false);
     avisarVersiones();
     cifras();
+    if (cred.buscar) setTimeout(function () { cargarBuscar().catch(function () {}); }, 1500); // T0685
   }
 
   /* ---------- T0412 · las cifras del menú ----------
@@ -1065,6 +1072,35 @@
     });
   }
 
+  /* ---------- T0685 · buscar en toda la app (nucleo/buscar.js) ----------
+   * La lupa del menú (ordenador) y de la cabecera (móvil), y ⌘K: carga nucleo/buscar.js la primera vez (con la huella que
+   * pone montar.js) y lo abre con los grupos de quien ha entrado (los de las secciones que ve), sus tablas y lo que no ve. */
+  var cargaBuscar = null;
+  /** El JS de la búsqueda, una vez (el marco lo pide un poco después de pintar, para que al abrirla ya esté y no se pierda
+   *  lo primero que se escribe). */
+  function cargarBuscar() {
+    var b = cred && cred.buscar;
+    if (!b) return Promise.reject(new Error('sin búsqueda'));
+    if (!cargaBuscar) cargaBuscar = new Promise(function (ok, ko) {
+      if (window.UBuscar) { ok(); return; }
+      var sc = document.createElement('script');
+      sc.src = RAIZ + 'nucleo/buscar.js?v=' + encodeURIComponent(b.version || '1');
+      sc.onload = function () { if (window.UBuscar) ok(); else ko(new Error('sin UBuscar')); };
+      sc.onerror = function () { cargaBuscar = null; ko(new Error('No se ha podido cargar la búsqueda.')); };
+      document.head.appendChild(sc);
+    });
+    return cargaBuscar;
+  }
+  function buscar() {
+    if (!cred || !cred.buscar) return;
+    var b = cred.buscar;
+    cargarBuscar().then(function () {
+      verMas(false);
+      window.UBuscar.abrir({ grupos: b.grupos, texto: b.texto || '', placeholder: b.placeholder || '', tablas: tablas(), ocultar: cred.ocultar || null,
+        secciones: todas().map(function (s) { return { id: s.id, titulo: s.titulo, icono: s.icono || ICONO_SECCION }; }) });
+    }, function () { aviso('No se ha podido abrir la búsqueda. Comprueba la conexión y vuelve a probar.'); });
+  }
+
   /* ---------- navegación ---------- */
 
   document.addEventListener('click', function (e) {
@@ -1072,6 +1108,7 @@
     if (e.target.closest && e.target.closest('#n-sx-mas')) { verMas($('n-sx-mas').getAttribute('aria-expanded') !== 'true'); return; }
     verMas(false);
     // T0273: «Entrar como otra persona» (en Perfil) y «Volver a mi cuenta» (franja y Perfil), estén donde estén.
+    if (e.target.closest && e.target.closest('[data-n-buscar]')) { buscar(); return; } // T0685
     var b = e.target.closest && e.target.closest('[data-n-como], [data-n-volver], [data-n-versiones]');
     if (b && cred) { e.preventDefault(); if (b.hasAttribute('data-n-volver')) volver(); else if (b.hasAttribute('data-n-versiones')) verVersiones(); else verComo(); return; }
     var a = e.target.closest && e.target.closest('a[data-sx]');
@@ -1080,6 +1117,10 @@
     // T0415: sin Perfil en el menú, el Perfil del marco es una ventana, no una sección.
     if (a.getAttribute('data-sx') === 'PERFIL' && sinPerfil() && (seccion('PERFIL') || {}).propia) { verPerfil(); return; }
     abrir(a.getAttribute('data-sx'), true, a.getAttribute('href'));
+  });
+  // T0685: ⌘K (Ctrl+K fuera del Mac) abre la búsqueda desde cualquier sección.
+  document.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && String(e.key).toLowerCase() === 'k' && cred && cred.buscar) { e.preventDefault(); buscar(); }
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && $('n-sx-mas') && $('n-sx-mas').getAttribute('aria-expanded') === 'true') { verMas(false); $('n-sx-mas').focus(); } }); // T0629
   try { history.scrollRestoration = 'manual'; } catch (e) {} // T0420: dónde estabas lo pone abrir() (alSitio)
