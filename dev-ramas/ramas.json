@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "4ce76c7b",
-   "ultimo": "Merge pull request #410 from UTILO-DIGITAL/T0729-ajustes-marta",
+   "commit": "c04ad428",
+   "ultimo": "Merge pull request #408 from UTILO-DIGITAL/T0719-claude-de-marta",
    "quien": "",
-   "fecha": "2026-11-20T23:03:53.852Z",
+   "fecha": "2026-11-20T23:11:51.958Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -278,7 +278,8 @@
      "20261120083735_zona_tablas.sql",
      "20261120083736_zona.sql",
      "20261120115014_dependencia_en_main_tablas.sql",
-     "20261120115015_dependencia_en_main.sql"
+     "20261120115015_dependencia_en_main.sql",
+     "20261120230000_vigilar_tablas.sql"
     ]
    },
    "rama": "main"
