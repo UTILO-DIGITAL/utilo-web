@@ -921,14 +921,17 @@
   },
   "T0688-marcas": {
    "tarea": "T0688",
-   "titulo": "Merge pull request #384 from UTILO-DIGITAL/T0685-buscar-en-toda-la-app",
+   "titulo": "Marcas junta Clientes y Prospección; Seguimiento pasa a Historial",
    "pr": null,
-   "commit": "856cf8a8",
-   "ultimo": "Merge pull request #384 from UTILO-DIGITAL/T0685-buscar-en-toda-la-app",
+   "commit": "0ca637c1",
+   "ultimo": "T0688: Marcas junta Clientes y Prospección; Seguimiento pasa a Historial",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T13:39:47.115Z",
-   "toca": [],
-   "comun": false,
+   "fecha": "2026-11-20T13:40:19.609Z",
+   "toca": [
+    "telas",
+    "utilo"
+   ],
+   "comun": true,
    "paginas": [
     {
      "ruta": "dev/konamigas/",
@@ -1001,7 +1004,7 @@
      "entrar": [
       "google"
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/area/",
@@ -1092,7 +1095,7 @@
        "nombre": "Admin"
       }
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/",
@@ -1109,7 +1112,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/catalogo/",
@@ -1124,7 +1127,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     }
    ],
    "migraciones": {
