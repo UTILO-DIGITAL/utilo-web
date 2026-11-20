@@ -52,6 +52,8 @@
 
   var ICONO_PERFIL = '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"/>';
   var ICONO_SECCION = '<circle cx="12" cy="12" r="3"/>';
+  var ICONO_LUPA = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>';
+  var MAC = /mac|iphone|ipad/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '');
 
   function $(id) { return document.getElementById(id); }
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -251,10 +253,12 @@
       version: r.version || '', versiones: Array.isArray(r.versiones) ? r.versiones : [] }; // T0283
     if (r.persona_id) o.persona_id = r.persona_id; // T0387: con Supabase, el id de la persona (acceso.personas)
     if (Array.isArray(r.roles)) o.roles = r.roles; // T0394: con Supabase, sus roles (ctx.roles); antes se perdían aquí
+    if (Array.isArray(r.equipo)) o.equipo = r.equipo; // T0689: quién más trabaja en la app (Mías / Todas de Listado)
     if (r.aviso) o.aviso = String(r.aviso); // T0639: el aviso de arriba (config.json · nucleo.aviso)
     if (r.perfilEnMenu === false) o.perfilEnMenu = false; // T0415: Perfil fuera del menú (se abre con el nombre de la cabecera)
     if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
     if (r.uso && r.uso.app && r.uso.url) o.uso = { app: String(r.uso.app), url: String(r.uso.url), clave: String(r.uso.clave || '') }; // T0682
+    if (r.buscar && Array.isArray(r.buscar.grupos) && r.buscar.grupos.length) o.buscar = r.buscar; // T0685: la lupa (nucleo.buscar)
     if (r.ocultar && Array.isArray(r.ocultar.tablas)) o.ocultar = { tablas: r.ocultar.tablas, refs: r.ocultar.refs || {}, filas: r.ocultar.filas || {}, columnas: r.ocultar.columnas || {} }; // T0650; T0671: columnas
     return o;
   }
@@ -291,6 +295,16 @@
   window.UN = {
     /** Cada sección se registra al cargar su JS: UN.registrar('EJEMPLO', { abrir: function (el, ctx) {}, cerrar: function () {} }). */
     registrar: function (id, def) { DEF[String(id).toUpperCase()] = def; },
+    /**
+     * T0692 · Otra sección que ve quien ha entrado, para usar sus cuentas sin abrirla (las ventas de una marca, de Pedidos, en
+     * su ficha de Clientes): su JS (una vez) y su configuración, { id, titulo, def, config }. null si no la ve: lo de esa
+     * sección no sale en otra a quien no la tiene (y el motor tampoco le daría sus tablas).
+     */
+    seccion: function (id) {
+      var s = cred ? seccion(String(id || '').toUpperCase()) : null;
+      if (!s || !s.web) return Promise.resolve(null);
+      return cargar(s).then(function (def) { return { id: s.id, titulo: s.titulo, def: def, config: s.config || {} }; }, function () { return null; });
+    },
     /** T0283: el bloque «Versión» de Perfil (vacío si no hay versión: DEV, local sin ejemplo). */
     htmlVersion: function () { return htmlVersion(); },
     /**
@@ -371,6 +385,8 @@
     }
     return '<nav class="sx u-sx' + (p.resto.length ? ' sx-mucho' : '') + '" aria-label="Secciones"><div class="sx-in"><div class="sx-cab"><span class="sx-marca">' + texto(C.nombreApp || cred.negocio || '') + '</span>' +
       '<button type="button" class="sx-plegar" id="n-plegar" aria-label="' + et + '" title="' + et + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button></div>' +
+      (cred.buscar ? '<button type="button" class="sx-buscar" data-n-buscar title="Buscar en toda la app (' + (MAC ? '⌘K' : 'Ctrl+K') + ')">' + ICONO_LUPA +
+        '<span>Buscar</span><kbd>' + (MAC ? '⌘K' : 'Ctrl K') + '</kbd></button>' : '') + // T0685: solo en el ordenador (en el móvil, la lupa de la cabecera)
       p.barra.map(enlace).join('') +
       (p.resto.length ? '<div class="sx-resto" id="n-sx-resto">' + p.resto.map(enlace).join('') + '</div>' +
         '<button type="button" class="sx-mas" id="n-sx-mas" aria-expanded="false" aria-controls="n-sx-resto" title="Más secciones">' +
@@ -415,6 +431,7 @@
     document.body.className = 'u u-con-barra' + (cred.como ? ' n-viendo-como' : '') + (sinPerfil() ? ' n-perfil-arriba' : '');
     document.body.innerHTML = bandaDev(cred.dev) + htmlMenu() +
       '<div id="sx-panel">' + htmlComo() + htmlAviso() + '<header class="u-cab n-cab"><h1 id="n-titulo"></h1>' +
+      (cred.buscar ? '<button type="button" class="n-lupa" data-n-buscar aria-label="Buscar en toda la app" title="Buscar en toda la app">' + ICONO_LUPA + '</button>' : '') + // T0685
       '<a class="n-quien" href="?s=perfil" data-sx="PERFIL"><span>' + texto(cred.persona) + '</span>' + (cred.perfil ? '<small>' + texto(cred.perfil) + '</small>' : '') + '</a></header>' +
       '<main class="u-main n-main" id="n-sec"></main></div>' +
       '<div class="u-aviso" id="n-aviso" role="status" hidden></div>';
@@ -424,6 +441,7 @@
     abrir(pedida() || menu()[0].id, false);
     avisarVersiones();
     cifras();
+    if (cred.buscar) setTimeout(function () { cargarBuscar().catch(function () {}); }, 1500); // T0685
   }
 
   /* ---------- T0412 · las cifras del menú ----------
@@ -432,12 +450,40 @@
    * con la misma copia de las tablas, la cuenta cada vez que esa tabla cambia y, con Supabase, la vuelve a leer en cuanto
    * cambia algo en las tablas de «directo» (Realtime). Sin nada que contar, no se ve. */
   var cifrasDirecto = [];
+  /** T0710 · Las condiciones de una cifra («si»), como las de Listado: es, no, vacio y, en una fecha, desde y hasta en días
+   * desde hoy (incluidos; «dias» es el «dias» de la cifra). Sin condiciones, todas. */
+  function cumpleCifra(f, si, dias) {
+    function norm(v) { return String(v == null ? '' : v).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+    function lista(x) { return Array.isArray(x) ? x : [x]; }
+    function dia(v) {
+      if (v instanceof Date) return isNaN(v) ? null : new Date(v.getFullYear(), v.getMonth(), v.getDate());
+      var s = String(v == null ? '' : v).trim(), m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+      if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+      m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s);
+      return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
+    }
+    function d(x) { return x === 'dias' ? dias : x === '-dias' ? -dias : x; }
+    var h = new Date(); h = new Date(h.getFullYear(), h.getMonth(), h.getDate());
+    return (si || []).every(function (c) {
+      var v = f[c.campo], vac = norm(v) === '';
+      if (c.es !== undefined && lista(c.es).map(norm).indexOf(norm(v)) < 0) return false;
+      if (c.no !== undefined && lista(c.no).map(norm).indexOf(norm(v)) >= 0) return false;
+      if (c.vacio !== undefined && vac !== !!c.vacio) return false;
+      if (c.desde !== undefined || c.hasta !== undefined) {
+        var x = dia(v); if (!x) return false;
+        var n = Math.round((x - h) / 864e5);
+        if (c.desde !== undefined && n < d(c.desde)) return false;
+        if (c.hasta !== undefined && n > d(c.hasta)) return false;
+      }
+      return true;
+    });
+  }
   function contarCifras(tabla) {
     if (!cred || !T) return;
     menu().forEach(function (s) {
       var c = s.cifra;
       if (!c || (tabla && tabla !== c.tabla)) return;
-      var n = T.filas(c.tabla).filter(function (f) { return Object.keys(c.donde || {}).every(function (k) { return f[k] === c.donde[k]; }); }).length;
+      var n = T.filas(c.tabla).filter(function (f) { return Object.keys(c.donde || {}).every(function (k) { return f[k] === c.donde[k]; }) && cumpleCifra(f, c.si, c.dias); }).length;
       var b = document.querySelector('[data-cifra="' + s.id + '"]');
       if (!b) return;
       b.textContent = n ? String(n) : ''; b.hidden = !n;
@@ -700,7 +746,8 @@
     var n = 0;
     (function paso() {
       if (actual !== id) return;
-      window.scrollTo(0, y);
+      // T0722 (R49): en el iPhone quien se desplaza es body, no la ventana: se mueven los dos.
+      window.scrollTo(0, y); document.body.scrollTop = y;
       if (Math.abs(bajado() - y) > 2 && ++n < 25) setTimeout(paso, 80);
     })();
   }
@@ -751,6 +798,8 @@
       autor: cred.como ? cred.como.persona + ' como ' + cred.persona : cred.persona,
       personaId: cred.persona_id || '', // T0387
       roles: cred.roles || [], // T0417
+      // T0689: quien administra y las personas con perfil ([{ persona, correo, admin }]), si una sección que ve usa MIAS; si no, [].
+      equipo: cred.equipo || [],
       // T0650: lo que su perfil no ve (nucleo.ocultar del motor): { tablas, refs: { TABLA: [columnas que apuntan a una oculta] },
       // filas: { TABLA: { COLUMNA: [valores que no ve] } } } o null.
       ocultar: cred.ocultar || null,
@@ -1055,6 +1104,35 @@
     });
   }
 
+  /* ---------- T0685 · buscar en toda la app (nucleo/buscar.js) ----------
+   * La lupa del menú (ordenador) y de la cabecera (móvil), y ⌘K: carga nucleo/buscar.js la primera vez (con la huella que
+   * pone montar.js) y lo abre con los grupos de quien ha entrado (los de las secciones que ve), sus tablas y lo que no ve. */
+  var cargaBuscar = null;
+  /** El JS de la búsqueda, una vez (el marco lo pide un poco después de pintar, para que al abrirla ya esté y no se pierda
+   *  lo primero que se escribe). */
+  function cargarBuscar() {
+    var b = cred && cred.buscar;
+    if (!b) return Promise.reject(new Error('sin búsqueda'));
+    if (!cargaBuscar) cargaBuscar = new Promise(function (ok, ko) {
+      if (window.UBuscar) { ok(); return; }
+      var sc = document.createElement('script');
+      sc.src = RAIZ + 'nucleo/buscar.js?v=' + encodeURIComponent(b.version || '1');
+      sc.onload = function () { if (window.UBuscar) ok(); else ko(new Error('sin UBuscar')); };
+      sc.onerror = function () { cargaBuscar = null; ko(new Error('No se ha podido cargar la búsqueda.')); };
+      document.head.appendChild(sc);
+    });
+    return cargaBuscar;
+  }
+  function buscar() {
+    if (!cred || !cred.buscar) return;
+    var b = cred.buscar;
+    cargarBuscar().then(function () {
+      verMas(false);
+      window.UBuscar.abrir({ grupos: b.grupos, texto: b.texto || '', placeholder: b.placeholder || '', tablas: tablas(), ocultar: cred.ocultar || null,
+        secciones: todas().map(function (s) { return { id: s.id, titulo: s.titulo, icono: s.icono || ICONO_SECCION }; }) });
+    }, function () { aviso('No se ha podido abrir la búsqueda. Comprueba la conexión y vuelve a probar.'); });
+  }
+
   /* ---------- navegación ---------- */
 
   document.addEventListener('click', function (e) {
@@ -1062,6 +1140,7 @@
     if (e.target.closest && e.target.closest('#n-sx-mas')) { verMas($('n-sx-mas').getAttribute('aria-expanded') !== 'true'); return; }
     verMas(false);
     // T0273: «Entrar como otra persona» (en Perfil) y «Volver a mi cuenta» (franja y Perfil), estén donde estén.
+    if (e.target.closest && e.target.closest('[data-n-buscar]')) { buscar(); return; } // T0685
     var b = e.target.closest && e.target.closest('[data-n-como], [data-n-volver], [data-n-versiones]');
     if (b && cred) { e.preventDefault(); if (b.hasAttribute('data-n-volver')) volver(); else if (b.hasAttribute('data-n-versiones')) verVersiones(); else verComo(); return; }
     var a = e.target.closest && e.target.closest('a[data-sx]');
@@ -1070,6 +1149,10 @@
     // T0415: sin Perfil en el menú, el Perfil del marco es una ventana, no una sección.
     if (a.getAttribute('data-sx') === 'PERFIL' && sinPerfil() && (seccion('PERFIL') || {}).propia) { verPerfil(); return; }
     abrir(a.getAttribute('data-sx'), true, a.getAttribute('href'));
+  });
+  // T0685: ⌘K (Ctrl+K fuera del Mac) abre la búsqueda desde cualquier sección.
+  document.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && String(e.key).toLowerCase() === 'k' && cred && cred.buscar) { e.preventDefault(); buscar(); }
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && $('n-sx-mas') && $('n-sx-mas').getAttribute('aria-expanded') === 'true') { verMas(false); $('n-sx-mas').focus(); } }); // T0629
   try { history.scrollRestoration = 'manual'; } catch (e) {} // T0420: dónde estabas lo pone abrir() (alSitio)

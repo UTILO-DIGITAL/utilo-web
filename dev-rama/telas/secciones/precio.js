@@ -6,6 +6,7 @@
  * precio no cubre lo que le cuesta. Solo guarda, si Marta quiere, el precio propuesto a una marca (PROPUESTAS, T0687). Lo que le cuesta es el mismo cálculo que «Te cuesta puesta en España» de
  * Mis telas. T0657: lo que gana va en euros por metro, sin porcentajes ni mínimo (Marta, 19/11/2026: «Mi margen es precio de
  * venta − (precio de coste + transporte). Por eso no quiero definir un %»).
+ * T0659: junto a «Ganas», lo que suele ganar por metro con esa tela o esa marca, de sus facturas (solo para quien ve Economía).
  */
 (function () {
   'use strict';
@@ -40,13 +41,13 @@
     var e = aNum(a.ENVIO_ARANCEL);
     return { rupias: aNum(a.RUPIAS_POR_EURO), envio: e > 0 ? e : NaN };
   }
-  /** Las telas que se pueden elegir (sin las descartadas), por código: { id, nombre, diseno, inr, ancho }. */
+  /** Las telas que se pueden elegir (sin las descartadas), por código: { id, nombre, tec (su técnica), diseno, inr, ancho }. */
   function telas(D) {
     return (D.filas('TELAS') || []).filter(function (t) { return t.ID && nombre(D, 'ESTADOS_TELA', t.ID_ESTADO) !== 'Descartada'; }).map(function (t) {
       var d = D.fila('DISENOS', t.ID_DISENO) || {}, inr = aNum(t.COSTE_INR);
       if (isNaN(inr)) inr = aNum(d.COSTE_INR); // el del color si cuesta distinto; si no, el de su diseño (como Mis telas)
       var tec = nombre(D, 'TECNICAS', d.ID_TECNICA);
-      return { id: String(t.ID), nombre: [tec, t.COLOR].filter(Boolean).join(' · ') || String(t.ID), diseno: String(t.ID_DISENO || ''), inr: inr, ancho: aNum(d.ANCHO), gsm: aNum(d.GSM) };
+      return { id: String(t.ID), nombre: [tec, t.COLOR].filter(Boolean).join(' · ') || String(t.ID), tec: tec, diseno: String(t.ID_DISENO || ''), inr: inr, ancho: aNum(d.ANCHO), gsm: aNum(d.GSM) };
     }).sort(function (a, b) { return a.id.localeCompare(b.id, 'es'); });
   }
   /** Lo que cuesta en euros, sin envío: las rupias entre el cambio (redondeado a céntimos, como Mis telas) o los euros escritos. NaN si falta. */
@@ -124,7 +125,70 @@
     return p;
   }
 
-  var CALC = { whatsapp: whatsapp, propuesta: propuesta, aNum: aNum, cifra: cifra, ajustes: ajustes, telas: telas, costeEur: costeEur, envioMetro: envioMetro,
+  /* ---------- T0659 · Lo que suele ganar por metro, de sus facturas ---------- */
+
+  /** Con menos líneas de factura con tela que estas, no se propone nada; y cada propuesta pide estas ventas parecidas. */
+  var SUELES = { lineas: 10, ventas: 3, ambas: 2 };
+
+  /**
+   * Lo que ganó en cada venta de una tela de Mis telas: las líneas de sus facturas emitidas (sin las anuladas) cuyo concepto
+   * acaba en el código de la tela (como las escribe Economía). Lo ganado es su precio por metro menos lo que esa tela le
+   * cuesta HOY (el cambio y el envío de sus ajustes, como la calculadora): los de aquel día no se guardan. Sin el coste de la
+   * tela o sin el envío, esa línea no cuenta; el envío escrito a mano tampoco (no es una tela).
+   * F = { lineas: FACTURA_LINEAS, facturas: FACTURAS, contrapartes: CONTRAPARTES } →
+   * [{ numero, fecha, marca (ID_MARCA de su contraparte), tela, tec, m (metros), precio, gana }], de la más nueva a la más vieja.
+   */
+  function vendido(D, F, a) {
+    var ts = {}, fac = {}, ctr = {};
+    telas(D).forEach(function (t) { ts[t.id] = t; });
+    (F.facturas || []).forEach(function (f) { if (f.ID) fac[String(f.ID)] = f; });
+    (F.contrapartes || []).forEach(function (c) { if (c.ID) ctr[String(c.ID)] = c; });
+    var r = [];
+    (F.lineas || []).forEach(function (l) {
+      var f = fac[String(l.ID_FACTURA)];
+      if (!f || String(f.TIPO) !== 'Emitida' || String(f.ESTADO) === 'Anulada') return;
+      var cod = String(l.CONCEPTO || '').split(' · ').pop().trim(), t = ts[cod];
+      if (!t || (l.UNIDAD && String(l.UNIDAD) !== 'm')) return;
+      var coste = r2(costeEur(t, a.rupias) + a.envio), precio = aNum(l.PRECIO), m = aNum(l.CANTIDAD);
+      if (isNaN(coste) || isNaN(precio) || !(m > 0)) return;
+      var c = ctr[String(f.ID_CONTRAPARTE)] || {};
+      r.push({ numero: String(f.NUMERO || ''), fecha: String(f.FECHA || '').slice(0, 10), marca: String(c.ID_MARCA || ''), tela: t.id, tec: t.tec, m: m, precio: precio, gana: r2(precio - coste) });
+    });
+    return r.sort(function (x, y) { return y.fecha.localeCompare(x.fecha) || y.numero.localeCompare(x.numero, 'es', { numeric: true }); });
+  }
+
+  /** Lo que suele ganar: lo de en medio de las ventas, pesando cada una por sus metros, redondeado a 0,50 €. */
+  function deEnMedio(vs) {
+    var s = vs.slice().sort(function (x, y) { return x.gana - y.gana; }), tot = 0, acc = 0, i;
+    for (i = 0; i < s.length; i++) tot += s[i].m;
+    for (i = 0; i < s.length; i++) { acc += s[i].m; if (acc >= tot / 2) return Math.round(s[i].gana * 2) / 2; }
+    return NaN;
+  }
+
+  /** «los bordados», «los lisos»; «las telas de ikat». */
+  function deLaTecnica(tec) {
+    var t = String(tec || '').toLowerCase();
+    return /[aeiou]$/.test(t) && t.indexOf(' ') < 0 ? 'los ' + t + 's' : 'las telas de ' + t;
+  }
+
+  /**
+   * T0659 · La propuesta de «Ganas» (la más parecida que haya), o null: esa tela a esa marca (2 ventas), esa tela (3) o, si no,
+   * su técnica (3), y esa marca (3). Nada si en total hay menos de 10 ventas con tela. vs = vendido(…), marca = { id, nombre }
+   * o null, t = la tela elegida o null. → { gana, que: 'ambas' | 'tela' | 'tecnica' | 'marca', texto, ventas }
+   */
+  function sueles(vs, marca, t) {
+    if (!vs || vs.length < SUELES.lineas) return null;
+    var de = function (f) { return vs.filter(f); }, id = t && t.id, m = marca && marca.id;
+    var hay = function (que, ventas, min, txt) { return ventas.length >= min ? { gana: deEnMedio(ventas), que: que, texto: txt, ventas: ventas } : null; };
+    var p = null;
+    if (id && m) p = hay('ambas', de(function (v) { return v.tela === id && v.marca === m; }), SUELES.ambas, 'A ' + marca.nombre + ' esta tela se la vendes ganando unos');
+    if (!p && id) p = hay('tela', de(function (v) { return v.tela === id; }), SUELES.ventas, 'Con esta tela sueles ganar unos');
+    if (!p && t && t.tec) p = hay('tecnica', de(function (v) { return v.tec === t.tec; }), SUELES.ventas, 'Con ' + deLaTecnica(t.tec) + ' sueles ganar unos');
+    if (!p && m) p = hay('marca', de(function (v) { return v.marca === m; }), SUELES.ventas, 'Con ' + marca.nombre + ' sueles ganar unos');
+    return p && !isNaN(p.gana) ? p : null;
+  }
+
+  var CALC = { vendido: vendido, sueles: sueles, SUELES: SUELES, whatsapp: whatsapp, propuesta: propuesta, aNum: aNum, cifra: cifra, ajustes: ajustes, telas: telas, costeEur: costeEur, envioMetro: envioMetro,
     precioDe: precioDe, ganaDe: ganaDe, comparativa: comparativa, calcular: calcular, ofrecer: ofrecer };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
@@ -138,6 +202,8 @@
       var T = ctx.tablas;
       var D = { filas: function (t) { return T.filas(t) || []; }, fila: function (t, id) { return id === '' || id == null ? null : T.fila(t, id); } };
       var factura = (ctx.secciones || []).some(function (x) { return x.id === 'ECONOMIA'; });
+      // T0659: lo que suele ganar sale de sus facturas, que solo ve quien ve Economía (Marta); a Equipo ni se le piden.
+      var FACTURAS = factura ? ['FACTURAS', 'FACTURA_LINEAS', 'CONTRAPARTES'] : [], facturasLeidas = false;
       // T0687: desde la ficha de una tela o de una marca llega ya puesta (?s=precio&tela=BOR-004-01 o &marca=M-002).
       var url = new URLSearchParams(location.search);
       var S = { marca: url.get('marca') || '', tela: url.get('tela') || '', modo: 'precio', envioModo: 'metro', envioTocado: false };
@@ -162,6 +228,7 @@
           '<div class="pr-par"><label class="u-campo" id="pr-c-gana"><span class="u-etiqueta">Ganas</span><span class="pr-ud"><input id="pr-gana" inputmode="decimal" autocomplete="off"><i>€/m</i></span></label>' +
             '<span class="pr-o">o</span>' +
             '<label class="u-campo" id="pr-c-precio"><span class="u-etiqueta">Precio</span><span class="pr-ud"><input id="pr-precio" inputmode="decimal" autocomplete="off"><i>€/m</i></span></label></div>' +
+          '<div class="pr-sueles" id="pr-sueles" hidden></div>' +
           '<p class="u-nota">Pon lo que quieres ganar por metro o el precio, y sale el otro.</p>' +
         '</section>' +
         '<div class="pr-lado"><section class="pr-caja" id="pr-res" aria-live="polite"></section><section class="pr-caja" id="pr-comp"></section></div>' +
@@ -253,12 +320,33 @@
               : 'La última vez le propusiste ' + eur(aNum(ultima.PRECIO)) + ' (' + texto(fechaCorta(ultima.FECHA)) + ').') + '</p>' : '');
         }
         $('pr-res').innerHTML = h;
+        pintarSueles(t, marca);
         pintarBarra(t, r);
         pintarComp(t, r, para);
         ultimo = { t: t, r: r, para: para };
       }
 
       var ultimo = null;
+
+      /** T0659 · «Sueles ganar unos 9 €/m» bajo Ganas, con «Ponerlo» y de dónde sale. Nunca lo pone sola. */
+      function pintarSueles(t, marca) {
+        var caja = $('pr-sueles'), p = null;
+        if (facturasLeidas) {
+          var F = { lineas: D.filas('FACTURA_LINEAS'), facturas: D.filas('FACTURAS'), contrapartes: D.filas('CONTRAPARTES') };
+          p = sueles(vendido(D, F, ajustes(D)), marca ? { id: S.marca, nombre: String(marca.NOMBRE || marca.ID) } : null, t && t.id ? t : null);
+        }
+        caja.hidden = !p;
+        if (!p) { caja.innerHTML = ''; return; }
+        var abierto = !!caja.querySelector('details[open]'), nm = function (id) { var m = D.fila('MARCAS', id); return m ? String(m.NOMBRE || id) : 'sin marca'; };
+        var MAX = 8, vs = p.ventas.slice(0, MAX);
+        caja.innerHTML = '<p>' + texto(p.texto) + ' <b class="u-cifra">' + cifra(p.gana, p.gana % 1 ? 2 : 0) + ' €/m</b>. ' +
+          '<button type="button" class="u-btn-texto" data-sueles="' + p.gana + '">Ponerlo</button></p>' +
+          '<details class="pr-origen"' + (abierto ? ' open' : '') + '><summary>De dónde sale</summary><ul>' + vs.map(function (v) {
+            return '<li class="u-cifra">' + texto(v.numero) + ' · ' + texto(nm(v.marca)) + (p.que === 'tela' || p.que === 'ambas' ? '' : ' · ' + texto(v.tela)) +
+              ': a ' + eur(v.precio) + ', ' + (v.gana < 0 ? 'perdiste ' + eur(-v.gana) : 'ganaste ' + eur(v.gana)) + ' (' + cifra(v.m, v.m % 1 ? 2 : 0) + ' m)</li>';
+          }).join('') + (p.ventas.length > MAX ? '<li>y ' + (p.ventas.length - MAX) + ' más</li>' : '') + '</ul>' +
+          '<p class="u-nota">Con lo que te cuesta hoy esa tela; el cambio o el envío de aquel día pudo ser otro.</p></details>';
+      }
       function ultimaPropuesta(marca, tela) {
         return D.filas('PROPUESTAS').filter(function (p) { return String(p.ID_MARCA) === String(marca) && String(p.ID_TELA) === String(tela); })
           .sort(function (a, b) { return String(b.FECHA || '').localeCompare(String(a.FECHA || '')); })[0] || null;
@@ -343,6 +431,8 @@
             function (er) { g.disabled = false; ctx.aviso('No se ha guardado: ' + ((er && er.message) || er)); });
           return;
         }
+        var su = e.target.closest('[data-sueles]');
+        if (su) { S.modo = 'gana'; $('pr-gana').value = cifra(Number(su.getAttribute('data-sueles'))); pintar('gana'); return; }
         var b = e.target.closest('[data-poner]');
         if (b) { S.modo = 'precio'; $('pr-precio').value = cifra(Number(b.getAttribute('data-poner'))); pintar(); return; }
         var v = e.target.closest('[data-envio]');
@@ -353,10 +443,14 @@
         }
       });
 
-      ctx.alCambiar(function (t) { if (TABLAS.indexOf(t) >= 0) { listas(); pintar(); } });
+      ctx.alCambiar(function (t) { if (TABLAS.indexOf(t) >= 0) { listas(); pintar(); } else if (FACTURAS.indexOf(t) >= 0) pintar(); });
       var hay = TABLAS.every(function (t) { return (T.filas(t) || []).length || t === 'COMPARATIVA' || t === 'PROPUESTAS'; });
       if (hay) { listas(); pintar(); } else $('pr-res').innerHTML = '<div class="kz-centro" role="status"><div class="u-carga"></div></div>';
-      T.leer(TABLAS).then(function () { listas(); pintar(); }, function (e) {
+      T.leer(TABLAS).then(function () {
+        listas(); pintar();
+        // T0659: después, sin hacer esperar a la calculadora; si no se pueden leer, la calculadora sigue igual, sin propuesta.
+        if (FACTURAS.length) T.leer(FACTURAS).then(function () { facturasLeidas = true; pintar(); }, function () {});
+      }, function (e) {
         if (ctx.abierta()) $('pr-res').innerHTML = '<p class="u-error">No se han podido leer tus telas.</p><p class="u-nota">' + texto(String(e.message).replace(/^\w+:\s*/, '')) + '</p>';
       });
     }

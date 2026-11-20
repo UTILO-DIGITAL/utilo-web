@@ -122,12 +122,15 @@ window.NUCLEO_MONTAJE = {
     "SECCIONES": {
      "telas": [
       "Hoy",
-      "Seguimiento",
-      "Clientes",
-      "Prospección",
+      "Marcas",
+      "Historial",
       "Proveedores",
       "Mis telas",
       "Calcular precio",
+      "Ferias",
+      "Documentos",
+      "Referentes",
+      "Pedidos",
       "Economía"
      ]
     }
@@ -642,6 +645,10 @@ window.NUCLEO_MONTAJE = {
       "tipo": "ref",
       "obligatoria": true,
       "ref": "TAREAS"
+     },
+     {
+      "nombre": "ESPERA_PRODUCCION",
+      "tipo": "booleano"
      }
     ],
     "restricciones": {
