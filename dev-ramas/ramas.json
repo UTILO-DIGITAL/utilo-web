@@ -959,12 +959,12 @@
   },
   "T0713-marcas-editar": {
    "tarea": "T0713",
-   "titulo": "En Marcas se edita cualquier dato tocándolo, se dan de alta y se borran",
-   "pr": null,
+   "titulo": "En Marcas se cambia cualquier dato, se dan de alta y se borran",
+   "pr": 399,
    "commit": "138520f5",
    "ultimo": "T0713: En Marcas se edita cualquier dato tocándolo, se dan de alta y se borran",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T18:37:33.664Z",
+   "fecha": "2026-11-20T18:42:28.902Z",
    "toca": [
     "telas"
    ],
