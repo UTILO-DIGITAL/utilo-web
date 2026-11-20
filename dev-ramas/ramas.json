@@ -1172,12 +1172,12 @@
   },
   "T0686-catalogo-para-marcas": {
    "tarea": "T0686",
-   "titulo": "Catálogo para enseñar a una marca, sin costes ni proveedores",
-   "pr": null,
-   "commit": "14592849",
-   "ultimo": "T0686: Catálogo para enseñar a una marca, sin costes ni proveedores",
+   "titulo": "Catálogo para enseñar tus telas a una marca, sin costes ni proveedores",
+   "pr": 373,
+   "commit": "bd7b5700",
+   "ultimo": "T0686: Al día con main (T0684, T0693, T0695): ?v=auto, las 500 telas de ejemplo y el catálogo de DEV en su hueco",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T06:11:06.151Z",
+   "fecha": "2026-11-20T09:51:47.968Z",
    "toca": [
     "telas"
    ],
@@ -1356,9 +1356,11 @@
       "web/estilos/base.css",
       "web/kanban4/google.js",
       "web/kanban4/tablas.js",
+      "web/nucleo/elegir.js",
       "web/nucleo/nucleo.js",
       "web/telas/marca.css"
      ],
+     "motor": true,
      "local": true,
      "cambia": true
     },
@@ -1373,6 +1375,7 @@
       "web/telas/catalogo/catalogo.js",
       "web/telas/marca.css"
      ],
+     "motor": true,
      "local": true,
      "cambia": true
     }
@@ -1443,7 +1446,9 @@
      "20261112182957_plan_pruebas_tablas.sql",
      "20261112183000_plan_pruebas.sql",
      "20261112190000_avisos_prueba_diaria.sql",
-     "20261119200000_uso.sql"
+     "20261119200000_uso.sql",
+     "20261120083735_zona_tablas.sql",
+     "20261120083736_zona.sql"
     ]
    },
    "rama": "T0686-catalogo-para-marcas"
