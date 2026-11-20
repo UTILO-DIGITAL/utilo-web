@@ -385,11 +385,8 @@
       /**
        * Borrar: la fila se quita de la pantalla al momento. El motor la marca «Eliminada» si su tabla tiene ese estado
        * (entonces vuelve, con ESTADO Eliminada) o la borra del Excel. Si dice que no, vuelve a su sitio.
-       * T0722 · op.con: [{ tabla, campo }], lo que se va con ella (las personas de contacto de una marca), en la misma llamada:
-       * el motor comprueba antes todos los usos y, si algo bloquea, no borra nada. Lo que se ha ido sale de su tabla al momento.
        */
-      borrar: function (n, id, op) {
-        var con = (op && op.con) || [];
+      borrar: function (n, id) {
         id = String(id);
         var m = mem[n], f = api.fila(n, id);
         if (!f) return Promise.reject(new Error('No tengo ' + id + ' en ' + n + ': actualiza la página.'));
@@ -398,14 +395,8 @@
         pendientes++;
         emitir('cambio', n, { id: id, optimista: true, borrada: true });
         var kq = n + '|' + id;
-        var p = (colas[kq] || Promise.resolve()).catch(function () {}).then(function () { return llamar('tablasBorrar', con.length ? [n, id, { con: con }] : [n, id]); }).then(function (r) {
+        var p = (colas[kq] || Promise.resolve()).catch(function () {}).then(function () { return llamar('tablasBorrar', [n, id]); }).then(function (r) {
           pendientes--;
-          Object.keys((r && r.con) || {}).forEach(function (t) {
-            var mt = mem[t]; if (!mt || !r.con[t].length) return;
-            r.con[t].forEach(function (x) { var fx = mt.ids[String(x)]; if (fx) { mt.filas.splice(mt.filas.indexOf(fx), 1); delete mt.ids[String(x)]; } });
-            guardarLocal(t);
-            emitir('cambio', t, { borradas: r.con[t] });
-          });
           if (r.eliminada && r.fila) { var mm = mem[n]; for (var c in r.fila) f[c] = r.fila[c]; if (!mm.ids[id]) { mm.filas.splice(Math.min(i, mm.filas.length), 0, f); mm.ids[id] = f; } }
           guardarLocal(n);
           emitir('cambio', n, { id: id, confirmado: true });

@@ -746,8 +746,7 @@
     var n = 0;
     (function paso() {
       if (actual !== id) return;
-      // T0722 (R49): en el iPhone quien se desplaza es body, no la ventana: se mueven los dos.
-      window.scrollTo(0, y); document.body.scrollTop = y;
+      window.scrollTo(0, y);
       if (Math.abs(bajado() - y) > 2 && ++n < 25) setTimeout(paso, 80);
     })();
   }

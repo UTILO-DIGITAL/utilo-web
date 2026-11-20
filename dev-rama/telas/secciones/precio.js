@@ -202,7 +202,7 @@
       var T = ctx.tablas;
       var D = { filas: function (t) { return T.filas(t) || []; }, fila: function (t, id) { return id === '' || id == null ? null : T.fila(t, id); } };
       var factura = (ctx.secciones || []).some(function (x) { return x.id === 'ECONOMIA'; });
-      // T0659: lo que suele ganar sale de sus facturas, que solo ve quien ve Economía (Marta); a Equipo ni se le piden.
+      // T0659: lo que suele ganar sale de sus facturas, que solo ve quien ve Economía (Marta y Equipo, T0721); a los demás ni se le piden.
       var FACTURAS = factura ? ['FACTURAS', 'FACTURA_LINEAS', 'CONTRAPARTES'] : [], facturasLeidas = false;
       // T0687: desde la ficha de una tela o de una marca llega ya puesta (?s=precio&tela=BOR-004-01 o &marca=M-002).
       var url = new URLSearchParams(location.search);
