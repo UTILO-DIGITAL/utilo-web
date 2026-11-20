@@ -1811,14 +1811,14 @@
           // T0679: un campo con colores (la fase, el estado) se elige en una pastilla de su color, no en un desplegable gris.
           var nv = ns.filter(function (n) { return String(cp.ids[n]) === String(v); })[0];
           var mp = {}; if (cp.colores) ns.forEach(function (n) { if (cp.colores[n]) mp[cp.ids[n]] = cp.colores[n]; });
-          var pil = cp.colores ? ' class="li-sel-pil li-estado li-' + texto(cp.colores[nv] || 'gris') + '" data-pil="' + texto(JSON.stringify(mp)) + '"' : '';
+          var pil = cp.colores ? ' class="li-sel-pil li-estado li-' + texto(cp.colores[nv] || 'gris') + '" data-pil="' + texto(JSON.stringify(mp)) + '"' : ' data-elegir="' + texto(c) + '"'; // T0684
           return '<div class="u-campo">' + et + '<select id="' + id + '"' + pil + ' data-c="' + texto(c) + '"><option value=""></option>' +
             ns.map(function (n) { return '<option value="' + texto(cp.ids[n]) + '"' + (String(v) === String(cp.ids[n]) ? ' selected' : '') + '>' + texto(mostrar(cp, n)) + '</option>'; }).join('') +
             (!vacio(v) && !ns.some(function (n) { return String(cp.ids[n]) === String(v); }) ? '<option value="' + texto(v) + '" selected>' + texto(v) + '</option>' : '') + '</select></div>';
         }
         if (cp.opciones) {
           var ops = cp.opciones.slice(); if (!vacio(v) && ops.indexOf(String(v)) < 0) ops.unshift(String(v));
-          return '<div class="u-campo">' + et + '<select id="' + id + '"' + (cp.colores ? ' class="li-sel-pil li-estado li-' + texto(cp.colores[String(v)] || 'gris') + '" data-pil="' + texto(JSON.stringify(cp.colores)) + '"' : '') + ' data-c="' + texto(c) + '"><option value=""></option>' +
+          return '<div class="u-campo">' + et + '<select id="' + id + '"' + (cp.colores ? ' class="li-sel-pil li-estado li-' + texto(cp.colores[String(v)] || 'gris') + '" data-pil="' + texto(JSON.stringify(cp.colores)) + '"' : ' data-elegir="' + texto(c) + '"') + ' data-c=""' + texto(c) + '"><option value=""></option>' +
             ops.map(function (o) { return '<option value="' + texto(o) + '"' + (String(v) === o ? ' selected' : '') + '>' + texto(mostrar(cp, o)) + '</option>'; }).join('') + '</select></div>';
         }
         // Lo que no se guarda (una cuenta, un DNI) tampoco se enseña al editar: sale tapado y, si se guarda, se quita.
@@ -2063,8 +2063,8 @@
           var gs = gruposConQuien(a, c, ed), n = gs.reduce(function (k, g) { return k + g.opciones.length; }, 0), sel = '';
           gs.forEach(function (g) { if (!vacio(crudo[g.col])) sel = g.col + '|' + crudo[g.col]; });
           return '<div class="u-campo u-ancho"><label class="u-etiqueta" for="' + id + '">' + texto(cp.titulo) + '</label>' +
-            (n > 12 ? '<input type="search" class="li-cq-buscar" data-buscar-uno="' + texto(c) + '" placeholder="Busca por el nombre" aria-label="Buscar en ' + texto(cp.titulo.toLowerCase()) + '" autocomplete="off">' : '') +
-            '<select id="' + id + '" data-uno="' + texto(c) + '">' + opcionesUno(gs, sel) + '</select></div>';
+            (n > 12 && !(typeof window !== 'undefined' && window.UElegir) ? '<input type="search" class="li-cq-buscar" data-buscar-uno="' + texto(c) + '" placeholder="Busca por el nombre" aria-label="Buscar en ' + texto(cp.titulo.toLowerCase()) + '" autocomplete="off">' : '') +
+            '<select id="' + id + '" data-uno="' + texto(c) + '" data-elegir="con-quien">' + opcionesUno(gs, sel) + '</select></div>';
         }
         var h = entrada(a, c, crudo), fin = h.lastIndexOf('</div>');
         if (cp.tipo === 'fecha') {
@@ -2108,7 +2108,7 @@
                 '<div>' + d.opciones.map(function (o) { return pil('=' + o, mostrar(d.cp, o)); }).join('') + (d.vacios ? pil('!', 'Sin ' + d.titulo.toLowerCase()) : '') + '</div></fieldset>';
             }
             if (d.tipo === 'lista') {
-              return '<div class="u-campo u-ancho">' + et(id) + '<select class="li-fsel" id="' + id + '" data-f="' + texto(d.campo) + '"><option value="">Cualquiera</option>' +
+              return '<div class="u-campo u-ancho">' + et(id) + '<select class="li-fsel" id="' + id + '" data-f="' + texto(d.campo) + '" data-elegir="filtro-' + texto(d.campo) + '"><option value="">Cualquiera</option>' +
                 d.opciones.map(function (o) { return '<option value="=' + texto(o) + '"' + (x.es !== undefined && norm(x.es) === norm(o) ? ' selected' : '') + '>' + texto(mostrar(d.cp, o)) + '</option>'; }).join('') +
                 (d.vacios ? '<option value="!"' + (x.vacio ? ' selected' : '') + '>Sin ' + texto(d.titulo.toLowerCase()) + '</option>' : '') + '</select></div>';
             }

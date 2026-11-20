@@ -1713,10 +1713,10 @@
    "tarea": "T0693",
    "titulo": "La versión de los estilos y los scripts de cada página se pone sola",
    "pr": 374,
-   "commit": "0578e421",
-   "ultimo": "T0693: La versión de lo que carga cada página la pone la herramienta (?v=auto y la huella del archivo al servir o subir la web)",
+   "commit": "83b2c2f5",
+   "ultimo": "T0693: Al día con main (las páginas, otra vez con ?v=auto; la prueba de base.css de T0684, con «auto»)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T06:35:12.260Z",
+   "fecha": "2026-11-20T06:37:19.321Z",
    "toca": [
     "konamigas",
     "telas",
@@ -1897,6 +1897,7 @@
       "web/estilos/base.css",
       "web/kanban4/google.js",
       "web/kanban4/tablas.js",
+      "web/nucleo/elegir.js",
       "web/nucleo/nucleo.js",
       "web/telas/marca.css"
      ],
