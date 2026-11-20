@@ -2271,9 +2271,9 @@
    ]
   },
   "utilo": {
-   "rama": "T0682-registro-uso",
-   "commit": "02320a82",
-   "fecha": "2026-11-19T19:04:00.270Z",
+   "rama": "T0696-avisar-solapes",
+   "commit": "1a745cb3",
+   "fecha": "2026-11-20T08:54:00.730Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
@@ -2317,7 +2317,9 @@
     "20261112182957_plan_pruebas_tablas.sql",
     "20261112183000_plan_pruebas.sql",
     "20261112190000_avisos_prueba_diaria.sql",
-    "20261119200000_uso.sql"
+    "20261119200000_uso.sql",
+    "20261120083735_zona_tablas.sql",
+    "20261120083736_zona.sql"
    ]
   }
  },
