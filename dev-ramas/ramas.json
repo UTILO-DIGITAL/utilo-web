@@ -1247,11 +1247,11 @@
   "T0741-permisos-drive-telas": {
    "tarea": "T0741",
    "titulo": "La app de Telas, solo con sus archivos de Drive",
-   "pr": null,
+   "pr": 413,
    "commit": "aaf59b98",
    "ultimo": "T0741: La app de Telas, solo con sus archivos de Drive",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T23:35:25.726Z",
+   "fecha": "2026-11-20T23:42:18.465Z",
    "toca": [
     "telas"
    ],
