@@ -1814,10 +1814,10 @@
    "tarea": "T0709",
    "titulo": "Mis telas dice en qué portfolio sale cada tela",
    "pr": 392,
-   "commit": "bb4c1882",
-   "ultimo": "T0709: Mis telas dice en qué portfolio sale cada tela",
+   "commit": "9c635806",
+   "ultimo": "T0709: La columna PORTFOLIO ya está en GESTION",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T14:59:21.873Z",
+   "fecha": "2026-11-20T15:07:07.604Z",
    "toca": [
     "telas"
    ],
