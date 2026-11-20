@@ -961,10 +961,10 @@
    "tarea": "T0703",
    "titulo": "Qué es un cliente en la app de Marta",
    "pr": 388,
-   "commit": "6ebfbeb1",
-   "ultimo": "T0703: Solo el CLAUDE.md de Telas; las descripciones de FASES y MARCAS, en T0706",
+   "commit": "b71f1a87",
+   "ultimo": "Merge remote-tracking branch 'origin/main' into T0703-que-es-un-cliente",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T14:40:09.884Z",
+   "fecha": "2026-11-20T15:08:19.128Z",
    "toca": [
     "telas"
    ],
@@ -1132,7 +1132,7 @@
        "nombre": "Admin"
       }
      ],
-     "cambia": true
+     "cambia": false
     },
     {
      "ruta": "dev/telas/",
@@ -1149,7 +1149,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": true
+     "cambia": false
     },
     {
      "ruta": "dev/telas/catalogo/",
@@ -1164,7 +1164,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": true
+     "cambia": false
     }
    ],
    "migraciones": {
