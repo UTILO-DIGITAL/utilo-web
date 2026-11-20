@@ -960,11 +960,11 @@
   "T0715-proveedores-editables": {
    "tarea": "T0715",
    "titulo": "En Proveedores se edita cualquier dato tocándolo, se da de alta y se borra",
-   "pr": null,
+   "pr": 398,
    "commit": "15c30225",
    "ultimo": "T0715: En Proveedores se edita cualquier dato tocándolo, se da de alta y se borra",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T18:32:44.053Z",
+   "fecha": "2026-11-20T18:33:27.794Z",
    "toca": [
     "telas"
    ],
