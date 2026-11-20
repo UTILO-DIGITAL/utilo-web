@@ -2084,6 +2084,15 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-cifra b { font: var(--peso-titulos) 30px/1 var(--fuente-titulos); font-variant-numeric: tabular-nums; margin-right: var(--e1); }
 .u .li-resumen-t { flex-basis: 100%; font-size: 14px; color: var(--color-suave); }
 @media (max-width: 640px) { .u .li-resumen { padding: var(--e2) var(--e3); margin-bottom: var(--e2); } .u .li-cifra b { font-size: 26px; } }
+/* T0710 · Lo de otra tabla que pide una decisión, arriba de la lista (la feria a 45 días sin decidir, en Hoy): la franja del aviso
+   pendiente, el texto y sus botones al lado (debajo en el móvil). */
+.u .li-arriba-av { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e4); margin: 0 0 var(--e3); padding: var(--e3) var(--e4);
+  background: var(--color-superficie); border: 1px solid var(--color-linea); border-left: 3px solid var(--color-pendiente); border-radius: var(--radio); }
+.u .li-arriba-tx { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.u .li-arriba-tx strong { font-size: 15px; }
+.u .li-arriba-et { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-suave); }
+.u .li-arriba-bt { display: flex; flex-wrap: wrap; gap: var(--e2); }
+@media (max-width: 640px) { .u .li-arriba-av { padding: var(--e2) var(--e3); margin-bottom: var(--e2); } }
 .u .li-cliente { margin: 0 0 var(--e3); padding: var(--e2) var(--e3); border-radius: var(--radio); font-size: 14px;
   background: color-mix(in srgb, var(--estado-ec) 10%, var(--color-superficie)); border-left: 4px solid var(--estado-ec); }
 .u .li-avisos { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); margin: 0 0 var(--e3); }

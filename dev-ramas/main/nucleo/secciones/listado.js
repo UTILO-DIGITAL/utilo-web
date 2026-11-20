@@ -261,9 +261,50 @@
       crear: !!cfg.CREAR, texto: cfg.TEXTO || '', vacio: cfg.VACIO || '', refs: cfg._refs || {}, filtro: cfg.FILTRO || [],
       nueva: cfg.NUEVA || {}, obligatorias: cfg.OBLIGATORIAS || [], filtros: cfg.FILTROS || [], filas: cfg.FILAS && cfg.FILAS.length ? cfg.FILAS : null,
       rapidas: rapidasDe(cfg.RAPIDAS), alta: cfg.ALTA && lista(cfg.ALTA.campos).length ? { campos: lista(cfg.ALTA.campos), mas: lista(cfg.ALTA.mas), titulo: cfg.ALTA.titulo || '' } : null,
-      deducir: cfg.DEDUCIR || {}, acciones: cfg.ACCIONES || [], contexto: contextoDe(cfg.CONTEXTO), resumen: resumenCifras(cfg.RESUMEN),
+      deducir: cfg.DEDUCIR || {}, acciones: cfg.ACCIONES || [], contexto: contextoDe(cfg.CONTEXTO), resumen: resumenCifras(cfg.RESUMEN), arriba: arribaDe(cfg.ARRIBA),
       // T0689: la ficha guarda sola cada campo al cambiarlo; con GUARDAR: "boton", como antes (con «Guardar»). MIAS: Mías / Todas.
       guardar: cfg.GUARDAR === 'boton' ? 'boton' : 'solo', mias: miasDe(cfg.MIAS) };
+  }
+  /**
+   * T0710 · ARRIBA: lo de otra tabla que pide una decisión, arriba de la lista (las ferias a 45 días sin decidir, en Hoy).
+   * Cada uno: { tabla, seccion, si: [condiciones], dias, fecha, fin, titulo: [columnas], debajo: [columnas], etiqueta: «… {dias}
+   * …», botones: [{ titulo, poner: { COLUMNA: valor }, hecho }], ver }. «dias» es el de las condiciones con «dias»; {dias} en la
+   * etiqueta, los que faltan hasta «fecha». Sin tabla, no va.
+   */
+  function arribaDe(x) {
+    return lista(x).filter(function (a) { return a && typeof a === 'object' && a.tabla; }).map(function (a) {
+      return { tabla: a.tabla, seccion: a.seccion || '', clave: a.clave || 'ID', si: lista(a.si), dias: typeof a.dias === 'number' ? a.dias : 7,
+        fecha: a.fecha || '', fin: a.fin || '', titulo: lista(a.titulo).length ? lista(a.titulo) : ['NOMBRE'], debajo: lista(a.debajo),
+        etiqueta: a.etiqueta || '', ver: a.ver || '', botones: lista(a.botones).filter(function (b) { return b && b.titulo && b.poner; }) };
+    });
+  }
+  /** T0710 · Las filas de un ARRIBA que tocan hoy, de la fecha más cercana a la más lejana (sin fecha, al final). */
+  function filasArriba(x, filas, hoy) {
+    return (filas || []).filter(function (f) { return cumple(f, x.si, { hoy: hoy, dias: x.dias }); }).sort(function (a, b) {
+      var da = x.fecha ? diasHasta(a[x.fecha], hoy) : null, db = x.fecha ? diasHasta(b[x.fecha], hoy) : null;
+      return (da === null ? 1e9 : da) - (db === null ? 1e9 : db);
+    });
+  }
+  var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  /** T0710 · Unas fechas en palabras: «del 12 al 15 de enero», «del 29 de enero al 2 de febrero», «el 3 de marzo» (con el año
+   *  solo si no es el de hoy). Sin la primera, ''. */
+  function rangoFechas(a, b, hoy) {
+    var d = aFecha(a), e = aFecha(b), h = aFecha(hoy);
+    if (!d) return '';
+    var anio = function (x) { return h && x.getFullYear() !== h.getFullYear() ? ' de ' + x.getFullYear() : ''; };
+    var dm = function (x) { return x.getDate() + ' de ' + MESES[x.getMonth()]; };
+    if (!e || e <= d) return 'el ' + dm(d) + anio(d);
+    if (d.getFullYear() !== e.getFullYear()) return 'del ' + dm(d) + anio(d) + ' al ' + dm(e) + anio(e);
+    if (d.getMonth() === e.getMonth()) return 'del ' + d.getDate() + ' al ' + dm(e) + anio(e);
+    return 'del ' + dm(d) + ' al ' + dm(e) + anio(e);
+  }
+  /** T0710 · Lo que se enseña de una fila de ARRIBA (ya como se ve): etiqueta, título, debajo. */
+  function lineaArriba(x, f, hoy) {
+    var d = x.fecha ? diasHasta(f[x.fecha], hoy) : null;
+    var et = x.etiqueta.replace(/\{dias\}/g, d === null ? '' : String(d)).replace(/\ben 1 días\b/, 'mañana').replace(/\ben 0 días\b/, 'hoy');
+    var r = x.fecha ? rangoFechas(f[x.fecha], x.fin ? f[x.fin] : '', hoy) : '';
+    var debajo = (r ? [r.charAt(0).toUpperCase() + r.slice(1)] : []).concat(x.debajo.map(function (c) { return vacio(f[c]) ? '' : String(f[c]); }).filter(Boolean));
+    return { etiqueta: et, titulo: x.titulo.map(function (c) { return vacio(f[c]) ? '' : String(f[c]); }).filter(Boolean).join(' · '), debajo: debajo.join(' · ') };
   }
   /** T0708 · RESUMEN de la configuración: { cifras: [{ tabla, filas: [singular, plural] }], texto }; null sin ninguna cifra. */
   function resumenCifras(r) {
@@ -365,6 +406,8 @@
     Object.keys(c.CAMPOS || {}).forEach(function (k) { var d = c.CAMPOS[k]; if (d && d.de && oculta(d.de.tabla)) fuera.push(k); });
     var vale = sinCampos(c, fuera);
     if (c.RELACIONADOS) c.RELACIONADOS = c.RELACIONADOS.filter(function (r) { return !oculta(r.tabla); });
+    // T0710: ni lo de arriba de una tabla oculta (las ferias, en el Hoy de Ayuda).
+    if (Array.isArray(c.ARRIBA)) c.ARRIBA = c.ARRIBA.filter(function (x) { return !(x && oculta(x.tabla)); });
     // T0708: ni las cifras del resumen de una tabla oculta.
     if (c.RESUMEN && Array.isArray(c.RESUMEN.cifras)) {
       c.RESUMEN.cifras = c.RESUMEN.cifras.filter(function (x) { return !(x && oculta(x.tabla)); });
@@ -768,6 +811,16 @@
     if (puesto(cfg.RESUMEN) && !ap.resumen) errores.push(donde + 'RESUMEN no dice en «cifras» qué tablas cuenta.');
     if (ap.resumen) ap.resumen.cifras.forEach(function (x, i) {
       if (!x.filas || x.filas.length !== 2) errores.push(donde + 'RESUMEN.cifras[' + i + '] (' + x.tabla + ') no dice en «filas» cómo se llama una y cómo varias (["tela", "telas"]).');
+    });
+    // T0710: lo de arriba (otra tabla): sus columnas y lo que ponen sus botones.
+    ap.arriba.forEach(function (x, i) {
+      var cs = columnasTabla ? columnasTabla(x.tabla) : null, dd = donde + 'ARRIBA[' + i + '] (' + x.tabla + ')';
+      if (!cs) return;
+      var mira = function (c, que) { if (c && cs.indexOf(c) < 0) errores.push(dd + ': ' + que + ' «' + c + '», que no es una columna de ' + x.tabla + '.'); };
+      x.si.forEach(function (c) { mira(c && c.campo, 'una condición mira'); });
+      [x.fecha, x.fin].concat(x.titulo, x.debajo).forEach(function (c) { mira(c, 'enseña'); });
+      x.botones.forEach(function (b) { Object.keys(b.poner).forEach(function (c) { mira(c, '«' + b.titulo + '» pone'); }); });
+      if (!x.si.length) errores.push(dd + ' no dice en «si» qué filas salen: saldrían todas.');
     });
     // T0652: el resumen de con quién es la fila.
     if (puesto(cfg.CONTEXTO) && !ap.contexto) errores.push(donde + 'CONTEXTO no dice en «de» de qué tablas sale el resumen.');
@@ -1631,7 +1684,7 @@
 
   var CALC = { fechaDia: fechaDia, webCorta: webCorta, textoCorto: textoCorto, gruposConQuien: gruposConQuien, nombreCorto: nombreCorto, deshacerEnOrden: deshacerEnOrden, loDiceUnAviso: loDiceUnAviso, contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
     textoVuelta: textoVuelta, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
-    valoresDe: valoresDe, resumenCifras: resumenCifras, cifrasResumen: cifrasResumen, seguirCrudo: seguirCrudo, tablasDeRuta: tablasDeRuta, conCamposPropios: conCamposPropios, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
+    valoresDe: valoresDe, resumenCifras: resumenCifras, arribaDe: arribaDe, filasArriba: filasArriba, rangoFechas: rangoFechas, lineaArriba: lineaArriba, cifrasResumen: cifrasResumen, seguirCrudo: seguirCrudo, tablasDeRuta: tablasDeRuta, conCamposPropios: conCamposPropios, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, vistaDeFila: vistaDeFila, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, recomendacionDe: recomendacionDe, camposCond: camposCond, irA: irA, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir, valorCon: valorCon, columnasCon: columnasCon, cambioCampo: cambioCampo, textoCambio: textoCambio, miasDe: miasDe, equipoLimpio: equipoLimpio, hayMias: hayMias, esMia: esMia, nombrePara: nombrePara, conEquipo: conEquipo,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
     relacionadas: relacionadas, juntarDe: juntarDe, partes: partes, verTexto: verTexto, rellenar: rellenar, enPlantilla: enPlantilla, veRelacionado: veRelacionado, expandir: expandir, camposTarjeta: camposTarjeta, desglose: desglose, cuando: cuando, comparar: comparar,
@@ -1720,6 +1773,7 @@
       Object.keys(BASE.campos).forEach(function (c) { ruta(BASE.campos[c].de); });
       BASE.relacionados.forEach(function (r) { Object.keys(r.campos || {}).forEach(function (c) { ruta(r.campos[c].de); }); });
       if (BASE.resumen) BASE.resumen.cifras.forEach(function (x) { if (tablas.indexOf(x.tabla) < 0) tablas.push(x.tabla); });
+      BASE.arriba.forEach(function (x) { if (tablas.indexOf(x.tabla) < 0) tablas.push(x.tabla); }); // T0710
       // T0652: las del resumen de con quién es cada fila (la marca, sus necesidades, sus personas).
       if (BASE.contexto) Object.keys(BASE.contexto.de).forEach(function (c) {
         var d = BASE.contexto.de[c];
@@ -1860,6 +1914,18 @@
         if (cifras.length) html += '<div class="li-resumen" role="group" aria-label="Resumen">' + cifras.map(function (x) {
           return '<span class="li-cifra"><b>' + texto(num(x.n, 0)) + '</b> ' + texto(x.nombre) + '</span>';
         }).join('') + (a.resumen.texto ? '<span class="li-resumen-t">' + texto(a.resumen.texto) + '</span>' : '') + '</div>';
+        // T0710: lo de otra tabla que pide una decisión (la feria a 45 días sin decidir), arriba, con sus botones.
+        if (!vista.cliente) a.arriba.forEach(function (x, ix) {
+          filasArriba(x, filas(x.tabla), hoy).forEach(function (f) {
+            var l = lineaArriba(x, f, hoy), id = f[x.clave];
+            html += '<div class="li-arriba-av" role="group" aria-label="' + texto(l.titulo) + '">' +
+              '<div class="li-arriba-tx">' + (l.etiqueta ? '<span class="li-arriba-et">' + texto(l.etiqueta) + '</span>' : '') +
+              '<strong>' + texto(l.titulo) + '</strong>' + (l.debajo ? '<span class="u-nota">' + texto(l.debajo) + '</span>' : '') + '</div>' +
+              '<div class="li-arriba-bt">' + x.botones.map(function (b, ib) {
+                return '<button type="button" class="u-btn' + (ib ? '' : ' u-btn-accion') + '" data-arriba="' + ix + '" data-arriba-b="' + ib + '" data-arriba-id="' + texto(id) + '">' + texto(b.titulo) + '</button>';
+              }).join('') + (x.ver && x.seccion && veo[x.seccion.toUpperCase()] ? '<a class="u-btn" href="?s=' + encodeURIComponent(x.seccion) + '&ficha=' + encodeURIComponent(id) + '" data-sx="' + texto(x.seccion.toUpperCase()) + '">' + texto(x.ver) + '</a>' : '') + '</div></div>';
+          });
+        });
         if (vista.cliente) {
           var nombres = []; ocultas(a, vista).forEach(function (c) { var t = campo(a, c).titulo; if (nombres.indexOf(t) < 0) nombres.push(t); });
           html += '<p class="li-cliente">Vista para enseñar a un cliente: sin avisos y sin ' + (nombres.length ? nombres.map(function (t) { return t.toLowerCase(); }).join(', ').replace(/, ([^,]*)$/, ' ni $1') : 'los datos privados') + '.</p>';
@@ -2844,6 +2910,18 @@
 
       /* ---------- eventos ---------- */
       cont.addEventListener('click', function (ev) {
+        // T0710: un botón de lo de arriba (Voy / No voy): cambia esa fila de su tabla y lo dice; deja de salir sola.
+        var ab = ev.target.closest('[data-arriba]');
+        if (ab) {
+          var xa = ap().arriba[+ab.getAttribute('data-arriba')], bb = xa && xa.botones[+ab.getAttribute('data-arriba-b')], ida = ab.getAttribute('data-arriba-id');
+          if (!bb) return;
+          var fa = filaDe(xa.tabla, ida) || {}, nom = xa.titulo.map(function (c) { return fa[c]; }).filter(Boolean)[0] || ida;
+          ab.disabled = true;
+          Promise.resolve(T.actualizar(xa.tabla, ida, bb.poner)).then(function () {
+            ctx.aviso(String(bb.hecho || 'Apuntado.').replace(/\{nombre\}/g, nom)); pintar();
+          }, function (e) { ab.disabled = false; ctx.aviso('No se ha apuntado: ' + ((e && e.message) || e)); });
+          return;
+        }
         var rp = ev.target.closest('[data-rapido]');
         if (rp) { // T0679: el filtro rápido de encima de la lista
           var c = rp.getAttribute('data-rapido'), v = rp.getAttribute('data-v');

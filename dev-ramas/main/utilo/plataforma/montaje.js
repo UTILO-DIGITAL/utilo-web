@@ -127,6 +127,9 @@ window.NUCLEO_MONTAJE = {
       "Proveedores",
       "Mis telas",
       "Calcular precio",
+      "Ferias",
+      "Documentos",
+      "Referentes",
       "Pedidos",
       "Economía"
      ]
