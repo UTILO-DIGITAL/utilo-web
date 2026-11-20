@@ -921,12 +921,12 @@
   },
   "T0690-listas-largas": {
    "tarea": "T0690",
-   "titulo": "Listas largas: lo hecho plegado, «Ver más», ordenar por columna y «Ver todo» en la ficha",
-   "pr": null,
+   "titulo": "Las listas largas se leen de un vistazo: lo hecho plegado, «Ver más» y ordenar por columna",
+   "pr": 383,
    "commit": "6c8b6257",
    "ultimo": "T0690: Listas largas: lo hecho plegado, «Ver más», ordenar por columna y «Ver todo» en la ficha",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T12:49:53.171Z",
+   "fecha": "2026-11-20T12:51:24.484Z",
    "toca": [
     "telas"
    ],
