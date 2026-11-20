@@ -1628,6 +1628,15 @@
    "quien": "Javi Canela",
    "rama": "T0725-facturas-sin-fallos",
    "carpeta": "T0725-facturas-sin-fallos"
+  },
+  "DEV-2": {
+   "cliente": "telas",
+   "modo": "ejemplo",
+   "commit": "43e441f4",
+   "subido": "20/11/26, 23:45",
+   "quien": "Javi Canela",
+   "rama": "T0735-afinar-ferias-documentos",
+   "carpeta": "T0735-afinar-ferias-documentos"
   }
  }
 }
