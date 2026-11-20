@@ -637,6 +637,33 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .eco-sw button[aria-pressed=true][data-tipo=Gasto] { color: var(--color-error); }
 .u .u-campo input.eco-imp { font-size: 22px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
 .u .eco-opc { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--color-suave); }
+/* T0689 · Con o sin IVA: un botón de texto debajo del importe (la casilla va escondida) */
+.u .eco-iva-sw { margin-top: calc(-1 * var(--e2)); }
+.u .eco-iva-sw .u-btn-texto { min-height: 36px; padding: 0; }
+/* T0689 · La foto del ticket: un botón grande con borde de rayas; elegida, su miniatura con «Cambiar» y «Quitar» */
+.u .eco-foto-b { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; min-height: 88px; padding: var(--e3); border: 1.5px dashed var(--color-linea);
+  border-radius: var(--radio); background: var(--color-superficie); color: var(--color-texto); font: inherit; cursor: pointer; }
+.u .eco-foto-b:hover { background: var(--color-bloque); }
+.u .eco-foto-b:focus-visible { outline: 3px solid var(--color-principal-oscuro); outline-offset: 2px; }
+.u .eco-foto-ic { color: var(--color-accion, var(--color-principal)); }
+.u .eco-foto-ok { display: flex; align-items: center; gap: var(--e2); flex-wrap: wrap; padding: var(--e2); border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); }
+.u .eco-foto-ok img { width: 56px; height: 72px; object-fit: cover; border-radius: var(--radio-peq); border: 1px solid var(--color-linea); }
+.u .eco-foto-n { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.u .eco-foto-ok .u-btn-texto { min-height: 36px; }
+/* T0689 · De qué pedido es la factura: una opción por pedido, que se toca entera */
+.u .eco-elige { display: flex; flex-direction: column; gap: var(--e2); margin: 0 0 var(--e3); }
+.u .eco-elige-o { display: flex; align-items: flex-start; gap: var(--e2); padding: var(--e2) var(--e3); border: 1px solid var(--color-linea); border-radius: var(--radio);
+  background: var(--color-superficie); cursor: pointer; }
+.u .eco-elige-o > span { display: flex; flex-direction: column; min-width: 0; }
+.u .eco-elige-o input { margin-top: 3px; accent-color: var(--color-accion, var(--color-principal)); }
+.u .eco-elige-o:has(input:checked) { border-color: var(--color-principal-oscuro); }
+.u .eco-elige-sin { border-style: dashed; color: var(--color-suave); }
+/* T0689 · La factura ya hecha: el número grande, a quién y cuánto, y su PDF */
+.u .eco-hecha { text-align: center; padding: var(--e3) 0 0; }
+.u .eco-hecha-ic { display: inline-grid; place-items: center; width: 48px; height: 48px; margin: 0 0 var(--e2); border-radius: 50%; background: var(--color-bloque); color: var(--color-bien); font-size: 24px; font-weight: 700; }
+.u .eco-hecha h2 { margin: 0 0 var(--e1); }
+.u .eco-hecha-b { justify-content: center; }
+@media (max-width: 600px) { .u .eco-hecha-b { flex-direction: column; align-items: stretch; } .u .eco-hecha-b .u-btn { justify-content: center; } }
 
 /* T0292 · Ajustes: las tablas de cada bloque y las acciones, como botones grandes; las hijas dentro de la ficha. */
 .u .aj-bloque { margin: 0 0 var(--e4); }
@@ -2216,6 +2243,21 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-mas > summary { cursor: pointer; min-height: 40px; display: flex; align-items: center; color: var(--color-suave); font-size: 14px; }
 .u .li-mas[open] .li-claude { border-top: 0; padding-top: var(--e1); }
 .u .li-accion-t { margin: var(--e1) 0 0; }
+/* T0689 · La ficha guarda sola: «Guardando…» y «Guardado» al lado de cada campo (en rojo, lo que no se ha guardado); lo que
+   cambia la fila («Pasar a Prospección»), dentro de «Más». Mías / Todas, delante de Buscar; en «Todas», para quién es cada fila. */
+.u .li-guardado { display: block; min-height: 1em; margin-top: 2px; font-size: 12.5px; color: var(--color-suave); }
+.u .li-guardado:empty { display: none; }
+.u .li-guardado-ok { color: var(--color-bien); }
+.u .li-guardado-ok::before { content: '✓ '; }
+.u .li-guardado-mal { color: var(--color-error); }
+.u .li-mas-acc { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e1) var(--e3); padding: var(--e1) 0 var(--e2); }
+.u .li-mas-acc .u-btn { min-height: 36px; font-size: 14px; padding: 0 var(--e3); }
+.u .li-mias { display: inline-flex; flex: none; border: 1px solid var(--linea-btn); border-radius: var(--radio, 6px); overflow: hidden; background: var(--color-superficie); }
+.u .li-mias button { min-height: 38px; padding: 0 var(--e3); border: 0; background: none; color: var(--color-texto); font: inherit; font-size: 14px; cursor: pointer; }
+.u .li-mias button + button { border-left: 1px solid var(--linea-btn); }
+.u .li-mias button[aria-pressed=true] { background: var(--color-principal-oscuro); color: var(--color-sobre-principal, #fff); font-weight: 600; }
+.u .li-mias button:focus-visible { outline: 2px solid var(--color-principal-oscuro); outline-offset: -2px; }
+.u .li-para { display: inline-block; margin-left: var(--e1); padding: 0 6px; border-radius: var(--radio-peq, 4px); background: var(--color-bloque); color: var(--color-suave); font-size: 12px; font-weight: 400; vertical-align: 1px; white-space: nowrap; }
 /* T0625 · Filtrar en la sección Listado: el botón (con cuántos hay puestos), las etiquetas de los puestos, que se quitan con
    su ✕ o todas con «Quitar filtros», y en el panel los rangos «de … a …» y «desde … hasta …». */
 .u .li-barra .li-filtrar { font-size: 15px; padding: 0 var(--e3); gap: var(--e1); }
