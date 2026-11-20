@@ -1713,10 +1713,10 @@
    "tarea": "T0694",
    "titulo": "Las pruebas, a la vez y solo lo que toca la rama, sin pisarse entre sesiones",
    "pr": 375,
-   "commit": "ff71e364",
-   "ultimo": "T0694: Al menos 4 pasos a la vez (en «Pruebas» la máquina tiene 2 núcleos)",
+   "commit": "f13df453",
+   "ultimo": "T0694: «Pruebas» en dos máquinas a la vez (npm test -- --trozo n/2) y el ✅ «pruebas» cuando salen bien las dos",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T08:07:29.809Z",
+   "fecha": "2026-11-20T08:19:22.765Z",
    "toca": [],
    "comun": false,
    "paginas": [
