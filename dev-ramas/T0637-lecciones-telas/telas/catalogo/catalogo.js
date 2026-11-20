@@ -1,7 +1,7 @@
 /*
  * Catálogo de Marta para enseñar a una marca · T0686 · clientes/telas/modulos/catalogo de utilo-apps
  *
- * Página aparte de su app (decidido con Javi, 20/11/2026): sin menú, sin el aviso de prueba, sin otras marcas ni nada
+ * Página aparte de su app (decidido con Javi, 20/11/2026): sin menú, sin otras marcas ni nada
  * confidencial. Lo que pinta es lo que manda el motor (catalogoTelas), que ya escoge campo a campo lo que puede ver una
  * marca: aquí no se quita nada porque no llega nada que quitar.
  * - Entra con su Google como en la app: la misma clave («telas»), así que si ya ha entrado en la app de este navegador no
@@ -45,7 +45,7 @@
       ['Composición', t.composicion],
       ['Hilo del bordado', t.hilo],
       ['Ancho', t.ancho ? String(t.ancho).replace(/\s*cm$/i, '') + ' cm' : ''],
-      ['Peso (g/m²)', peso],
+      ['Peso', peso],
       ['Rapport', t.rapport],
       ['Resistencia', t.martindale ? miles(t.martindale) + ' ciclos Martindale' : ''],
       ['Para', t.uso],

@@ -18,7 +18,7 @@
  */
 (function () {
   'use strict';
-  var POR_GRUPO = 4, MAX_GRUPO = 50;
+  var POR_GRUPO = 4, MAX_GRUPO = 50, ESPERA = 120; // T0722: ms tras la última tecla
 
   /** Sin tildes ni mayúsculas, con la misma longitud (para resaltar donde toca): «Ébano» → «ebano». */
   function plano(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^\S ]/g, ' ').slice(0, String(s == null ? '' : s).length); }
@@ -204,7 +204,12 @@
       antes: document.activeElement, bloqueo: document.body.style.overflow };
     document.body.style.overflow = 'hidden';
     A.q.focus();
-    A.q.addEventListener('input', function () { A.abiertos = {}; A.activa = 0; pintar(); });
+    // T0722 (R76): busca cuando se deja de escribir (ESPERA ms), no en cada tecla; vacía, al momento.
+    A.q.addEventListener('input', function () {
+      var a = A; a.abiertos = {}; a.activa = 0; clearTimeout(a.espera); a.espera = 0;
+      if (!palabras(a.q.value).length) { pintar(); return; }
+      a.espera = setTimeout(function () { a.espera = 0; if (A === a) pintar(); }, ESPERA);
+    });
     A.q.addEventListener('keydown', teclas);
     velo.addEventListener('click', function (e) {
       if (e.target === velo || (e.target.closest && e.target.closest('#bu-cerrar'))) { cerrar(); return; }
@@ -271,6 +276,8 @@
 
   function teclas(e) {
     var a = A;
+    // Con una búsqueda a la espera, las flechas e Intro van sobre lo último escrito.
+    if (a.espera && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter')) { clearTimeout(a.espera); a.espera = 0; pintar(); }
     if (e.key === 'Escape') { e.preventDefault(); cerrar(); return; }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       if (!a.total) return;
@@ -288,6 +295,7 @@
   function cerrar(yendo) {
     var a = A;
     if (!a) return;
+    clearTimeout(a.espera);
     A = null;
     a.velo.remove();
     document.body.style.overflow = a.bloqueo || '';

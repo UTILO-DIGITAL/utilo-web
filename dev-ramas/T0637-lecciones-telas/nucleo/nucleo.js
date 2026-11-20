@@ -253,6 +253,7 @@
       version: r.version || '', versiones: Array.isArray(r.versiones) ? r.versiones : [] }; // T0283
     if (r.persona_id) o.persona_id = r.persona_id; // T0387: con Supabase, el id de la persona (acceso.personas)
     if (Array.isArray(r.roles)) o.roles = r.roles; // T0394: con Supabase, sus roles (ctx.roles); antes se perdían aquí
+    if (Array.isArray(r.equipo)) o.equipo = r.equipo; // T0689: quién más trabaja en la app (Mías / Todas de Listado)
     if (r.aviso) o.aviso = String(r.aviso); // T0639: el aviso de arriba (config.json · nucleo.aviso)
     if (r.perfilEnMenu === false) o.perfilEnMenu = false; // T0415: Perfil fuera del menú (se abre con el nombre de la cabecera)
     if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
@@ -449,12 +450,40 @@
    * con la misma copia de las tablas, la cuenta cada vez que esa tabla cambia y, con Supabase, la vuelve a leer en cuanto
    * cambia algo en las tablas de «directo» (Realtime). Sin nada que contar, no se ve. */
   var cifrasDirecto = [];
+  /** T0710 · Las condiciones de una cifra («si»), como las de Listado: es, no, vacio y, en una fecha, desde y hasta en días
+   * desde hoy (incluidos; «dias» es el «dias» de la cifra). Sin condiciones, todas. */
+  function cumpleCifra(f, si, dias) {
+    function norm(v) { return String(v == null ? '' : v).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+    function lista(x) { return Array.isArray(x) ? x : [x]; }
+    function dia(v) {
+      if (v instanceof Date) return isNaN(v) ? null : new Date(v.getFullYear(), v.getMonth(), v.getDate());
+      var s = String(v == null ? '' : v).trim(), m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+      if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+      m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s);
+      return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
+    }
+    function d(x) { return x === 'dias' ? dias : x === '-dias' ? -dias : x; }
+    var h = new Date(); h = new Date(h.getFullYear(), h.getMonth(), h.getDate());
+    return (si || []).every(function (c) {
+      var v = f[c.campo], vac = norm(v) === '';
+      if (c.es !== undefined && lista(c.es).map(norm).indexOf(norm(v)) < 0) return false;
+      if (c.no !== undefined && lista(c.no).map(norm).indexOf(norm(v)) >= 0) return false;
+      if (c.vacio !== undefined && vac !== !!c.vacio) return false;
+      if (c.desde !== undefined || c.hasta !== undefined) {
+        var x = dia(v); if (!x) return false;
+        var n = Math.round((x - h) / 864e5);
+        if (c.desde !== undefined && n < d(c.desde)) return false;
+        if (c.hasta !== undefined && n > d(c.hasta)) return false;
+      }
+      return true;
+    });
+  }
   function contarCifras(tabla) {
     if (!cred || !T) return;
     menu().forEach(function (s) {
       var c = s.cifra;
       if (!c || (tabla && tabla !== c.tabla)) return;
-      var n = T.filas(c.tabla).filter(function (f) { return Object.keys(c.donde || {}).every(function (k) { return f[k] === c.donde[k]; }); }).length;
+      var n = T.filas(c.tabla).filter(function (f) { return Object.keys(c.donde || {}).every(function (k) { return f[k] === c.donde[k]; }) && cumpleCifra(f, c.si, c.dias); }).length;
       var b = document.querySelector('[data-cifra="' + s.id + '"]');
       if (!b) return;
       b.textContent = n ? String(n) : ''; b.hidden = !n;
@@ -717,7 +746,8 @@
     var n = 0;
     (function paso() {
       if (actual !== id) return;
-      window.scrollTo(0, y);
+      // T0722 (R49): en el iPhone quien se desplaza es body, no la ventana: se mueven los dos.
+      window.scrollTo(0, y); document.body.scrollTop = y;
       if (Math.abs(bajado() - y) > 2 && ++n < 25) setTimeout(paso, 80);
     })();
   }
@@ -768,6 +798,8 @@
       autor: cred.como ? cred.como.persona + ' como ' + cred.persona : cred.persona,
       personaId: cred.persona_id || '', // T0387
       roles: cred.roles || [], // T0417
+      // T0689: quien administra y las personas con perfil ([{ persona, correo, admin }]), si una sección que ve usa MIAS; si no, [].
+      equipo: cred.equipo || [],
       // T0650: lo que su perfil no ve (nucleo.ocultar del motor): { tablas, refs: { TABLA: [columnas que apuntan a una oculta] },
       // filas: { TABLA: { COLUMNA: [valores que no ve] } } } o null.
       ocultar: cred.ocultar || null,
