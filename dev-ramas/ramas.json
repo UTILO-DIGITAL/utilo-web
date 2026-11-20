@@ -1980,10 +1980,10 @@
    "tarea": "T0695",
    "titulo": "Varios huecos de motor en DEV: cada rama coge el suyo o uno libre, y su web llama a su API",
    "pr": null,
-   "commit": "dd70bdb3",
-   "ultimo": "T0695: La prueba del aviso, con el texto nuevo",
+   "commit": "1b4a8ac7",
+   "ultimo": "T0695: Las «API DEV» de DEV-2 y DEV-3",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T08:52:02.752Z",
+   "fecha": "2026-11-20T08:53:26.796Z",
    "toca": [],
    "comun": true,
    "paginas": [
