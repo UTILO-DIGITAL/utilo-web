@@ -1298,6 +1298,15 @@
    "quien": "Javi Canela",
    "rama": "T0686-catalogo-para-marcas",
    "carpeta": "T0686-catalogo-para-marcas"
+  },
+  "DEV-2": {
+   "cliente": "telas",
+   "modo": "ejemplo",
+   "commit": "237a3998",
+   "subido": "20/11/26, 11:52",
+   "quien": "Javi Canela",
+   "rama": "T0697-partir-archivos",
+   "carpeta": "T0697-partir-archivos"
   }
  }
 }
