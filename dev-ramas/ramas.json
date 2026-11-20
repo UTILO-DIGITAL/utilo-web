@@ -1246,14 +1246,16 @@
   },
   "T0741-permisos-drive-telas": {
    "tarea": "T0741",
-   "titulo": "Merge pull request #410 from UTILO-DIGITAL/T0729-ajustes-marta",
+   "titulo": "La app de Telas, solo con sus archivos de Drive",
    "pr": null,
-   "commit": "4ce76c7b",
-   "ultimo": "Merge pull request #410 from UTILO-DIGITAL/T0729-ajustes-marta",
+   "commit": "aaf59b98",
+   "ultimo": "T0741: La app de Telas, solo con sus archivos de Drive",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T23:20:08.187Z",
-   "toca": [],
-   "comun": false,
+   "fecha": "2026-11-20T23:35:25.726Z",
+   "toca": [
+    "telas"
+   ],
+   "comun": true,
    "paginas": [
     {
      "ruta": "dev/konamigas/",
@@ -1417,7 +1419,7 @@
        "nombre": "Admin"
       }
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/",
@@ -1434,7 +1436,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/catalogo/",
@@ -1449,7 +1451,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     }
    ],
    "migraciones": {
