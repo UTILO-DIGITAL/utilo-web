@@ -959,12 +959,12 @@
   },
   "T0721-telas-permisos-tablas": {
    "tarea": "T0721",
-   "titulo": "Equipo ve Economía y Pedidos, la competencia aparte en Marcas, foto de GESTION y ECONOMIA comparada en npm test y documentos al día",
-   "pr": null,
+   "titulo": "Equipo ve Pedidos y Economía, la competencia aparte en Marcas y Telas al día por dentro",
+   "pr": 404,
    "commit": "b84bf4b1",
    "ultimo": "T0721: Al día con main (T0720)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T21:49:56.420Z",
+   "fecha": "2026-11-20T21:55:19.037Z",
    "toca": [
     "telas"
    ],
