@@ -1295,10 +1295,10 @@
           campo('Fecha', '<input type="date" id="m-FECHA" value="' + texto(v.FECHA) + '">') +
           (tienePer ? campo(texto(nomPer), '<select id="m-PER">' + opciones(lista.map(function (p) { return [p.id, p.nombre]; }), v[P], 'Elige') + '</select>') : '') +
           campo('Categoría', '<select id="m-ID_CATEGORIA"></select>', 'eco-no-interno') +
-          (tieneDes ? campo(texto(nomDes), '<select id="m-DES" data-elegir="venta"></select>', 'eco-no-interno') : '') +
+          (tieneDes ? campo(texto(nomDes), '<select id="m-DES"></select>', 'eco-no-interno') : '') +
           campo('<span id="m-cue-et">Cuenta</span>', '<select id="m-ID_CUENTA">' + opciones(cuentas, v.ID_CUENTA, 'Elige la cuenta') + '</select>') +
           campo('A la cuenta', '<select id="m-ID_CUENTA_DESTINO">' + opciones(cuentas, v.ID_CUENTA_DESTINO, 'Elige a dónde va') + '</select>', 'eco-interno') +
-          campo('<span id="m-ctr-et">Quién paga o cobra</span>', '<select id="m-ID_CONTRAPARTE" data-elegir="contraparte">' + opcContrapartes(v.ID_CONTRAPARTE) + '</select>', 'eco-no-interno') +
+          campo('<span id="m-ctr-et">Quién paga o cobra</span>', '<select id="m-ID_CONTRAPARTE">' + opcContrapartes(v.ID_CONTRAPARTE) + '</select>', 'eco-no-interno') +
           (altaCtr.length ? '<div class="u-ancho eco-no-interno"><button type="button" class="u-btn u-btn-texto" id="m-ctr-nueva">+ Nueva (no está en la lista)</button>' +
             '<div class="u-campos" id="m-ctr-alta" hidden>' + campo('Nombre', '<input type="text" id="m-ctr-nom" maxlength="120" autocomplete="off">') +
             campo('Es', '<select id="m-ctr-tipo">' + opciones(altaCtr.map(function (x) { return [x, x]; }), altaCtr[0]) + '</select>') +
