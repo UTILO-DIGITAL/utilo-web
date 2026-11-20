@@ -255,9 +255,22 @@
       crear: !!cfg.CREAR, texto: cfg.TEXTO || '', vacio: cfg.VACIO || '', refs: cfg._refs || {}, filtro: cfg.FILTRO || [],
       nueva: cfg.NUEVA || {}, obligatorias: cfg.OBLIGATORIAS || [], filtros: cfg.FILTROS || [], filas: cfg.FILAS && cfg.FILAS.length ? cfg.FILAS : null,
       rapidas: rapidasDe(cfg.RAPIDAS), alta: cfg.ALTA && lista(cfg.ALTA.campos).length ? { campos: lista(cfg.ALTA.campos), mas: lista(cfg.ALTA.mas), titulo: cfg.ALTA.titulo || '' } : null,
-      deducir: cfg.DEDUCIR || {}, acciones: cfg.ACCIONES || [], contexto: contextoDe(cfg.CONTEXTO),
+      deducir: cfg.DEDUCIR || {}, acciones: cfg.ACCIONES || [], contexto: contextoDe(cfg.CONTEXTO), resumen: resumenCifras(cfg.RESUMEN),
       // T0689: la ficha guarda sola cada campo al cambiarlo; con GUARDAR: "boton", como antes (con «Guardar»). MIAS: Mías / Todas.
       guardar: cfg.GUARDAR === 'boton' ? 'boton' : 'solo', mias: miasDe(cfg.MIAS) };
+  }
+  /** T0708 · RESUMEN de la configuración: { cifras: [{ tabla, filas: [singular, plural] }], texto }; null sin ninguna cifra. */
+  function resumenCifras(r) {
+    var cs = (r && Array.isArray(r.cifras) ? r.cifras : []).filter(function (x) { return x && x.tabla; });
+    return cs.length ? { cifras: cs, texto: typeof r.texto === 'string' ? r.texto : '' } : null;
+  }
+  /** T0708 · Las cifras del resumen: cuántas filas tiene cada tabla, todas (no las de la vista), con su nombre. */
+  function cifrasResumen(ap, D) {
+    if (!ap.resumen) return [];
+    return ap.resumen.cifras.map(function (x) {
+      var n = (D.filas(x.tabla) || []).length, f = x.filas && x.filas.length === 2 ? x.filas : ['fila', 'filas'];
+      return { n: n, nombre: n === 1 ? f[0] : f[1] };
+    });
   }
   /** T0652 · CONTEXTO de la configuración, con sus claves por defecto; null sin ninguna tabla en «de». Cada sección de
    *  «seccion» es un nombre o { id, si: [condiciones] } (la primera que cumple la fila de la otra tabla: Clientes o Prospección). */
@@ -346,6 +359,11 @@
     Object.keys(c.CAMPOS || {}).forEach(function (k) { var d = c.CAMPOS[k]; if (d && d.de && oculta(d.de.tabla)) fuera.push(k); });
     var vale = sinCampos(c, fuera);
     if (c.RELACIONADOS) c.RELACIONADOS = c.RELACIONADOS.filter(function (r) { return !oculta(r.tabla); });
+    // T0708: ni las cifras del resumen de una tabla oculta.
+    if (c.RESUMEN && Array.isArray(c.RESUMEN.cifras)) {
+      c.RESUMEN.cifras = c.RESUMEN.cifras.filter(function (x) { return !(x && oculta(x.tabla)); });
+      if (!c.RESUMEN.cifras.length) delete c.RESUMEN;
+    }
     // T0671: el resumen de con quién es (CONTEXTO.de): sin el de una tabla oculta ni el de una columna quitada (el proveedor), y
     // sin las líneas de una tabla oculta o por una columna que apunta a una oculta (las personas de un proveedor).
     var cx = c.CONTEXTO;
@@ -376,7 +394,8 @@
     return { n: c, titulo: d.titulo || (c === ap.codigo ? 'Código' : titulo(base)), tipo: tipo, opciones: d.opciones || null, ref: d.ref || refDe(ap, ap.tabla, c), ids: d._ids || null,
       de: d.de || null, primero: d.primero || null, grupos: d.grupos || null,
       unidad: d.unidad || '', calculo: d.calculo ? expandir(d.calculo, ap.campos, [c]) : null, precio: d.precio || null, envio: d.calculo ? envioDe(d) || conEnvio(d.calculo, ap.campos, [c]) : null, privado: !!d.privado, colores: d.colores || null,
-      ayuda: d.ayuda || '', sinNumero: !!d.sinNumero, nombres: d.nombres || null, comun: d.comun || null, signo: d.signo || null, desglose: d.desglose || null, plantilla: d.plantilla || '', varios: !!d.varios };
+      ayuda: d.ayuda || '', sinNumero: !!d.sinNumero, nombres: d.nombres || null, comun: d.comun || null, signo: d.signo || null, desglose: d.desglose || null, plantilla: d.plantilla || '', varios: !!d.varios,
+      palabras: Array.isArray(d.palabras) && d.palabras.length >= 2 ? d.palabras : null };
   }
   /** T0642 · Un valor como se enseña: sin el número de delante («1 Contactado» → «Contactado», con «sinNumero») y con su
    *  nombre en palabras («IG» → «Instagram», con «nombres»). Lo guardado, los filtros y los colores siguen con el valor de verdad. */
@@ -437,6 +456,26 @@
     if (!fila) return '';
     var ult = ps[ps.length - 1], rr = refDe(ap, tt, ult);
     return rr ? nombreDe(D, rr, fila[ult]) : fila[ult];
+  }
+  /** T0708 · Si lo relacionado enseña una columna que es uno de sus «campos» calculados, plantilla, «de» o «primero». */
+  function conCamposPropios(r) {
+    return (r.columnas || []).some(function (c) { var d = (r.campos || {})[c]; return !!(d && (d.calculo || d.plantilla || d.de || d.primero)); });
+  }
+  /** T0708 · Lo de verdad (el código, no el nombre) al final de una ruta («ID_DISENO.ID_PROVEEDOR» → P-001). */
+  function seguirCrudo(ap, D, t, f, ruta) {
+    var ps = String(ruta).split('.'), fila = f, tt = t;
+    for (var i = 0; i < ps.length - 1; i++) {
+      var r = refDe(ap, tt, ps[i]);
+      if (!r || !fila || vacio(fila[ps[i]])) return '';
+      fila = D.fila(r, fila[ps[i]]); tt = r;
+    }
+    return fila ? fila[ps[ps.length - 1]] : '';
+  }
+  /** T0708 · Las tablas por las que pasa una ruta desde t (TELAS, «ID_DISENO.ID_PROVEEDOR» → [DISENOS]): hay que leerlas. */
+  function tablasDeRuta(ap, t, ruta) {
+    var ps = String(ruta || '').split('.'), r = [], tt = t;
+    for (var i = 0; i < ps.length - 1; i++) { tt = refDe(ap, tt, ps[i]); if (!tt) break; r.push(tt); }
+    return r;
   }
   /** Todas las columnas que nombra la configuración (para saber qué rutas preparar). */
   function nombradas(ap) {
@@ -520,7 +559,9 @@
       rutas.forEach(function (ruta) { r[ruta] = seguir(a, D, a.tabla, f, ruta); });
       conDe.forEach(function (c) {
         var de = a.campos[c].de, clave = f[de.con || a.clave];
-        var xs = vacio(clave) ? [] : (D.filas(de.tabla) || []).filter(function (x) { return norm(x[de.campo]) === norm(clave); }).map(function (x) { return conNombres(a, D, de.tabla, x); });
+        // T0708: «campo» puede ser una ruta (las telas de un proveedor: TELAS · ID_DISENO.ID_PROVEEDOR).
+        var ruta = String(de.campo || '').indexOf('.') > 0;
+        var xs = vacio(clave) ? [] : (D.filas(de.tabla) || []).filter(function (x) { return norm(ruta ? seguirCrudo(a, D, de.tabla, x, de.campo) : x[de.campo]) === norm(clave); }).map(function (x) { return conNombres(a, D, de.tabla, x); });
         if (de.filtro) xs = xs.filter(function (x) { return cumple(x, de.filtro, { hoy: de.hoy }); });
         if (de.orden) xs.sort(comparar(de.orden));
         r[c] = de.columnas ? enLinea(de, xs) : (de.columna ? (xs.length ? xs[0][de.columna] : '') : xs.length);
@@ -697,6 +738,18 @@
       if (!sePuede(c)) errores.push(donde + 'DEDUCIR pone «' + c + '», que no está en EDITAR.');
       Object.keys(ap.deducir[c] || {}).forEach(function (o) { hay(o, 'DEDUCIR mira'); });
     });
+    // T0708: un «de» por una ruta (TELAS · ID_DISENO.ID_PROVEEDOR): su primer paso apunta a otra tabla; y las cifras del resumen.
+    Object.keys(ap.campos).forEach(function (c) {
+      var de = ap.campos[c].de;
+      if (!de || !de.tabla || String(de.campo || '').indexOf('.') < 0) return;
+      var p0 = String(de.campo).split('.')[0], cs = columnasTabla ? columnasTabla(de.tabla) : null;
+      if (cs && cs.indexOf(p0) < 0) errores.push(donde + 'CAMPOS.' + c + '.de.campo «' + de.campo + '»: ' + p0 + ' no es una columna de ' + de.tabla + '.');
+      else if (Object.keys(ap.refs).length && !refDe(ap, de.tabla, p0)) errores.push(donde + 'CAMPOS.' + c + '.de.campo «' + de.campo + '»: ' + p0 + ' no apunta a otra tabla.');
+    });
+    if (puesto(cfg.RESUMEN) && !ap.resumen) errores.push(donde + 'RESUMEN no dice en «cifras» qué tablas cuenta.');
+    if (ap.resumen) ap.resumen.cifras.forEach(function (x, i) {
+      if (!x.filas || x.filas.length !== 2) errores.push(donde + 'RESUMEN.cifras[' + i + '] (' + x.tabla + ') no dice en «filas» cómo se llama una y cómo varias (["tela", "telas"]).');
+    });
     // T0652: el resumen de con quién es la fila.
     if (puesto(cfg.CONTEXTO) && !ap.contexto) errores.push(donde + 'CONTEXTO no dice en «de» de qué tablas sale el resumen.');
     if (ap.contexto) {
@@ -739,7 +792,9 @@
       if (columnasTabla && !cs) errores.push(donde + q + ': la tabla ' + r.tabla + ' no está.');
       hay(r.con, q + ' usa');
       // T0642: una columna con ruta («ID_TELA.COLOR»): su primer paso es una columna de esa tabla.
-      if (cs) [r.campo].concat(r.columnas || []).forEach(function (c) { hay(String(c).split('.')[0], q + ' usa', r.tabla, cs); });
+      // T0708: una columna que es uno de sus «campos» calculados, plantilla o «de» (los colores de cada diseño) no está en la tabla.
+      var deCampos = function (c) { var d = (r.campos || {})[c]; return !!(d && (d.calculo || d.plantilla || d.de || d.primero)); };
+      if (cs) [r.campo].concat((r.columnas || []).filter(function (c) { return !deCampos(c); })).forEach(function (c) { hay(String(c).split('.')[0], q + ' usa', r.tabla, cs); });
       if (r.nueva && !r.seccion) errores.push(donde + q + ': «nueva» necesita la sección a la que lleva (seccion).');
       // T0641: en una «tarjeta», cada campo es una columna de esa tabla, una ruta o uno de sus «campos» (calculado, plantilla, «de»).
       if (cs && r.tarjeta) camposTarjeta(r).forEach(function (c) {
@@ -1234,7 +1289,12 @@
     if (cp.tipo === 'fecha') return fechaCorta(v);
     if (cp.tipo === 'importe') { var n = aNumero(v); return isNaN(n) ? String(v) : num(n, 2) + (u || ' €'); }
     if (cp.tipo === 'porcentaje') { var p = aNumero(v); return isNaN(p) ? String(v) : num(p * 100, 0) + ' %'; }
-    if (cp.tipo === 'numero') { var m = aNumero(v); return isNaN(m) ? String(v) : num(m, m % 1 ? 1 : 0) + u; }
+    if (cp.tipo === 'numero') {
+      var m = aNumero(v);
+      // T0708: «palabras» [uno, varios, cero]: «1 tela», «82 telas» y, con 0, el tercero (sin él, vacío).
+      if (cp.palabras && !isNaN(m)) return m === 0 ? String(cp.palabras[2] || '') : num(m, m % 1 ? 1 : 0) + ' ' + (m === 1 ? cp.palabras[0] : cp.palabras[1]);
+      return isNaN(m) ? String(v) : num(m, m % 1 ? 1 : 0) + u;
+    }
     if (cp.tipo === 'sino') return v === true || norm(v) === 'si' || norm(v) === 'true' ? 'Sí' : (v === false || norm(v) === 'no' || norm(v) === 'false' ? 'No' : String(v));
     if (cp.tipo === 'instagram') return cuentaInstagram(v) || String(v);
     return mostrar(cp, v) + u;
@@ -1544,7 +1604,7 @@
 
   var CALC = { fechaDia: fechaDia, webCorta: webCorta, textoCorto: textoCorto, gruposConQuien: gruposConQuien, nombreCorto: nombreCorto, deshacerEnOrden: deshacerEnOrden, loDiceUnAviso: loDiceUnAviso, contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
     textoVuelta: textoVuelta, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
-    valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
+    valoresDe: valoresDe, resumenCifras: resumenCifras, cifrasResumen: cifrasResumen, seguirCrudo: seguirCrudo, tablasDeRuta: tablasDeRuta, conCamposPropios: conCamposPropios, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, vistaDeFila: vistaDeFila, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, irA: irA, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir, valorCon: valorCon, columnasCon: columnasCon, cambioCampo: cambioCampo, textoCambio: textoCambio, miasDe: miasDe, equipoLimpio: equipoLimpio, hayMias: hayMias, esMia: esMia, nombrePara: nombrePara, conEquipo: conEquipo,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
     relacionadas: relacionadas, juntarDe: juntarDe, partes: partes, verTexto: verTexto, rellenar: rellenar, enPlantilla: enPlantilla, veRelacionado: veRelacionado, expandir: expandir, camposTarjeta: camposTarjeta, desglose: desglose, cuando: cuando, comparar: comparar,
@@ -1628,6 +1688,11 @@
       Object.keys(BASE.campos).forEach(function (c) { var de = BASE.campos[c].de; if (de && de.tabla && tablas.indexOf(de.tabla) < 0) tablas.push(de.tabla); });
       // T0641: y las de los campos con «de» de lo relacionado (la composición de la alternativa de una comparativa).
       BASE.relacionados.forEach(function (r) { Object.keys(r.campos || {}).forEach(function (c) { var de = r.campos[c].de; if (de && de.tabla && tablas.indexOf(de.tabla) < 0) tablas.push(de.tabla); }); });
+      // T0708: las de por medio de un «de» por una ruta (DISENOS, para las telas de un proveedor) y las del resumen.
+      function ruta(de) { if (de && de.tabla) tablasDeRuta(BASE, de.tabla, de.campo).forEach(function (t) { if (tablas.indexOf(t) < 0) tablas.push(t); }); }
+      Object.keys(BASE.campos).forEach(function (c) { ruta(BASE.campos[c].de); });
+      BASE.relacionados.forEach(function (r) { Object.keys(r.campos || {}).forEach(function (c) { ruta(r.campos[c].de); }); });
+      if (BASE.resumen) BASE.resumen.cifras.forEach(function (x) { if (tablas.indexOf(x.tabla) < 0) tablas.push(x.tabla); });
       // T0652: las del resumen de con quién es cada fila (la marca, sus necesidades, sus personas).
       if (BASE.contexto) Object.keys(BASE.contexto.de).forEach(function (c) {
         var d = BASE.contexto.de[c];
@@ -1763,6 +1828,11 @@
         if (ayuda) html += '<button type="button" class="u-btn u-btn-icono li-qes" data-qes aria-expanded="' + !!S.qes + '" aria-controls="li-texto" aria-label="Qué es esta vista">' + ICONO_INFO + '</button>';
         html += '</div>';
         if (ayuda) html += '<p class="u-nota li-texto' + (S.qes ? ' li-abierto' : '') + '" id="li-texto">' + texto(ayuda) + '</p>';
+        // T0708: el resumen de todo lo que hay (no solo lo de la vista): «203 telas · 39 diseños», con su frase.
+        var cifras = vista.cliente ? [] : cifrasResumen(a, D);
+        if (cifras.length) html += '<div class="li-resumen" role="group" aria-label="Resumen">' + cifras.map(function (x) {
+          return '<span class="li-cifra"><b>' + texto(num(x.n, 0)) + '</b> ' + texto(x.nombre) + '</span>';
+        }).join('') + (a.resumen.texto ? '<span class="li-resumen-t">' + texto(a.resumen.texto) + '</span>' : '') + '</div>';
         if (vista.cliente) {
           var nombres = []; ocultas(a, vista).forEach(function (c) { var t = campo(a, c).titulo; if (nombres.indexOf(t) < 0) nombres.push(t); });
           html += '<p class="li-cliente">Vista para enseñar a un cliente: sin avisos y sin ' + (nombres.length ? nombres.map(function (t) { return t.toLowerCase(); }).join(', ').replace(/, ([^,]*)$/, ' ni $1') : 'los datos privados') + '.</p>';
@@ -2348,7 +2418,8 @@
         if (!nueva && !cli) a.relacionados.filter(function (r) { return veRelacionado(r, ctx); }).forEach(function (r) {
           if (r.juntar) { h += pintarJuntar(a, r, f); return; } // T0691: las marcas de una tela, de varias tablas, una vez cada una
           // T0641: con «tarjeta», sus filas se preparan como las de una sección (rutas, calculados, «de» y plantillas de sus «campos»).
-          var otroAp = r.tarjeta ? apartado({ TABLA: r.tabla, CAMPOS: r.campos || {}, COLUMNAS: (r.columnas || []).concat(camposTarjeta(r)), _refs: a.refs }) : null;
+          // T0708: también sin tarjeta, si alguna de sus columnas es uno de esos «campos» (los colores de cada diseño de un proveedor).
+          var otroAp = r.tarjeta || conCamposPropios(r) ? apartado({ TABLA: r.tabla, CAMPOS: r.campos || {}, COLUMNAS: (r.columnas || []).concat(r.tarjeta ? camposTarjeta(r) : []), _refs: a.refs }) : null;
           var rs = relacionadas(r, f, otroAp ? preparar(otroAp, filas(r.tabla), D, VAL) : filas(r.tabla).map(function (x) {
             // T0642: una columna con ruta («ID_TELA.COLOR»: el color de la tela que le interesa) sigue las referencias.
             var y = conNombres(a, D, r.tabla, x);

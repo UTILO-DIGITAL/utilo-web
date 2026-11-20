@@ -418,7 +418,7 @@
 
   // T0662 · Lo que la sección no dice llega a la web con el defecto de motor/modulos/listado/modulo.json, como lo monta
   // montar.js (RAPIDAS, ALTA y CONTEXTO, {}): así se ve aquí lo mismo que en la app de verdad. probar-listado.js comprueba que son esos.
-  var DEFECTOS = {"TABLA":"","CLAVE":"ID","CODIGO":"","NOMBRE":"","COLUMNAS":[],"DETALLE":[],"ORDEN":"","FILTRO":[],"BUSCAR":[],"CAMPOS":{},"FICHA":[],"RELACIONADOS":[],"VISTAS":[],"AVISOS":[],"EDITAR":[],"CREAR":false,"ACCIONES":[],"GUARDAR":"solo","MIAS":{},"NUEVA":{},"RAPIDAS":{},"ALTA":{},"DEDUCIR":{},"CONTEXTO":{},"OBLIGATORIAS":[],"FILTROS":[],"TEXTO":"","FILAS":[],"VACIO":"","VALORES":{},"PROHIBIDO":["CONTRASENA","CUENTA","DNI"],"PERSONALIZAN":[],"VENTAS":{},"PREFERENCIAS":""};
+  var DEFECTOS = {"TABLA":"","CLAVE":"ID","CODIGO":"","NOMBRE":"","COLUMNAS":[],"DETALLE":[],"ORDEN":"","FILTRO":[],"BUSCAR":[],"CAMPOS":{},"FICHA":[],"RELACIONADOS":[],"VISTAS":[],"AVISOS":[],"EDITAR":[],"CREAR":false,"ACCIONES":[],"GUARDAR":"solo","MIAS":{},"NUEVA":{},"RAPIDAS":{},"ALTA":{},"DEDUCIR":{},"CONTEXTO":{},"RESUMEN":{},"OBLIGATORIAS":[],"FILTROS":[],"TEXTO":"","FILAS":[],"VACIO":"","VALORES":{},"PROHIBIDO":["CONTRASENA","CUENTA","DNI"],"PERSONALIZAN":[],"VENTAS":{},"PREFERENCIAS":""};
   Object.keys(SECCIONES).forEach(function (n) {
     var c = SECCIONES[n].config;
     Object.keys(DEFECTOS).forEach(function (k) { if (!(k in c)) c[k] = JSON.parse(JSON.stringify(DEFECTOS[k])); });
