@@ -1711,12 +1711,12 @@
   },
   "T0694-pruebas-en-paralelo": {
    "tarea": "T0694",
-   "titulo": "npm test pasa los pasos a la vez, --rama pasa solo lo que toca y dos sesiones ya no se pisan",
-   "pr": null,
-   "commit": "927c97b8",
-   "ultimo": "T0694: npm test pasa los pasos a la vez, --rama pasa solo lo que toca y dos sesiones ya no se pisan",
+   "titulo": "Las pruebas, a la vez y solo lo que toca la rama, sin pisarse entre sesiones",
+   "pr": 375,
+   "commit": "ff71e364",
+   "ultimo": "T0694: Al menos 4 pasos a la vez (en «Pruebas» la máquina tiene 2 núcleos)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T08:01:46.968Z",
+   "fecha": "2026-11-20T08:07:29.809Z",
    "toca": [],
    "comun": false,
    "paginas": [
