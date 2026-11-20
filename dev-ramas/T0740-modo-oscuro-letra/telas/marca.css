@@ -55,9 +55,11 @@
 
 /* T0740 · Modo oscuro (maqueta conjunta de T0702, «Idea: modo oscuro», aprobada por Javi): fondo tinta, texto claro y los
    mismos colores, más suaves para que se lean: oliva claro para lo elegido y los contornos, índigo claro en los enlaces (la
-   teja de lo atrasado y los demás colores de estado, en base.css). El menú y el botón principal siguen en oliva. */
+   teja de lo atrasado y los demás colores de estado, en base.css). El menú y el botón principal siguen en oliva.
+   Solo en las páginas que lo piden (<meta name="color-scheme" content="light dark">): el catálogo, que también carga esta
+   hoja, sigue en claro. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:has(meta[name="color-scheme"][content~="dark"]) {
     color-scheme: dark;
     --color-fondo: #171815;            /* tinta · fondo general */
     --color-superficie: #1F201C;       /* un punto más claro · tablas, listas, fichas, campos y la barra de abajo */

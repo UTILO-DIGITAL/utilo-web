@@ -19,6 +19,8 @@
 <script>
   window.LI_MARCA = (/[?&]marca=(utilo|konamigas|telas)\b/.exec(location.search) || [])[1] || 'telas';
   document.write('<link rel="stylesheet" href="../../' + window.LI_MARCA + '/marca.css?v=4">');
+  // T0740: con la marca de Telas, como su app: oscura si el sistema lo está.
+  if (window.LI_MARCA === 'telas') document.write('<meta name="color-scheme" content="light dark">');
 </script>
 <link rel="stylesheet" href="../../estilos/base.css?v=f5c2c77326">
 <style>
@@ -34,6 +36,7 @@
 </style>
 <script>
   window.KANBAN = { clave: 'listado-ejemplo', marca: 'utilo', nombreApp: 'Telas', api: 'motor-de-ejemplo' };
+  if (window.LI_MARCA === 'telas') window.KANBAN.letraDelSistema = true; // T0740: la letra del iPhone, como la app de Marta
   // Las tablas viven en el motor de mentira: sin copia en el dispositivo (IndexedDB), que traería las de otra vez.
   try { Object.defineProperty(window, 'indexedDB', { value: undefined, configurable: true }); } catch (e) {}
 </script>

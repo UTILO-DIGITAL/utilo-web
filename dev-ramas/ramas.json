@@ -1529,12 +1529,12 @@
   },
   "T0740-modo-oscuro-letra": {
    "tarea": "T0740",
-   "titulo": "Modo oscuro y letra del iPhone en la app de Telas",
-   "pr": null,
-   "commit": "99948e61",
-   "ultimo": "T0740: Modo oscuro y letra del iPhone en la app de Telas",
+   "titulo": "La app de Telas, en oscuro con el iPhone y con su tamaño de letra",
+   "pr": 412,
+   "commit": "6004a161",
+   "ultimo": "T0740: El oscuro, solo en las páginas que lo piden (no en el catálogo) y también en DEV",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T23:22:48.761Z",
+   "fecha": "2026-11-20T23:30:25.184Z",
    "toca": [
     "telas"
    ],
