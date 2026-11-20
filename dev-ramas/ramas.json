@@ -1917,15 +1917,6 @@
    "rama": "T0725-facturas-sin-fallos",
    "carpeta": "T0725-facturas-sin-fallos"
   },
-  "DEV-2": {
-   "cliente": "telas",
-   "modo": "ejemplo",
-   "commit": "e371c7a6",
-   "subido": "20/11/26, 23:53",
-   "quien": "Javi Canela",
-   "rama": "T0729-ajustes-marta",
-   "carpeta": "T0729-ajustes-marta"
-  },
   "DEV-3": {
    "cliente": "telas",
    "modo": "ejemplo",
@@ -1934,6 +1925,15 @@
    "quien": "Javi Canela",
    "rama": "T0719-claude-de-marta",
    "carpeta": "T0719-claude-de-marta"
+  },
+  "DEV-2": {
+   "cliente": "telas",
+   "modo": "ejemplo",
+   "commit": "b16f2c4f",
+   "subido": "20/11/26, 23:56",
+   "quien": "Javi Canela",
+   "rama": "T0729-ajustes-marta",
+   "carpeta": "T0729-ajustes-marta"
   }
  }
 }
