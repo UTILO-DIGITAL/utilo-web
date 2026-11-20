@@ -1206,8 +1206,8 @@
  "bases": {
   "konamigas": {
    "rama": "main y las ramas abiertas",
-   "commit": "6f7cbee",
-   "fecha": "2026-11-19T12:10:03.590Z",
+   "commit": "f6436b35",
+   "fecha": "2026-11-20T12:11:07.699Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
