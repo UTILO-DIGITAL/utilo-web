@@ -657,6 +657,33 @@
     var f = (filas || []).filter(function (x) { return String(x.ID) === String(cfgMin.fila); })[0] || (cfgMin.fila ? null : (filas || [])[0]);
     return f ? fraccion(f[cfgMin.columna]) : 0;
   }
+  /**
+   * T0692 · Las ventas de cada uno con quien se trata (las de una marca, para su ficha de Clientes): su contraparte lleva en
+   * «campo» la clave de su ficha (CONTRAPARTES.ID_MARCA). { clave: { ventas, ultima, anio, enAnio, debe, sinPrecio } }:
+   *   ventas     cada venta (la de venta()), de la más reciente a la más antigua por FECHA
+   *   ultima     la FECHA de la más reciente
+   *   anio       lo que suman las de este año (IMPORTE, sin IVA; las sin precio cerrado no suman) y enAnio, cuántas son
+   *   debe       lo que le falta por pagar de las que no ha pagado enteras; sinPrecio, cuántas de esas no tienen IMPORTE
+   * Una venta sin contraparte, o con una que no tiene «campo», no es de nadie. hoy: 'AAAA-MM-DD' (para el año).
+   */
+  function ventasPorQuien(d, filas, DS, minimo, ctr, campo, hoy) {
+    var de = {}, o = {}, anio = String(hoy || '').slice(0, 4);
+    (ctr || []).forEach(function (c) { var k = c[campo]; if (k !== '' && k != null) de[String(c.ID)] = String(k); });
+    (filas || []).forEach(function (v) {
+      var k = de[String(v.ID_CONTRAPARTE || '')];
+      if (!k) return;
+      var x = venta(d, v, DS, minimo), q = o[k] || (o[k] = { ventas: [], ultima: '', anio: 0, enAnio: 0, debe: 0, sinPrecio: 0 });
+      q.ventas.push(x);
+      var f = String(v.FECHA || '').slice(0, 10);
+      if (f > q.ultima) q.ultima = f;
+      if (anio && f.slice(0, 4) === anio) { q.enAnio++; if (x.importe !== null) q.anio += x.importe; }
+      if (!x.cobrada && !x.adelantado) { if (x.debe === null) q.sinPrecio++; else q.debe += x.debe; }
+    });
+    Object.keys(o).forEach(function (k) {
+      o[k].ventas.sort(function (a, b) { var x = String(a.v.FECHA || ''), y = String(b.v.FECHA || ''); return x < y ? 1 : x > y ? -1 : String(a.v.ID) < String(b.v.ID) ? 1 : -1; });
+    });
+    return o;
+  }
 
 
   /* ---------- T0646 · caja y clientes de una factura ---------- */
@@ -720,7 +747,7 @@
     desglose: desglose, recomendar: recomendar, esReparto: esReparto, problemasMov: problemasMov,
     cantidad: cantidad, precio: precio, iban: iban, sinIva: sinIva, conIvaPrecio: conIvaPrecio, importeLinea: importeLinea, baseLineas: baseLineas, lineasDe: lineasDe,
     articulos: articulos, buscarArt: buscarArt, artDe: artDe, ultimoPrecio: ultimoPrecio, precioOpcion: precioOpcion, conQuien: conQuien,
-    fraccion: fraccion, diasEntre: diasEntre, venta: venta, ventas: ventas, minimoDe: minimoDe };
+    fraccion: fraccion, diasEntre: diasEntre, venta: venta, ventas: ventas, minimoDe: minimoDe, ventasPorQuien: ventasPorQuien };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -772,11 +799,22 @@
       var CLAVE = 'eco_' + ctx.id + '_';
       function movVacio() { return { tipo: '', cat: '', cue: '', q: '', sinFac: false, cruz: false, ver: VER, desde: '' }; }
       var S = { tab: pest.indexOf(guardado(CLAVE + 'tab')) >= 0 ? guardado(CLAVE + 'tab') : pest[0], per: guardado(CLAVE + 'per'), des: '',
-        mov: movVacio(), fac: { tipo: '', estado: '' }, caja: { cue: '', ceros: false }, ven: { id: '', des: '' }, ab: {}, ceros: false, medidas: null, leido: false };
+        mov: movVacio(), fac: { tipo: '', estado: '' }, caja: { cue: '', ceros: false }, ven: { id: '', des: '', volver: null }, ab: {}, ceros: false, medidas: null, leido: false };
+      // T0692 · ?venta=VEN0001 (desde la ficha de una marca en Clientes): abre esa venta, con «‹ Volver a …» a la ficha de la que
+      // se viene. Se quita de la dirección: el atrás del navegador ya vuelve a la ficha.
+      (function () {
+        var u; try { u = new URL(location.href); } catch (e) { return; }
+        var id = u.searchParams.get('venta');
+        if (id === null) return;
+        u.searchParams.delete('venta');
+        try { history.replaceState(history.state, '', u.pathname + u.search + u.hash); } catch (e) {}
+        if (!id || pest.indexOf('VENTAS') < 0) return;
+        S.tab = 'VENTAS'; S.ven.id = String(id); S.ven.volver = ctx.desde || null;
+      })();
 
       el.innerHTML = (cfg.AYUDA ? '<p class="u-nota n-ayuda">' + texto(cfg.AYUDA) + '</p>' : '') +
         '<div class="eco-barra"><label class="u-campo eco-per"><span class="u-etiqueta">' + texto(nomPer) + '</span><select id="eco-per"></select></label>' +
-        '<div class="u-pestanas" role="tablist">' + pest.map(function (p) {
+        '<div class="u-pestanas" role="tablist"' + (pest.length < 2 ? ' hidden' : '') + '>' + pest.map(function (p) {
           return '<button type="button" role="tab" data-tab="' + p + '">' + PESTANAS[p] + (p === 'PENDIENTE' ? ' <span class="u-chip" id="eco-npend" hidden></span>' : '') + '</button>';
         }).join('') + '</div></div>' +
         '<div id="eco-cont" class="eco-cont"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div>' +
@@ -2112,7 +2150,7 @@
           'Has pagado ' + eur0(x.pagado) + ' y ' + texto(c) + ' te ha pagado ' + eur0(x.cobrado) + '. ' +
             (x.debe === null ? 'Aún sin precio cerrado: apunta lo que paga la marca en «Editar la venta».' :
               'Te debe ' + (x.cobrado ? 'otros ' : '') + eur0(x.debe) + ': cuando pague, habrás ganado ' + eur0(x.previsto) + ', si no hay más gastos.');
-        var h = '<button type="button" class="u-btn u-btn-texto eco-volver" data-accion="todasventas">‹ Todas las ventas</button>' +
+        var h = (S.ven.volver ? '<button type="button" class="u-btn u-btn-texto eco-volver" data-accion="volverficha">‹ Volver a ' + texto(S.ven.volver.titulo) + '</button>' : '<button type="button" class="u-btn u-btn-texto eco-volver" data-accion="todasventas">‹ Todas las ventas</button>') +
           '<div class="eco-kpis"><div class="eco-kpi eco-grande"><b>' + texto(nombreVenta(v)) + '</b><span class="eco-val">' +
           (x.cobrada ? eur0(x.ganado) + ' ganados' : x.adelantado ? 'Cobrada por adelantado' : eur0(x.enJuego) + ' en juego') + '</span><span class="eco-sub">' + sub + '</span></div></div>';
         var pasos = [['Pedida', v.FECHA]];
@@ -2194,7 +2232,7 @@
       function verMovs(f, desde) { S.mov = Object.assign(movVacio(), f, { desde: desde || '' }); irA('MOVIMIENTOS'); }
       el.addEventListener('click', function (e) {
         var t = e.target;
-        var b = t.closest('[data-tab]'); if (b) { if (b.getAttribute('data-tab') === 'MOVIMIENTOS') S.mov.desde = ''; if (b.getAttribute('data-tab') === 'CAJA') S.caja.cue = ''; if (b.getAttribute('data-tab') === 'VENTAS') S.ven.id = ''; irA(b.getAttribute('data-tab')); return; }
+        var b = t.closest('[data-tab]'); if (b) { if (b.getAttribute('data-tab') === 'MOVIMIENTOS') S.mov.desde = ''; if (b.getAttribute('data-tab') === 'CAJA') S.caja.cue = ''; if (b.getAttribute('data-tab') === 'VENTAS') { S.ven.id = ''; S.ven.volver = null; } irA(b.getAttribute('data-tab')); return; }
         if (t.closest('[data-fuera]')) return; // un enlace a Drive se abre en otra pestaña, sin abrir la fila
         if (t.closest('[data-cerrar]')) { cerrar(); return; }
         if (velo.contains(t)) return; // lo de dentro de una ventana lo lleva su ventana
@@ -2231,6 +2269,7 @@
           else if (ac === 'editarventa') { var ve = ix.des[S.ven.id]; if (ve && !ve._nueva) formVenta(ve); }
           else if (ac === 'movventa') { var pv = {}; pv[DS] = S.ven.id; formMov(null, pv); }
           else if (ac === 'todasventas') { S.ven.id = ''; pintar(); arriba(); }
+          else if (ac === 'volverficha') { S.ven.volver = null; ctx.volver(); }
           else if (ac === 'cerrardes') { S.ven.des = ''; pintar(); }
           return;
         }
@@ -2288,6 +2327,21 @@
       });
       this._cerrar = cerrar;
     },
-    cerrar: function () { if (this._cerrar) this._cerrar(); }
+    cerrar: function () { if (this._cerrar) this._cerrar(); },
+    /**
+     * T0692 · Las ventas de cada uno con quien se trata, para otra sección (la ficha de una marca en Clientes) sin abrir esta:
+     * lee lo que hace falta con las tablas de quien ha entrado (el permiso es el de esta sección) y da ventasPorQuien() por
+     * «campo» de CONTRAPARTES (ID_MARCA). null si esta sección no tiene ventas (sin VENTAS o sin su DESGLOSE).
+     */
+    ventasDe: function (T, cfg, campo) {
+      cfg = cfg || {};
+      var R = cfg._refs || {}, DS = String(cfg.DESGLOSE || ''), VEN = cfg.VENTAS && DS && R.DESGLOSE === cfg.VENTAS ? String(cfg.VENTAS) : '';
+      if (!VEN || !campo) return Promise.resolve(null);
+      var MIN = cfg.MARGEN_MINIMO && typeof cfg.MARGEN_MINIMO === 'object' && cfg.MARGEN_MINIMO.tabla ? cfg.MARGEN_MINIMO : null;
+      return T.leer(['MOVIMIENTOS', 'CATEGORIAS', 'CONTRAPARTES', VEN].concat(MIN ? [MIN.tabla] : [])).then(function () {
+        var m = MIN ? minimoDe(MIN, T.filas(MIN.tabla)) : minimoDe(cfg.MARGEN_MINIMO);
+        return ventasPorQuien({ cfg: cfg, mov: T.filas('MOVIMIENTOS') || [], cat: T.filas('CATEGORIAS') || [] }, T.filas(VEN) || [], DS, m, T.filas('CONTRAPARTES') || [], campo, hoy());
+      });
+    }
   });
 })();

@@ -291,6 +291,16 @@
   window.UN = {
     /** Cada sección se registra al cargar su JS: UN.registrar('EJEMPLO', { abrir: function (el, ctx) {}, cerrar: function () {} }). */
     registrar: function (id, def) { DEF[String(id).toUpperCase()] = def; },
+    /**
+     * T0692 · Otra sección que ve quien ha entrado, para usar sus cuentas sin abrirla (las ventas de una marca, de Pedidos, en
+     * su ficha de Clientes): su JS (una vez) y su configuración, { id, titulo, def, config }. null si no la ve: lo de esa
+     * sección no sale en otra a quien no la tiene (y el motor tampoco le daría sus tablas).
+     */
+    seccion: function (id) {
+      var s = cred ? seccion(String(id || '').toUpperCase()) : null;
+      if (!s || !s.web) return Promise.resolve(null);
+      return cargar(s).then(function (def) { return { id: s.id, titulo: s.titulo, def: def, config: s.config || {} }; }, function () { return null; });
+    },
     /** T0283: el bloque «Versión» de Perfil (vacío si no hay versión: DEV, local sin ejemplo). */
     htmlVersion: function () { return htmlVersion(); },
     /**

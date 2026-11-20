@@ -2187,6 +2187,11 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-claude .u-btn { min-height: 36px; font-size: 14px; padding: 0 var(--e3); }
 .u .li-volver { align-self: flex-start; padding-left: 0; text-decoration: none; margin-bottom: calc(var(--e3) * -1); }
 .u a.li-rel-f { text-decoration: none; }
+/* T0692 · Una sección con una sola pestaña (Pedidos, de Economía) no enseña la barra. */
+.u .u-pestanas[hidden] { display: none; }
+/* T0692 · «Sus ventas» de una marca: lo que dice de un vistazo, encima de cada venta. */
+.u .li-ven-res { margin: 0 0 var(--e2); }
+.u .li-ven-res .u-bien { color: var(--color-bien); font-weight: 600; }
 .u .li-rel-f .li-ir { margin-left: auto; font-weight: 700; color: var(--color-principal-oscuro); white-space: nowrap; }
 .u div.li-rel-f { cursor: default; }
 /* T0642 · Lo relacionado con cada dato y su título («Qué buscan»), «+ Nueva tarea» debajo y «Copiar para Claude» dentro de «Más». */

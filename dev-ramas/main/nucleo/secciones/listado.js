@@ -286,6 +286,49 @@
    * «columnas» ({ TABLA: [columnas] }, que le llegan vacías), esos campos fuera como los demás.
    * No cambia cfg. Sin nada que ocultar, la misma.
    */
+  /**
+   * Quita de la configuración (ya copiada: la cambia) los campos de «fuera»: de CAMPOS, de las columnas, la ficha, el orden,
+   * las vistas, los filtros y lo que se edita. Devuelve vale(x): si x (una columna, una ruta o «-COLUMNA») sigue.
+   */
+  function sinCampos(c, fuera) {
+    var vale = function (x) { return typeof x !== 'string' || fuera.indexOf(x.replace(/^-/, '').split('.')[0]) < 0; };
+    if (!fuera.length) return vale;
+    var limpiar = function (a) { return Array.isArray(a) ? a.filter(vale) : a; };
+    fuera.forEach(function (k) { if (c.CAMPOS) delete c.CAMPOS[k]; if (c.NUEVA) delete c.NUEVA[k]; });
+    Object.keys(c.CAMPOS || {}).forEach(function (k) { if (c.CAMPOS[k].primero) c.CAMPOS[k].primero = limpiar(c.CAMPOS[k].primero); });
+    ['COLUMNAS', 'DETALLE', 'BUSCAR', 'EDITAR', 'OBLIGATORIAS', 'FILTROS'].forEach(function (k) { if (k in c) c[k] = limpiar(c[k]); });
+    if (!vale(c.ORDEN)) c.ORDEN = '';
+    if (c.FICHA) c.FICHA = c.FICHA.map(function (g) { if (g.campos) g.campos = limpiar(g.campos); return g; }).filter(function (g) { return !g.campos || g.campos.length; });
+    (c.VISTAS || []).forEach(function (v) {
+      if (v.columnas) v.columnas = limpiar(v.columnas);
+      if (v.orden && !vale(v.orden)) delete v.orden;
+      if (v.agrupar && !vale(v.agrupar.campo || v.agrupar)) delete v.agrupar;
+      if (v.tablero && !vale(v.tablero.campo)) delete v.tablero;
+    });
+    return vale;
+  }
+  /**
+   * T0692 · VENTAS: las ventas de cada fila, que da otra sección (Pedidos: { seccion, campo, titulo }), en su ficha («Sus
+   * ventas») y en los campos con «venta» (ULTIMA_VENTA: { "venta": "ultima" }; también «anio» y «debe»). Quien no ve esa
+   * sección no ve nada de esto: sin VENTAS ni esos campos (veo: { ID: titulo } de las secciones que ve).
+   */
+  function sinVentas(cfg, veo) {
+    var v = cfg && cfg.VENTAS && Object.keys(cfg.VENTAS).length ? cfg.VENTAS : null, ve = !!(v && v.seccion && veo[String(v.seccion).toUpperCase()]);
+    var fuera = Object.keys((cfg && cfg.CAMPOS) || {}).filter(function (k) { return cfg.CAMPOS[k] && cfg.CAMPOS[k].venta; });
+    if (ve || (!v && !fuera.length)) return cfg;
+    var c = JSON.parse(JSON.stringify(cfg));
+    delete c.VENTAS;
+    sinCampos(c, fuera);
+    return c;
+  }
+  /** T0692 · El valor de un campo con «venta» para las ventas de una fila (las de ventasPorQuien de Economía, o nada). */
+  function deVentas(que, q) {
+    if (!q) return '';
+    if (que === 'ultima') return q.ultima || '';
+    if (que === 'anio') return q.enAnio ? q.anio / 100 : '';
+    if (que === 'debe') return q.debe / 100;
+    return '';
+  }
   function quitada(vs, n) { var k = String(n).trim().toLowerCase(); return vs.some(function (v) { return String(v).trim().toLowerCase() === k; }); }
   function sinOcultas(cfg, oc) {
     var ts = (oc && oc.tablas) || [], fs = ((oc && oc.filas) || {})[cfg && cfg.TABLA] || {}, vacias = (oc && oc.columnas) || {};
@@ -299,19 +342,7 @@
     });
     var oculta = function (t) { return ts.indexOf(t) >= 0; };
     Object.keys(c.CAMPOS || {}).forEach(function (k) { var d = c.CAMPOS[k]; if (d && d.de && oculta(d.de.tabla)) fuera.push(k); });
-    var vale = function (x) { return typeof x !== 'string' || fuera.indexOf(x.replace(/^-/, '').split('.')[0]) < 0; };
-    var limpiar = function (a) { return Array.isArray(a) ? a.filter(vale) : a; };
-    fuera.forEach(function (k) { if (c.CAMPOS) delete c.CAMPOS[k]; if (c.NUEVA) delete c.NUEVA[k]; });
-    Object.keys(c.CAMPOS || {}).forEach(function (k) { if (c.CAMPOS[k].primero) c.CAMPOS[k].primero = limpiar(c.CAMPOS[k].primero); });
-    ['COLUMNAS', 'DETALLE', 'BUSCAR', 'EDITAR', 'OBLIGATORIAS', 'FILTROS'].forEach(function (k) { if (k in c) c[k] = limpiar(c[k]); });
-    if (!vale(c.ORDEN)) c.ORDEN = '';
-    if (c.FICHA) c.FICHA = c.FICHA.map(function (g) { if (g.campos) g.campos = limpiar(g.campos); return g; }).filter(function (g) { return !g.campos || g.campos.length; });
-    (c.VISTAS || []).forEach(function (v) {
-      if (v.columnas) v.columnas = limpiar(v.columnas);
-      if (v.orden && !vale(v.orden)) delete v.orden;
-      if (v.agrupar && !vale(v.agrupar.campo || v.agrupar)) delete v.agrupar;
-      if (v.tablero && !vale(v.tablero.campo)) delete v.tablero;
-    });
+    var vale = sinCampos(c, fuera);
     if (c.RELACIONADOS) c.RELACIONADOS = c.RELACIONADOS.filter(function (r) { return !oculta(r.tabla); });
     // T0671: el resumen de con quién es (CONTEXTO.de): sin el de una tabla oculta ni el de una columna quitada (el proveedor), y
     // sin las líneas de una tabla oculta o por una columna que apunta a una oculta (las personas de un proveedor).
@@ -472,6 +503,7 @@
     var rs = (a.refs || {})[a.tabla] || {}, rutas = nombradas(a).filter(function (c) { return c.indexOf('.') > 0; });
     var conDe = Object.keys(a.campos).filter(function (c) { return a.campos[c].de; }), conPrimero = Object.keys(a.campos).filter(function (c) { return a.campos[c].primero; });
     var conPlantilla = Object.keys(a.campos).filter(function (c) { return a.campos[c].plantilla; });
+    var conVenta = Object.keys(a.campos).filter(function (c) { return a.campos[c].venta; });
     return filas.map(function (f) {
       var r = {};
       Object.keys(f).forEach(function (k) { r[k] = rs[k] ? nombreDe(D, rs[k], f[k]) : f[k]; });
@@ -483,6 +515,7 @@
         if (de.orden) xs.sort(comparar(de.orden));
         r[c] = de.columnas ? enLinea(de, xs) : (de.columna ? (xs.length ? xs[0][de.columna] : '') : xs.length);
       });
+      conVenta.forEach(function (c) { r[c] = deVentas(a.campos[c].venta, D.ventas ? D.ventas[String(f[a.clave])] : null); });
       conPrimero.forEach(function (c) { r[c] = a.campos[c].primero.map(function (x) { return r[x]; }).filter(function (v) { return !vacio(v); })[0] || ''; });
       conPlantilla.forEach(function (c) { r[c] = rellenar(a, a.campos[c].plantilla, r, valores || {}); });
       r.__crudo = f;
@@ -501,7 +534,7 @@
     var cols = columnasTabla ? columnasTabla(ap.tabla) : null, calc = Object.keys(ap.campos).filter(function (c) { return ap.campos[c].calculo; });
     function hay(c, que, t, cs) {
       if (!t && calc.indexOf(c) >= 0) return;
-      if (!t && ap.campos[c] && (ap.campos[c].de || ap.campos[c].primero || ap.campos[c].plantilla)) return;
+      if (!t && ap.campos[c] && (ap.campos[c].de || ap.campos[c].primero || ap.campos[c].plantilla || ap.campos[c].venta)) return;
       if (!t && String(c).indexOf('.') > 0) { // una ruta: su primer paso tiene que apuntar a otra tabla
         var p0 = String(c).split('.')[0];
         if (cols && cols.indexOf(p0) < 0) errores.push(donde + que + ' «' + c + '»: ' + p0 + ' no es una columna de ' + ap.tabla + '.');
@@ -516,6 +549,15 @@
     todas.forEach(function (c) { hay(c, 'la columna'); });
     var ed = ap.editar === true ? [] : lista(ap.editar);
     ed.forEach(function (c) { hay(c, 'la columna que se edita'); if (calc.indexOf(c) >= 0) errores.push(donde + '«' + c + '» es calculado, no se edita.'); });
+    // T0692: las ventas de cada fila salen de otra sección (VENTAS: { seccion, campo }); un campo con «venta» las necesita.
+    var vts = cfg.VENTAS && (typeof cfg.VENTAS !== 'object' || Object.keys(cfg.VENTAS).length) ? cfg.VENTAS : null;
+    if (vts && (typeof vts !== 'object' || !vts.seccion || !vts.campo)) errores.push(donde + 'VENTAS lleva «seccion» (la que tiene las ventas, Pedidos) y «campo» (la columna de CONTRAPARTES con la clave de esta fila).');
+    Object.keys(ap.campos).filter(function (c) { return ap.campos[c] && ap.campos[c].venta; }).forEach(function (c) {
+      var q = ap.campos[c].venta;
+      if (['ultima', 'anio', 'debe'].indexOf(q) < 0) errores.push(donde + '«' + c + '»: «venta» es ultima, anio o debe, no «' + q + '».');
+      if (!vts) errores.push(donde + '«' + c + '» sale de las ventas, pero falta VENTAS.');
+      if (ed.indexOf(c) >= 0) errores.push(donde + '«' + c + '» sale de las ventas, no se edita.');
+    });
     var nombres = todas.concat(ed, cols || []);
     nombres.filter(function (c, i) { return nombres.indexOf(c) === i; }).forEach(function (c) {
       prohib.forEach(function (k) { if (NOMBRES_PROHIBIDOS[k] && NOMBRES_PROHIBIDOS[k].test(norm(c).toUpperCase())) errores.push(donde + 'la columna «' + c + '» guardaría ' + QUE_ES[k] + ', que aquí no se guardan.'); });
@@ -1310,13 +1352,37 @@
       masPendientes: Math.max(0, pend.length - cx.pendientes), lineas: lineas };
   }
 
+  /**
+   * T0692 · «Sus ventas» en la ficha: lo que dice de un vistazo (la última, lo de este año y lo que debe) y cada venta, que
+   * abre su sección (o.seccion, o.va: su título si quien mira la ve) con ella (?venta=). q: las de ventasPorQuien de Economía
+   * de esta fila; undefined, aún no han llegado («Mirando sus ventas…»); null o sin ventas, nada. o: { titulo, seccion, va, max, hoy }.
+   */
+  function htmlVentas(q, o) {
+    var tit = texto(o.titulo || 'Sus ventas');
+    if (q === undefined) return '<section class="li-fgrupo"><h3 class="li-fg-t">' + tit + '</h3><p class="u-nota">Mirando sus ventas…</p></section>';
+    if (!q || !q.ventas || !q.ventas.length) return '';
+    var eur = function (c) { return num(c / 100, c % 100 ? 2 : 0) + ' €'; };
+    var partes = ['Última venta ' + (cuando(q.ultima, o.hoy) || fechaCorta(q.ultima))];
+    if (q.enAnio) partes.push(q.anio ? eur(q.anio) + ' este año' : (q.enAnio === 1 ? '1 venta' : q.enAnio + ' ventas') + ' este año, sin precio cerrado');
+    var debe = q.debe > 0 ? '<span class="u-mal">Te debe ' + eur(q.debe) + '</span>' : (q.sinPrecio ? 'Sin precio cerrado en ' + (q.sinPrecio === 1 ? 'una' : q.sinPrecio) : '<span class="u-bien">Al día</span>');
+    var sec = String(o.seccion || ''), va = o.va, max = o.max || 10;
+    return '<section class="li-fgrupo li-ventas"><h3 class="li-fg-t">' + tit + ' <span class="u-cifra">' + q.ventas.length + '</span></h3>' +
+      '<p class="li-ven-res">' + partes.map(texto).join(' · ') + ' · ' + debe + '</p><ul class="li-rel">' + q.ventas.slice(0, max).map(function (x) {
+        var paso = x.paso + (x.fechaPaso ? ' ' + fechaCorta(x.fechaPaso) : ''), extra = x.cobrada || x.adelantado ? (x.importe !== null ? eur(x.importe) : '') :
+          (x.debe === null ? 'Sin precio cerrado' : x.debe > 0 ? 'Te debe ' + eur(x.debe) : '');
+        var dentro = '<span class="li-rel-n">' + texto(x.v.NOMBRE || x.v.ID) + '</span><span>' + texto(paso) + '</span>' +
+          (extra ? '<span' + (x.debe > 0 && !x.cobrada && !x.adelantado ? ' class="u-mal"' : '') + '>' + texto(extra) + '</span>' : '');
+        return '<li>' + (va ? '<a class="li-rel-f" href="?s=' + encodeURIComponent(sec.toLowerCase()) + '&venta=' + encodeURIComponent(x.v.ID) + '" data-sx="' + texto(sec) + '">' + dentro + '<span class="li-ir">' + texto(va) + ' ›</span></a>' : '<div class="li-rel-f">' + dentro + '</div>') + '</li>';
+      }).join('') + '</ul>' + (q.ventas.length > max ? '<p class="u-nota">Y ' + (q.ventas.length - max) + ' más, en ' + texto(va || 'Pedidos') + '.</p>' : '') + '</section>';
+  }
+
   var CALC = { fechaDia: fechaDia, webCorta: webCorta, textoCorto: textoCorto, gruposConQuien: gruposConQuien, nombreCorto: nombreCorto, deshacerEnOrden: deshacerEnOrden, loDiceUnAviso: loDiceUnAviso, contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
     textoVuelta: textoVuelta, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, irA: irA, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
     relacionadas: relacionadas, juntarDe: juntarDe, partes: partes, verTexto: verTexto, rellenar: rellenar, enPlantilla: enPlantilla, veRelacionado: veRelacionado, expandir: expandir, camposTarjeta: camposTarjeta, desglose: desglose, cuando: cuando, comparar: comparar,
-    filtrables: filtrables, aIntervalo: aIntervalo, cumpleFiltros: cumpleFiltros, filtrosQueValen: filtrosQueValen, textoFiltro: textoFiltro };
+    filtrables: filtrables, aIntervalo: aIntervalo, cumpleFiltros: cumpleFiltros, filtrosQueValen: filtrosQueValen, textoFiltro: textoFiltro, sinVentas: sinVentas, deVentas: deVentas, sinCampos: sinCampos, htmlVentas: htmlVentas };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -1347,7 +1413,10 @@
 
   window.UN.registrar('LISTADO', {
     abrir: function (el, ctx) {
-      var T = ctx.tablas, cfg = sinOcultas(ctx.config || {}, ctx.ocultar), PROHIB = cfg.PROHIBIDO === undefined ? PROHIB_DEFECTO : cfg.PROHIBIDO;
+      // Las secciones a las que se puede ir (las que ve quien ha entrado), para los enlaces de lo relacionado.
+      var veo = {}; (ctx.secciones || []).forEach(function (s) { veo[s.id] = s.titulo; });
+      // T0692: las ventas (VENTAS y los campos con «venta»), solo para quien ve su sección (Pedidos).
+      var T = ctx.tablas, cfg = sinVentas(sinOcultas(ctx.config || {}, ctx.ocultar), veo), PROHIB = cfg.PROHIBIDO === undefined ? PROHIB_DEFECTO : cfg.PROHIBIDO;
       var BASE = apartado(cfg, ctx.id, ctx.titulo), PREF = cfg.PREFERENCIAS || '';
       var puedePersonalizar = !!ctx.admin || (cfg.PERSONALIZAN || []).indexOf(ctx.perfil) >= 0;
       var K = 'li_' + ctx.id + '_';
@@ -1405,9 +1474,28 @@
       function filaVista(a, id) { return vistas(a).filter(function (f) { return String(f[a.clave]) === String(id); })[0] || null; }
       function vistaActual(a) { var vs = vistasDe(a); return vs.filter(function (v) { return v.id === S.vista; })[0] || vs[0]; }
       var VAL = {};
-      // Las secciones a las que se puede ir (las que ve quien ha entrado), para los enlaces de lo relacionado.
-      var veo = {}; (ctx.secciones || []).forEach(function (s) { veo[s.id] = s.titulo; });
       var errores = null, pintado = '';
+
+      /* ---------- T0692 · ventas (de Pedidos) ---------- */
+      var VENTAS = cfg.VENTAS && cfg.VENTAS.seccion ? cfg.VENTAS : null, venSec = VENTAS ? String(VENTAS.seccion).toUpperCase() : '';
+      /** «Sus ventas» de una fila (vacío si no tiene; «Mirando…» mientras no han llegado). */
+      function htmlVentasDe(crudo, hoy) {
+        return htmlVentas(D.ventas ? D.ventas[String(crudo[BASE.clave])] || null : undefined, { titulo: VENTAS.titulo, seccion: venSec, va: veo[venSec], max: VENTAS.max, hoy: hoy });
+      }
+      /** Las ventas de cada fila, de su sección (sin abrirla). Al llegar, la lista (Última venta) y la ficha abierta las enseñan. */
+      function leerVentas() {
+        if (!VENTAS || !window.UN.seccion) return;
+        window.UN.seccion(venSec).then(function (s) {
+          return s && s.def && typeof s.def.ventasDe === 'function' ? s.def.ventasDe(T, s.config, VENTAS.campo) : null;
+        }).then(function (o) { ponerVentas(o || {}); }, function () { ponerVentas({}); });
+      }
+      function ponerVentas(o) {
+        D.ventas = o;
+        if (!ctx.abierta()) return;
+        pintar();
+        var sv = vent.querySelector('#li-ventas'), f = abierta && filaVista(ap(), abierta.id);
+        if (sv && f) sv.innerHTML = htmlVentasDe(f.__crudo || {}, hoyIso());
+      }
 
       /* ---------- pintar ---------- */
       function celda(a, c, f, conEnlaces, cliente) {
@@ -2015,6 +2103,8 @@
         h += '</form>';
         // T0652: con quién es, ya abierto (sin la propia tarea: esa es la ficha).
         if (!nueva && !cli && a.contexto) { var rc = resumenDe(a, D, crudo, vistas(a), { hoy: hoy, prohib: PROHIB, sin: id }); if (rc) h += htmlResumen(rc, true); }
+        // T0692: sus ventas (de Pedidos), antes de lo relacionado; si aún no han llegado, su sitio, que se rellena al llegar.
+        if (!nueva && !cli && VENTAS) h += '<div id="li-ventas">' + htmlVentasDe(crudo, hoy) + '</div>';
         // Lo relacionado (el seguimiento de un cliente): cada fila lleva a su sección, con su ficha abierta.
         if (!nueva && !cli) a.relacionados.filter(function (r) { return veRelacionado(r, ctx); }).forEach(function (r) {
           if (r.juntar) { h += pintarJuntar(a, r, f); return; } // T0691: las marcas de una tela, de varias tablas, una vez cada una
@@ -2443,7 +2533,8 @@
           var h2 = vent.querySelector('#li-vt'), nom = '';
           if (h2) { var cp2 = h2.cloneNode(true); [].forEach.call(cp2.querySelectorAll('.li-cod'), function (x) { x.parentNode.removeChild(x); }); nom = cp2.textContent.trim(); }
           try { history.replaceState(history.state, '', location.pathname + conFicha(location.search, abierta.id, editables(BASE)) + location.hash); } catch (e) {}
-          vueltaPendiente = nom;
+          // T0692: a Pedidos (otra sección, no un Listado) no se le dice: lo recogería esta ficha al volver («‹ Volver a» sí misma).
+          if (!(venSec && String(sx.getAttribute('data-sx')).toUpperCase() === venSec)) vueltaPendiente = nom;
           return; // el marco hace el salto
         }
         if (ev.target.closest('[data-claude]')) { copiarClaude(); return; }
@@ -2521,6 +2612,7 @@
         // El orden del menú que ha guardado quien personaliza (para todos), por si este dispositivo aún no lo tiene.
         if (PREF && window.UN.ordenMenu) { var m = prefDe(MENU); if (Array.isArray(m)) window.UN.ordenMenu(m); }
         pintar();
+        leerVentas(); // T0692
         // T0644: desde el Perfil («Personalizar»), ?personalizar=1 abre aquí su ventana.
         if (url.get('personalizar') && puedePersonalizar) personalizar();
         else if (pedida) ficha(pedida);
