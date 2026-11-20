@@ -1,6 +1,14 @@
 {
-  "version": "5.25-1.22.1",
+  "version": "5.31-1.23",
   "versiones": [
+    {
+      "v": "5.31-1.23",
+      "fecha": "20/11/2026",
+      "novedades": [
+        "En el móvil, si tu app tiene muchas secciones, la barra de abajo enseña las cuatro primeras y «Más» con el resto, y los nombres ya no se parten.",
+        "Nueva sección Uso: quién entra en la app de cada cliente, qué usa y dónde se atasca."
+      ]
+    },
     {
       "v": "5.25-1.22.1",
       "fecha": "18/11/2026",

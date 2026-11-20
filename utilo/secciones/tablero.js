@@ -397,7 +397,7 @@
   /** La acción de GitHub de un botón, con las opciones ya puestas (boton-*.yml): solo hay que pulsar «Run workflow». '' para
    *  los de «A mano». Igual que accionDe de herramientas/entregar.js (probar-plataforma.js comprueba que dan lo mismo). */
   function enlaceBoton(b) {
-    var m = /^Publicar · ([a-z0-9_-]+)\/([a-z0-9_-]+)$/.exec(b), a = m ? 'boton-publicar-' + m[1] + '-' + m[2] + '.yml' : '';
+    var m = /^Publicar · ([a-z0-9_-]+)(?:\/([a-z0-9_-]+))?$/.exec(b), a = m ? 'boton-publicar-' + m[1] + (m[2] ? '-' + m[2] : '') + '.yml' : ''; // T0631: «Publicar · telas»
     if (!a && (m = /^Supabase · ([a-z0-9_-]+) · Producción$/.exec(b))) a = 'boton-supabase-' + m[1] + '.yml';
     return a ? 'https://github.com/UTILO-DIGITAL/utilo-apps/actions/workflows/' + a : '';
   }

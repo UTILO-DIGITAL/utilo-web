@@ -32,7 +32,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Tareas",
    "icono": "<rect x=\"3\" y=\"4\" width=\"5\" height=\"16\" rx=\"1\"/><rect x=\"10\" y=\"4\" width=\"5\" height=\"11\" rx=\"1\"/><rect x=\"17\" y=\"4\" width=\"4\" height=\"7\" rx=\"1\"/>",
    "web": "utilo/secciones/tablero.js",
-   "version": "c61eed98e2",
+   "version": "178f1a533e",
    "perfiles": "todos",
    "config": {
     "VISTA": "ocho",
@@ -102,6 +102,40 @@ window.NUCLEO_MONTAJE = {
     ],
     "que": "por atender"
    }
+  },
+  {
+   "id": "USO",
+   "modulo": "uso",
+   "titulo": "Uso",
+   "icono": "<path d=\"M4 20V10\"/><path d=\"M10 20V4\"/><path d=\"M16 20v-7\"/><path d=\"M22 20H2\"/>",
+   "web": "utilo/secciones/uso.js",
+   "version": "d475154e0a",
+   "perfiles": [
+    "admin",
+    "responsable"
+   ],
+   "config": {
+    "NO_CUENTAN": [
+     "utilo.digital@gmail.com",
+     "javier.canela3@gmail.com"
+    ],
+    "SECCIONES": {
+     "telas": [
+      "Hoy",
+      "Seguimiento",
+      "Clientes",
+      "Prospección",
+      "Proveedores",
+      "Mis telas",
+      "Calcular precio",
+      "Economía"
+     ]
+    }
+   },
+   "api": [
+    "uso_apps",
+    "uso_de"
+   ]
   }
  ],
  "perfilEnMenu": false,
@@ -509,6 +543,10 @@ window.NUCLEO_MONTAJE = {
        "Cowork",
        "Claude Code"
       ]
+     },
+     {
+      "nombre": "ZONA",
+      "tipo": "texto"
      },
      {
       "nombre": "AUTONOMA",
@@ -983,6 +1021,10 @@ window.NUCLEO_MONTAJE = {
        "Cowork",
        "Claude Code"
       ]
+     },
+     {
+      "nombre": "ZONA",
+      "tipo": "texto"
      },
      {
       "nombre": "AUTONOMA",

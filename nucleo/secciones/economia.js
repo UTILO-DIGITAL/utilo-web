@@ -838,7 +838,7 @@
           if (si && b.parentNode.scrollWidth > b.parentNode.clientWidth) b.parentNode.scrollLeft = Math.max(0, b.offsetLeft - b.parentNode.offsetLeft - 16); // en el móvil, que se vea
         });
         el.querySelector('.eco-fab').hidden = S.tab !== 'MOVIMIENTOS'; // T0272: añadir un movimiento, solo desde Movimientos
-        el.querySelector('.eco-per').style.display = S.tab === 'VENTAS' ? 'none' : ''; // T0628: las ventas, desde el principio (no por periodo)
+        el.querySelector('.eco-per').style.display = S.tab === 'VENTAS' || S.tab === 'CAJA' ? 'none' : ''; // T0628: las ventas, desde el principio (no por periodo). T0679: Caja tampoco (sus saldos son de siempre): el año sale solo donde cuenta
         cont.classList.toggle('eco-con-fab', S.tab === 'MOVIMIENTOS'); // T0644: con sitio abajo para el botón
         var np = pendientes(d).filter(function (x) { return x.falta > 0; }).length + sinFactura(d, per).length, nb = el.querySelector('#eco-npend');
         if (nb) { nb.textContent = np; nb.hidden = !np; }
@@ -909,7 +909,7 @@
         // T0270: las cifras grandes y las pequeñas, juntas: en una pantalla ancha van en la misma fila.
         h += '<div class="eco-arriba"><div class="eco-kpis">' +
           '<div class="eco-kpi eco-grande"><b>Beneficio <span class="eco-pint">' + texto(nomPeriodo()) + '</span></b><span class="eco-val">' + eur0(r.resultado) + '</span>' +
-          '<span class="eco-sub">' + (pb || pi || pg ? 'Previsto ' + eur0(pb) + ' · ' + eur0(Math.abs(desv)) + (desv >= 0 ? ' mejor' : ' peor') + ' de lo previsto' : 'Sin presupuesto') + '</span></div>' +
+          '<span class="eco-sub">' + (pb || pi || pg ? 'Previsto: ' + eur0(pb) + '. Vas ' + eur0(Math.abs(desv)) + (desv >= 0 ? ' mejor' : ' peor') : 'Sin presupuesto') + '</span></div>' +
           '<div class="eco-kpi"><b>Ingresos</b><span class="eco-val">' + eur0(r.ingresos.base) + '</span><span class="eco-sub">' + (pi ? 'de ' + eur0(pi) + ' previstos' : 'sin IVA') + '</span></div>' +
           '<div class="eco-kpi"><b>Gastos</b><span class="eco-val">' + eur0(r.gastos.base) + '</span><span class="eco-sub">' + (pg ? 'de ' + eur0(pg) + ' previstos' : 'sin IVA') + '</span></div></div>';
         var pend = pendientes(d).filter(function (x) { return x.falta > 0; }), sf = sinFactura(d, per, S.des);
@@ -973,7 +973,7 @@
         // en una línea que se quita. Así, en el móvil, el primer movimiento sale arriba (antes, a unos 650 px, tras 6 filtros).
         var puestos = filtrosMovPuestos(f, { cat: function (id) { return nombre('cat', id); }, cue: function (id) { return nombre('cue', id); } }), nf = puestos.length;
         var h = (f.desde ? '<button type="button" class="u-btn u-btn-texto eco-volver" data-accion="volver">‹ Volver a ' + texto(PESTANAS[f.desde] || 'Resumen') + '</button>' : '') +
-          '<div class="li-barra eco-fbarra eco-fmov"><div class="li-buscar"><label class="u-oculto" for="eco-q">Buscar</label><input type="search" id="eco-q" value="' + texto(f.q) + '" placeholder="Buscar: concepto, con quién…" autocomplete="off"></div>' +
+          '<div class="li-barra eco-fbarra eco-fmov"><div class="li-buscar"><label class="u-oculto" for="eco-q">Buscar</label><input type="search" id="eco-q" value="' + texto(f.q) + '" placeholder="Buscar en movimientos" autocomplete="off"></div>' +
           '<button type="button" class="u-btn li-filtrar" data-accion="filtrarmov" aria-haspopup="dialog"' + (nf ? ' aria-pressed="true"' : '') + '>' + ICONO_FILTRO + 'Filtrar' +
           (nf ? ' <span class="li-nf" aria-label="' + nf + (nf === 1 ? ' puesto' : ' puestos') + '">' + nf + '</span>' : '') + '</button></div>' +
           (nf ? '<p class="u-nota">Solo ' + texto(puestos.join(', ')) + ' · <button type="button" class="u-btn u-btn-texto" data-accion="quitarfmov">Quitar filtros</button></p>' : '') +
@@ -1091,7 +1091,7 @@
         // T0673 · En el móvil, una tarjeta como Movimientos: sin la columna Archivo (el enlace, si lo hay, va debajo; «Sin archivo» lo cuenta la nota del final).
         return h + '<table class="u-tabla eco-tabla"><thead><tr><th>Factura</th><th class="u-solo-ancho">Archivo</th><th class="num">Total</th></tr></thead><tbody>' + fs.map(function (x) {
           return '<tr tabindex="0" data-fac="' + texto(x.ID) + '"><td class="u-tabla-t">' + texto(numFac(x)) + ' · ' + texto(nombre('ctr', x.ID_CONTRAPARTE)) + chip(x) +
-            '<div class="u-nota">' + [texto(fecha(x.FECHA)), x.TIPO === 'Emitida' ? 'Emitida<span class="u-solo-ancho"> (a un cliente)</span>' : x.TIPO === 'Ticket' ? 'Ticket' : 'Recibida<span class="u-solo-ancho"> (de un proveedor)</span>', texto(x.ESTADO || '')].filter(Boolean).join(' · ') + '</div>' +
+            '<div class="u-nota">' + [texto(fecha(x.FECHA)), x.TIPO === 'Emitida' ? 'Emitida<span class="u-solo-ancho"> (a un cliente)</span>' : x.TIPO === 'Ticket' ? 'Ticket' : 'Recibida<span class="u-solo-ancho"> (de un proveedor)</span>', texto(x.TIPO === 'Emitida' && x.ESTADO === 'Pagada' ? 'Cobrada' : (x.ESTADO || ''))].filter(Boolean).join(' · ') /* T0679: una emitida pagada se dice «Cobrada» (se guarda Pagada) */ + '</div>' +
             (x.ARCHIVO_URL ? '<div class="u-nota u-solo-movil">' + enlaceDrive(x) + '</div>' : '') + '</td>' +
             '<td class="u-solo-ancho">' + enlaceDrive(x) + '</td>' +
             '<td class="num"><span class="u-cifra' + (x.ESTADO === 'Anulada' ? ' eco-anulada' : '') + '">' + eur(importe(x).total) + '</span></td></tr>';
@@ -1295,10 +1295,10 @@
           campo('Fecha', '<input type="date" id="m-FECHA" value="' + texto(v.FECHA) + '">') +
           (tienePer ? campo(texto(nomPer), '<select id="m-PER">' + opciones(lista.map(function (p) { return [p.id, p.nombre]; }), v[P], 'Elige') + '</select>') : '') +
           campo('Categoría', '<select id="m-ID_CATEGORIA"></select>', 'eco-no-interno') +
-          (tieneDes ? campo(texto(nomDes), '<select id="m-DES"></select>', 'eco-no-interno') : '') +
+          (tieneDes ? campo(texto(nomDes), '<select id="m-DES" data-elegir="venta"></select>', 'eco-no-interno') : '') +
           campo('<span id="m-cue-et">Cuenta</span>', '<select id="m-ID_CUENTA">' + opciones(cuentas, v.ID_CUENTA, 'Elige la cuenta') + '</select>') +
           campo('A la cuenta', '<select id="m-ID_CUENTA_DESTINO">' + opciones(cuentas, v.ID_CUENTA_DESTINO, 'Elige a dónde va') + '</select>', 'eco-interno') +
-          campo('<span id="m-ctr-et">Quién paga o cobra</span>', '<select id="m-ID_CONTRAPARTE">' + opcContrapartes(v.ID_CONTRAPARTE) + '</select>', 'eco-no-interno') +
+          campo('<span id="m-ctr-et">Quién paga o cobra</span>', '<select id="m-ID_CONTRAPARTE" data-elegir="contraparte">' + opcContrapartes(v.ID_CONTRAPARTE) + '</select>', 'eco-no-interno') +
           (altaCtr.length ? '<div class="u-ancho eco-no-interno"><button type="button" class="u-btn u-btn-texto" id="m-ctr-nueva">+ Nueva (no está en la lista)</button>' +
             '<div class="u-campos" id="m-ctr-alta" hidden>' + campo('Nombre', '<input type="text" id="m-ctr-nom" maxlength="120" autocomplete="off">') +
             campo('Es', '<select id="m-ctr-tipo">' + opciones(altaCtr.map(function (x) { return [x, x]; }), altaCtr[0]) + '</select>') +
