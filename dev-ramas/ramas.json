@@ -1233,9 +1233,9 @@
    ]
   },
   "utilo": {
-   "rama": "T0664-dependencia-al-fusionar",
-   "commit": "4299efb3",
-   "fecha": "2026-11-20T12:03:55.025Z",
+   "rama": "main y las ramas abiertas",
+   "commit": "f6436b35",
+   "fecha": "2026-11-20T12:10:20.283Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
