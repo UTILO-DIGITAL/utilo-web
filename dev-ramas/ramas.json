@@ -961,10 +961,10 @@
    "tarea": "T0703",
    "titulo": "Qué es un cliente en la app de Marta",
    "pr": 388,
-   "commit": "16dd20db",
-   "ultimo": "T0703: Qué es un cliente en la app de Marta: desde la primera reunión, y la lista a mano",
+   "commit": "6ebfbeb1",
+   "ultimo": "T0703: Solo el CLAUDE.md de Telas; las descripciones de FASES y MARCAS, en T0706",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T14:35:19.769Z",
+   "fecha": "2026-11-20T14:40:09.884Z",
    "toca": [
     "telas"
    ],
