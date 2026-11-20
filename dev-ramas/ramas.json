@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "939d3177",
-   "ultimo": "Merge pull request #370 from UTILO-DIGITAL/T0687-calcular-precio-desde-ficha",
+   "commit": "5c5da325",
+   "ultimo": "Merge pull request #373 from UTILO-DIGITAL/T0686-catalogo-para-marcas",
    "quien": "",
-   "fecha": "2026-11-20T09:42:26.446Z",
+   "fecha": "2026-11-20T10:01:14.943Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -186,6 +186,21 @@
       "web/kanban4/tablas.js",
       "web/nucleo/elegir.js",
       "web/nucleo/nucleo.js",
+      "web/telas/marca.css"
+     ],
+     "motor": true,
+     "local": true,
+     "cambia": true
+    },
+    {
+     "ruta": "dev/telas/catalogo/",
+     "nombre": "Catálogo para marcas (Excel de prueba)",
+     "iniciativa": "telas",
+     "proyecto": "",
+     "carga": [
+      "web/kanban4/google.js",
+      "web/telas/catalogo/catalogo.css",
+      "web/telas/catalogo/catalogo.js",
       "web/telas/marca.css"
      ],
      "motor": true,
