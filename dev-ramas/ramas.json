@@ -1983,7 +1983,7 @@
    "commit": "1b4a8ac7",
    "ultimo": "T0695: Las «API DEV» de DEV-2 y DEV-3",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T08:53:26.796Z",
+   "fecha": "2026-11-20T08:53:32.420Z",
    "toca": [],
    "comun": true,
    "paginas": [
@@ -2164,6 +2164,7 @@
       "web/nucleo/nucleo.js",
       "web/telas/marca.css"
      ],
+     "motor": true,
      "local": true,
      "cambia": true
     }
