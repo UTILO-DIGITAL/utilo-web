@@ -923,10 +923,10 @@
    "tarea": "T0685",
    "titulo": "Buscar en toda la app de Marta, con la lupa del menú o de la cabecera en el móvil",
    "pr": 384,
-   "commit": "3be5da5c",
-   "ultimo": "T0685: Buscar en toda la app: la lupa del menú (⌘K) y de la cabecera en el móvil",
+   "commit": "dfeae6a8",
+   "ultimo": "Merge remote-tracking branch 'origin/main' into T0685-buscar-en-toda-la-app",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T13:01:35.407Z",
+   "fecha": "2026-11-20T13:05:27.405Z",
    "toca": [
     "telas"
    ],
