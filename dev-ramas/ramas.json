@@ -1057,6 +1057,15 @@
    "quien": "Javi Canela",
    "rama": "T0686-catalogo-para-marcas",
    "carpeta": "T0686-catalogo-para-marcas"
+  },
+  "DEV-2": {
+   "cliente": "telas",
+   "modo": "ejemplo",
+   "commit": "575860c1+cambios",
+   "subido": "20/11/26, 20:18",
+   "quien": "Javi Canela",
+   "rama": "T0716-app-como-lo-bueno",
+   "carpeta": "T0716-app-como-lo-bueno"
   }
  }
 }
