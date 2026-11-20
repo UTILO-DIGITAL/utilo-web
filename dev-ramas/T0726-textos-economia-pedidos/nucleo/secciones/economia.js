@@ -935,6 +935,11 @@
   function facturaCerrada(f) {
     return !!(f && f.TIPO === 'Emitida' && (String(f.ARCHIVO_URL || '').trim() || String(f.ESTADO || '') !== 'Pendiente'));
   }
+  /** T0741 · ¿Puede sacar ya su PDF? Una emitida guardada sin PDF que no está anulada: también cobrada (sacarlo no la
+   * cambia, solo la guarda en Drive con lo que ya tiene). Con PDF, anulada, recibida o sin guardar, no. */
+  function puedeSacarPdf(f) {
+    return !!(f && f.TIPO === 'Emitida' && !String(f.ARCHIVO_URL || '').trim() && String(f.ESTADO || '') !== 'Anulada');
+  }
   /** T0725 (R62) · Lo que le falta a una línea con unidad y sin cantidad («Faltan los metros.»), o ''. Sin unidad (el envío), nada. */
   function faltaCantidad(l) {
     if (!l || !String(l.CONCEPTO || '').trim() || !String(l.UNIDAD || '').trim()) return '';
@@ -964,7 +969,7 @@
     return ('Ticket · ' + (c || fecha(fechaIso))).slice(0, 40).trim();
   }
 
-  var CALC = { facturaDeVenta: facturaDeVenta, ventasSinFactura: ventasSinFactura, lineaDeVenta: lineaDeVenta, facturaDelCobro: facturaDelCobro, numeroTicket: numeroTicket, facturaCerrada: facturaCerrada, faltaCantidad: faltaCantidad, ultimaEmitida: ultimaEmitida, fechaEmitidaMal: fechaEmitidaMal,
+  var CALC = { facturaDeVenta: facturaDeVenta, ventasSinFactura: ventasSinFactura, lineaDeVenta: lineaDeVenta, facturaDelCobro: facturaDelCobro, numeroTicket: numeroTicket, facturaCerrada: facturaCerrada, puedeSacarPdf: puedeSacarPdf, faltaCantidad: faltaCantidad, ultimaEmitida: ultimaEmitida, fechaEmitidaMal: fechaEmitidaMal,
     filtrosMovPuestos: filtrosMovPuestos, cajaPartes: cajaPartes, clientesFactura: clientesFactura, direccionCliente: direccionCliente, categoriaUnica: categoriaUnica, cts: cts, pct: pct, tipoIva: tipoIva, opciones: opciones, opcionesConValor: opcionesConValor, importe: importe, baseDeTotal: baseDeTotal, eur: eur, eur0: eur0, fecha: fecha, periodos: periodos, periodoActual: periodoActual,
     anteriores: anteriores, movDe: movDe, facDe: facDe, preDe: preDe, resumen: resumen, saldos: saldos, cuenta: cuenta, pendientes: pendientes,
     sinFactura: sinFactura, presupuesto: presupuesto, grupos: grupos, estadoLinea: estadoLinea, avisos: avisos, cruzados: cruzados,
@@ -1975,7 +1980,7 @@
         var html = '<h2 id="eco-vt">' + (f ? 'Factura ' + texto(numFac(f)) : deVenta ? 'Factura a ' + texto(nombre('ctr', v.ID_CONTRAPARTE) || 'la marca') : movId ? (v.TIPO === 'Emitida' ? 'Hacer la factura' : 'Añadir su factura') : 'Añadir factura') + '</h2>' +
           (deVenta ? '<p class="u-nota">' + V('{Del} {venta}') + ' «' + texto(deVenta.NOMBRE || deVenta.ID) + '»: revisa lo que se vende y el precio. Será la siguiente de la serie ' + texto(String(cfg.SERIE_EMITIDAS || '')) + ', con fecha de hoy.</p>' : '') +
           // T0627: en una emitida por líneas, arriba, su PDF guardado (el que se manda al cliente) o que aún no tiene.
-          (f && LINEAS && f.TIPO === 'Emitida' ? '<p>' + (f.ARCHIVO_URL ? enlaceDrive(f) : '<span class="u-nota">Todavía sin PDF' + (pdf ? ': «Guardar y sacar el PDF» lo hace.' : '.') + '</span>') + '</p>'
+          (f && LINEAS && f.TIPO === 'Emitida' ? '<p>' + (f.ARCHIVO_URL ? enlaceDrive(f) : '<span class="u-nota">Todavía sin PDF' + (pdf && puedeSacarPdf(f) ? ': «Guardar y sacar el PDF» lo hace.' : '.') + '</span>') + '</p>'
             : f && f.ARCHIVO_URL ? '<p>' + enlaceDrive(f) + '</p>' : '') +
           (cerrada ? '<p class="u-nota" id="f-cerrada">' + (String(f.ARCHIVO_URL || '').trim() ? 'Ya tiene su PDF' : f.ESTADO === 'Anulada' ? 'Está anulada' : 'Ya está cobrada') +
             ': solo se cambian el estado y las notas. La fecha, el cliente, lo que se vende y el IVA se quedan como están.</p>' : '') +
@@ -2013,7 +2018,7 @@
           // T0689 · Una emitida nueva con carpeta para el PDF: un solo botón, que la guarda, la numera y saca su PDF.
           (pdf && !f ? '<button type="button" class="u-btn u-btn-accion" id="f-hacer" hidden>Hacer la factura y el PDF</button>' : '') +
           '<button type="button" class="u-btn u-btn-accion" id="f-guardar">Guardar factura</button>' +
-          (pdf && f && !cerrada ? '<button type="button" class="u-btn" id="f-pdf" hidden>Guardar y sacar el PDF</button>' : '') +
+          (pdf && puedeSacarPdf(f) ? '<button type="button" class="u-btn" id="f-pdf" hidden>Guardar y sacar el PDF</button>' : '') +
           (f && f.ESTADO === 'Pendiente' ? '<button type="button" class="u-btn" id="f-apuntar">' + (f.TIPO === 'Emitida' ? 'Apuntar el cobro' : 'Apuntar el pago') + '</button>' : '') +
           (LINEAS ? '<button type="button" class="u-btn u-btn-texto" id="f-ver" hidden title="Cómo queda con lo que hay ahora en pantalla, sin guardar">Vista previa</button>' : '') +
           '<button type="button" class="u-btn u-btn-texto" data-cerrar>Cancelar</button></div>';

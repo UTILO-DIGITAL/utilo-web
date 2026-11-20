@@ -1246,12 +1246,12 @@
   },
   "T0726-textos-economia-pedidos": {
    "tarea": "T0726",
-   "titulo": "Economía y Pedidos hablan claro: siempre «pedido», dos totales, píldoras, «Ver el PDF», moneda en los gastos y la factura en tres viajes",
-   "pr": null,
-   "commit": "131e8b56",
-   "ultimo": "T0726: Economía y Pedidos hablan claro: siempre «pedido», dos totales, píldoras, «Ver el PDF», moneda en los gastos y la factura en tres viajes",
+   "titulo": "Economía y Pedidos, más claros: siempre «pedido», dos totales, gastos en rupias y la factura más rápida",
+   "pr": 414,
+   "commit": "ee58bc9b",
+   "ultimo": "T0726: Al día con main (T0741, T0719)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T23:47:15.032Z",
+   "fecha": "2026-11-20T23:55:36.197Z",
    "toca": [
     "telas"
    ],
@@ -1524,7 +1524,8 @@
      "20261120083735_zona_tablas.sql",
      "20261120083736_zona.sql",
      "20261120115014_dependencia_en_main_tablas.sql",
-     "20261120115015_dependencia_en_main.sql"
+     "20261120115015_dependencia_en_main.sql",
+     "20261120230000_vigilar_tablas.sql"
     ]
    },
    "rama": "T0726-textos-economia-pedidos"

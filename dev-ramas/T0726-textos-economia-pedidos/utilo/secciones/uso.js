@@ -9,6 +9,8 @@
  *   esos días entró y una frase con el aparato de siempre y lo que suele durar una visita.
  * - Qué usa: las secciones por días en que se abrieron y, si la configuración trae el menú de esa app (SECCIONES), las que
  *   nunca se han abierto.
+ * - Qué cambia (T0719): por sección, cuántos cambios en sus tablas desde la app y desde Claude (cada línea nueva de sus LOG,
+ *   que apunta herramientas/vigilar-tablas.js como eventos «cambio»). Si Marta solo trabaja desde Claude, sale igual.
  * - Dónde se atasca: los avisos en rojo y los errores, juntos por texto (cuántas veces, en cuántos días, la última) y las
  *   esperas largas (cuántas, la más larga y la mediana).
  * - Día a día: cada visita (de qué hora a qué hora, aparato, avisos y errores y la ruta de secciones); un día sin visitas
@@ -234,6 +236,26 @@
   }
 
   /**
+   * T0719 · Lo que se cambia en las tablas de la app, por sección: los eventos «cambio» (cada línea nueva de sus LOG, que
+   * apunta herramientas/vigilar-tablas.js), desde la App o desde Claude. { lista: [{ seccion, app, claude }] (lo más
+   * cambiado primero), app, claude }.
+   */
+  function cambios(ev) {
+    var por = {}, orden = [], t = { app: 0, claude: 0 };
+    ev.forEach(function (e) {
+      if (e.tipo !== 'cambio') return;
+      var k = e.seccion || 'Otras', x = por[k];
+      if (!x) { x = por[k] = { seccion: k, app: 0, claude: 0 }; orden.push(x); }
+      if (e.que === 'Claude') { x.claude++; t.claude++; } else { x.app++; t.app++; }
+    });
+    t.lista = orden.sort(function (a, b) { return (b.app + b.claude) - (a.app + a.claude) || a.seccion.localeCompare(b.seccion); });
+    return t;
+  }
+  function cuantosCambios(x) {
+    return [x.app ? uno(x.app, 'desde la app', 'desde la app') : '', x.claude ? uno(x.claude, 'desde Claude', 'desde Claude') : ''].filter(Boolean).join(' · ');
+  }
+
+  /**
    * Todo lo de una app para pintar o resumir: datos = lo que da uso_de(); o = { noCuentan, menu (los títulos de su menú) }.
    * ahora: la hora de referencia (ms).
    */
@@ -241,10 +263,11 @@
     o = o || {};
     datos = datos || {};
     var n = Math.max(1, Math.min(90, +datos.dias || 14));
-    var ev = filtrar(datos.eventos, o.noCuentan).filter(function (e) { return e.t > ahora - n * DIA - DIA; });
+    var todo = filtrar(datos.eventos, o.noCuentan).filter(function (e) { return e.t > ahora - n * DIA - DIA; });
+    var ev = todo.filter(function (e) { return e.tipo !== 'cambio'; }); // T0719: los cambios de las tablas no son visitas
     return {
       app: datos.app || '', nombre: datos.nombre || datos.app || '', desde: datos.desde || '', dias: n, ahora: ahora,
-      vacio: !ev.length, personas: personas(ev, ahora, n), secciones: secciones(ev, n, o.menu), tropiezos: tropiezos(ev), diaADia: diaADia(ev, ahora)
+      vacio: !todo.length, sinVisitas: !ev.length, cambios: cambios(todo), personas: personas(ev, ahora, n), secciones: secciones(ev, n, o.menu), tropiezos: tropiezos(ev), diaADia: diaADia(ev, ahora)
     };
   }
 
@@ -278,6 +301,12 @@
     L.push(md ? '## Uso de ' + r.nombre + ' · los últimos ' + r.dias + ' días' : 'Uso de ' + r.nombre + ' · los últimos ' + r.dias + ' días');
     L.push('');
     if (r.vacio) { L.push('Aún no ha entrado nadie' + (r.desde ? ' desde el ' + fechaEs(r.desde) : '') + '.'); return L.join('\n'); }
+    var qc = function () {
+      L.push(h('Qué cambia'));
+      r.cambios.lista.forEach(function (x) { L.push('- ' + x.seccion + ': ' + cuantosCambios(x)); });
+      if (!r.cambios.lista.length) L.push('- Nada cambiado en sus tablas.');
+    };
+    if (r.sinVisitas) { L.push('Aún no ha entrado nadie en la app' + (r.desde ? ' desde el ' + fechaEs(r.desde) : '') + '.', ''); qc(); return L.join('\n'); }
     var s = senales(r);
     L.push(h('Señales'));
     (s.length ? s : ['Nada que destacar.']).forEach(function (x) { L.push('- ' + x); });
@@ -291,6 +320,8 @@
     r.secciones.usadas.forEach(function (x) { L.push('- ' + x.titulo + ': ' + x.cuanto + ' (' + uno(x.veces, 'vez', 'veces') + ')'); });
     if (!r.secciones.usadas.length) L.push('- Ninguna sección abierta.');
     if (r.secciones.nunca && r.secciones.nunca.length) L.push('- ' + b('Nunca abiertas') + ': ' + lista(r.secciones.nunca) + '.');
+    L.push('');
+    qc();
     L.push('');
     L.push(h('Dónde se atasca'));
     r.tropiezos.lista.forEach(function (t) {
@@ -333,7 +364,7 @@
     sinFuncion: sinFuncion, falloEnPalabras: falloEnPalabras, nombres: nombres,
     diaDe: diaDe, diasHasta: diasHasta, mediana: mediana, duracion: duracion, segundos: segundos, haceCuanto: haceCuanto, nombreDia: nombreDia,
     filtrar: filtrar, visitas: visitas, personas: personas, secciones: secciones, tropiezos: tropiezos, diaADia: diaADia,
-    resumen: resumen, senales: senales, informe: informe
+    resumen: resumen, senales: senales, informe: informe, cambios: cambios
   };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
@@ -366,6 +397,8 @@
     '.us-barra{height:12px;background:var(--color-linea);border-radius:6px;overflow:hidden}',
     '.us-barra i{display:block;height:100%;background:var(--color-principal);border-radius:6px}',
     '.us-barras .c{color:var(--color-suave);font-size:.88rem}',
+    '.us-dos{display:flex}.us-dos i{border-radius:0}.us-dos i:first-child{border-radius:6px 0 0 6px}.us-dos i:last-child{border-radius:0 6px 6px 0}',
+    '.us-barra i.cl,.us-ley-cl{background:var(--color-suave)}.us-ley-cl{display:inline-block;width:10px;height:10px;border-radius:3px;vertical-align:middle}',
     '.us-nunca{margin:14px 0 0;padding:10px 12px;background:var(--color-bloque);border-radius:var(--radio)}',
     '.us-tr{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}',
     '.us-tr li{display:grid;grid-template-columns:6px minmax(0,1fr);gap:12px}',
@@ -437,6 +470,13 @@
         }).join('') + '</div>' : '<p class="us-vacio">No ha abierto ninguna sección.</p>') +
           (r.secciones.nunca && r.secciones.nunca.length ? '<p class="us-nunca"><b>Nunca abiertas:</b> ' + texto(lista(r.secciones.nunca)) + '.</p>' : '') + '</section>';
       }
+      function bloqueCambios(r) {
+        var c = r.cambios, max = c.lista.length ? c.lista[0].app + c.lista[0].claude : 1;
+        return '<section class="us-b"><h2>Qué cambia</h2>' + (c.lista.length ? '<div class="us-barras">' + c.lista.map(function (x) {
+          return '<span class="n">' + texto(x.seccion) + '</span><span class="us-barra us-dos"><i style="width:' + Math.round(x.app / max * 100) + '%"></i>' +
+            '<i class="cl" style="width:' + Math.round(x.claude / max * 100) + '%"></i></span><span class="c">' + texto(cuantosCambios(x)) + '</span>';
+        }).join('') + '</div>' + (c.claude ? '<p class="us-nunca"><span class="us-ley-cl"></span> Lo hecho desde Claude.</p>' : '') : '<p class="us-vacio">Nada cambiado en sus tablas.</p>') + '</section>';
+      }
       function bloqueTropiezos(r) {
         var t = r.tropiezos, e = t.esperas;
         var li = t.lista.map(function (x) {
@@ -478,7 +518,11 @@
           $cont.innerHTML = '<section class="us-b"><p class="us-vacio">Aún no ha entrado nadie' + (r.desde ? ' desde el ' + texto(fechaEs(r.desde)) : '') + '.</p></section>';
           return;
         }
-        $cont.innerHTML = bloquePersonas(r) + bloqueSecciones(r) + bloqueTropiezos(r) + bloqueDias(r) +
+        if (r.sinVisitas) {
+          $cont.innerHTML = '<section class="us-b"><p class="us-vacio">Aún no ha entrado nadie en la app' + (r.desde ? ' desde el ' + texto(fechaEs(r.desde)) : '') + '.</p></section>' + bloqueCambios(r);
+          return;
+        }
+        $cont.innerHTML = bloquePersonas(r) + bloqueSecciones(r) + bloqueCambios(r) + bloqueTropiezos(r) + bloqueDias(r) +
           '<p class="us-nota">' + texto('No cuentan tus entradas con las cuentas de Utilo ni lo que veas «como» otra persona. ' + desde) + '</p>';
       }
 
