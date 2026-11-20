@@ -1049,5 +1049,14 @@
   "sesion": "sb_utilo-plataforma_prod",
   "ficha": "../utilo/plataforma/?s=tablero&t="
  },
- "huecos": {}
+ "huecos": {
+  "DEV-1": {
+   "cliente": "telas",
+   "commit": "e773849c",
+   "subido": "20/11/26, 23:14",
+   "quien": "Javi Canela",
+   "rama": "T0721-telas-permisos-tablas",
+   "carpeta": "T0721-telas-permisos-tablas"
+  }
+ }
 }
