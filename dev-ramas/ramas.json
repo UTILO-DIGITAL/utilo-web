@@ -1244,10 +1244,10 @@
    "tarea": "T0723",
    "titulo": "El iPhone y el iPad se manejan como una app de Apple",
    "pr": 405,
-   "commit": "f2d670be",
-   "ultimo": "T0723: Gestos del iPhone y del iPad y detalles de estilo",
+   "commit": "f6af7d5a",
+   "ultimo": "T0723: Al día con main (T0721)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T22:26:26.260Z",
+   "fecha": "2026-11-20T22:29:25.488Z",
    "toca": [
     "telas"
    ],
