@@ -919,12 +919,12 @@
   },
   "T0697-partir-archivos": {
    "tarea": "T0697",
-   "titulo": "Cada sección, tabla de ejemplo, prueba y paso al publicar de Telas, en su archivo",
-   "pr": null,
+   "titulo": "Cada sección, tabla de ejemplo y paso al publicar de Telas, en su archivo (sin choques entre tareas)",
+   "pr": 379,
    "commit": "237a3998",
    "ultimo": "T0697: Cada sección, tabla de ejemplo, prueba y paso al publicar de Telas, en su archivo",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T10:47:14.196Z",
+   "fecha": "2026-11-20T10:52:43.072Z",
    "toca": [
     "telas"
    ],
