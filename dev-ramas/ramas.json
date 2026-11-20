@@ -1912,6 +1912,15 @@
    "quien": "Javi Canela",
    "rama": "T0686-catalogo-para-marcas",
    "carpeta": "T0686-catalogo-para-marcas"
+  },
+  "DEV-2": {
+   "cliente": "telas",
+   "modo": "ejemplo",
+   "commit": "ffc9e331",
+   "subido": "20/11/26, 16:08",
+   "quien": "Javi Canela",
+   "rama": "T0708-telas-por-color-proveedores",
+   "carpeta": "T0708-telas-por-color-proveedores"
   }
  }
 }
