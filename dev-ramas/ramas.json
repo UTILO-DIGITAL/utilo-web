@@ -2082,15 +2082,6 @@
    "quien": "Javi Canela",
    "rama": "T0695-huecos-dev",
    "carpeta": "T0695-huecos-dev"
-  },
-  "DEV-3": {
-   "cliente": "telas",
-   "modo": "ejemplo",
-   "commit": "1b4a8ac7",
-   "subido": "20/11/26, 9:53",
-   "quien": "Javi Canela",
-   "rama": "T0695-prueba-tercera",
-   "carpeta": "T0695-prueba-tercera"
   }
  }
 }
