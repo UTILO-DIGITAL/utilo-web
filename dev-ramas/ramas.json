@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "be3a39e4",
-   "ultimo": "Merge pull request #375 from UTILO-DIGITAL/T0694-pruebas-en-paralelo",
+   "commit": "e7e5ebe1",
+   "ultimo": "Merge pull request #376 from UTILO-DIGITAL/T0696-avisar-solapes",
    "quien": "",
-   "fecha": "2026-11-20T08:24:48.778Z",
+   "fecha": "2026-11-20T09:01:25.170Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -258,7 +258,9 @@
      "20261112182957_plan_pruebas_tablas.sql",
      "20261112183000_plan_pruebas.sql",
      "20261112190000_avisos_prueba_diaria.sql",
-     "20261119200000_uso.sql"
+     "20261119200000_uso.sql",
+     "20261120083735_zona_tablas.sql",
+     "20261120083736_zona.sql"
     ]
    },
    "rama": "main"
