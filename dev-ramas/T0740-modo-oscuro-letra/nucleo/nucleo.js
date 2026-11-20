@@ -975,7 +975,7 @@
       (window.UG.avisos && !cred.como ? '<div class="n-avisos" id="n-avisos"></div>' : '') +
       (dentro.length ? '<div class="n-botones">' + dentro.map(function (s) {
         return '<a class="u-btn" href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '">' + texto(s.titulo) + '</a>';
-      }).join('') + '</div>' : '') + htmlPersonalizar() + '</div>' + htmlVersion();
+      }).join('') + '</div>' : '') + htmlPersonalizar() + '</div>' + htmlAspecto() + htmlVersion(); // T0740: Aspecto
   }
 
   function conCodigo() { return !!(window.UG.formas && window.UG.formas().indexOf('codigo') >= 0); }
