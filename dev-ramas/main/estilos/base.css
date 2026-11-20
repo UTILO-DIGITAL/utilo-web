@@ -3065,3 +3065,27 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
   .u .u-elegir-hoja { animation: u-elegir-sube .18s ease-out; }
   @keyframes u-elegir-sube { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
 }
+
+/* T0690 · Listas largas: ordenar tocando el título de la columna, «Ver más», lo hecho plegado y «Ver todo» en la ficha. */
+.u .u-tabla th .li-ord { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font: inherit; color: inherit;
+  border-radius: 4px; white-space: inherit; }
+.u .u-tabla th.num .li-ord { flex-direction: row-reverse; }
+.u .u-tabla th .li-ord:hover, .u .u-tabla th .li-ord-on { color: var(--color-texto); }
+.u .u-tabla th .li-ord:focus-visible { outline: 2px solid var(--color-accion); outline-offset: 2px; }
+.u .u-tabla th .li-ord-f { font-size: 11px; opacity: 0; transition: opacity .12s; }
+.u .u-tabla th .li-ord:hover .li-ord-f, .u .u-tabla th .li-ord:focus-visible .li-ord-f { opacity: .55; }
+.u .u-tabla th .li-ord-on .li-ord-f { opacity: 1; }
+.u .li-tabla .li-mas-f td { padding: 6px 14px; background: transparent; }
+.u .li-tarjetas > .li-mas-f, .u .li-gal-g > .li-mas-f { list-style: none; padding: var(--e1) 0; }
+.u .li-vermas, .u .li-plegar { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 var(--e2);
+  margin-left: calc(-1 * var(--e2)); border-radius: var(--radio); cursor: pointer; font: 600 14px/1.3 var(--fuente-texto); color: var(--color-enlace, var(--color-principal-oscuro)); }
+.u .li-vermas .u-nota { font-weight: 400; }
+.u .li-vermas:hover, .u .li-plegar:hover { background: color-mix(in srgb, var(--color-texto) 6%, transparent); }
+.u .li-vermas:focus-visible, .u .li-plegar:focus-visible { outline: 2px solid var(--color-accion); outline-offset: 1px; }
+.u .li-plegar { color: var(--color-suave); }
+.u .li-plegar .u-cifra { font-weight: 400; }
+.u .li-plegar .li-flecha { width: 16px; height: 16px; transition: transform .15s; }
+.u .li-plegar[aria-expanded="true"] .li-flecha { transform: rotate(90deg); }
+.u .li-col-l > .li-mas-f { padding: var(--e1); }
+.u .li-vertodo { margin-top: var(--e1); }
+@media (max-width: 639px) { .u .li-vermas, .u .li-plegar { min-height: 44px; } }
