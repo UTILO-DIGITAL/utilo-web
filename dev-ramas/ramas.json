@@ -1532,11 +1532,11 @@
   "T0729-ajustes-marta": {
    "tarea": "T0729",
    "titulo": "Marta cambia en Ajustes el cambio, el envío y sus listas",
-   "pr": null,
+   "pr": 410,
    "commit": "e371c7a6",
    "ultimo": "T0729: Marta cambia en Ajustes el cambio, el envío y sus listas",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T22:48:28.561Z",
+   "fecha": "2026-11-20T22:53:35.370Z",
    "toca": [
     "telas",
     "utilo"
