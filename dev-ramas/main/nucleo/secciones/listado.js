@@ -1091,7 +1091,7 @@
     return isNaN(a) || isNaN(b) ? null : [Math.min(a, b), Math.max(a, b)];
   }
   /** T0691 · Los valores de un campo con «varios» («Poliéster · Algodón» → ['Poliéster', 'Algodón']). */
-  function partes(v) { return String(v == null ? '' : v).split(/\s*·\s*/).map(function (x) { return x.trim(); }).filter(Boolean); }
+  function partes(v) { return String(v == null ? '' : v).split(/\s*[·,]\s*/).map(function (x) { return x.trim(); }).filter(Boolean); }
   function valorDe(ap, c, f, valores) { var cp = campo(ap, c); return cp.calculo ? calcular(cp.calculo, f, valores) : f[c]; }
   /** Las columnas que se pueden filtrar en esta vista con estas filas: [{ campo, titulo, tipo: lista|rango|fecha, opciones, vacios, unidad }]. */
   function filtrables(ap, vista, filas, valores) {
