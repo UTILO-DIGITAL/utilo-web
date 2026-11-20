@@ -1172,14 +1172,12 @@
    "tarea": "T0691",
    "titulo": "Mis telas como muestrario de fotos, con filtros por cómo es cada tela y sus marcas en la ficha",
    "pr": 371,
-   "commit": "4f4c3118",
-   "ultimo": "T0691: Mis telas como muestrario de fotos, con filtros por cómo es cada tela y sus marcas en la ficha",
+   "commit": "ef6e7485",
+   "ultimo": "T0691: Trae main (huecos de DEV de T0695, elegir escribiendo de T0684); las telas de ejemplo de T0684, también con foto",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T05:55:40.156Z",
+   "fecha": "2026-11-20T09:26:25.947Z",
    "toca": [
-    "konamigas",
-    "telas",
-    "utilo"
+    "telas"
    ],
    "comun": true,
    "paginas": [
@@ -1356,9 +1354,11 @@
       "web/estilos/base.css",
       "web/kanban4/google.js",
       "web/kanban4/tablas.js",
+      "web/nucleo/elegir.js",
       "web/nucleo/nucleo.js",
       "web/telas/marca.css"
      ],
+     "motor": true,
      "local": true,
      "cambia": true
     }
@@ -1429,7 +1429,9 @@
      "20261112182957_plan_pruebas_tablas.sql",
      "20261112183000_plan_pruebas.sql",
      "20261112190000_avisos_prueba_diaria.sql",
-     "20261119200000_uso.sql"
+     "20261119200000_uso.sql",
+     "20261120083735_zona_tablas.sql",
+     "20261120083736_zona.sql"
     ]
    },
    "rama": "T0691-muestrario-telas"

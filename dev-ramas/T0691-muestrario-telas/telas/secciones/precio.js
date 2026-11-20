@@ -123,8 +123,8 @@
       el.innerHTML = '<p class="u-nota n-ayuda">Lo que te cuesta una tela y lo que le cobras a un cliente. No se guarda nada.</p>' +
         '<div class="pr-calc">' +
         '<section class="pr-caja u-campos" aria-label="Datos">' +
-          '<label class="u-campo"><span class="u-etiqueta">Para</span><select id="pr-marca"></select></label>' +
-          '<label class="u-campo"><span class="u-etiqueta">Tela</span><select id="pr-tela"></select></label>' +
+          '<label class="u-campo"><span class="u-etiqueta">Para</span><select id="pr-marca" data-elegir="marca"></select></label>' +
+          '<label class="u-campo"><span class="u-etiqueta">Tela</span><select id="pr-tela" data-elegir="tela"></select></label>' +
           '<div class="u-bloque pr-manual" id="pr-manual" hidden><div class="pr-dos">' +
             '<label class="u-campo"><span class="u-etiqueta">Coste del proveedor</span><span class="pr-ud"><input id="pr-mcoste" inputmode="decimal" autocomplete="off"><i id="pr-mud-t">₹/m</i></span></label>' +
             '<label class="u-campo"><span class="u-etiqueta">En</span><select id="pr-mud"><option value="inr">Rupias</option><option value="eur">Euros</option></select></label></div>' +
@@ -155,7 +155,7 @@
         $('pr-marca').value = S.marca;
         $('pr-tela').innerHTML = '<option value="">Elige una tela</option>' + telas(D).map(function (t) {
           return '<option value="' + texto(t.id) + '">' + texto(t.id + ' · ' + t.nombre) + (isNaN(t.inr) ? ' (falta el coste)' : '') + '</option>';
-        }).join('') + '<option value="otra">Otra: escribo el coste</option>';
+        }).join('') + '<option value="otra" data-siempre>Otra: escribo el coste</option>';
         $('pr-tela').value = S.tela;
         if (!S.envioTocado) { var e = ajustes(D).envio; $('pr-envio').value = isNaN(e) ? '' : cifra(e); }
       }
