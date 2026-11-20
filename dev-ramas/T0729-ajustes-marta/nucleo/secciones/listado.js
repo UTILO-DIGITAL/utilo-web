@@ -954,6 +954,7 @@
         if (cs) e.editar.concat(e.crear ? e.alta : [], e.elegir ? [e.elegir] : [], e.obligatorias).forEach(function (c) { hay(c, q + ' edita', r.tabla, cs); });
         if (e.crear && !e.elegir && !e.alta.length) errores.push(donde + q + ': «crear» necesita lo que se pide al añadir («alta» o «editar»).');
         if (r.elegir && !r.crear) errores.push(donde + q + ': «elegir» va con «crear».');
+        if (r.quitar != null && r.quitar !== true && r.quitar !== false && r.quitar !== 'admin') errores.push(donde + q + ': «quitar» es true o "admin" (solo quien administra).');
         if (e.crear && lista(r.filas).length < 2) errores.push(donde + q + ': «crear» lleva «filas» (cómo se llama cada una: ["persona de contacto", "personas de contacto"]), para «+ Añadir …».');
         if (e.id && cs) enPlantilla(e.id).filter(function (c) { return /^[A-Z0-9_]+$/.test(c); }).forEach(function (c) { hay(c, q + ': «id» usa', r.tabla, cs); });
       }
@@ -1896,17 +1897,19 @@
    * «elegir» (añadir eligiendo una fila de la tabla a la que apunta esa columna: la tela que le interesa), «quitar» (con
    * confirmación y Deshacer), «id» (la plantilla del código, si su tabla no tiene prefijo), «obligatorias» y «filas» (cómo
    * se llama cada una: «+ Añadir persona de contacto»). La columna que la une (campo) no se edita: se pone sola.
+   * T0728: «quitar»: "admin", solo quien administra (los precios propuestos a una marca: solo Marta); admin = si lo es quien ve.
    */
-  function relEdicion(r) {
+  function relEdicion(r, admin) {
     var ed = r.editar === true ? lista(r.columnas).filter(function (c) { return !esRuta(c); }) : lista(r.editar);
     ed = ed.filter(function (c, i) { return c !== r.campo && ed.indexOf(c) === i && !esRuta(c); });
     var crear = !!r.crear && !r.contiene, elegir = crear && r.elegir ? String(r.elegir) : '';
-    return { editar: r.contiene ? [] : ed, crear: crear, elegir: elegir, quitar: !!r.quitar && !r.contiene,
+    var quitar = (r.quitar === 'admin' ? !!admin : !!r.quitar) && !r.contiene;
+    return { editar: r.contiene ? [] : ed, crear: crear, elegir: elegir, quitar: quitar,
       alta: (lista(r.alta).length ? lista(r.alta) : ed).filter(function (c) { return c !== r.campo; }), obligatorias: lista(r.obligatorias),
       // La clave de su tabla (para cambiarla o quitarla): «claveTabla»; si no, ID cuando lleva a una sección (entonces «clave» es la
       // de la fila a la que lleva: la tela que le interesa) y, si no, su «clave» (NECESIDADES: ID_MARCA).
       filas: lista(r.filas).length >= 2 ? r.filas : ['fila', 'filas'], id: r.id || '', clave: r.claveTabla || (r.seccion ? 'ID' : r.clave || 'ID'),
-      algo: !r.contiene && (ed.length > 0 || !!r.crear || !!r.quitar) };
+      algo: !r.contiene && (ed.length > 0 || !!r.crear || quitar) };
   }
   /**
    * T0651 · La fila nueva de lo relacionado: lo escrito (sin lo vacío), la columna que la une (r.campo = el «con» de esta
@@ -2848,7 +2851,7 @@
           var cab = '<h3 class="li-fg-t">' + texto(r.titulo || r.tabla) + (r.datos ? '' : ' <span class="u-cifra">' + rs.length + '</span>') + '</h3>';
           var cuerpo;
           // T0651: lo de dentro que se edita, se añade o se quita desde la ficha (las personas de contacto de una marca).
-          var ri = a.relacionados.indexOf(r), e = relEdicion(r), conEd = e.algo && !r.tarjeta && !!T.actualizar;
+          var ri = a.relacionados.indexOf(r), e = relEdicion(r, YO.admin), conEd = e.algo && !r.tarjeta && !!T.actualizar;
           if (conEd) relAps[ri] = enriquecer(apartado({ TABLA: r.tabla, CLAVE: e.clave, CAMPOS: r.campos || {}, COLUMNAS: cols, _refs: a.refs }), D);
           var claveDe = function (x) { return (x.__crudo || x)[e.clave]; };
           if (!rs.length) cuerpo = '<p class="u-vacio">' + texto(r.vacio || 'Nada todavía.') + '</p>';
@@ -3142,7 +3145,7 @@
         }
         /** «+ Añadir …»: un formulario corto ahí mismo (o, con «elegir», un buscador de lo que se puede añadir). */
         function nuevaRel(b) {
-          var s = b.closest('[data-rel]'), ri = +s.getAttribute('data-rel'), r = a.relacionados[ri], ra = relAps[ri], e = relEdicion(r);
+          var s = b.closest('[data-rel]'), ri = +s.getAttribute('data-rel'), r = a.relacionados[ri], ra = relAps[ri], e = relEdicion(r, YO.admin);
           var existentes = function () { return filas(r.tabla).map(function (y) { return y[e.clave]; }); };
           var anadir = function (valores, nombre) {
             var q = altaRelacionada(r, crudo, valores, existentes(), a.prefijos);

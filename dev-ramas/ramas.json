@@ -1248,10 +1248,10 @@
    "tarea": "T0729",
    "titulo": "Marta cambia en Ajustes el cambio, el envío y sus listas",
    "pr": 410,
-   "commit": "e371c7a6",
-   "ultimo": "T0729: Marta cambia en Ajustes el cambio, el envío y sus listas",
+   "commit": "b16f2c4f",
+   "ultimo": "T0729: Al día con main (T0728, T0725, T0735, T0723)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T22:53:35.370Z",
+   "fecha": "2026-11-20T22:56:50.163Z",
    "toca": [
     "telas",
     "utilo"

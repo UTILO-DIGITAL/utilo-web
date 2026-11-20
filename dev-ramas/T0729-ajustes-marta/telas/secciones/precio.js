@@ -3,14 +3,14 @@
  *
  * La calculadora de Marta: lo que le cuesta una tela (de Mis telas o escribiendo el coste) con el envío y el precio para un
  * cliente, poniendo lo que quiere ganar o el precio, al lado de lo que ese cliente paga hoy (su Comparativa). Avisa si el
- * precio no cubre lo que le cuesta. Solo guarda, si Marta quiere, el precio propuesto a una marca (PROPUESTAS, T0687). Lo que le cuesta es el mismo cálculo que «Te cuesta puesta en España» de
- * Mis telas. T0657: lo que gana va en euros por metro, sin porcentajes ni mínimo (Marta, 19/11/2026: «Mi margen es precio de
+ * precio no cubre lo que le cuesta. Solo guarda, si Marta quiere, el precio propuesto a una marca (PROPUESTAS, T0687). Lo que le cuesta es el mismo cálculo que «Te cuesta con el envío» de
+ * Mis telas y que «Te cuesta» de la Comparativa de una marca (la prueba compara los tres, T0728). T0657: lo que gana va en euros por metro, sin porcentajes ni mínimo (Marta, 19/11/2026: «Mi margen es precio de
  * venta − (precio de coste + transporte). Por eso no quiero definir un %»).
  * T0659: junto a «Ganas», lo que suele ganar por metro con esa tela o esa marca, de sus facturas (solo para quien ve Economía).
  */
 (function () {
   'use strict';
-  var TABLAS = ['TELAS', 'DISENOS', 'TECNICAS', 'ESTADOS_TELA', 'AJUSTES', 'MARCAS', 'COMPARATIVA', 'COMPETIDORES', 'PROPUESTAS'];
+  var TABLAS = ['TELAS', 'DISENOS', 'TECNICAS', 'ESTADOS_TELA', 'AJUSTES', 'MARCAS', 'COMPARATIVA', 'COMPETIDORES', 'PROPUESTAS', 'NECESIDADES'];
 
   /* ======================= cálculo (también para las pruebas en node) ======================= */
 
@@ -46,15 +46,19 @@
     return (D.filas('TELAS') || []).filter(function (t) { return t.ID && nombre(D, 'ESTADOS_TELA', t.ID_ESTADO) !== 'Descartada'; }).map(function (t) {
       var d = D.fila('DISENOS', t.ID_DISENO) || {}, inr = aNum(t.COSTE_INR);
       if (isNaN(inr)) inr = aNum(d.COSTE_INR); // el del color si cuesta distinto; si no, el de su diseño (como Mis telas)
+      if (!(inr > 0)) inr = NaN; // T0728: un coste de 0 o menos es que falta (como el envío a 0, T0678)
       var tec = nombre(D, 'TECNICAS', d.ID_TECNICA);
       return { id: String(t.ID), nombre: [tec, t.COLOR].filter(Boolean).join(' · ') || String(t.ID), tec: tec, diseno: String(t.ID_DISENO || ''), inr: inr, ancho: aNum(d.ANCHO), gsm: aNum(d.GSM) };
     }).sort(function (a, b) { return a.id.localeCompare(b.id, 'es'); });
   }
-  /** Lo que cuesta en euros, sin envío: las rupias entre el cambio (redondeado a céntimos, como Mis telas) o los euros escritos. NaN si falta. */
+  /**
+   * Lo que cuesta en euros, sin envío: las rupias entre el cambio (redondeado a céntimos, como Mis telas) o los euros escritos.
+   * NaN si falta; T0728: también si es 0 o menos («falta el coste», como el envío a 0).
+   */
   function costeEur(t, rupias) {
     if (!t) return NaN;
-    if (!isNaN(t.eur)) return r2(t.eur);
-    if (isNaN(t.inr) || !(rupias > 0)) return NaN;
+    if (!isNaN(t.eur)) return t.eur > 0 ? r2(t.eur) : NaN;
+    if (!(t.inr > 0) || !(rupias > 0)) return NaN;
     return r2(t.inr / rupias);
   }
   /** El envío por metro: el escrito o, del pedido entero, repartido entre los metros. NaN si falta (también a 0: T0678). */
@@ -85,7 +89,8 @@
   /**
    * Todo lo que enseña la pantalla, de lo que hay escrito: s = { tela (la de la lista, con eur si es «otra»), envio, gana
    * (euros por metro) o precio y modo (el último que se ha escrito: 'gana' o 'precio') }, a = ajustes(D).
-   * → { coste (con envío), base (sin envío), envio, precio, gana (negativo: pierde), perdida }
+   * → { coste (con envío), base (sin envío), envio, precio, gana (negativo: pierde), perdida, imposible }
+   * T0728: un precio de 0 o menos no es un precio (un «Ganas» de −20 con un coste de 14,27): sin precio ni ganancia, e imposible.
    */
   function calcular(s, a) {
     var base = costeEur(s.tela, a.rupias), envio = envioMetro(s.envio), r = { base: base, envio: envio, coste: NaN, precio: NaN, gana: NaN };
@@ -99,6 +104,7 @@
       if (!isNaN(p)) { r.precio = r2(p); r.gana = ganaDe(r.coste, r.precio); }
     }
     if (isNaN(r.precio)) return r;
+    if (!(r.precio > 0)) { r.precio = NaN; r.gana = NaN; r.imposible = true; return r; }
     r.perdida = r.gana < 0;
     return r;
   }
@@ -106,16 +112,38 @@
   function ofrecer(su, coste) { var p = r2(su * 0.9); return p > coste ? p : NaN; }
 
   /**
-   * T0687 · Lo que Marta pega en WhatsApp: la tela, su ancho y peso y el precio, sin IVA y con el envío a España incluido (nunca
-   * un precio sin el envío). Nunca el proveedor, la referencia del proveedor ni lo que le cuesta.
+   * T0687 · Lo que Marta pega en WhatsApp: la tela, su ancho y peso y el precio, sin IVA y con el envío incluido (nunca un
+   * precio sin el envío; T0728: sin decir hasta dónde llega). Nunca el proveedor, la referencia del proveedor ni lo que le
+   * cuesta. Con «Otra», el nombre que ha escrito para el cliente (T0728: sin él, no se copia). T0728: con el envío del pedido,
+   * el precio vale para esos metros y lo dice («para un pedido de 120 m»). envio = { modo, metros } (lo de la pantalla).
    */
-  function whatsapp(t, precio) {
-    var l = [t.nombre + (t.id ? ' (' + t.id + ')' : '')], med = [];
+  function whatsapp(t, precio, envio) {
+    var l = [t.nombre + (t.id ? ' (' + t.id + ')' : '')], med = [], m = envio && envio.modo === 'pedido' ? aNum(envio.metros) : NaN;
     if (t.ancho > 0) med.push(cifra(t.ancho, 0) + ' cm de ancho');
     if (t.gsm > 0) med.push(cifra(t.gsm, 0) + ' g/m²');
     if (med.length) l.push(med.join(' · '));
-    l.push('Precio: ' + cifra(precio) + ' €/m + IVA, con el envío a España incluido.');
+    l.push('Precio: ' + cifra(precio) + ' €/m + IVA, con el envío incluido' + (m > 0 ? ', para un pedido de ' + cifra(m, m % 1 ? 2 : 0) + ' m' : '') + '.');
     return l.join('\n');
+  }
+  /** T0728 · Si se puede copiar para WhatsApp: con un precio de verdad y el nombre de la tela (el de «Otra», escrito). */
+  function copiable(t, r) { return !!t && !isNaN(r.precio) && !!String(t.nombre || '').trim(); }
+
+  /**
+   * T0728 · Lo que paga hoy la marca según «Qué buscan» (NECESIDADES.PAGAN_HOY, texto libre: «17–34», «unos 20 €/m»), para
+   * cuando no hay Comparativa: { texto, min, max } (min y max, NaN si el texto no trae números) o null si no lo ha apuntado.
+   */
+  function paganHoy(D, marca) {
+    if (!marca) return null;
+    var n = (D.filas('NECESIDADES') || []).filter(function (x) { return String(x.ID_MARCA) === String(marca); })[0];
+    var txt = n ? String(n.PAGAN_HOY == null ? '' : n.PAGAN_HOY).trim() : '';
+    if (!txt) return null;
+    var ns = (txt.match(/\d+(?:[.,]\d+)?/g) || []).map(aNum).filter(function (x) { return !isNaN(x); });
+    return { texto: txt, min: ns.length ? Math.min.apply(null, ns) : NaN, max: ns.length ? Math.max.apply(null, ns) : NaN };
+  }
+  /** T0728 · Tu precio frente a lo que paga según «Qué buscan»: 'debajo', 'dentro', 'encima' o '' (sin números o sin precio). */
+  function frenteA(p, precio) {
+    if (!p || isNaN(p.min) || isNaN(precio)) return '';
+    return precio < p.min ? 'debajo' : precio > p.max ? 'encima' : 'dentro';
   }
   /** T0687 · La fila de PROPUESTAS que guarda «Guardar en su ficha»: hace falta la marca, una tela de Mis telas y el precio. */
   function propuesta(marca, t, r, hoy) {
@@ -188,7 +216,7 @@
     return p && !isNaN(p.gana) ? p : null;
   }
 
-  var CALC = { vendido: vendido, sueles: sueles, SUELES: SUELES, whatsapp: whatsapp, propuesta: propuesta, aNum: aNum, cifra: cifra, ajustes: ajustes, telas: telas, costeEur: costeEur, envioMetro: envioMetro,
+  var CALC = { vendido: vendido, sueles: sueles, SUELES: SUELES, whatsapp: whatsapp, copiable: copiable, paganHoy: paganHoy, frenteA: frenteA, propuesta: propuesta, aNum: aNum, cifra: cifra, ajustes: ajustes, telas: telas, costeEur: costeEur, envioMetro: envioMetro,
     precioDe: precioDe, ganaDe: ganaDe, comparativa: comparativa, calcular: calcular, ofrecer: ofrecer };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
@@ -214,7 +242,9 @@
         '<section class="pr-caja u-campos" aria-label="Datos">' +
           '<label class="u-campo"><span class="u-etiqueta">Para</span><select id="pr-marca" data-elegir="marca"></select></label>' +
           '<label class="u-campo"><span class="u-etiqueta">Tela</span><select id="pr-tela" data-elegir="tela"></select></label>' +
-          '<div class="u-bloque pr-manual" id="pr-manual" hidden><p class="u-nota" id="pr-manual-t"></p><div class="pr-dos">' +
+          '<div class="u-bloque pr-manual" id="pr-manual" hidden><p class="u-nota" id="pr-manual-t"></p>' +
+            '<label class="u-campo" id="pr-c-nombre"><span class="u-etiqueta">Nombre para el cliente</span><input id="pr-mnombre" autocomplete="off" placeholder="Lino lavado arena">' +
+            '<span class="u-nota">Lo que verá la marca en WhatsApp.</span></label><div class="pr-dos">' +
             '<label class="u-campo"><span class="u-etiqueta">Coste del proveedor</span><span class="pr-ud"><input id="pr-mcoste" inputmode="decimal" autocomplete="off"><i id="pr-mud-t">₹/m</i></span></label>' +
             '<label class="u-campo"><span class="u-etiqueta">En</span><select id="pr-mud"><option value="inr">Rupias</option><option value="eur">Euros</option></select></label></div>' +
             '<label class="u-campo" id="pr-c-ancho"><span class="u-etiqueta">Ancho (si lo sabes)</span><span class="pr-ud"><input id="pr-mancho" inputmode="numeric" autocomplete="off"><i>cm</i></span>' +
@@ -255,7 +285,7 @@
       function telaAhora() {
         if (S.tela === 'otra') {
           var c = aNum($('pr-mcoste').value), eurs = $('pr-mud').value === 'eur';
-          return { id: '', nombre: 'Otra tela', diseno: '', inr: eurs ? NaN : c, eur: eurs ? c : NaN, ancho: aNum($('pr-mancho').value), otra: true };
+          return { id: '', nombre: $('pr-mnombre').value.trim(), diseno: '', inr: eurs ? NaN : c, eur: eurs ? c : NaN, ancho: aNum($('pr-mancho').value), otra: true };
         }
         var t = telas(D).filter(function (x) { return x.id === S.tela; })[0] || null;
         // T0687: una tela de Mis telas sin coste del proveedor: se escribe aquí mismo (solo para esta cuenta, no se guarda en la tela).
@@ -270,6 +300,7 @@
         var escribir = S.tela === 'otra' || sinCoste();
         $('pr-manual').hidden = !escribir;
         $('pr-c-ancho').hidden = S.tela !== 'otra';
+        $('pr-c-nombre').hidden = S.tela !== 'otra';
         $('pr-manual-t').textContent = S.tela === 'otra' ? '' : 'Esta tela no tiene el coste del proveedor en Mis telas. Escríbelo aquí: solo cuenta para este precio.';
         $('pr-manual-t').hidden = S.tela === 'otra';
         $('pr-mud-t').textContent = $('pr-mud').value === 'eur' ? '€/m' : '₹/m';
@@ -291,10 +322,11 @@
         var marca = S.marca ? D.fila('MARCAS', S.marca) : null, para = marca ? String(marca.NOMBRE || marca.ID) : 'el cliente', h = '';
         h += '<span class="u-etiqueta">Precio para ' + texto(para) + '</span>';
         if (!t) h += '<p class="u-vacio">Elige una tela de Mis telas o «Otra: escribo el coste».</p>';
-        else if (isNaN(r.base)) h += '<p class="u-vacio">' + (t.otra || t.escrito ? 'Escribe el coste del proveedor.' : 'Falta el cambio de rupias en Ajustes.') + '</p>';
+        else if (isNaN(r.base)) h += '<p class="u-vacio">' + (t.otra || t.escrito ? 'Falta el coste: escríbelo para calcular.' : 'Falta el cambio de rupias en Ajustes.') + '</p>';
         else if (isNaN(r.envio)) h += '<p class="u-vacio">Falta el envío: escríbelo arriba. Sin él no se sabe lo que te cuesta.</p>';
         else {
-          if (isNaN(r.precio)) h += '<p class="pr-grande pr-nada">— <small>pon lo que quieres ganar o un precio</small></p>';
+          if (r.imposible) h += '<p class="pr-grande pr-nada">— <small>con eso el precio sale a 0 o menos</small></p>';
+          else if (isNaN(r.precio)) h += '<p class="pr-grande pr-nada">— <small>pon lo que quieres ganar o un precio</small></p>';
           else {
             h += '<p class="pr-grande u-cifra">' + cifra(r.precio) + ' <small>€/m sin IVA</small></p>';
             h += r.perdida ? '<p class="u-mal">Pierdes ' + eur(-r.gana) + '</p>' : '<p class="u-cifra">Ganas <b>' + eur(r.gana) + '</b></p>';
@@ -309,24 +341,29 @@
             h += '<a class="u-btn pr-fac" href="' + texto(href) + '" data-sx="ECONOMIA">Llevar a una factura</a>';
           }
         }
-        // T0687: guardar en la ficha de la marca (necesita marca y una tela de Mis telas) o copiarlo para WhatsApp.
-        if (t && !isNaN(r.precio)) {
-          var prop = propuesta(S.marca, t, r, ''), ultima = prop ? ultimaPropuesta(S.marca, t.id) : null;
+        // T0687: guardar en la ficha de la marca (necesita marca y una tela de Mis telas) o copiarlo para WhatsApp. T0728: sin
+        // un precio de verdad (o, con «Otra», sin el nombre para el cliente), los botones salen apagados; y lo ya guardado (este
+        // precio, a esta marca y con esta tela, hoy) no se guarda dos veces: «Guardado ✓» hasta que cambie algo.
+        if (t) {
+          var prop = propuesta(S.marca, t, r, ''), ultima = S.marca && t.id ? ultimaPropuesta(S.marca, t.id) : null;
+          var ya = !!prop && (S.guardado === claveGuardado(t, r) || (!!ultima && String(ultima.FECHA).slice(0, 10) === hoyISO() && Math.abs(aNum(ultima.PRECIO) - r.precio) < 0.005));
           h += '<div class="pr-acciones">' +
-            (prop ? '<button type="button" class="u-btn u-btn-accion" data-guardar>Guardar en la ficha de ' + texto(para) + '</button>' : '') +
-            '<button type="button" class="u-btn" data-whatsapp>Copiar para WhatsApp</button></div>' +
+            (S.marca && t.id ? '<button type="button" class="u-btn u-btn-accion" data-guardar' + (prop && !ya ? '' : ' disabled') + '>' + (ya ? 'Guardado ✓' : 'Guardar en la ficha de ' + texto(para)) + '</button>' : '') +
+            '<button type="button" class="u-btn" data-whatsapp' + (copiable(t, r) ? '' : ' disabled') + '>Copiar para WhatsApp</button></div>' +
+            (t.otra && !t.nombre ? '<p class="u-nota">Escribe el nombre para el cliente y podrás copiarlo.</p>' : '') +
             (!S.marca ? '<p class="u-nota">Elige para quién y podrás guardarlo en su ficha.</p>' : !t.id ? '<p class="u-nota">Una tela que no está en Mis telas no se guarda: cópialo.</p>' : '') +
-            (ultima ? '<p class="u-nota u-cifra">' + (String(ultima.FECHA).slice(0, 10) === hoyISO() && Math.abs(aNum(ultima.PRECIO) - r.precio) < 0.005 ? 'Guardado hoy en su ficha.'
-              : 'La última vez le propusiste ' + eur(aNum(ultima.PRECIO)) + ' (' + texto(fechaCorta(ultima.FECHA)) + ').') + '</p>' : '');
+            (ultima && !ya ? '<p class="u-nota u-cifra">La última vez le propusiste ' + eur(aNum(ultima.PRECIO)) + ' (' + texto(fechaCorta(ultima.FECHA)) + ').</p>' : '');
         }
         $('pr-res').innerHTML = h;
         pintarSueles(t, marca);
         pintarBarra(t, r);
         pintarComp(t, r, para);
-        ultimo = { t: t, r: r, para: para };
+        ultimo = { t: t, r: r, para: para, envio: env };
       }
 
       var ultimo = null;
+      /** T0728 · Lo que se acaba de guardar (marca, tela y precio): mientras no cambie, «Guardado ✓». */
+      function claveGuardado(t, r) { return [S.marca, t && t.id, r.precio].join('|'); }
 
       /** T0659 · «Sueles ganar unos 9 €/m» bajo Ganas, con «Ponerlo» y de dónde sale. Nunca lo pone sola. */
       function pintarSueles(t, marca) {
@@ -396,7 +433,16 @@
         if (!S.marca) { caja.innerHTML = '<h3 class="pr-h">Lo que paga hoy</h3><p class="u-vacio">Elige para quién y verás lo que paga hoy por sus telas.</p>'; return; }
         var tt = t || { ancho: NaN, diseno: '' }, c = comparativa(D, S.marca, tt.diseno, tt.ancho), n = c.misma.length + c.otras.length;
         var h = '<h3 class="pr-h">Lo que paga hoy ' + texto(para) + '</h3>';
-        if (!n) { caja.innerHTML = h + '<p class="u-vacio">Aún no sabes lo que paga por sus telas. Se apunta en su Comparativa.</p>'; return; }
+        if (!n) {
+          // T0728: sin Comparativa, lo que apuntó en «Qué buscan» (Pagan hoy); si tampoco, adónde ir a apuntarlo.
+          var ph = paganHoy(D, S.marca), fr = frenteA(ph, r.precio);
+          var ir = '<a href="' + texto('?s=marcas&ficha=' + encodeURIComponent(S.marca)) + '" data-sx="MARCAS">Qué buscan</a>';
+          caja.innerHTML = h + (!ph ? '<p class="u-vacio">Todavía no sabes lo que paga ' + texto(para) + ': apúntalo en ' + ir + '.</p>'
+            : '<div class="pr-cmp"><span class="pr-cmp-t">Según ' + ir + '</span><span class="u-nota u-cifra">Hoy paga ' + texto(ph.texto) + (/€/.test(ph.texto) ? '' : ' €/m') + '</span>' +
+              (fr === 'debajo' ? '<span class="pr-bien">Tu precio queda por debajo</span>' : fr === 'dentro' ? '<span class="u-cifra">Tu precio está dentro de lo que paga</span>'
+                : fr === 'encima' ? '<span class="u-mal">Tu precio pasa lo que paga</span>' : '') + '</div>');
+          return;
+        }
         c.misma.forEach(function (x) { h += linea(x, tt, r, 'La comparas con esta'); });
         if (c.misma.length && c.otras.length) h += '<details class="pr-otras"><summary>' + (c.otras.length === 1 ? 'Su otra tela' : 'Sus otras ' + c.otras.length + ' telas') + '</summary>' + c.otras.map(function (x) { return linea(x, tt, r); }).join('') + '</details>';
         else {
@@ -418,17 +464,20 @@
         if (id === 'pr-gana') { S.modo = 'gana'; pintar('gana'); }
         else if (id === 'pr-precio') { S.modo = 'precio'; pintar('precio'); }
         else if (id === 'pr-envio') { S.envioTocado = true; pintar(); }
-        else if (['pr-etotal', 'pr-metros', 'pr-mcoste', 'pr-mancho'].indexOf(id) >= 0) pintar();
+        else if (['pr-etotal', 'pr-metros', 'pr-mcoste', 'pr-mancho', 'pr-mnombre'].indexOf(id) >= 0) pintar();
       });
       el.addEventListener('click', function (e) {
-        if (e.target.closest('[data-whatsapp]') && ultimo) { copiar(whatsapp(ultimo.t, ultimo.r.precio), 'Copiado: pégalo en WhatsApp.'); return; }
+        var w = e.target.closest('[data-whatsapp]');
+        if (w && ultimo) { if (!w.disabled && copiable(ultimo.t, ultimo.r)) copiar(whatsapp(ultimo.t, ultimo.r.precio, ultimo.envio), 'Copiado: pégalo en WhatsApp.'); return; }
         var g = e.target.closest('[data-guardar]');
         if (g && ultimo) {
           var fila = propuesta(S.marca, ultimo.t, ultimo.r, hoyISO()), para = ultimo.para;
-          if (!fila) return;
+          if (!fila || g.disabled) return;
           g.disabled = true;
+          var clave = claveGuardado(ultimo.t, ultimo.r);
+          S.guardado = clave; // T0728: un segundo toque mientras se guarda no crea otra
           Promise.resolve(T.crear('PROPUESTAS', fila)).then(function () { ctx.aviso('Guardado en la ficha de ' + para + ': ' + eur(fila.PRECIO) + '.'); if (ctx.abierta()) pintar(); },
-            function (er) { g.disabled = false; ctx.aviso('No se ha guardado: ' + ((er && er.message) || er)); });
+            function (er) { if (S.guardado === clave) S.guardado = ''; g.disabled = false; ctx.aviso('No se ha guardado: ' + ((er && er.message) || er)); });
           return;
         }
         var su = e.target.closest('[data-sueles]');
@@ -444,7 +493,7 @@
       });
 
       ctx.alCambiar(function (t) { if (TABLAS.indexOf(t) >= 0) { listas(); pintar(); } else if (FACTURAS.indexOf(t) >= 0) pintar(); });
-      var hay = TABLAS.every(function (t) { return (T.filas(t) || []).length || t === 'COMPARATIVA' || t === 'PROPUESTAS'; });
+      var hay = TABLAS.every(function (t) { return (T.filas(t) || []).length || t === 'COMPARATIVA' || t === 'PROPUESTAS' || t === 'NECESIDADES'; });
       if (hay) { listas(); pintar(); } else $('pr-res').innerHTML = '<div class="kz-centro" role="status"><div class="u-carga"></div></div>';
       T.leer(TABLAS).then(function () {
         listas(); pintar();
