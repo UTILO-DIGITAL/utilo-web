@@ -1713,12 +1713,12 @@
   },
   "T0695-huecos-dev": {
    "tarea": "T0695",
-   "titulo": "Varios huecos de motor en DEV: cada rama coge el suyo o uno libre, y su web llama a su API",
-   "pr": null,
+   "titulo": "Varias ramas a la vez en DEV, cada una con su motor",
+   "pr": 377,
    "commit": "1b4a8ac7",
    "ultimo": "T0695: Las «API DEV» de DEV-2 y DEV-3",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T08:53:32.420Z",
+   "fecha": "2026-11-20T09:12:32.175Z",
    "toca": [],
    "comun": true,
    "paginas": [
