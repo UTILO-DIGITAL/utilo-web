@@ -959,12 +959,12 @@
   },
   "T0710-ferias-documentos-referentes": {
    "tarea": "T0710",
-   "titulo": "Ferias, Documentos y Referentes en la app de Marta, con el aviso 45 días antes de cada feria",
-   "pr": null,
-   "commit": "eb75dd1e",
-   "ultimo": "T0710: Ferias, Documentos y Referentes en la app de Marta, con el aviso 45 días antes de cada feria",
+   "titulo": "Ferias, Documentos y Referentes en la app, con el aviso 45 días antes de cada feria",
+   "pr": 396,
+   "commit": "323eb9f0",
+   "ultimo": "T0710: Al día con main (T0706)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T15:53:13.307Z",
+   "fecha": "2026-11-20T15:55:21.156Z",
    "toca": [
     "telas",
     "utilo"
