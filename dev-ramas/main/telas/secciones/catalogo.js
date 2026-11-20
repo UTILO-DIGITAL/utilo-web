@@ -2,7 +2,7 @@
  * Catálogo para marcas · Telas (T0686) · clientes/telas/modulos/catalogo de utilo-apps
  *
  * El botón al final de Perfil (sección «enPerfil») que lleva a la página del catálogo (telas/catalogo/), la que Marta
- * enseña a una marca. El catálogo va aparte de la app a propósito: sin menú, sin el aviso de prueba y sin nada
+ * enseña a una marca. El catálogo va aparte de la app a propósito: sin menú y sin nada
  * confidencial. Aquí solo se explica qué es y se abre en otra pestaña.
  */
 (function () {
