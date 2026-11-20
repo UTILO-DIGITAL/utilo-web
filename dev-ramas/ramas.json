@@ -1531,12 +1531,12 @@
   },
   "T0728-afinar-calcular-precio": {
    "tarea": "T0728",
-   "titulo": "Calcular precio, con el nombre para el cliente, sin precios imposibles y sin guardar dos veces",
-   "pr": null,
+   "titulo": "Calcular precio con el nombre para el cliente, sin precios imposibles y sin guardar dos veces",
+   "pr": 409,
    "commit": "b8b38d72",
    "ultimo": "T0728: Calcular precio, con el nombre para el cliente, sin precios imposibles y sin guardar dos veces",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T22:47:10.919Z",
+   "fecha": "2026-11-20T22:47:56.007Z",
    "toca": [
     "telas"
    ],
