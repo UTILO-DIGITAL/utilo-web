@@ -1244,14 +1244,16 @@
   },
   "T0714-editar-alta-telas": {
    "tarea": "T0714",
-   "titulo": "Merge pull request #397 from UTILO-DIGITAL/T0651-editar-y-alta",
+   "titulo": "Mis telas se edita entera, con alta (también de un diseño nuevo) y borrar",
    "pr": null,
-   "commit": "0e0a3e8e",
-   "ultimo": "Merge pull request #397 from UTILO-DIGITAL/T0651-editar-y-alta",
+   "commit": "7df7be93",
+   "ultimo": "T0714: Mis telas se edita entera, con alta (también de un diseño nuevo) y borrar",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T18:46:43.594Z",
-   "toca": [],
-   "comun": false,
+   "fecha": "2026-11-20T18:47:12.761Z",
+   "toca": [
+    "telas"
+   ],
+   "comun": true,
    "paginas": [
     {
      "ruta": "dev/konamigas/",
@@ -1415,7 +1417,7 @@
        "nombre": "Admin"
       }
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/",
@@ -1432,7 +1434,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/catalogo/",
@@ -1447,7 +1449,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     }
    ],
    "migraciones": {
