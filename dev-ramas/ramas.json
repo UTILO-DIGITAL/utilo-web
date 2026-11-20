@@ -2335,6 +2335,15 @@
    "quien": "Javi Canela",
    "rama": "T0686-catalogo-para-marcas",
    "carpeta": "T0686-catalogo-para-marcas"
+  },
+  "DEV-2": {
+   "cliente": "telas",
+   "modo": "ejemplo",
+   "commit": "1b4a8ac7",
+   "subido": "20/11/26, 9:53",
+   "quien": "Javi Canela",
+   "rama": "T0695-huecos-dev",
+   "carpeta": "T0695-huecos-dev"
   }
  }
 }
