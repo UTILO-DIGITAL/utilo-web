@@ -2416,9 +2416,9 @@
    ]
   },
   "utilo": {
-   "rama": "main y las ramas abiertas",
-   "commit": "f6436b35",
-   "fecha": "2026-11-20T12:10:20.283Z",
+   "rama": "T0719-claude-de-marta",
+   "commit": "b49a1c9f",
+   "fecha": "2026-11-20T22:48:54.706Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
@@ -2466,7 +2466,8 @@
     "20261120083735_zona_tablas.sql",
     "20261120083736_zona.sql",
     "20261120115014_dependencia_en_main_tablas.sql",
-    "20261120115015_dependencia_en_main.sql"
+    "20261120115015_dependencia_en_main.sql",
+    "20261120230000_vigilar_tablas.sql"
    ]
   }
  },
