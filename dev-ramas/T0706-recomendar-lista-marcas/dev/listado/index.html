@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Telas · ejemplo</title>
+<!-- T0654: en la app «Utilo DEV», en la iniciativa Telas, y «Entrar como» son sus personas (las de motor-falso.js · GENTE). -->
+<meta name="dev-ramas" content="App de ejemplo">
+<meta name="dev-iniciativa" content="telas">
+<meta name="dev-personas" content="duena=Marta · Dueña, ayudante=Ayudante, admin=Admin">
+<link rel="icon" href="data:,">
+<!-- T0599: la app de ejemplo de la sección Listado (nucleo/secciones/listado.js) con el marco de verdad (nucleo/nucleo.js: el
+     menú a la izquierda en el ordenador y abajo en el móvil) y la capa de tablas de verdad (kanban4/tablas.js), con los datos
+     inventados de ejemplo-telas.js (con el modelo del Excel GESTION de Marta, T0598) y un motor de mentira en memoria (motor-falso.js):
+     sin Google ni Supabase, y lo que se cambia se pierde al recargar. npm run local → http://localhost:8080/dev/listado/
+     (#duena, #ayudante o #admin: quién entra). La app de Marta de verdad, sobre su Excel GESTION (T0598), llega con T0600 a T0602. -->
+<!-- T0610: con la marca de Telas, como la app de Marta. T0624: ?marca=utilo o ?marca=konamigas, con la de otra marca
+     (para ver que los avisos se ven igual que siempre fuera de Telas). -->
+<script>
+  window.LI_MARCA = (/[?&]marca=(utilo|konamigas|telas)\b/.exec(location.search) || [])[1] || 'telas';
+  document.write('<link rel="stylesheet" href="../../' + window.LI_MARCA + '/marca.css?v=4">');
+</script>
+<link rel="stylesheet" href="../../estilos/base.css?v=65390ec5fd">
+<style>
+  /* El selector de quién entra: fuera del marco (que rehace el body), abajo a la derecha, encima de la barra del móvil. */
+  #mf-quien { position: fixed; right: max(12px, env(safe-area-inset-right, 0px)); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 90;
+    display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 12px; border-radius: 999px; background: #1C1C1C; color: #fff;
+    font: 600 13px/1.2 system-ui, sans-serif; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+  #mf-quien select { font: inherit; border-radius: 999px; border: 0; padding: 4px 8px; max-width: 60vw; }
+  @media (min-width: 900px) { #mf-quien { bottom: max(16px, env(safe-area-inset-bottom, 0px)); } }
+  /* Mientras sale un aviso del marco («Copiado…»), el selector se aparta para no taparlo. */
+  html:has(#n-aviso:not([hidden])) #mf-quien { opacity: 0; pointer-events: none; }
+  #mf-quien { transition: opacity .2s; }
+</style>
+<script>
+  window.KANBAN = { clave: 'listado-ejemplo', marca: 'utilo', nombreApp: 'Telas', api: 'motor-de-ejemplo' };
+  // Las tablas viven en el motor de mentira: sin copia en el dispositivo (IndexedDB), que traería las de otra vez.
+  try { Object.defineProperty(window, 'indexedDB', { value: undefined, configurable: true }); } catch (e) {}
+</script>
+</head>
+<body class="u">
+<div class="kz"><div class="kz-caja kz-centro" role="status"><div class="u-carga"></div><p>Cargando…</p></div></div>
+<script src="ejemplo-telas.js"></script>
+<script src="motor-falso.js"></script>
+<script src="../../kanban4/tablas.js?v=6d45123156"></script>
+<script src="../../nucleo/nucleo.js?v=83915f8094"></script>
+</body>
+</html>
