@@ -1539,14 +1539,6 @@
   "ficha": "../utilo/plataforma/?s=tablero&t="
  },
  "huecos": {
-  "DEV-1": {
-   "cliente": "telas",
-   "commit": "14592849",
-   "subido": "20/11/26, 7:49",
-   "quien": "Javi Canela",
-   "rama": "T0686-catalogo-para-marcas",
-   "carpeta": "T0686-catalogo-para-marcas"
-  },
   "DEV-3": {
    "cliente": "telas",
    "modo": "ejemplo",
@@ -1555,6 +1547,15 @@
    "quien": "Javi Canela",
    "rama": "T0691-muestrario-telas",
    "carpeta": "T0691-muestrario-telas"
+  },
+  "DEV-1": {
+   "cliente": "telas",
+   "modo": "ejemplo",
+   "commit": "bd7b5700",
+   "subido": "20/11/26, 10:51",
+   "quien": "Javi Canela",
+   "rama": "T0686-catalogo-para-marcas",
+   "carpeta": "T0686-catalogo-para-marcas"
   }
  }
 }
