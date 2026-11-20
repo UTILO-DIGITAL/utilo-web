@@ -1603,8 +1603,8 @@
   "DEV-3": {
    "cliente": "telas",
    "modo": "ejemplo",
-   "commit": "856cf8a8+cambios",
-   "subido": "20/11/26, 14:46",
+   "commit": "18532a3a",
+   "subido": "20/11/26, 14:47",
    "quien": "Javi Canela",
    "rama": "T0689-facturar-fichas-solas",
    "carpeta": "T0689-facturar-fichas-solas"
