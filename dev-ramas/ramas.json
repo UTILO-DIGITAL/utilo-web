@@ -919,12 +919,12 @@
   },
   "T0698-al-dia-con-main": {
    "tarea": "T0698",
-   "titulo": "Poner al día una rama con main en una orden (al-dia.js y /al-dia)",
-   "pr": null,
-   "commit": "0d90db5c",
-   "ultimo": "T0698: Para fusionar en tanda, el orden de las PR aprobadas (al-dia.js orden)",
+   "titulo": "Poner al día una rama con main en una orden, y en qué orden fusionar las aprobadas",
+   "pr": 380,
+   "commit": "b505be59",
+   "ultimo": "T0698: Aviso en la plataforma cuando una PR abierta deja de unirse con main (acción «Al día»)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T11:13:20.083Z",
+   "fecha": "2026-11-20T11:29:09.828Z",
    "toca": [],
    "comun": false,
    "paginas": [
