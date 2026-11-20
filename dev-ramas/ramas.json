@@ -1308,8 +1308,8 @@
   "DEV-2": {
    "cliente": "telas",
    "modo": "ejemplo",
-   "commit": "3be5da5c",
-   "subido": "20/11/26, 14:00",
+   "commit": "dfeae6a8",
+   "subido": "20/11/26, 14:05",
    "quien": "Javi Canela",
    "rama": "T0685-buscar-en-toda-la-app",
    "carpeta": "T0685-buscar-en-toda-la-app"
