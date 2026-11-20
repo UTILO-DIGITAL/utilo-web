@@ -961,10 +961,10 @@
    "tarea": "T0709",
    "titulo": "Mis telas dice en qué portfolio sale cada tela",
    "pr": 392,
-   "commit": "9c635806",
-   "ultimo": "T0709: La columna PORTFOLIO ya está en GESTION",
+   "commit": "57adccc5",
+   "ultimo": "T0709: El portfolio se apunta en la app; la copia lo conserva y no lo lee de su Excel",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T15:07:07.604Z",
+   "fecha": "2026-11-20T15:19:51.552Z",
    "toca": [
     "telas"
    ],
