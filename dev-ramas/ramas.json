@@ -923,10 +923,10 @@
    "tarea": "T0692",
    "titulo": "Las ventas, en su sección Pedidos y en la ficha de cada cliente",
    "pr": 382,
-   "commit": "ff2cd626",
-   "ultimo": "T0692: Pedidos y las ventas de cada marca en Clientes",
+   "commit": "74f9c461",
+   "ultimo": "Merge remote-tracking branch 'origin/main' into T0692-ventas-en-ficha-cliente",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T12:12:12.733Z",
+   "fecha": "2026-11-20T12:29:18.288Z",
    "toca": [
     "telas",
     "utilo"
@@ -1198,7 +1198,9 @@
      "20261112190000_avisos_prueba_diaria.sql",
      "20261119200000_uso.sql",
      "20261120083735_zona_tablas.sql",
-     "20261120083736_zona.sql"
+     "20261120083736_zona.sql",
+     "20261120115014_dependencia_en_main_tablas.sql",
+     "20261120115015_dependencia_en_main.sql"
     ]
    },
    "rama": "T0692-ventas-en-ficha-cliente"
