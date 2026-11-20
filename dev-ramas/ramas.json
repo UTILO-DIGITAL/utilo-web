@@ -1233,9 +1233,9 @@
    ]
   },
   "utilo": {
-   "rama": "T0696-avisar-solapes",
-   "commit": "1a745cb3",
-   "fecha": "2026-11-20T08:54:00.730Z",
+   "rama": "T0664-dependencia-al-fusionar",
+   "commit": "4299efb3",
+   "fecha": "2026-11-20T12:03:55.025Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
@@ -1281,7 +1281,9 @@
     "20261112190000_avisos_prueba_diaria.sql",
     "20261119200000_uso.sql",
     "20261120083735_zona_tablas.sql",
-    "20261120083736_zona.sql"
+    "20261120083736_zona.sql",
+    "20261120115014_dependencia_en_main_tablas.sql",
+    "20261120115015_dependencia_en_main.sql"
    ]
   }
  },
