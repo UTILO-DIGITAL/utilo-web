@@ -1533,10 +1533,10 @@
    "tarea": "T0740",
    "titulo": "La app de Telas, en oscuro con el iPhone y con su tamaño de letra",
    "pr": 412,
-   "commit": "6004a161",
-   "ultimo": "T0740: El oscuro, solo en las páginas que lo piden (no en el catálogo) y también en DEV",
+   "commit": "4d8c5102",
+   "ultimo": "T0740: El modo oscuro, voluntario: Claro, Oscuro o Como el móvil en Perfil › Aspecto",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T23:30:25.184Z",
+   "fecha": "2026-11-20T23:43:27.120Z",
    "toca": [
     "telas"
    ],

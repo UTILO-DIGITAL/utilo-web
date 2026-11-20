@@ -3332,30 +3332,34 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
  * T0723 · Que en el iPhone y el iPad se porte como una app de Apple.
  * ========================================================================================================================== */
 /* R54 · La app es clara aunque el iPhone esté en oscuro: así los controles del sistema (casillas, listas, calendario) no salen
-   oscuros sobre fondo blanco. Va con su <meta name="color-scheme" content="light">. En :where, para que una marca con modo
-   oscuro (T0740: Telas) lo cambie en su marca.css. */
+   oscuros sobre fondo blanco. Va con su <meta name="color-scheme" content="light">. En :where, para que el modo oscuro
+   (T0740, abajo y en marca.css) lo cambie. */
 :where(:root) { color-scheme: light; }
 
-/* T0740 · Modo oscuro, solo en las páginas que lo piden (<meta name="color-scheme" content="light dark">) y con el sistema en
-   oscuro. Los colores de la marca, en su marca.css; aquí, los que son iguales en todas: los de estado, más suaves para que se
-   lean sobre tinta (maqueta de T0702: teja para lo atrasado, índigo, oliva), con su fondo apagado; el texto sobre un color
-   lleno pasa a tinta, y el velo y las sombras, a negro (con el texto claro saldrían claros). */
-@media (prefers-color-scheme: dark) {
-  :root:has(meta[name="color-scheme"][content~="dark"]) {
-    --est-gris: #B5B0A6;  --est-gris-f: #2B2925;
-    --est-azul: #9DB4DE;  --est-azul-f: #1E2634;
-    --est-ocre: #D9B26A;  --est-ocre-f: #2F2718;
-    --est-verde: #9CC78F; --est-verde-f: #1F2A1C;
-    --est-teja: #E08A6F;  --est-teja-f: #34211B;
-    --est-teal: #8CC7BF;  --est-teal-f: #1A2B29;
-    --estado-bl: #E08A6F; --estado-ec: #9DB4DE; --estado-pr: #D9B26A; --estado-co: #9CC78F; --estado-ni: #B5B0A6; --estado-x: #B5B0A6;
-    --color-error: #E08A6F;
-    --color-bien: #9CC78F;
-    --sobre-estado: #171815;
-    --color-velo: rgb(0 0 0 / 60%);
-    --sombra-flota: 0 6px 20px rgb(0 0 0 / 55%);
-  }
-}
+/* T0740 · Modo oscuro, voluntario: en las apps que lo tienen (KANBAN.modoOscuro), quien entra lo elige en Perfil › Aspecto
+   (Claro, Oscuro o Como el móvil) y nucleo.js pone <html data-tema="oscuro">. Los colores de la marca, en su marca.css; aquí,
+   los que son iguales en todas: los de estado, más suaves para que se lean sobre tinta (maqueta de T0702: teja para lo
+   atrasado, índigo, oliva), con su fondo apagado; el texto sobre un color lleno pasa a tinta, y el velo y las sombras, a
+   negro (con el texto claro saldrían claros). */
+:root[data-tema="oscuro"] {
+  --est-gris: #B5B0A6;  --est-gris-f: #2B2925;
+  --est-azul: #9DB4DE;  --est-azul-f: #1E2634;
+  --est-ocre: #D9B26A;  --est-ocre-f: #2F2718;
+  --est-verde: #9CC78F; --est-verde-f: #1F2A1C;
+  --est-teja: #E08A6F;  --est-teja-f: #34211B;
+  --est-teal: #8CC7BF;  --est-teal-f: #1A2B29;
+  --estado-bl: #E08A6F; --estado-ec: #9DB4DE; --estado-pr: #D9B26A; --estado-co: #9CC78F; --estado-ni: #B5B0A6; --estado-x: #B5B0A6;
+  --color-error: #E08A6F;
+  --color-bien: #9CC78F;
+  --sobre-estado: #171815;
+  --color-velo: rgb(0 0 0 / 60%);
+  --sombra-flota: 0 6px 20px rgb(0 0 0 / 55%);
+}/* En oscuro, la opción elegida de un interruptor (Mías/Todas, las vistas, Calcular precio, Aspecto) sobre su carril: un gris
+   más claro, que la superficie casi no se distingue del carril. */
+:root[data-tema="oscuro"] .u .li-mias button[aria-pressed=true], :root[data-tema="oscuro"] .u .pr-seg button[aria-pressed=true],
+:root[data-tema="oscuro"] .u .li-arriba .u-pestanas.li-vistas button[aria-selected=true] {
+  background: color-mix(in srgb, var(--color-texto) 20%, var(--color-superficie)); box-shadow: none; }
+
 /* R47 · Mantener apretado lo que se toca no saca el menú del enlace de Safari ni selecciona texto, y el toque no deja el
    recuadro gris. Lo que se copia (un teléfono, un correo, las notas y los campos) sigue pudiéndose copiar. */
 .u a:not(.li-enl), .u button, .u .u-btn, .u [role=tab], .u label, .sx.u-sx a, .sx.u-sx button {

@@ -19,10 +19,8 @@
 <script>
   window.LI_MARCA = (/[?&]marca=(utilo|konamigas|telas)\b/.exec(location.search) || [])[1] || 'telas';
   document.write('<link rel="stylesheet" href="../../' + window.LI_MARCA + '/marca.css?v=4">');
-  // T0740: con la marca de Telas, como su app: oscura si el sistema lo está.
-  if (window.LI_MARCA === 'telas') document.write('<meta name="color-scheme" content="light dark">');
 </script>
-<link rel="stylesheet" href="../../estilos/base.css?v=f5c2c77326">
+<link rel="stylesheet" href="../../estilos/base.css?v=a17030a628">
 <style>
   /* El selector de quién entra: fuera del marco (que rehace el body), abajo a la derecha, encima de la barra del móvil. */
   #mf-quien { position: fixed; right: max(12px, env(safe-area-inset-right, 0px)); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 90;
@@ -36,7 +34,7 @@
 </style>
 <script>
   window.KANBAN = { clave: 'listado-ejemplo', marca: 'utilo', nombreApp: 'Telas', api: 'motor-de-ejemplo' };
-  if (window.LI_MARCA === 'telas') window.KANBAN.letraDelSistema = true; // T0740: la letra del iPhone, como la app de Marta
+  if (window.LI_MARCA === 'telas') { window.KANBAN.letraDelSistema = true; window.KANBAN.modoOscuro = true; } // T0740: como la app de Marta
   // Las tablas viven en el motor de mentira: sin copia en el dispositivo (IndexedDB), que traería las de otra vez.
   try { Object.defineProperty(window, 'indexedDB', { value: undefined, configurable: true }); } catch (e) {}
 </script>
@@ -46,6 +44,6 @@
 <script src="ejemplo-telas.js"></script>
 <script src="motor-falso.js"></script>
 <script src="../../kanban4/tablas.js?v=5b0bde6456"></script>
-<script src="../../nucleo/nucleo.js?v=94c7ce5a1b"></script>
+<script src="../../nucleo/nucleo.js?v=3cc0ce7587"></script>
 </body>
 </html>

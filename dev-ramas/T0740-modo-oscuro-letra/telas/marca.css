@@ -6,7 +6,7 @@
  * Orden de carga: marca.css → ../estilos/base.css → ../estilos/kanban.css
  * El contraste de cada texto con su fondo (mínimo 4,5:1) lo comprueba herramientas/probar-marcas.js.
  * El gris #8A7F72 del PDF no se usa en texto (3,5:1).
- * T0740: con el iPhone o el Mac en oscuro, la app también (abajo, y su <meta name="color-scheme" content="light dark">).
+ * T0740: sus colores oscuros, abajo (los elige quien entra en Perfil › Aspecto).
  */
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif&display=swap');
 
@@ -56,21 +56,18 @@
 /* T0740 · Modo oscuro (maqueta conjunta de T0702, «Idea: modo oscuro», aprobada por Javi): fondo tinta, texto claro y los
    mismos colores, más suaves para que se lean: oliva claro para lo elegido y los contornos, índigo claro en los enlaces (la
    teja de lo atrasado y los demás colores de estado, en base.css). El menú y el botón principal siguen en oliva.
-   Solo en las páginas que lo piden (<meta name="color-scheme" content="light dark">): el catálogo, que también carga esta
-   hoja, sigue en claro. */
-@media (prefers-color-scheme: dark) {
-  :root:has(meta[name="color-scheme"][content~="dark"]) {
-    color-scheme: dark;
-    --color-fondo: #171815;            /* tinta · fondo general */
-    --color-superficie: #1F201C;       /* un punto más claro · tablas, listas, fichas, campos y la barra de abajo */
-    --color-bloque: #2A2B26;           /* bloques y etiquetas suaves */
-    --color-texto: #ECEBE6;
-    --color-principal: #ECEBE6;
-    --color-principal-oscuro: #B9C98A; /* oliva claro · contornos, foco, etiquetas y botones secundarios */
-    --color-sobre-principal: #171815;
-    --color-destacado: #8C7550;        /* arena apagada · subrayado de una cifra clave */
-    --color-enlace: #9DB4DE;           /* índigo claro */
-    --color-menu: #22281E;
-    --color-linea-menu: #2E3529;
-  }
+   Es voluntario: se elige en Perfil › Aspecto (Claro, Oscuro o Como el móvil) y nucleo.js pone <html data-tema="oscuro">. */
+:root[data-tema="oscuro"] {
+  color-scheme: dark;
+  --color-fondo: #171815;            /* tinta · fondo general */
+  --color-superficie: #1F201C;       /* un punto más claro · tablas, listas, fichas, campos y la barra de abajo */
+  --color-bloque: #2A2B26;           /* bloques y etiquetas suaves */
+  --color-texto: #ECEBE6;
+  --color-principal: #ECEBE6;
+  --color-principal-oscuro: #B9C98A; /* oliva claro · contornos, foco, etiquetas y botones secundarios */
+  --color-sobre-principal: #171815;
+  --color-destacado: #8C7550;        /* arena apagada · subrayado de una cifra clave */
+  --color-enlace: #9DB4DE;           /* índigo claro */
+  --color-menu: #22281E;
+  --color-linea-menu: #2E3529;
 }
