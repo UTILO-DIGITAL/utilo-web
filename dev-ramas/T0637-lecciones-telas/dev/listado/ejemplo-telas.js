@@ -38,7 +38,7 @@
   var FASES = dimension('FA', ['Por contactar', '1 Contactado', '2 Interesado', '3 Reunión hecha', '4 Cuestionario enviado', '5 Cuestionario recibido', '6 Propuesta enviada',
     '7 Muestras enviadas', '8 Primer pedido', '9 Cliente habitual', 'En pausa', 'Descartado']);
   var ESTADOS_TAREA = dimension('ET', ['Pendiente', 'En curso', 'Esperando respuesta', 'Hecha', 'Descartada']);
-  var TIPOS_SEGUIMIENTO = dimension('TS', ['Tarea', 'Reunión', 'Próximo paso', 'Nota']);
+  var TIPOS_SEGUIMIENTO = dimension('TS', ['Tarea', 'Reunión', 'Nota']);
   var TEMAS = dimension('TE', ['Clientes', 'Proveedores', 'Telas', 'Pedidos', 'Empresa', 'Envíos', 'Ferias', 'Formación', 'Marca propia']);
   var FORMATOS = dimension('FO', ['Videollamada', 'Llamada', 'Presencial', 'WhatsApp', 'Email', 'Visita a taller', 'Feria']);
   var PRIORIDADES = dimension('PR', ['Alta', 'Media', 'Baja']);
@@ -98,10 +98,10 @@
   // T0652 · El resumen de con quién es cada tarea (el mismo en Hoy y en Seguimiento). Lo hecho: lo cerrado y las notas.
   var CONTEXTO_SEG = { campo: 'CON_QUIEN', notas: 'NOTAS', hecho: [{ o: [{ campo: 'ID_ESTADO', es: ['Hecha'] }, { campo: 'ID_TIPO', es: ['Nota'] }] }],
     de: {
-      ID_MARCA: { tabla: 'MARCAS', seccion: 'clientes', sub: ['CIUDAD', 'QUE_FABRICAN'], chips: ['ID_FASE', { campo: 'ID_PRIORIDAD', antes: 'Prioridad' }], nota: 'NOTA',
+      ID_MARCA: { tabla: 'MARCAS', seccion: 'clientes', sub: ['CIUDAD', 'QUE_FABRICAN'], chips: [{ campo: 'ID_FASE', sinNumero: true }, { campo: 'ID_PRIORIDAD', antes: 'Prioridad' }], nota: 'NOTA',
         lineas: [{ titulo: 'Buscan', tabla: 'NECESIDADES', campo: 'ID_MARCA', columnas: ['MATERIAL', { campo: 'PAGAN_HOY', antes: 'pagan hoy', despues: ' €/m' }, { campo: 'PRECIO_OBJETIVO', antes: 'objetivo', despues: ' €/m' }] },
           { titulo: 'Hablar con', tabla: 'PERSONAS', campo: 'ID_MARCA', columnas: ['NOMBRE', 'CARGO', 'TELEFONO'] }] },
-      ID_PROVEEDOR: { tabla: 'PROVEEDORES', seccion: 'proveedores', sub: ['ZONA', 'QUE_TIENEN'], chips: ['ID_ESTADO', { campo: 'ID_PRIORIDAD', antes: 'Prioridad' }], nota: 'OJO',
+      ID_PROVEEDOR: { tabla: 'PROVEEDORES', seccion: 'proveedores', sub: ['ZONA', 'QUE_TIENEN'], chips: [{ campo: 'ID_ESTADO', sinNumero: true }, { campo: 'ID_PRIORIDAD', antes: 'Prioridad' }], nota: 'OJO',
         lineas: [{ titulo: 'Hablar con', tabla: 'PERSONAS', campo: 'ID_PROVEEDOR', columnas: ['NOMBRE', 'CARGO', 'TELEFONO'] }] } } };
   var seg = [
     [dia(-9), 'Tarea', 'Clientes', 'Pendiente', 'Mandar la propuesta de lino lavado', 'Piden 3 colores y precio puesto en su taller de Valencia.', { ID_MARCA: 'M-001' }],
@@ -123,10 +123,10 @@
     [diaBarras(-20), 'Reunión', 'Clientes', 'Hecha', 'Llamada de presentación', '', { ID_MARCA: 'M-002' }],
     [dia(-30), 'Tarea', 'Clientes', 'Descartada', 'Propuesta de jacquard', 'No les cuadra el pedido mínimo.', { ID_MARCA: 'M-005' }],
     [dia(-6), 'Tarea', 'Proveedores', 'Hecha', 'Pedir muestras de rayas de telar', '', { ID_PROVEEDOR: 'P-003' }],
-    // T0643: una nota (sin estado: ni círculo ni «Pasar»), un próximo paso y una tarea con marca y sin área (como en su
+    // T0643: una nota (sin estado: ni círculo ni «Pasar»), el siguiente paso con una marca (una tarea, T0661) y una tarea con marca y sin área (como en su
     // Excel: al guardar su ficha, el área se pone sola).
     [dia(-3), 'Nota', 'Proveedores', '', 'El ikat destiñe un poco al lavarlo a 40°', '', { ID_PROVEEDOR: 'P-002' }],
-    [dia(1), 'Próximo paso', 'Clientes', 'Pendiente', 'Llamar para ver si les cuadra el precio', '', { ID_MARCA: 'M-002' }],
+    [dia(1), 'Tarea', 'Clientes', 'Pendiente', 'Llamar para ver si les cuadra el precio', '', { ID_MARCA: 'M-002' }],
     [dia(4), 'Tarea', '', 'Pendiente', 'Mandarles la carta de colores', '', { ID_MARCA: 'M-003' }]
   ];
   var SEGUIMIENTO = tabla(['ID', 'FECHA', 'ID_TIPO', 'ID_TEMA', 'ID_ESTADO', 'ID_FORMATO', 'DETALLE', 'NOTAS', 'ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO'], seg.map(function (r, i) {
@@ -227,12 +227,13 @@
       SU_TELA: { titulo: 'Su tela' }, USO: { titulo: 'Para' }, ANCHO: { titulo: 'Ancho', unidad: 'cm' }, GSM: { titulo: 'Peso', unidad: 'g/m²' },
       'ID_DISENO.ANCHO': { titulo: 'Ancho', unidad: 'cm' }, 'ID_DISENO.GSM': { titulo: 'Peso', unidad: 'g/m²' },
       PRECIO_A_BATIR: { titulo: 'Precio a batir', tipo: 'importe', unidad: '€/m' }, ID_ESTADO: { titulo: 'Estado' }, NOTAS: { titulo: 'Notas', tipo: 'nota' },
-      MI_COSTE: { titulo: 'Te cuesta', tipo: 'importe', unidad: '€/m', calculo: COSTE },
+      MI_COSTE: { titulo: 'Te cuesta', tipo: 'importe', unidad: '€/m', calculo: COSTE, envio: '$ENVIO' }, // T0678: sin envío, «Falta el envío»
+      A_TU_ANCHO: { titulo: 'A tu ancho', tipo: 'importe', unidad: '€/m', calculo: ['*', ['/', 'PRECIO_A_BATIR', 'ANCHO'], 'ID_DISENO.ANCHO'] },
       HUECO: { titulo: 'Hasta su precio', tipo: 'importe', unidad: '€/m', signo: { mas: 'Hasta su precio te quedan {}', menos: 'Tu coste ya pasa su precio en {}', cero: 'Tu coste es su precio' },
         calculo: ['o', ['-', ['*', ['/', 'PRECIO_A_BATIR', 'ANCHO'], 'ID_DISENO.ANCHO'], 'MI_COSTE'], ['-', 'PRECIO_A_BATIR', 'MI_COSTE']] },
       M2_SU: { titulo: 'Por m²', tipo: 'importe', unidad: '€/m²', calculo: ['/', 'PRECIO_A_BATIR', ['/', 'ANCHO', 100]] },
       M2_MIO: { titulo: 'Por m²', tipo: 'importe', unidad: '€/m²', calculo: ['/', 'MI_COSTE', ['/', 'ID_DISENO.ANCHO', 100]] },
-      HOY: { titulo: 'Hoy', plantilla: 'Hoy paga {PRECIO_A_BATIR}[ ({ID_COMPETIDOR})]' },
+      HOY: { titulo: 'Hoy', plantilla: 'Hoy paga {PRECIO_A_BATIR}[ ({ID_COMPETIDOR})][ · a tu ancho, {A_TU_ANCHO}]' },
       PROPUESTA: { titulo: 'Tu alternativa', plantilla: '{ID_DISENO}[: te cuesta {MI_COSTE}]' },
       PRECIO_SU: { titulo: 'Precio', plantilla: '{PRECIO_A_BATIR}[ · {ID_TIPO_PRECIO}]' },
       PROVEEDOR_HOY: { titulo: 'Hoy la compra a', plantilla: '{ID_COMPETIDOR}[ ({DETALLE_COMPETIDOR})]' },
@@ -252,7 +253,7 @@
     seguimiento: { modulo: 'listado', titulo: 'Seguimiento', icono: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9l2 2 4-4M8 15h8"/>', config: mezcla(COMUN, {
       TABLA: 'SEGUIMIENTO', CODIGO: 'ID', NOMBRE: 'DETALLE', ORDEN: 'FECHA', TEXTO: 'Tus tareas, reuniones y notas.', FILAS: ['tarea', 'tareas'],
       COLUMNAS: ['FECHA', 'ID_TIPO', 'CON_QUIEN', 'DETALLE', 'ID_ESTADO'], DETALLE: ['CON_QUIEN', 'FECHA', 'ID_ESTADO'],
-      CAMPOS: { CON_QUIEN: { titulo: 'Con quién', primero: ['ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO'] }, ID_TIPO: { titulo: 'Tipo' }, ID_TEMA: { titulo: 'Área' }, ID_FORMATO: { titulo: 'Formato' },
+      CAMPOS: { CON_QUIEN: { titulo: 'Con quién', primero: ['ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO'], grupos: { ID_MARCA: 'Marcas', ID_PROVEEDOR: 'Proveedores', ID_OTRO: 'Otros' } }, ID_TIPO: { titulo: 'Tipo' }, ID_TEMA: { titulo: 'Área' }, ID_FORMATO: { titulo: 'Formato' },
         ID_MARCA: { titulo: 'Marca' }, ID_PROVEEDOR: { titulo: 'Proveedor' }, ID_OTRO: { titulo: 'Otro contacto' }, DETALLE: { titulo: 'Qué hay que hacer o qué pasó' },
         ID_ESTADO: { titulo: 'Estado', colores: COLORES_TAREA }, NOTAS: { titulo: 'Notas y enlaces', tipo: 'nota' } },
       FICHA: [{ titulo: '', campos: ['ID_ESTADO', 'FECHA', 'DETALLE', 'ID_TIPO', 'ID_TEMA', 'ID_FORMATO', 'NOTAS'] }, { titulo: 'Con quién', campos: ['ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO'] }],
@@ -272,8 +273,8 @@
       NUEVA: { ID_ESTADO: 'Pendiente', ID_TIPO: 'Tarea', FECHA: 'hoy' }, OBLIGATORIAS: ['DETALLE', 'ID_ESTADO'],
       // T0643: cerrar y pasar en un toque, el siguiente paso al cerrar con una marca o un proveedor, el alta con el texto primero y el área puesta sola.
       RAPIDAS: { HECHA: { campo: 'ID_ESTADO', valor: 'Hecha' }, PASAR: 'FECHA', SI: [{ campo: 'ID_TIPO', no: ['Nota'] }, NO_HECHAS],
-        SIGUIENTE: { con: ['ID_MARCA', 'ID_PROVEEDOR'], copia: ['ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO', 'ID_TEMA'], pone: { ID_TIPO: 'Próximo paso', ID_ESTADO: 'Pendiente' } } },
-      ALTA: { campos: ['DETALLE', 'CON_QUIEN', 'FECHA', 'ID_TEMA'], mas: ['ID_TIPO', 'ID_FORMATO', 'NOTAS'] },
+        SIGUIENTE: { con: ['ID_MARCA', 'ID_PROVEEDOR'], copia: ['ID_MARCA', 'ID_PROVEEDOR', 'ID_OTRO', 'ID_TEMA'], pone: { ID_TIPO: 'Tarea', ID_ESTADO: 'Pendiente' } } },
+      ALTA: { titulo: 'Nueva tarea', campos: ['DETALLE', 'CON_QUIEN', 'FECHA', 'ID_TEMA'], mas: ['ID_TIPO', 'ID_FORMATO', 'NOTAS'] },
       DEDUCIR: { ID_TEMA: { ID_MARCA: 'Clientes', ID_PROVEEDOR: 'Proveedores' } },
       // T0652: el nombre de con quién es abre lo último con esa marca o ese proveedor, lo que queda y su ficha en dos líneas.
       CONTEXTO: CONTEXTO_SEG,
@@ -365,7 +366,7 @@
         ID_ESTADO: { titulo: 'Estado', colores: { 'Aprobada': 'bien', 'Propuesta a marca': 'info', 'Muestra pedida': 'medio', 'Descartada': 'apagado' } },
         MUESTRA_EN_MANO: { titulo: 'Muestra en mano' }, NOTAS: { tipo: 'nota' }, N_INTERESADAS: { titulo: 'Marcas interesadas', de: { tabla: 'INTERESES', campo: 'ID_TELA' } },
         // T0641
-        COSTE_ESPANA: { titulo: 'Te cuesta puesta en España', tipo: 'importe', unidad: '€/m', privado: true, calculo: COSTE,
+        COSTE_ESPANA: { titulo: 'Te cuesta puesta en España', tipo: 'importe', unidad: '€/m', privado: true, calculo: COSTE, envio: '$ENVIO',
           desglose: [{ calculo: 'ID_DISENO.COSTE_INR', tipo: 'numero', unidad: '₹' }, '→', { calculo: EUROS }, '+ envío', { calculo: '$ENVIO' }],
           ayuda: 'El coste del proveedor en euros más el envío y el arancel de Ajustes. El precio para cada cliente lo pones tú.' },
         COMPOSICION: { titulo: 'Composición', de: COMP_DE },
@@ -415,7 +416,18 @@
     mas.forEach(function (t) { var x = refsDesde(t); Object.keys(x).forEach(function (k) { c._refs[k] = c._refs[k] || x[k]; }); });
   });
 
-  var E = { nucleo: { perfiles: ['Dueña', 'Ayudante'], secciones: SECCIONES }, tablas: TABLAS, refs: REFS };
+  // T0662 · Lo que la sección no dice llega a la web con el defecto de motor/modulos/listado/modulo.json, como lo monta
+  // montar.js (RAPIDAS, ALTA y CONTEXTO, {}): así se ve aquí lo mismo que en la app de verdad. probar-listado.js comprueba que son esos.
+  var DEFECTOS = {"TABLA":"","CLAVE":"ID","CODIGO":"","NOMBRE":"","COLUMNAS":[],"DETALLE":[],"ORDEN":"","FILTRO":[],"BUSCAR":[],"CAMPOS":{},"FICHA":[],"RELACIONADOS":[],"VISTAS":[],"AVISOS":[],"EDITAR":[],"CREAR":false,"ACCIONES":[],"NUEVA":{},"RAPIDAS":{},"ALTA":{},"DEDUCIR":{},"CONTEXTO":{},"OBLIGATORIAS":[],"FILTROS":[],"TEXTO":"","FILAS":[],"VACIO":"","VALORES":{},"PROHIBIDO":["CONTRASENA","CUENTA","DNI"],"PERSONALIZAN":[],"VENTAS":{},"PREFERENCIAS":""};
+  Object.keys(SECCIONES).forEach(function (n) {
+    var c = SECCIONES[n].config;
+    Object.keys(DEFECTOS).forEach(function (k) { if (!(k in c)) c[k] = JSON.parse(JSON.stringify(DEFECTOS[k])); });
+  });
+
+  // T0672 · El aviso de arriba, como en la app de Marta (nucleo.aviso), y una sección sin él ("": Mis telas), para ver que
+  // cambia al pasar de una sección a otra. En su app, Economía lleva el suyo («Aquí sí se guarda…»; npm run local -- telas).
+  SECCIONES.telas.aviso = '';
+  var E = { nucleo: { perfiles: ['Dueña', 'Ayudante'], aviso: 'Esto es una prueba: lo que cambies aquí no se guarda. Tu Excel sigue mandando.', secciones: SECCIONES }, tablas: TABLAS, refs: REFS, defectos: DEFECTOS };
   if (typeof module !== 'undefined' && module.exports) module.exports = E;
   if (typeof window !== 'undefined') window.LISTADO_EJEMPLO = E;
 })();

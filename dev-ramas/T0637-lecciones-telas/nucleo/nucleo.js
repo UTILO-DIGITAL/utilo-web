@@ -52,6 +52,8 @@
 
   var ICONO_PERFIL = '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"/>';
   var ICONO_SECCION = '<circle cx="12" cy="12" r="3"/>';
+  var ICONO_LUPA = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>';
+  var MAC = /mac|iphone|ipad/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '');
 
   function $(id) { return document.getElementById(id); }
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -101,6 +103,7 @@
 
   /** Entrar con Google: el motor dice el nombre del negocio y si tiene sesión larga (T0209); después, «entrar». */
   function acceso(aviso) {
+    usoParar(); // T0682: en la pantalla de entrada no hay nadie a quien apuntar
     cargando('Conectando…');
     inicio().then(function (ini) {
       if (window.UG.configurar) window.UG.configurar(ini);
@@ -253,7 +256,9 @@
     if (r.aviso) o.aviso = String(r.aviso); // T0639: el aviso de arriba (config.json · nucleo.aviso)
     if (r.perfilEnMenu === false) o.perfilEnMenu = false; // T0415: Perfil fuera del menú (se abre con el nombre de la cabecera)
     if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
-    if (r.ocultar && Array.isArray(r.ocultar.tablas)) o.ocultar = { tablas: r.ocultar.tablas, refs: r.ocultar.refs || {}, filas: r.ocultar.filas || {} }; // T0650
+    if (r.uso && r.uso.app && r.uso.url) o.uso = { app: String(r.uso.app), url: String(r.uso.url), clave: String(r.uso.clave || '') }; // T0682
+    if (r.buscar && Array.isArray(r.buscar.grupos) && r.buscar.grupos.length) o.buscar = r.buscar; // T0685: la lupa (nucleo.buscar)
+    if (r.ocultar && Array.isArray(r.ocultar.tablas)) o.ocultar = { tablas: r.ocultar.tablas, refs: r.ocultar.refs || {}, filas: r.ocultar.filas || {}, columnas: r.ocultar.columnas || {} }; // T0650; T0671: columnas
     return o;
   }
 
@@ -266,9 +271,14 @@
 
   /** T0639 · El aviso del proyecto (config.json · nucleo.aviso), arriba en todas las secciones; sin él, nada. No se queda
    *  fijo al bajar: no tapa nada. */
-  function htmlAviso() {
-    return cred.aviso ? '<p class="n-aviso-app" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/>' +
-      '<path d="M12 11v5M12 8h.01"/></svg><span>' + texto(cred.aviso) + '</span></p>' : '';
+  function htmlAviso() { return '<div id="n-aviso-app"></div>'; }
+
+  /** T0672 · El aviso de la sección abierta: el suyo (nucleo.secciones.<id>.aviso; "" = ninguno) o, si no tiene, el del proyecto. */
+  function ponerAviso(s) {
+    var c = $('n-aviso-app'); if (!c) return;
+    var t = s && s.aviso !== undefined ? s.aviso : cred.aviso || '';
+    c.innerHTML = t ? '<p class="n-aviso-app" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/>' +
+      '<path d="M12 11v5M12 8h.01"/></svg><span>' + texto(t) + '</span></p>' : '';
   }
 
   /* ---------- el marco ---------- */
@@ -284,6 +294,16 @@
   window.UN = {
     /** Cada sección se registra al cargar su JS: UN.registrar('EJEMPLO', { abrir: function (el, ctx) {}, cerrar: function () {} }). */
     registrar: function (id, def) { DEF[String(id).toUpperCase()] = def; },
+    /**
+     * T0692 · Otra sección que ve quien ha entrado, para usar sus cuentas sin abrirla (las ventas de una marca, de Pedidos, en
+     * su ficha de Clientes): su JS (una vez) y su configuración, { id, titulo, def, config }. null si no la ve: lo de esa
+     * sección no sale en otra a quien no la tiene (y el motor tampoco le daría sus tablas).
+     */
+    seccion: function (id) {
+      var s = cred ? seccion(String(id || '').toUpperCase()) : null;
+      if (!s || !s.web) return Promise.resolve(null);
+      return cargar(s).then(function (def) { return { id: s.id, titulo: s.titulo, def: def, config: s.config || {} }; }, function () { return null; });
+    },
     /** T0283: el bloque «Versión» de Perfil (vacío si no hay versión: DEV, local sin ejemplo). */
     htmlVersion: function () { return htmlVersion(); },
     /**
@@ -364,6 +384,8 @@
     }
     return '<nav class="sx u-sx' + (p.resto.length ? ' sx-mucho' : '') + '" aria-label="Secciones"><div class="sx-in"><div class="sx-cab"><span class="sx-marca">' + texto(C.nombreApp || cred.negocio || '') + '</span>' +
       '<button type="button" class="sx-plegar" id="n-plegar" aria-label="' + et + '" title="' + et + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button></div>' +
+      (cred.buscar ? '<button type="button" class="sx-buscar" data-n-buscar title="Buscar en toda la app (' + (MAC ? '⌘K' : 'Ctrl+K') + ')">' + ICONO_LUPA +
+        '<span>Buscar</span><kbd>' + (MAC ? '⌘K' : 'Ctrl K') + '</kbd></button>' : '') + // T0685: solo en el ordenador (en el móvil, la lupa de la cabecera)
       p.barra.map(enlace).join('') +
       (p.resto.length ? '<div class="sx-resto" id="n-sx-resto">' + p.resto.map(enlace).join('') + '</div>' +
         '<button type="button" class="sx-mas" id="n-sx-mas" aria-expanded="false" aria-controls="n-sx-resto" title="Más secciones">' +
@@ -408,14 +430,17 @@
     document.body.className = 'u u-con-barra' + (cred.como ? ' n-viendo-como' : '') + (sinPerfil() ? ' n-perfil-arriba' : '');
     document.body.innerHTML = bandaDev(cred.dev) + htmlMenu() +
       '<div id="sx-panel">' + htmlComo() + htmlAviso() + '<header class="u-cab n-cab"><h1 id="n-titulo"></h1>' +
+      (cred.buscar ? '<button type="button" class="n-lupa" data-n-buscar aria-label="Buscar en toda la app" title="Buscar en toda la app">' + ICONO_LUPA + '</button>' : '') + // T0685
       '<a class="n-quien" href="?s=perfil" data-sx="PERFIL"><span>' + texto(cred.persona) + '</span>' + (cred.perfil ? '<small>' + texto(cred.perfil) + '</small>' : '') + '</a></header>' +
       '<main class="u-main n-main" id="n-sec"></main></div>' +
       '<div class="u-aviso" id="n-aviso" role="status" hidden></div>';
     $('n-plegar').onclick = plegar;
     tope();
+    usoSegun(cred); // T0682: antes de abrir, para que la primera sección cuente
     abrir(pedida() || menu()[0].id, false);
     avisarVersiones();
     cifras();
+    if (cred.buscar) setTimeout(function () { cargarBuscar().catch(function () {}); }, 1500); // T0685
   }
 
   /* ---------- T0412 · las cifras del menú ----------
@@ -655,7 +680,9 @@
     actual = s.id;
     marcarMenu(s.enPerfil ? 'PERFIL' : s.id); // una sección de dentro de Perfil marca Perfil en el menú (T0269)
     verMas(false);
+    usar(function (u) { u.seccion(s.id, s.titulo); }); // T0682
     $('n-titulo').textContent = s.titulo;
+    ponerAviso(s);
     document.title = s.titulo + ' · ' + (C.nombreApp || cred.negocio || '');
     if (push) {
       // T0420: cuánto habías bajado donde estabas y de qué sección vienes, para que «atrás» (o «Volver a …» de la ficha de
@@ -747,7 +774,11 @@
       // T0420: la sección de la que vienes ({ id, titulo }, o null si se ha entrado directo) y volver a ella como estaba.
       desde: (function () { var d = history.state && history.state.desde, x = d && seccion(d); return x ? { id: x.id, titulo: x.titulo } : null; })(),
       volver: function () { history.back(); },
-      correo: cred.correo || '', secciones: todas().map(function (x) { return x.enPerfil ? { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true } : { id: x.id, titulo: x.titulo }; }),
+      correo: cred.correo || '', secciones: todas().map(function (x) {
+        if (x.enPerfil) return { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true };
+        // T0644: las que esta persona personaliza (Listado: quien administra o su perfil en PERSONALIZAN) salen en su Perfil.
+        return personaliza(x) ? { id: x.id, titulo: x.titulo, personaliza: true } : { id: x.id, titulo: x.titulo };
+      }),
       tablas: tablas(),
       alCambiar: function (f) { (oyentes[s.id] = oyentes[s.id] || []).push(f); },
       llamar: llamar,
@@ -759,6 +790,51 @@
     };
   }
 
+  /* ---------- T0682 · el uso de la app (nucleo/uso.js) ----------
+   * Si «entrar» trae uso ({ app, url, clave }: config.json · nucleo.uso) y no se está viendo como otra persona, se carga
+   * nucleo/uso.js cuando la sección ya está pintada y apunta quién entra, las secciones, los avisos en rojo, los errores y las
+   * esperas del motor, y cuándo sale. Lo de antes de que cargue espera en usoPend. Otra persona o sin uso: se para. */
+  var usoAhora = null, usoPend = [], usoCargando = false, usoOyentes = false;
+  function usar(f) { if (usoAhora) { try { f(usoAhora); } catch (e) {} } else if (usoCargando) usoPend.push(f); }
+  function usoParar() { if (usoAhora) usoAhora.parar(); usoAhora = null; usoPend = []; usoCargando = false; }
+  function usoSegun(c) {
+    if (!c || !c.uso || c.como || !c.correo) { usoParar(); return; }
+    if (usoAhora && usoAhora.correo === c.correo) return;
+    if (usoCargando && usoCargando === c.correo) return;
+    usoParar();
+    usoCargando = c.correo;
+    var listo = function () {
+      if (usoCargando !== c.correo || !window.NUCLEO_USO) return;
+      var U = window.NUCLEO_USO;
+      usoAhora = U.crear({
+        app: c.uso.app, url: c.uso.url, clave: c.uso.clave, correo: c.correo, persona: c.persona, perfil: c.perfil, version: c.version,
+        aparato: U.aparato(navigator, window.innerWidth),
+        local: /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) || location.protocol === 'file:'
+      });
+      usoCargando = false;
+      var p = usoPend; usoPend = [];
+      p.forEach(usar);
+      U.envolver(window.UG, function () { return usoAhora; });
+      if (!usoOyentes) {
+        usoOyentes = true;
+        U.vigilarAvisos(document, function () { return usoAhora; });
+        document.addEventListener('visibilitychange', function () { usar(function (u) { if (document.visibilityState === 'hidden') u.salir(); else u.volver(); }); });
+        window.addEventListener('pagehide', function () { usar(function (u) { u.salir(); }); });
+        window.addEventListener('error', function (e) { usar(function (u) { u.falloPagina(e && (e.message || e.error)); }); });
+      }
+    };
+    if (window.NUCLEO_USO) { listo(); return; }
+    // Cuando la página ya está pintada: no compite con lo que se ve al entrar.
+    setTimeout(function () {
+      if (usoCargando !== c.correo) return;
+      var sc = document.createElement('script');
+      sc.src = RAIZ + 'nucleo/uso.js?v=1';
+      sc.onload = listo;
+      sc.onerror = function () { if (usoCargando === c.correo) { usoCargando = false; usoPend = []; } };
+      document.head.appendChild(sc);
+    }, 1200);
+  }
+
   var tAviso = 0;
   function aviso(t) {
     var a = $('n-aviso');
@@ -766,6 +842,21 @@
     a.textContent = t; a.hidden = false;
     clearTimeout(tAviso);
     tAviso = setTimeout(function () { a.hidden = true; }, 5000);
+  }
+
+  /** T0644 · Si quien ha entrado personaliza esta sección (Listado: quien administra o su perfil en PERSONALIZAN). Lo usan el
+   *  Perfil del marco y, por ctx.secciones (personaliza), la sección Perfil. */
+  function personaliza(x) {
+    return (x.base || x.id) === 'LISTADO' && !x.enPerfil && (!!cred.admin || ((x.config || {}).PERSONALIZAN || []).indexOf(cred.perfil) >= 0);
+  }
+  /** T0644 · Personalizar en el Perfil del marco (sin sección PERFIL), como en la sección Perfil: una línea por sección. */
+  function htmlPersonalizar() {
+    var ss = todas().filter(personaliza);
+    if (!ss.length) return '';
+    return '<section class="pf-pers"><h2 class="n-grupo">Personalizar</h2><p class="u-nota">El orden del menú, qué vistas ve cada sección y con cuántos días avisa.</p>' +
+      '<ul class="pf-pers-l">' + ss.map(function (x) {
+        return '<li><a href="?s=' + encodeURIComponent(x.id.toLowerCase()) + '&personalizar=1" data-sx="' + texto(x.id) + '"><span>' + texto(x.titulo) + '</span><span aria-hidden="true">›</span></a></li>';
+      }).join('') + '</ul></section>';
   }
 
   /** Perfil del marco, mientras el cliente no tenga la sección PERFIL: quién eres, tu perfil, las de dentro de Perfil y cerrar sesión. */
@@ -786,7 +877,7 @@
       (window.UG.avisos && !cred.como ? '<div class="n-avisos" id="n-avisos"></div>' : '') +
       (dentro.length ? '<div class="n-botones">' + dentro.map(function (s) {
         return '<a class="u-btn" href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '">' + texto(s.titulo) + '</a>';
-      }).join('') + '</div>' : '') + '</div>' + htmlVersion();
+      }).join('') + '</div>' : '') + htmlPersonalizar() + '</div>' + htmlVersion();
   }
 
   function conCodigo() { return !!(window.UG.formas && window.UG.formas().indexOf('codigo') >= 0); }
@@ -981,6 +1072,35 @@
     });
   }
 
+  /* ---------- T0685 · buscar en toda la app (nucleo/buscar.js) ----------
+   * La lupa del menú (ordenador) y de la cabecera (móvil), y ⌘K: carga nucleo/buscar.js la primera vez (con la huella que
+   * pone montar.js) y lo abre con los grupos de quien ha entrado (los de las secciones que ve), sus tablas y lo que no ve. */
+  var cargaBuscar = null;
+  /** El JS de la búsqueda, una vez (el marco lo pide un poco después de pintar, para que al abrirla ya esté y no se pierda
+   *  lo primero que se escribe). */
+  function cargarBuscar() {
+    var b = cred && cred.buscar;
+    if (!b) return Promise.reject(new Error('sin búsqueda'));
+    if (!cargaBuscar) cargaBuscar = new Promise(function (ok, ko) {
+      if (window.UBuscar) { ok(); return; }
+      var sc = document.createElement('script');
+      sc.src = RAIZ + 'nucleo/buscar.js?v=' + encodeURIComponent(b.version || '1');
+      sc.onload = function () { if (window.UBuscar) ok(); else ko(new Error('sin UBuscar')); };
+      sc.onerror = function () { cargaBuscar = null; ko(new Error('No se ha podido cargar la búsqueda.')); };
+      document.head.appendChild(sc);
+    });
+    return cargaBuscar;
+  }
+  function buscar() {
+    if (!cred || !cred.buscar) return;
+    var b = cred.buscar;
+    cargarBuscar().then(function () {
+      verMas(false);
+      window.UBuscar.abrir({ grupos: b.grupos, texto: b.texto || '', placeholder: b.placeholder || '', tablas: tablas(), ocultar: cred.ocultar || null,
+        secciones: todas().map(function (s) { return { id: s.id, titulo: s.titulo, icono: s.icono || ICONO_SECCION }; }) });
+    }, function () { aviso('No se ha podido abrir la búsqueda. Comprueba la conexión y vuelve a probar.'); });
+  }
+
   /* ---------- navegación ---------- */
 
   document.addEventListener('click', function (e) {
@@ -988,6 +1108,7 @@
     if (e.target.closest && e.target.closest('#n-sx-mas')) { verMas($('n-sx-mas').getAttribute('aria-expanded') !== 'true'); return; }
     verMas(false);
     // T0273: «Entrar como otra persona» (en Perfil) y «Volver a mi cuenta» (franja y Perfil), estén donde estén.
+    if (e.target.closest && e.target.closest('[data-n-buscar]')) { buscar(); return; } // T0685
     var b = e.target.closest && e.target.closest('[data-n-como], [data-n-volver], [data-n-versiones]');
     if (b && cred) { e.preventDefault(); if (b.hasAttribute('data-n-volver')) volver(); else if (b.hasAttribute('data-n-versiones')) verVersiones(); else verComo(); return; }
     var a = e.target.closest && e.target.closest('a[data-sx]');
@@ -996,6 +1117,10 @@
     // T0415: sin Perfil en el menú, el Perfil del marco es una ventana, no una sección.
     if (a.getAttribute('data-sx') === 'PERFIL' && sinPerfil() && (seccion('PERFIL') || {}).propia) { verPerfil(); return; }
     abrir(a.getAttribute('data-sx'), true, a.getAttribute('href'));
+  });
+  // T0685: ⌘K (Ctrl+K fuera del Mac) abre la búsqueda desde cualquier sección.
+  document.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && String(e.key).toLowerCase() === 'k' && cred && cred.buscar) { e.preventDefault(); buscar(); }
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && $('n-sx-mas') && $('n-sx-mas').getAttribute('aria-expanded') === 'true') { verMas(false); $('n-sx-mas').focus(); } }); // T0629
   try { history.scrollRestoration = 'manual'; } catch (e) {} // T0420: dónde estabas lo pone abrir() (alSitio)
@@ -1040,6 +1165,32 @@
       comprobar();      // y por detrás, con el motor
     } else { borrarComo(); acceso(''); }
   }
+  /* T0644 · Un solo patrón de pestañas (.u-pestanas) en toda la app: una línea que se desliza de lado, con la activa a la
+     vista (sin mover la página arriba o abajo) y el borde difuminado donde hay más. Vale para cualquier sección, que solo
+     pinta sus pestañas. */
+  function pestanasAVista() {
+    [].forEach.call(document.querySelectorAll('.u-pestanas'), function (p) {
+      var a = p.querySelector('[aria-selected=true]');
+      if (a && p.scrollWidth > p.clientWidth && p._activa !== a) {
+        p._activa = a;
+        var izq = a.getBoundingClientRect().left - p.getBoundingClientRect().left + p.scrollLeft, der = izq + a.offsetWidth;
+        if (izq < p.scrollLeft + 24) p.scrollLeft = Math.max(0, izq - 24);
+        else if (der > p.scrollLeft + p.clientWidth - 40) p.scrollLeft = der - p.clientWidth + 40;
+      }
+      bordes(p);
+      if (!p._conBordes) { p._conBordes = true; p.addEventListener('scroll', function () { bordes(p); }, { passive: true }); }
+    });
+  }
+  function bordes(p) {
+    var hay = p.scrollWidth > p.clientWidth + 1;
+    p.classList.toggle('u-mas-izda', hay && p.scrollLeft > 1);
+    p.classList.toggle('u-mas-dcha', hay && p.scrollLeft + p.clientWidth < p.scrollWidth - 1);
+  }
+  var tPest = 0;
+  function pestanasLuego() { cancelAnimationFrame(tPest); tPest = requestAnimationFrame(pestanasAVista); }
+  if (window.MutationObserver) new MutationObserver(pestanasLuego).observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('resize', pestanasLuego);
+
   // Con la página ya leída: así, una sección que va en la misma página (después de este archivo) ya se ha registrado.
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arrancar); else arrancar();
 })();

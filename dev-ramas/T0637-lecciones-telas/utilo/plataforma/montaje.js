@@ -102,6 +102,40 @@ window.NUCLEO_MONTAJE = {
     ],
     "que": "por atender"
    }
+  },
+  {
+   "id": "USO",
+   "modulo": "uso",
+   "titulo": "Uso",
+   "icono": "<path d=\"M4 20V10\"/><path d=\"M10 20V4\"/><path d=\"M16 20v-7\"/><path d=\"M22 20H2\"/>",
+   "web": "utilo/secciones/uso.js",
+   "version": "d475154e0a",
+   "perfiles": [
+    "admin",
+    "responsable"
+   ],
+   "config": {
+    "NO_CUENTAN": [
+     "utilo.digital@gmail.com",
+     "javier.canela3@gmail.com"
+    ],
+    "SECCIONES": {
+     "telas": [
+      "Hoy",
+      "Marcas",
+      "Historial",
+      "Proveedores",
+      "Mis telas",
+      "Calcular precio",
+      "Pedidos",
+      "Economía"
+     ]
+    }
+   },
+   "api": [
+    "uso_apps",
+    "uso_de"
+   ]
   }
  ],
  "perfilEnMenu": false,
@@ -511,6 +545,10 @@ window.NUCLEO_MONTAJE = {
       ]
      },
      {
+      "nombre": "ZONA",
+      "tipo": "texto"
+     },
+     {
       "nombre": "AUTONOMA",
       "tipo": "booleano"
      },
@@ -604,6 +642,10 @@ window.NUCLEO_MONTAJE = {
       "tipo": "ref",
       "obligatoria": true,
       "ref": "TAREAS"
+     },
+     {
+      "nombre": "ESPERA_PRODUCCION",
+      "tipo": "booleano"
      }
     ],
     "restricciones": {
@@ -983,6 +1025,10 @@ window.NUCLEO_MONTAJE = {
        "Cowork",
        "Claude Code"
       ]
+     },
+     {
+      "nombre": "ZONA",
+      "tipo": "texto"
      },
      {
       "nombre": "AUTONOMA",

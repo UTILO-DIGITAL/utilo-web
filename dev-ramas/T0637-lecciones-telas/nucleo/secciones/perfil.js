@@ -206,6 +206,18 @@
         '<p class="u-nota">Al cerrar la sesión tendrás que volver a entrar con tu cuenta de Google.</p>') + '</section>';
   }
 
+  /** T0644 · Personalizar (el orden del menú, qué vistas se ven y los días de los avisos), aquí y no en cada sección: una
+   *  línea por sección que se personaliza, que abre su ventana. */
+  function htmlPersonalizar(ctx) {
+    var ss = (ctx.secciones || []).filter(function (s) { return s.personaliza; });
+    if (!ss.length) return '';
+    return '<section class="pf-bloque pf-pers"><h2 class="n-grupo">Personalizar</h2>' +
+      '<p class="u-nota">El orden del menú, qué vistas ve cada sección y con cuántos días avisa.</p>' +
+      '<ul class="pf-pers-l">' + ss.map(function (s) {
+        return '<li><a href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '&personalizar=1" data-sx="' + texto(s.id) + '"><span>' + texto(s.titulo) + '</span><span aria-hidden="true">›</span></a></li>';
+      }).join('') + '</ul></section>';
+  }
+
   /** Las secciones que van dentro de Perfil («enPerfil», T0269: Pedir a Utilo), como botones al final. */
   function htmlDentro(ctx) {
     var ss = (ctx.secciones || []).filter(function (s) { return s.enPerfil; });
@@ -256,7 +268,7 @@
           // Sin tareas abiertas, el bloque de tareas va después de lo demás: arriba, lo que hay que hacer.
           (d ? (d.tareas && !d.tareas.error && !d.tareas.abiertas ? bloques(d) + htmlTareas(d.tareas, d.hoy, ctx)
             : htmlTareas(d.tareas, d.hoy, ctx) + bloques(d)) : cargando()) + '</div>' +
-          '<div class="pf-col pf-lado">' + htmlCuenta(ctx) + htmlDentro(ctx) + (window.UN.htmlVersion ? window.UN.htmlVersion() : '') + // T0283: versión y novedades
+          '<div class="pf-col pf-lado">' + htmlPersonalizar(ctx) + htmlCuenta(ctx) + htmlDentro(ctx) + (window.UN.htmlVersion ? window.UN.htmlVersion() : '') + // T0283: versión y novedades
           '<p class="u-nota pf-hora" id="pf-hora">' + (d ? 'Al día a las ' + hora(d.leido) + '.' : '') + '</p></div></div></div>';
       }
       var guardado = leer(ctx);
