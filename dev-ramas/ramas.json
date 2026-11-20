@@ -1057,6 +1057,15 @@
    "quien": "Javi Canela",
    "rama": "T0686-catalogo-para-marcas",
    "carpeta": "T0686-catalogo-para-marcas"
+  },
+  "DEV-2": {
+   "cliente": "telas",
+   "modo": "ejemplo",
+   "commit": "8b63ae82+cambios",
+   "subido": "20/11/26, 16:52",
+   "quien": "Javi Canela",
+   "rama": "T0710-ferias-documentos-referentes",
+   "carpeta": "T0710-ferias-documentos-referentes"
   }
  }
 }
