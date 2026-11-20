@@ -545,6 +545,10 @@ window.NUCLEO_MONTAJE = {
       ]
      },
      {
+      "nombre": "ZONA",
+      "tipo": "texto"
+     },
+     {
       "nombre": "AUTONOMA",
       "tipo": "booleano"
      },
@@ -1017,6 +1021,10 @@ window.NUCLEO_MONTAJE = {
        "Cowork",
        "Claude Code"
       ]
+     },
+     {
+      "nombre": "ZONA",
+      "tipo": "texto"
      },
      {
       "nombre": "AUTONOMA",
