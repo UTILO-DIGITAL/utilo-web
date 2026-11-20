@@ -1116,6 +1116,8 @@
 
       // T0646 · Con CUENTAS_PERSONALES (tipos de CUENTAS que son lo que pone una persona, p. ej. «Personal»), la caja no las
       // suma al dinero de la empresa: van aparte, en positivo, como lo que la empresa le debe a esa persona.
+      // T0707 · Un gasto pagado desde una de ellas es gasto de la empresa (Resumen, resultado y lo invertido) y, a la vez, lo que se
+      // le debe: no se cuenta dos veces (Javi, 20/11/2026). El capital no es ni lo uno ni lo otro.
       var PERSONALES = String(cfg.CUENTAS_PERSONALES || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
       function esPersonal(c) { return PERSONALES.indexOf(String(c.TIPO || '')) >= 0; }
       // T0673 · Con CUENTAS_CAPITAL (p. ej. «Capital»), el capital no sale en Caja: ni dinero de la empresa ni lo que te debe.
@@ -1136,7 +1138,7 @@
             (cs.length > 1 ? '<tr class="eco-total"><td class="u-tabla-t">Total de la empresa</td><td class="num">' + cifra(tot, true) + '</td></tr>' : '') + '</tbody></table>'
             : '<p class="u-vacio">La empresa no tiene dinero en ninguna cuenta.</p>');
           if (pers.length) {
-            h += '<h2 class="n-grupo">Lo que te debe la empresa</h2><p class="u-nota">Lo que has pagado tú por la empresa (o le has prestado) y todavía no te ha devuelto.</p>' +
+            h += '<h2 class="n-grupo">Lo que te debe la empresa</h2><p class="u-nota">Lo que has pagado tú por la empresa (o le has prestado) y todavía no te ha devuelto. Lo que pagaste por ella ya cuenta como gasto de la empresa en el Resumen.</p>' +
               '<table class="u-tabla eco-tabla"><tbody>' + pers.map(function (y) {
                 return fila(y.c, y.v, y.v < 0 ? 'Te ha devuelto más de lo que pusiste' : '');
               }).join('') + (pers.length > 1 ? '<tr class="eco-total"><td class="u-tabla-t">Total</td><td class="num">' + cifra(debe, true) + '</td></tr>' : '') + '</tbody></table>';
