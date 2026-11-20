@@ -962,11 +962,11 @@
   "T0724-borrado-avisos-listas": {
    "tarea": "T0724",
    "titulo": "El borrado, los avisos y las columnas de las listas no fallan",
-   "pr": null,
-   "commit": "241ea2de",
-   "ultimo": "T0724: El borrado, los avisos y las columnas de las listas no fallan",
+   "pr": 411,
+   "commit": "a4ba9c3e",
+   "ultimo": "T0724: Al día con main (T0719, T0729, T0728, T0725, T0735, T0723)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T22:48:39.082Z",
+   "fecha": "2026-11-20T23:47:08.782Z",
    "toca": [
     "telas"
    ],
@@ -1239,7 +1239,8 @@
      "20261120083735_zona_tablas.sql",
      "20261120083736_zona.sql",
      "20261120115014_dependencia_en_main_tablas.sql",
-     "20261120115015_dependencia_en_main.sql"
+     "20261120115015_dependencia_en_main.sql",
+     "20261120230000_vigilar_tablas.sql"
     ]
    },
    "rama": "T0724-borrado-avisos-listas"
