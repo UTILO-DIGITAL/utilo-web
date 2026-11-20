@@ -2279,6 +2279,16 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .pr-otras summary { cursor: pointer; font-size: 13.5px; color: var(--color-principal-oscuro); padding-top: var(--e1); }
 @media (max-width: 820px) { .u .pr-calc { grid-template-columns: 1fr; } }
 @media (max-width: 420px) { .u .pr-par { grid-template-columns: 1fr; } .u .pr-o { display: none; } }
+/* T0687: guardar en la ficha de la marca o copiar para WhatsApp; en el móvil, el precio arriba y fijo mientras se escribe
+   (abajo lo tapa el teclado). En el ordenador el resultado ya está al lado: la barra no sale. */
+.u .pr-acciones { display: flex; flex-wrap: wrap; gap: var(--e2); margin-top: var(--e2); }
+.u .pr-barra { display: none; }
+@media (max-width: 820px) {
+  .u .pr-barra { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e1) var(--e3); position: sticky; top: var(--tope, 0px); z-index: 3;
+    margin: 0 calc(var(--e4) * -1) var(--e3); padding: var(--e2) var(--e4); background: var(--color-fondo); border-bottom: 1px solid var(--color-linea); }
+  .u .pr-barra-p { font-size: 20px; font-weight: 600; }
+  .u .pr-acciones .u-btn { flex: 1 1 auto; }
+}
 /* T0643 · Sección Listado: cerrar, pasar y apuntar en un toque. El círculo cierra una fila (como en una lista de tareas) y
    «Pasar» la lleva a otro día; en el móvil, los dos van encima de la tarjeta (no dentro: un botón no va dentro de otro). */
 .u .li-circ { width: 26px; height: 26px; flex: none; padding: 0; border-radius: 50%; border: 1.5px solid var(--color-suave); background: var(--color-superficie);

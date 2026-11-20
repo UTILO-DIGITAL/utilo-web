@@ -921,10 +921,10 @@
    "tarea": "T0691",
    "titulo": "Mis telas como muestrario de fotos, con filtros por cómo es cada tela y sus marcas en la ficha",
    "pr": 371,
-   "commit": "ca3e1f7f",
-   "ultimo": "T0691: En el móvil, el filtro de proveedor puesto sale con los demás filtros (sus pastillas no caben)",
+   "commit": "3bb9fcbe",
+   "ultimo": "T0691: Al día con main (T0687 calcular precio, T0686 catálogo): en la ficha de la tela, «Precios propuestos» y «Marcas»; las telas del muestrario, solo en el ejemplo largo",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T10:03:21.885Z",
+   "fecha": "2026-11-20T10:10:54.771Z",
    "toca": [
     "telas"
    ],
@@ -1105,6 +1105,21 @@
       "web/kanban4/tablas.js",
       "web/nucleo/elegir.js",
       "web/nucleo/nucleo.js",
+      "web/telas/marca.css"
+     ],
+     "motor": true,
+     "local": true,
+     "cambia": true
+    },
+    {
+     "ruta": "dev/telas/catalogo/",
+     "nombre": "Catálogo para marcas (Excel de prueba)",
+     "iniciativa": "telas",
+     "proyecto": "",
+     "carga": [
+      "web/kanban4/google.js",
+      "web/telas/catalogo/catalogo.css",
+      "web/telas/catalogo/catalogo.js",
       "web/telas/marca.css"
      ],
      "motor": true,
