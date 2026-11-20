@@ -1618,14 +1618,6 @@
   "ficha": "../utilo/plataforma/?s=tablero&t="
  },
  "huecos": {
-  "DEV-1": {
-   "cliente": "telas",
-   "commit": "e773849c",
-   "subido": "20/11/26, 23:14",
-   "quien": "Javi Canela",
-   "rama": "T0721-telas-permisos-tablas",
-   "carpeta": "T0721-telas-permisos-tablas"
-  },
   "DEV-2": {
    "cliente": "telas",
    "modo": "ejemplo",
@@ -1634,6 +1626,15 @@
    "quien": "Javi Canela",
    "rama": "T0719-claude-de-marta",
    "carpeta": "T0719-claude-de-marta"
+  },
+  "DEV-1": {
+   "cliente": "utilo",
+   "modo": "ejemplo",
+   "commit": "85cbb11e",
+   "subido": "20/11/26, 23:31",
+   "quien": "Javi Canela",
+   "rama": "T0725-facturas-sin-fallos",
+   "carpeta": "T0725-facturas-sin-fallos"
   }
  }
 }
