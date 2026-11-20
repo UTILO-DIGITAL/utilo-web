@@ -959,13 +959,15 @@
   },
   "T0716-app-como-lo-bueno": {
    "tarea": "T0716",
-   "titulo": "Merge pull request #400 from UTILO-DIGITAL/T0714-editar-alta-telas",
+   "titulo": "La app de Telas como lo bueno: sin la copia de su Excel ni los avisos de prueba",
    "pr": null,
-   "commit": "575860c1",
-   "ultimo": "Merge pull request #400 from UTILO-DIGITAL/T0714-editar-alta-telas",
+   "commit": "ddcf99ef",
+   "ultimo": "T0716: La app de Telas como lo bueno: sin la copia de su Excel ni los avisos de prueba",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T19:18:24.645Z",
-   "toca": [],
+   "fecha": "2026-11-20T19:18:59.016Z",
+   "toca": [
+    "telas"
+   ],
    "comun": false,
    "paginas": [
     {
@@ -1130,7 +1132,7 @@
        "nombre": "Admin"
       }
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/",
@@ -1147,7 +1149,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/catalogo/",
@@ -1162,7 +1164,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     }
    ],
    "migraciones": {
