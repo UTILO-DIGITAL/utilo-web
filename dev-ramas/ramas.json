@@ -1249,10 +1249,10 @@
    "tarea": "T0741",
    "titulo": "La app de Telas, solo con sus archivos de Drive",
    "pr": 413,
-   "commit": "aaf59b98",
-   "ultimo": "T0741: La app de Telas, solo con sus archivos de Drive",
+   "commit": "6897aa96",
+   "ultimo": "T0741: Una factura cobrada sin PDF puede sacarlo",
    "quien": "Javi Canela",
-   "fecha": "2026-11-20T23:42:18.465Z",
+   "fecha": "2026-11-20T23:47:58.199Z",
    "toca": [
     "telas"
    ],
