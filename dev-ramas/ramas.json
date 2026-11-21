@@ -1339,14 +1339,6 @@
   "ficha": "../utilo/plataforma/?s=tablero&t="
  },
  "huecos": {
-  "DEV-1": {
-   "cliente": "utilo",
-   "commit": "85cbb11e",
-   "subido": "20/11/26, 23:31",
-   "quien": "Javi Canela",
-   "rama": "T0725-facturas-sin-fallos",
-   "carpeta": "T0725-facturas-sin-fallos"
-  },
   "DEV-3": {
    "cliente": "telas",
    "modo": "ejemplo",
@@ -1355,6 +1347,15 @@
    "quien": "Javi Canela",
    "rama": "T0730-afinar-mis-telas",
    "carpeta": "T0730-afinar-mis-telas"
+  },
+  "DEV-1": {
+   "cliente": "utilo",
+   "modo": "ejemplo",
+   "commit": "1108e61d+cambios",
+   "subido": "21/11/26, 1:27",
+   "quien": "Javi Canela",
+   "rama": "T0733-economia-gestoria",
+   "carpeta": "T0733-economia-gestoria"
   }
  }
 }
