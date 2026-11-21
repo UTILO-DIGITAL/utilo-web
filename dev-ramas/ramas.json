@@ -1350,6 +1350,15 @@
    "quien": "Javi Canela",
    "rama": "T0733-economia-gestoria",
    "carpeta": "T0733-economia-gestoria"
+  },
+  "DEV-2": {
+   "cliente": "telas",
+   "modo": "ejemplo",
+   "commit": "bb722eb5+cambios",
+   "subido": "21/11/26, 20:25",
+   "quien": "Javi Canela",
+   "rama": "T0752-telas-antes-del-video",
+   "carpeta": "T0752-telas-antes-del-video"
   }
  }
 }
