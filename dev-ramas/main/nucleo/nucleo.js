@@ -62,7 +62,7 @@
     var x = sv[0], p = Array.isArray(x.principal) && x.principal.length ? x.principal : (x.novedades || []).slice(0, 5);
     return { version: x, lineas: p, total: total };
   }
-  if (typeof window === 'undefined') { if (typeof module !== 'undefined') module.exports = { plano: plano, cumpleCifra: cumpleCifra, nombreCifra: nombreCifra, versionesSinVer: versionesSinVer, novedadesCortas: novedadesCortas }; return; }
+  if (typeof window === 'undefined') { if (typeof module !== 'undefined') module.exports = { plano: plano, cumpleCifra: cumpleCifra, nombreCifra: nombreCifra, miaCifra: miaCifra, versionesSinVer: versionesSinVer, novedadesCortas: novedadesCortas }; return; }
   var C = window.KANBAN || {};
   var CLAVE = 'nucleo_' + (C.clave || 'negocio');
   // Raíz de utilo-web (…/utilo-web/): de aquí cuelgan nucleo/, kanban4/, estilos/ y la carpeta de cada negocio.
@@ -604,13 +604,25 @@
       return k ? String(x[k]) : undefined;
     };
   }
+  /** T0752 · Si la sección abre en «Mías» (cifra.mias: { campo, sinNadie }, de su MIAS) y en el equipo hay alguien más, la cifra
+   *  cuenta solo las filas de quien entra, como la lista al abrirla (esMia de Listado): la de su correo y la que no es de nadie,
+   *  si administra o su perfil está en sinNadie. Sin eso, todas. q: { correo, perfil, admin, equipo }. */
+  function miaCifra(mias, q) {
+    var yo = String((q && q.correo) || '').trim().toLowerCase();
+    var otro = ((q && q.equipo) || []).some(function (p) { var c = String((p && p.correo) || '').trim().toLowerCase(); return c && c !== yo; });
+    if (!mias || !mias.campo || !otro) return function () { return true; };
+    return function (f) {
+      var v = String((f && f[mias.campo]) || '').trim().toLowerCase();
+      return v ? v === yo : !!q.admin || (mias.sinNadie || []).indexOf(String(q.perfil || '')) >= 0;
+    };
+  }
   function contarCifras(tabla) {
     if (!cred || !T) return;
     menu().forEach(function (s) {
       var c = s.cifra;
       if (!c || (tabla && tabla !== c.tabla)) return;
-      var nom = nombreCifra(c.refs, T.fila ? function (t, id) { return T.fila(t, id); } : null);
-      var n = T.filas(c.tabla).filter(function (f) { return Object.keys(c.donde || {}).every(function (k) { return f[k] === c.donde[k]; }) && cumpleCifra(f, c.si, c.dias, nom); }).length;
+      var nom = nombreCifra(c.refs, T.fila ? function (t, id) { return T.fila(t, id); } : null), mia = miaCifra(c.mias, cred);
+      var n = T.filas(c.tabla).filter(function (f) { return Object.keys(c.donde || {}).every(function (k) { return f[k] === c.donde[k]; }) && mia(f) && cumpleCifra(f, c.si, c.dias, nom); }).length;
       var b = document.querySelector('[data-cifra="' + s.id + '"]');
       if (!b) return;
       b.textContent = n ? String(n) : ''; b.hidden = !n;
@@ -754,12 +766,18 @@
   }
   /** Lo que ocupa la franja (--tope), para que lo que se queda fijo arriba al bajar (cabeceras de tabla…) quede debajo. */
   var obsTope = null;
+  // T0752: y --alto-cab, lo que ocupa la cabecera de la sección cuando se queda fija arriba (en el móvil, nucleo-2.css), para
+  // que lo demás que se pega arriba quede debajo de ella.
   function tope() {
     if (obsTope) { obsTope.disconnect(); obsTope = null; }
-    var f = $('n-como'), poner = function () { document.body.style.setProperty('--tope', (f ? f.offsetHeight : 0) + 'px'); };
-    if (!f) { document.body.style.removeProperty('--tope'); return; }
+    var f = $('n-como'), c = document.querySelector('.n-cab');
+    var poner = function () {
+      var st = document.body.style, fija = c && window.getComputedStyle(c).position === 'sticky';
+      if (f) st.setProperty('--tope', f.offsetHeight + 'px'); else st.removeProperty('--tope');
+      if (fija) st.setProperty('--alto-cab', c.offsetHeight + 'px'); else st.removeProperty('--alto-cab');
+    };
     poner();
-    if (window.ResizeObserver) { obsTope = new ResizeObserver(poner); obsTope.observe(f); }
+    if (window.ResizeObserver && (f || c)) { obsTope = new ResizeObserver(poner); if (f) obsTope.observe(f); if (c) obsTope.observe(c); }
   }
 
   /** La ventana para elegir como quién entrar: las personas de la tabla de accesos (solo quien administra; lo comprueba el motor). */

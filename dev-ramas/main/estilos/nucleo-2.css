@@ -866,9 +866,9 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
 .u .li-nueva .u-icono { display: none; }
 @media (max-width: 639px) {
   .u .li-arriba { gap: var(--e2); margin-bottom: var(--e2); }
-  .u .li-arriba .u-pestanas.li-vistas { flex: 0 1 auto; gap: 2px; padding: 3px; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--color-texto) 6%, var(--color-fondo)); -webkit-mask-image: none; mask-image: none; }
-  .u .li-arriba .u-pestanas.li-vistas button { min-height: 34px; padding: 0 var(--e3); border: 0; border-radius: 8px; font-size: 14px; }
-  .u .li-arriba .u-pestanas.li-vistas button[aria-selected=true] { background: var(--color-superficie); box-shadow: 0 1px 2px rgba(0, 0, 0, .1); }
+  /* T0752: las vistas (y Mías / Todas en Hoy), pestañas subrayadas como en el ordenador; antes, un interruptor en cápsula. */
+  .u .li-arriba .u-pestanas.li-vistas { flex: 1 1 auto; min-width: 0; gap: 0; }
+  .u .li-arriba .u-pestanas.li-vistas button { min-height: 38px; padding: 0 var(--e2); font-size: 14px; }
   .u .li-arriba .li-cuenta { margin-left: auto; font-size: 13px; }
   .u .li-qes { width: 34px; min-height: 34px; border: 0; background: transparent; }
   .u .li-barra { margin-bottom: var(--e2); }
@@ -1075,10 +1075,7 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
 /* Los tableros, sin la rayita de color arriba de cada columna (solo la tenían algunas; el nombre ya lo dice). */
 .u .li-col { border-top: 1px solid var(--linea-fila); }
 @media (max-width: 639px) {
-  /* Con tres vistas, el número de filas no cabe al lado: T0723, pasa a su propia línea, debajo (antes se quitaba). */
-  .u .li-arriba:has(.li-vistas button:nth-child(3)) { flex-wrap: wrap; }
-  .u .li-arriba:has(.li-vistas button:nth-child(3)) .li-cuenta { order: 9; flex-basis: 100%; margin-left: 0; }
-  .u .li-arriba .u-pestanas.li-vistas button { padding: 0 10px; }
+  /* T0752: con pestañas subrayadas, el número de filas cabe al lado también con tres vistas (T0723 lo bajaba de línea). */
   /* El filtro rápido, en líneas que bajan (no se corta por el lado). */
   .u .li-rapido { flex-wrap: wrap; overflow: visible; }
 }
@@ -1317,8 +1314,7 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
   --sombra-flota: 0 6px 20px rgb(0 0 0 / 55%);
 }/* En oscuro, la opción elegida de un interruptor (Mías/Todas, las vistas, Calcular precio, Aspecto) sobre su carril: un gris
    más claro, que la superficie casi no se distingue del carril. */
-:root[data-tema="oscuro"] .u .li-mias button[aria-pressed=true], :root[data-tema="oscuro"] .u .pr-seg button[aria-pressed=true],
-:root[data-tema="oscuro"] .u .li-arriba .u-pestanas.li-vistas button[aria-selected=true] {
+:root[data-tema="oscuro"] .u .li-mias button[aria-pressed=true], :root[data-tema="oscuro"] .u .pr-seg button[aria-pressed=true] {
   background: color-mix(in srgb, var(--color-texto) 20%, var(--color-superficie)); box-shadow: none; }
 
 /* R47 · Mantener apretado lo que se toca no saca el menú del enlace de Safari ni selecciona texto, y el toque no deja el
@@ -1368,3 +1364,12 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
 .u .eco-cambio-f input { width: 7em; text-align: right; }
 /* Pedidos: las cifras, todas a 24 px (antes, de 22 a 40). */
 .u .eco-kpis-ven .eco-val, .u .eco-kpis-ven .eco-grande .eco-val { font-size: 24px; line-height: 1.2; }
+
+/* T0752 · En el móvil, la cabecera de la sección (el título y quién ha entrado) se queda fija arriba. En Safari (iOS 26) lo que
+   sube por debajo de la hora se ve borroso: con algo fijo arriba, Safari pinta esa franja de su color y el título no se
+   emborrona al bajar. Lo demás que se pega arriba (cabeceras de tabla, la barra de Calcular precio…) va debajo de ella:
+   --alto-cab, de nucleo.js (tope). */
+@media (max-width: 699px) {
+  body.u-con-barra .u-cab { position: sticky; top: var(--tope, 0px); z-index: 30; background: var(--color-fondo); padding-bottom: var(--e2); }
+  .u .u-tabla th, .u .pr-barra, .u .barra, .u .f-cambio { top: calc(var(--tope, 0px) + var(--alto-cab, 0px)); }
+}

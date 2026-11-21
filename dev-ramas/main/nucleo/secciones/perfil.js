@@ -266,10 +266,12 @@
         visto = d;
         // T0270: en el ordenador, lo tuyo a la izquierda y tu cuenta, lo que va dentro y la versión en una columna a la
         // derecha; en el móvil, una debajo de la otra, en el mismo orden de siempre.
-        el.innerHTML = '<div class="pf">' + htmlQuien(ctx) + '<div class="pf-cols"><div class="pf-col">' +
-          // Sin tareas abiertas, el bloque de tareas va después de lo demás: arriba, lo que hay que hacer.
-          (d ? (d.tareas && !d.tareas.error && !d.tareas.abiertas ? bloques(d) + htmlTareas(d.tareas, d.hoy, ctx)
-            : htmlTareas(d.tareas, d.hoy, ctx) + bloques(d)) : cargando()) + '</div>' +
+        // Sin tareas abiertas, el bloque de tareas va después de lo demás: arriba, lo que hay que hacer.
+        var izq = d ? (d.tareas && !d.tareas.error && !d.tareas.abiertas ? bloques(d) + htmlTareas(d.tareas, d.hoy, ctx)
+          : htmlTareas(d.tareas, d.hoy, ctx) + bloques(d)) : cargando();
+        // T0752: sin nada a la izquierda (Telas: sin tareas ni bloques), una sola columna; antes, la izquierda vacía.
+        el.innerHTML = '<div class="pf">' + htmlQuien(ctx) + '<div class="pf-cols' + (String(izq).trim() ? '' : ' pf-una') + '">' +
+          (String(izq).trim() ? '<div class="pf-col">' + izq + '</div>' : '') +
           '<div class="pf-col pf-lado">' + htmlPersonalizar(ctx) + (window.UN.htmlAspecto ? window.UN.htmlAspecto() : '') + htmlCuenta(ctx) + htmlDentro(ctx) + (window.UN.htmlVersion ? window.UN.htmlVersion() : '') + // T0283: versión y novedades
           '<p class="u-nota pf-hora" id="pf-hora">' + (d ? 'Al día a las ' + hora(d.leido) + '.' : '') + '</p></div></div></div>';
       }

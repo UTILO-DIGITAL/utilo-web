@@ -208,8 +208,9 @@ body.u { margin: 0; background: var(--color-fondo); color: var(--color-texto);
 .sx.u-sx a[aria-current=page] { color: var(--color-principal-oscuro); border-top-color: var(--color-principal); }
 .sx.u-sx a:focus-visible { outline: 3px solid var(--color-principal-oscuro); outline-offset: -3px; }
 .sx.u-sx svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
-/* T0218: el contador de Nuevas de la Bandeja va en su sección de la barra (lo mueve BANDEJA_WEB del motor) */
-.sx.u-sx a[data-sx=BANDEJA] { position: relative; }
+/* T0218: el contador de Nuevas de la Bandeja va en su sección de la barra (lo mueve BANDEJA_WEB del motor). T0752: y el de
+   cualquier sección: sin esto, el número de Hoy salía sobre el botón del centro de la barra (Historial en Telas). */
+.sx.u-sx a { position: relative; }
 .sx.u-sx a .bj-n { position: absolute; top: 4px; left: calc(50% + 6px); min-width: 18px; margin: 0; padding: 0 5px; font-size: 11px; line-height: 18px; }
 body.u-con-barra { padding-bottom: calc(var(--alto-barra) + var(--e1) + env(safe-area-inset-bottom, 0px)) !important; }
 /* T0629: en el móvil, como mucho 5 botones abajo. Con más secciones, «Más» (.sx-mas) abre las demás (.sx-resto) en una lista
@@ -444,6 +445,9 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 @media (min-width: 1200px) {
   .u .pf-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); align-items: start; gap: var(--e6); }
   .u .pf-lado { padding-left: var(--e5); border-left: 1px solid var(--color-linea); }
+  /* T0752 · Sin nada a la izquierda (sin tareas ni bloques), una columna, del ancho de la de la derecha y algo más. */
+  .u .pf-cols.pf-una { display: flex; max-width: 560px; }
+  .u .pf-una .pf-lado { padding-left: 0; border-left: 0; }
 }
 .u .pf-bloque .n-grupo { margin: 0 0 var(--e2); }
 .u .pf-resumen { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e4); margin-bottom: var(--e3); font-size: 14px; }
