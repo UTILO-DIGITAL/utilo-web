@@ -1119,7 +1119,7 @@ body.u-con-barra .rp-toast { bottom: calc(var(--alto-barra, 64px) + var(--e2) + 
 .u .eco-rec .eco-dl { align-self: stretch; margin: 0; }
 .u #p-lista input { text-align: right; font-variant-numeric: tabular-nums; }
 /* Abrir una factura en Drive (enlace que se abre en otra pestaña) */
-.u .eco-drive { font-weight: 700; white-space: nowrap; }
+.u .eco-drive { white-space: nowrap; } /* T0726 (R56): como los enlaces del Listado (li-enl), sin negrita ni flecha */
 /* T0627 · Las líneas de una factura emitida (FACTURA_LINEAS): qué se vende y su detalle, a lo ancho; debajo, la
    cantidad, la unidad, el precio, «IVA incl.» (su precio ya lleva el IVA), el importe y quitar. */
 .u .eco-lin { display: grid; grid-template-columns: 4.5em 3.2em minmax(5em, 1fr) auto auto auto; gap: var(--e2); align-items: center; padding: var(--e2) 0 var(--e3); border-bottom: 1px solid var(--color-linea); }
@@ -3387,3 +3387,20 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
   .u .li-ventana .n-ventana > .li-ficha-cab { margin: 0 calc(-1 * var(--e5)); padding: var(--e2) var(--e5) var(--e1); }
   .u .li-ventana .n-ventana > .li-ficha-cab:first-child { margin-top: calc(-1 * var(--e4)); padding-top: var(--e4); }
 }
+
+/* ---------- T0726 · Economía y Pedidos, más claros ---------- */
+/* Un gasto sin previsto: su barra en gris (no hay con qué compararla), no en teja. */
+.u .eco-barra-p i.eco-sinprev { background: color-mix(in srgb, var(--est-gris) 45%, var(--color-superficie)); }
+/* Facturas: lo que suman las emitidas y lo que suman las recibidas, aparte; el estado, en su píldora junto a la fecha. */
+.u .eco-fac-tot { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e1) var(--e4); margin: 0 0 var(--e3); font-size: 14px; }
+.u .eco-fac-tot b { font-weight: 600; }
+.u .eco-fac-l .u-chip { margin-left: var(--e1); vertical-align: middle; }
+.u .u-chip.eco-anulada { text-decoration: line-through; }
+/* El importe de un movimiento con su moneda al lado (€, ₹, $) y, para la que no tiene cambio guardado, «1 € = … $». */
+.u .eco-imp-m { display: flex; gap: var(--e2); min-width: 0; }
+.u .eco-imp-m .eco-imp { flex: 1; min-width: 0; }
+.u .eco-imp-m .eco-moneda { flex: none; width: auto; min-width: 4.2em; }
+.u .eco-cambio-f { display: flex; align-items: center; gap: var(--e2); white-space: nowrap; }
+.u .eco-cambio-f input { width: 7em; text-align: right; }
+/* Pedidos: las cifras, todas a 24 px (antes, de 22 a 40). */
+.u .eco-kpis-ven .eco-val, .u .eco-kpis-ven .eco-grande .eco-val { font-size: 24px; line-height: 1.2; }

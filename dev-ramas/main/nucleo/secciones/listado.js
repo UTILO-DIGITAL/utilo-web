@@ -1776,22 +1776,26 @@
   /**
    * T0692 · «Sus ventas» en la ficha: lo que dice de un vistazo (la última, lo de este año y lo que debe) y cada venta, que
    * abre su sección (o.seccion, o.va: su título si quien mira la ve) con ella (?venta=). q: las de ventasPorQuien de Economía
-   * de esta fila; undefined, aún no han llegado («Mirando sus ventas…»); null o sin ventas, nada. o: { titulo, seccion, va, max, hoy }.
+   * de esta fila; undefined, aún no han llegado («Mirando sus ventas…»); null o sin ventas, nada. o: { titulo, seccion, va, max, hoy, nombre }.
+   * T0726 (R26) · nombre: cómo se llaman allí («pedido» en Telas; vacío, «venta»), para que diga lo mismo en todas partes.
    */
   function htmlVentas(q, o) {
-    var tit = texto(o.titulo || 'Sus ventas');
-    if (q === undefined) return '<section class="li-fgrupo"><h3 class="li-fg-t">' + tit + '</h3><p class="u-nota">Mirando sus ventas…</p></section>';
+    var uno = String(o.nombre || 'venta').toLowerCase(), varios = /[aeiouáéó]$/.test(uno) ? uno + 's' : uno + 'es', f = /a$/.test(uno);
+    var tit = texto(o.titulo || 'Sus ' + varios);
+    if (q === undefined) return '<section class="li-fgrupo"><h3 class="li-fg-t">' + tit + '</h3><p class="u-nota">Mirando sus ' + texto(varios) + '…</p></section>';
     if (!q || !q.ventas || !q.ventas.length) return '';
     var eur = function (c) { return num(c / 100, c % 100 ? 2 : 0) + ' €'; };
-    var partes = ['Última venta ' + (cuando(q.ultima, o.hoy) || fechaCorta(q.ultima))];
-    if (q.enAnio) partes.push(q.anio ? eur(q.anio) + ' este año' : (q.enAnio === 1 ? '1 venta' : q.enAnio + ' ventas') + ' este año, sin precio cerrado');
-    var debe = q.debe > 0 ? '<span class="u-mal">Te debe ' + eur(q.debe) + '</span>' : (q.sinPrecio ? 'Sin precio cerrado en ' + (q.sinPrecio === 1 ? 'una' : q.sinPrecio) : '<span class="u-bien">Al día</span>');
+    var partes = [(f ? 'Última ' : 'Último ') + uno + ' ' + (cuando(q.ultima, o.hoy) || fechaCorta(q.ultima))];
+    if (q.enAnio) partes.push(q.anio ? eur(q.anio) + ' este año' : (q.enAnio === 1 ? '1 ' + uno : q.enAnio + ' ' + varios) + ' este año, sin precio cerrado');
+    var debe = q.debe > 0 ? '<span class="u-mal">Te debe ' + eur(q.debe) + '</span>' : (q.sinPrecio ? 'Sin precio cerrado en ' + (q.sinPrecio === 1 ? (f ? 'una' : 'uno') : q.sinPrecio) : '<span class="u-bien">Al día</span>');
+    // El paso, concordando con la palabra: «Pedido», «Cobrado».
+    var paso = function (t) { return f ? String(t || '') : String(t || '').replace(/^(Pedid|Cobrad|Entregad|Pagad|Facturad)a\b/, '$1o'); };
     var sec = String(o.seccion || ''), va = o.va, max = o.max || 10;
     return '<section class="li-fgrupo li-ventas"><h3 class="li-fg-t">' + tit + ' <span class="u-cifra">' + q.ventas.length + '</span></h3>' +
       '<p class="li-ven-res">' + partes.map(texto).join(' · ') + ' · ' + debe + '</p><ul class="li-rel">' + q.ventas.slice(0, max).map(function (x) {
-        var paso = x.paso + (x.fechaPaso ? ' ' + fechaCorta(x.fechaPaso) : ''), extra = x.cobrada || x.adelantado ? (x.importe !== null ? eur(x.importe) : '') :
+        var pasoT = paso(x.paso) + (x.fechaPaso ? ' ' + fechaCorta(x.fechaPaso) : ''), extra = x.cobrada || x.adelantado ? (x.importe !== null ? eur(x.importe) : '') :
           (x.debe === null ? 'Sin precio cerrado' : x.debe > 0 ? 'Te debe ' + eur(x.debe) : '');
-        var dentro = '<span class="li-rel-n">' + texto(x.v.NOMBRE || x.v.ID) + '</span><span>' + texto(paso) + '</span>' +
+        var dentro = '<span class="li-rel-n">' + texto(x.v.NOMBRE || x.v.ID) + '</span><span>' + texto(pasoT) + '</span>' +
           (extra ? '<span' + (x.debe > 0 && !x.cobrada && !x.adelantado ? ' class="u-mal"' : '') + '>' + texto(extra) + '</span>' : '');
         return '<li>' + (va ? '<a class="li-rel-f" href="?s=' + encodeURIComponent(sec.toLowerCase()) + '&venta=' + encodeURIComponent(x.v.ID) + '" data-sx="' + texto(sec) + '">' + dentro + '<span class="li-ir">' + texto(va) + ' ›</span></a>' : '<div class="li-rel-f">' + dentro + '</div>') + '</li>';
       }).join('') + '</ul>' + (q.ventas.length > max ? '<p class="u-nota">Y ' + (q.ventas.length - max) + ' más, en ' + texto(va || 'Pedidos') + '.</p>' : '') + '</section>';
@@ -2156,7 +2160,7 @@
       var VENTAS = cfg.VENTAS && cfg.VENTAS.seccion ? cfg.VENTAS : null, venSec = VENTAS ? String(VENTAS.seccion).toUpperCase() : '';
       /** «Sus ventas» de una fila (vacío si no tiene; «Mirando…» mientras no han llegado). */
       function htmlVentasDe(crudo, hoy) {
-        return htmlVentas(D.ventas ? D.ventas[String(crudo[BASE.clave])] || null : undefined, { titulo: VENTAS.titulo, seccion: venSec, va: veo[venSec], max: VENTAS.max, hoy: hoy });
+        return htmlVentas(D.ventas ? D.ventas[String(crudo[BASE.clave])] || null : undefined, { titulo: VENTAS.titulo, nombre: VENTAS.nombre, seccion: venSec, va: veo[venSec], max: VENTAS.max, hoy: hoy });
       }
       /** Las ventas de cada fila, de su sección (sin abrirla). Al llegar, la lista (Última venta) y la ficha abierta las enseñan. */
       function leerVentas() {
