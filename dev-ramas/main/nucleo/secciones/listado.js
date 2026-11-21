@@ -1,3 +1,4 @@
+// Generado por node herramientas/piezas.js con sus piezas de web/nucleo/secciones/listado/ (T0743): no se cambia a mano, se cambia su pieza.
 /*
  * Sección Listado base del núcleo · UTILO_CORE 5.0 (T0599) · motor/modulos/listado de utilo-apps
  *
