@@ -4,10 +4,10 @@
    "tarea": "",
    "titulo": "Lo fusionado (aún no publicado)",
    "pr": null,
-   "commit": "c3197d69",
-   "ultimo": "Merge pull request #429 from UTILO-DIGITAL/T0717-listado-solo-mirar",
+   "commit": "e292e966",
+   "ultimo": "Merge pull request #430 from UTILO-DIGITAL/T0744-partir-base-css",
    "quien": "",
-   "fecha": "2026-11-21T08:53:45.670Z",
+   "fecha": "2026-11-21T10:01:40.709Z",
    "toca": [],
    "comun": false,
    "paginas": [
@@ -53,7 +53,8 @@
      "proyecto": "utilo/plataforma",
      "carga": [
       "web/dev/plataforma/manifest.webmanifest",
-      "web/estilos/base.css",
+      "web/estilos/nucleo-2.css",
+      "web/estilos/nucleo.css",
       "web/kanban4/tablas.js",
       "web/nucleo/acceso-supabase.js",
       "web/nucleo/nucleo.js",
@@ -153,7 +154,8 @@
       "web/' + window.LI_MARCA + '/marca.css",
       "web/dev/listado/ejemplo-telas.js",
       "web/dev/listado/motor-falso.js",
-      "web/estilos/base.css",
+      "web/estilos/nucleo-2.css",
+      "web/estilos/nucleo.css",
       "web/kanban4/tablas.js",
       "web/nucleo/nucleo.js",
       "web/nucleo/secciones/listado.js"
@@ -181,7 +183,8 @@
      "iniciativa": "telas",
      "proyecto": "",
      "carga": [
-      "web/estilos/base.css",
+      "web/estilos/nucleo-2.css",
+      "web/estilos/nucleo.css",
       "web/kanban4/google.js",
       "web/kanban4/tablas.js",
       "web/nucleo/elegir.js",

@@ -3,7 +3,7 @@
  * Variables de su guía de marca (T0609, «Guía de marca · App de Marta Canela», apartado 01) y de «Su estilo» de su
  * ficha de cliente: la plataforma Utilo con la piel de su portfolio Bordados (lino, tinta, oliva y tonos tierra).
  * Es el único sitio con los colores de Telas: las vistas solo usan var(--…). Cambiar aquí cambia todas.
- * Orden de carga: marca.css → ../estilos/base.css → ../estilos/kanban.css
+ * Orden de carga: marca.css → ../estilos/nucleo.css y nucleo-2.css (T0744; antes base.css) → ../estilos/kanban.css
  * El contraste de cada texto con su fondo (mínimo 4,5:1) lo comprueba herramientas/probar-marcas.js.
  * El gris #8A7F72 del PDF no se usa en texto (3,5:1).
  * T0740: sus colores oscuros, abajo (los elige quien entra en Perfil › Aspecto).
@@ -48,14 +48,14 @@
   --tam-marca: 24px;
   --fuente-destacar: 'Instrument Serif', Georgia, serif;
 
-  /* Forma: esquinas de 6 px (4 px en lo pequeño); las cajas, 8 px en el ordenador y 12 px en el móvil (base.css). */
+  /* Forma: esquinas de 6 px (4 px en lo pequeño); las cajas, 8 px en el ordenador y 12 px en el móvil (las hojas del núcleo). */
   --radio: 6px;
   --radio-peq: 4px;
 }
 
 /* T0740 · Modo oscuro (maqueta conjunta de T0702, «Idea: modo oscuro», aprobada por Javi): fondo tinta, texto claro y los
    mismos colores, más suaves para que se lean: oliva claro para lo elegido y los contornos, índigo claro en los enlaces (la
-   teja de lo atrasado y los demás colores de estado, en base.css). El menú y el botón principal siguen en oliva.
+   teja de lo atrasado y los demás colores de estado, en las hojas del núcleo). El menú y el botón principal siguen en oliva.
    Es voluntario: se elige en Perfil › Aspecto (Claro, Oscuro o Como el móvil) y nucleo.js pone <html data-tema="oscuro">. */
 :root[data-tema="oscuro"] {
   color-scheme: dark;
