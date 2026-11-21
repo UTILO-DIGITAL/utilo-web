@@ -274,7 +274,7 @@
       nombre: cfg.NOMBRE || cfg.CLAVE || 'ID', columnas: cfg.COLUMNAS || [], detalle: cfg.DETALLE || [], orden: cfg.ORDEN || '',
       buscar: cfg.BUSCAR && cfg.BUSCAR.length ? cfg.BUSCAR : null, campos: cfg.CAMPOS || {}, ficha: cfg.FICHA || [],
       relacionados: cfg.RELACIONADOS || [], vistas: cfg.VISTAS || [], avisos: cfg.AVISOS || [], editar: cfg.EDITAR || [],
-      crear: !!cfg.CREAR, texto: cfg.TEXTO || '', vacio: cfg.VACIO || '', refs: cfg._refs || {}, filtro: cfg.FILTRO || [],
+      crear: !!cfg.CREAR, texto: cfg.TEXTO || '', vacio: cfg.VACIO || '', antiguo: cfg.ANTIGUO === true, refs: cfg._refs || {}, filtro: cfg.FILTRO || [],
       nueva: cfg.NUEVA || {}, obligatorias: cfg.OBLIGATORIAS || [], filtros: cfg.FILTROS || [], filas: cfg.FILAS && cfg.FILAS.length ? cfg.FILAS : null,
       rapidas: rapidasDe(cfg.RAPIDAS), alta: cfg.ALTA && lista(cfg.ALTA.campos).length ? { campos: lista(cfg.ALTA.campos), mas: lista(cfg.ALTA.mas), titulo: cfg.ALTA.titulo || '', abrir: !!cfg.ALTA.abrir, nuevo: altaNuevoDe(cfg.ALTA.nuevo) } : null,
       deducir: cfg.DEDUCIR || {}, acciones: cfg.ACCIONES || [], contexto: contextoDe(cfg.CONTEXTO), resumen: resumenCifras(cfg.RESUMEN), arriba: arribaDe(cfg.ARRIBA),
@@ -2525,6 +2525,7 @@
         else if (vista.tablero) html += pintarTablero(a, vista, fs, hoy);
         else if (vista.galeria) html += pintarGaleria(a, vista, agrupar(a, vista, fs, hoy), hoy);
         else html += pintarGrupos(a, vista, agrupar(a, vista, fs, hoy), hoy);
+        html += botonAntiguo(a, vista);
         if (vista.tablero || !conRapidas(a, vista)) S.menu = '';
         html += menuPasar(hoy);
         if (S.ctx) pintarCtx(); // T0652: el resumen abierto, con lo nuevo
@@ -2717,7 +2718,33 @@
         pCtx.hidden = false;
         if (foco) { var t = pCtx.querySelector('#li-ctx-t'); if (t) t.focus(); }
       }
-      function abrirCtx(id) { S.ctx = String(id); S.menu = ''; pintar(); pintarCtx(true); }
+      function abrirCtx(id) {
+        S.ctx = String(id); S.menu = ''; pintar(); pintarCtx(true);
+        // T0742: lo antiguo con quien es esta fila, si su tabla se lee por partes; al llegar, el resumen se rehace.
+        var a = ap(), f = filaVista(a, id);
+        if (f) historiaDe(a, f.__crudo, true).then(function (nuevo) { if (nuevo && S.ctx === String(id)) pintarCtx(); });
+      }
+      /**
+       * T0742 · La historia entera de una fila en las tablas que se leen por partes (nucleo.partes): las de su seguimiento
+       * (RELACIONADOS) y, con CONTEXTO, lo de su tabla con quien es. Devuelve una promesa con true si ha pedido algo que
+       * la copia aún no tenía (para rehacer la ficha), false si ya estaba todo.
+       */
+      function historiaDe(a, crudo, soloCtx) {
+        if (!crudo || !T.porPartes) return Promise.resolve(false);
+        var pide = [];
+        var de = function (t, col, v) {
+          if (!T.porPartes(t) || vacio(v) || esRuta(col)) return;
+          if (pide.some(function (x) { return x.t === t && x.col === col && x.v === String(v); })) return;
+          pide.push({ t: t, col: col, v: String(v), ya: T.tiene(t, { clave: col + ':' + v }) });
+        };
+        if (!soloCtx) a.relacionados.forEach(function (r) { if (r.tabla && r.campo && r.con && !r.contiene && !r.juntar) de(r.tabla, r.campo, crudo[r.con]); });
+        var cc = contextoCol(a, crudo);
+        if (cc) de(a.tabla, cc, crudo[cc]);
+        if (!pide.length) return Promise.resolve(false);
+        return Promise.all(pide.map(function (x) { return T.leerDe(x.t, x.col, x.v); })).then(function () {
+          return pide.some(function (x) { return !x.ya; });
+        }, function () { return false; });
+      }
       function cerrarCtx(sinFoco) {
         if (!S.ctx) return;
         var id = S.ctx; S.ctx = ''; pintarCtx(); pintar();
@@ -2823,6 +2850,17 @@
             lis(tz.abiertas) + li(tz.masA) + li(tz.plegar) + lis(tz.hechas) + li(tz.masH) + li(tz.antes) + '</ul></section>';
         }).join('') + '</div>';
         return tabla + tarjetas;
+      }
+      /**
+       * T0742 · Con ANTIGUO y su tabla leída por partes (nucleo.partes), al final de la lista «Ver más», que trae lo cerrado de
+       * antes de sus meses (una vez; después ya está en la lista, también al buscar y filtrar). Nunca en la vista para clientes.
+       */
+      function botonAntiguo(a, vista) {
+        if (!a.antiguo || vista.cliente || !T.faltaAntiguo || !T.faltaAntiguo(a.tabla)) return '';
+        var d = T.desdeAntiguo(a.tabla), m = /^(\d{4})-(\d\d)/.exec(d);
+        var cuando = m ? MESES[+m[2] - 1] + ' de ' + m[1] : '';
+        return '<p class="li-antiguo"><button type="button" class="li-vermas" data-antiguo' + (S.antiguo ? ' disabled aria-busy="true"' : '') + '>' +
+          (S.antiguo ? 'Buscando lo de antes…' : 'Ver más') + (cuando && !S.antiguo ? ' <span class="u-nota">· lo de antes de ' + cuando + '</span>' : '') + '</button></p>';
       }
       /** T0690 · «Ver N más»: cuántas quedan y el botón que enseña otras tantas (data-mas con su clave en S.mas). */
       function botonMas(k, quedan, paso) {
@@ -3162,6 +3200,9 @@
         h += '</form>';
         // T0652: con quién es, ya abierto (sin la propia tarea: esa es la ficha).
         if (!nueva && !cli && a.contexto) { var rc = resumenDe(a, D, crudo, vistas(a), { hoy: hoy, prohib: PROHIB, sin: id }); if (rc) h += htmlResumen(rc, true); }
+        // T0742: de una tabla que se lee por partes, la historia entera de esta fila (su seguimiento, lo último con quien es);
+        // cuando llega, la ficha se rehace (una vez: después ya está en la copia).
+        if (!nueva && !cli) historiaDe(a, crudo).then(function (nuevo) { if (nuevo && abierta && String(abierta.id) === String(id)) rehacer(); });
         // T0692: sus ventas (de Pedidos), antes de lo relacionado; si aún no han llegado, su sitio, que se rellena al llegar.
         if (!nueva && !cli && VENTAS) h += '<div id="li-ventas">' + htmlVentasDe(crudo, hoy) + '</div>';
         // Lo relacionado (el seguimiento de un cliente): cada fila lleva a su sección, con su ficha abierta.
@@ -4028,6 +4069,17 @@
         // T0652: el nombre de con quién es abre su resumen (otra vez, lo cierra).
         var bx = ev.target.closest('[data-ctx]');
         if (bx) { var ix = bx.getAttribute('data-ctx'); if (S.ctx === ix) cerrarCtx(); else abrirCtx(ix); return; }
+        // T0742: «Ver más» al final de la lista: lo antiguo de su tabla (nucleo.partes), una vez.
+        var ba = ev.target.closest('[data-antiguo]');
+        if (ba) {
+          if (S.antiguo) return;
+          S.antiguo = true; pintar();
+          T.leerAntiguo(ap().tabla).then(function () { S.antiguo = false; pintar(); }, function (e) {
+            S.antiguo = false; pintar();
+            ctx.aviso('No se ha podido traer lo de antes: ' + ((e && e.message) || e));
+          });
+          return;
+        }
         // T0690: ordenar por una columna (se recuerda por vista en este dispositivo), «Ver más», lo hecho y lo de antes.
         var lg = ev.target.closest('[data-orden],[data-mas],[data-plegar],[data-antes]');
         if (lg) {

@@ -332,6 +332,7 @@
     if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
     if (r.uso && r.uso.app && r.uso.url) o.uso = { app: String(r.uso.app), url: String(r.uso.url), clave: String(r.uso.clave || '') }; // T0682
     if (r.buscar && Array.isArray(r.buscar.grupos) && r.buscar.grupos.length) o.buscar = r.buscar; // T0685: la lupa (nucleo.buscar)
+    if (r.partes && typeof r.partes === 'object') o.partes = r.partes; // T0742: las tablas que se leen por partes (nucleo.partes)
     if (r.ocultar && Array.isArray(r.ocultar.tablas)) o.ocultar = { tablas: r.ocultar.tablas, refs: r.ocultar.refs || {}, filas: r.ocultar.filas || {}, columnas: r.ocultar.columnas || {} }; // T0650; T0671: columnas
     return o;
   }
@@ -412,7 +413,7 @@
   function tablas() {
     if (T) return T;
     // T0275: la copia del dispositivo es de quien ha entrado (sin correo, solo en memoria).
-    T = window.UT.crear({ llamar: llamar, clave: C.clave || 'negocio', persona: copiaDe(cred), aviso: aviso });
+    T = window.UT.crear({ llamar: llamar, clave: C.clave || 'negocio', persona: copiaDe(cred), aviso: aviso, partes: (cred && cred.partes) || {} }); // T0742: partes
     T.en('cambio', function (tabla, info) {
       (oyentes[actual] || []).forEach(function (f) { try { f(tabla, info); } catch (e) { if (window.console) console.error(e); } });
       contarCifras(tabla); // T0412

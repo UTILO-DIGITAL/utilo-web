@@ -238,6 +238,23 @@
       pintar();
     });
   }
+  /**
+   * T0742 · De las tablas que se leen por partes (nucleo.partes: SEGUIMIENTO), al escribir algo también lo antiguo: se busca ya en
+   * lo que hay y, cuando llega lo de antes, se rehacen sus índices (una nota de hace años también se encuentra).
+   */
+  function antiguo(a) {
+    var o = a.o, T = o.tablas, vis = lista(o);
+    if (!T.faltaAntiguo) return;
+    var ts = [];
+    (o.grupos || []).forEach(function (g) { if (T.faltaAntiguo(g.tabla) && ts.indexOf(g.tabla) < 0) ts.push(g.tabla); });
+    ts.forEach(function (t) {
+      T.leerAntiguo(t).then(function () {
+        if (A !== a || !a.indices) return;
+        a.indices = a.indices.map(function (x) { return x.g.tabla === t ? { g: x.g, filas: indice(x.g, T, o.ocultar, vis) } : x; });
+        pintar();
+      }, function () {});
+    });
+  }
 
   function pintar() {
     var a = A, q = a.q.value, ps = palabras(q), o = a.o, vis = lista(o);
@@ -246,6 +263,7 @@
       return;
     }
     if (!a.indices) { a.res.innerHTML = '<div class="bu-vacio" role="status"><div class="u-carga"></div></div>'; return; }
+    if (!a.antiguo) { a.antiguo = true; antiguo(a); } // T0742: lo de antes, al buscar algo (no solo por abrir)
     var rs = buscar(a.indices, q);
     if (!rs.length) {
       a.res.innerHTML = '<div class="bu-vacio"><p>Nada con «' + texto(q.trim()) + '».</p><p>Prueba con una parte del nombre o con otra palabra (no hace falta poner tildes).</p></div>';

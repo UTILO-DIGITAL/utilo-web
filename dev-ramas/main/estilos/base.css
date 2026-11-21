@@ -3344,6 +3344,8 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
 @media (hover: hover) { .u .li-vermas:hover, .u .li-plegar:hover { background: color-mix(in srgb, var(--color-texto) 6%, transparent); } }
 .u .li-vermas:focus-visible, .u .li-plegar:focus-visible { outline: 2px solid var(--color-accion); outline-offset: 1px; }
 .u .li-plegar { color: var(--color-suave); }
+.u .li-antiguo { margin: var(--e2) 0 0; padding: 0 14px; } /* T0742: «Ver más» al final de Historial, lo antiguo */
+.u .li-vermas[disabled] { cursor: progress; color: var(--color-suave); }
 .u .li-plegar .u-cifra { font-weight: 400; }
 .u .li-plegar .li-flecha { width: 16px; height: 16px; transition: transform .15s; }
 .u .li-plegar[aria-expanded="true"] .li-flecha { transform: rotate(90deg); }
