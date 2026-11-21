@@ -1247,14 +1247,16 @@
   },
   "T0733-economia-gestoria": {
    "tarea": "T0733",
-   "titulo": "Merge pull request #414 from UTILO-DIGITAL/T0726-textos-economia-pedidos",
+   "titulo": "Para tu gestoría: IVA del trimestre de las facturas, descarga CSV, retención de IRPF e IVA de aduana",
    "pr": null,
-   "commit": "1108e61d",
-   "ultimo": "Merge pull request #414 from UTILO-DIGITAL/T0726-textos-economia-pedidos",
+   "commit": "bf00abe3",
+   "ultimo": "T0733: Para tu gestoría: IVA del trimestre de las facturas, descarga CSV, retención de IRPF e IVA de aduana",
    "quien": "Javi Canela",
-   "fecha": "2026-11-21T00:28:05.980Z",
-   "toca": [],
-   "comun": false,
+   "fecha": "2026-11-21T00:28:35.235Z",
+   "toca": [
+    "telas"
+   ],
+   "comun": true,
    "paginas": [
     {
      "ruta": "dev/konamigas/",
@@ -1289,7 +1291,7 @@
       "google",
       "codigo"
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/plataforma/",
@@ -1327,7 +1329,7 @@
      "entrar": [
       "google"
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/area/",
@@ -1362,7 +1364,7 @@
       "codigo",
       "google"
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/konamigas/competiciones/",
@@ -1387,7 +1389,7 @@
       "nombre": "konamigas-dev"
      },
      "publica": true,
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/listado/",
@@ -1418,7 +1420,7 @@
        "nombre": "Admin"
       }
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/",
@@ -1435,7 +1437,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/catalogo/",
@@ -1450,7 +1452,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     }
    ],
    "migraciones": {
