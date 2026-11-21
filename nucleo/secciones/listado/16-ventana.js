@@ -92,12 +92,12 @@
       function entrada(a, c, f) {
         var cp = campo(a, c), v = f ? f[c] : '', id = 'li-c-' + c;
         var et = '<label class="u-etiqueta" for="' + id + '">' + texto(cp.titulo) + '</label>';
-        var dos = dosOpciones(cp, v);
-        if (dos) {
+        var dosOp = dosOpciones(cp, v);
+        if (dosOp) {
           // T0746: dos opciones (Sí | No), dos botones juntos; tocar el elegido lo deja vacío. Guarda su desplegable, escondido.
-          return '<div class="u-campo"><span class="u-etiqueta">' + texto(cp.titulo) + '</span><div class="li-dos" role="group" aria-label="' + texto(cp.titulo) + '">' + dos.map(function (o) {
+          return '<div class="u-campo"><span class="u-etiqueta">' + texto(cp.titulo) + '</span><div class="li-dos" role="group" aria-label="' + texto(cp.titulo) + '">' + dosOp.map(function (o) {
             return '<button type="button" class="li-dos-b' + (o.color ? ' li-' + texto(o.color) : '') + '" data-dos-v="' + texto(o.valor) + '" aria-pressed="' + (o.valor === String(v)) + '">' + texto(mostrar(cp, o.nombre)) + '</button>';
-          }).join('') + '</div><select id="' + id + '" hidden data-dos data-c="' + texto(c) + '"><option value=""></option>' + dos.map(function (o) {
+          }).join('') + '</div><select id="' + id + '" hidden data-dos data-c="' + texto(c) + '"><option value=""></option>' + dosOp.map(function (o) {
             return '<option value="' + texto(o.valor) + '"' + (o.valor === String(v) ? ' selected' : '') + '>' + texto(mostrar(cp, o.nombre)) + '</option>';
           }).join('') + '</select></div>';
         }
