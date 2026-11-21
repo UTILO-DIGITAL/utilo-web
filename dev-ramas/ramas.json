@@ -1928,6 +1928,15 @@
    "quien": "Javi Canela",
    "rama": "T0733-economia-gestoria",
    "carpeta": "T0733-economia-gestoria"
+  },
+  "DEV-2": {
+   "cliente": "telas",
+   "modo": "ejemplo",
+   "commit": "dafaf43a",
+   "subido": "21/11/26, 1:33",
+   "quien": "Javi Canela",
+   "rama": "T0734-proveedores-portatil",
+   "carpeta": "T0734-proveedores-portatil"
   }
  }
 }
