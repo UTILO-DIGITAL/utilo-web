@@ -1350,15 +1350,6 @@
    "quien": "Javi Canela",
    "rama": "T0733-economia-gestoria",
    "carpeta": "T0733-economia-gestoria"
-  },
-  "DEV-2": {
-   "cliente": "telas",
-   "modo": "ejemplo",
-   "commit": "e292e966",
-   "subido": "21/11/26, 11:04",
-   "quien": "Javi Canela",
-   "rama": "T0702-comprobacion-final",
-   "carpeta": "T0702-comprobacion-final"
   }
  }
 }
