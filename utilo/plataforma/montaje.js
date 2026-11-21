@@ -109,7 +109,7 @@ window.NUCLEO_MONTAJE = {
    "titulo": "Uso",
    "icono": "<path d=\"M4 20V10\"/><path d=\"M10 20V4\"/><path d=\"M16 20v-7\"/><path d=\"M22 20H2\"/>",
    "web": "utilo/secciones/uso.js",
-   "version": "d475154e0a",
+   "version": "3fa28171c1",
    "perfiles": [
     "admin",
     "responsable"
@@ -122,13 +122,17 @@ window.NUCLEO_MONTAJE = {
     "SECCIONES": {
      "telas": [
       "Hoy",
-      "Seguimiento",
-      "Clientes",
-      "Prospección",
+      "Marcas",
+      "Historial",
       "Proveedores",
       "Mis telas",
       "Calcular precio",
-      "Economía"
+      "Ferias",
+      "Documentos",
+      "Referentes",
+      "Pedidos",
+      "Economía",
+      "Ajustes"
      ]
     }
    },
@@ -642,6 +646,10 @@ window.NUCLEO_MONTAJE = {
       "tipo": "ref",
       "obligatoria": true,
       "ref": "TAREAS"
+     },
+     {
+      "nombre": "ESPERA_PRODUCCION",
+      "tipo": "booleano"
      }
     ],
     "restricciones": {
