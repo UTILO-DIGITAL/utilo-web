@@ -78,19 +78,30 @@
   }
   /** Base, cuota de IVA y total de una fila (BASE, TIPO_IVA), en céntimos. La cuota se redondea al céntimo; T0689: sobre la base
    *  tal cual (con 4 decimales si los lleva), para que «100 € con IVA» dé 82,64 + 17,36 = 100,00. Con 2 decimales, como siempre. */
-  function importe(f) { var x = ctsExactos(f.BASE), b = Math.round(x), i = Math.round(x * pct(f.TIPO_IVA) / 100); return { base: b, iva: i, total: b + i }; }
+  /*  T0733 (R101) · Con la retención de IRPF (RETENCION: «15%», en la factura de un profesional) y el IVA de importación del
+   *  DUA (IVA_IMPORTACION: un importe aparte de la base, que se recupera), si la fila los tiene: { base, cuota (la del
+   *  TIPO_IVA), dua, iva (cuota + dua: todo el IVA), ret, total (lo que se paga: base + iva − ret) }. Sin ellas, como siempre. */
+  function importe(f) {
+    var x = ctsExactos(f.BASE), b = Math.round(x), i = Math.round(x * pct(f.TIPO_IVA) / 100);
+    var dua = cts(f.IVA_IMPORTACION), r = Math.round(x * pct(f.RETENCION) / 100);
+    return { base: b, iva: i + dua, cuota: i, dua: dua, ret: r, total: b + i + dua - r };
+  }
   /**
    * T0272 · La base (céntimos) de un total con IVA: la que, con su cuota redondeada al céntimo, da justo ese total
    * (si el redondeo no lo permite, T0689: con dos decimales más). Para apuntar un importe tal cual lo dicen, con el IVA incluido.
+   * T0733: con una retención (ret, «15%»), el total es lo que se paga: base + IVA − retención.
    */
-  function baseDeTotal(total, tipo) {
-    var p = pct(tipo), b = Math.round(total * 100 / (100 + p)), c = [b, b - 1, b + 1];
-    for (var k = 0; k < c.length; k++) if (c[k] + Math.round(c[k] * p / 100) === total) return c[k];
+  function baseDeTotal(total, tipo, ret) {
+    var p = pct(tipo), q = pct(ret), div = 100 + p - q;
+    function da(x) { return Math.round(x) + Math.round(x * p / 100) - Math.round(x * q / 100); }
+    if (div <= 0) return 0;
+    var b = Math.round(total * 100 / div), c = [b, b - 1, b + 1];
+    for (var k = 0; k < c.length; k++) if (da(c[k]) === total) return c[k];
     // T0689 · Si ninguna base en céntimos da justo ese total (100 € al 21 %), la base con dos decimales más de céntimo:
     // importe() calcula la cuota sobre ella y el total sale el escrito.
     // Si cae justo en medio céntimo (0,49 €: 40,50), la de al lado (40,49).
-    var r = Math.round(total * 100 / (100 + p) * 100) / 100, d = [0, -0.01, 0.01, -0.02, 0.02];
-    for (var j = 0; j < d.length; j++) { var x = Math.round((r + d[j]) * 100) / 100; if (Math.round(x) + Math.round(x * p / 100) === total) return x; }
+    var r = Math.round(total * 100 / div * 100) / 100, d = [0, -0.01, 0.01, -0.02, 0.02];
+    for (var j = 0; j < d.length; j++) { var x = Math.round((r + d[j]) * 100) / 100; if (da(x) === total) return x; }
     return r;
   }
   /** T0627 · Una cantidad escrita («12,5», «30», vacía = 1) → número. */
@@ -969,6 +980,105 @@
     return ('Ticket · ' + (c || fecha(fechaIso))).slice(0, 40).trim();
   }
 
+  /* ----- T0733 · Para tu gestoría: el IVA y las facturas de cada trimestre (modelos 303 y 111) ----- */
+
+  /** El trimestre de una fecha: '2026-11-21' → { ano: '2026', t: 4 } (o null). */
+  function trimestreDe(iso) {
+    var m = /^(\d{4})-(\d{2})/.exec(String(iso || ''));
+    return m ? { ano: m[1], t: Math.ceil(Number(m[2]) / 3) } : null;
+  }
+  /** { ano, t } → '4T 2026'. */
+  function trimestreNombre(q) { return q ? q.t + 'T ' + q.ano : ''; }
+  /** Las fechas de un trimestre: { desde: '2026-10-01', hasta: '2026-12-31' }. */
+  function trimestreFechas(q) {
+    var m0 = (q.t - 1) * 3 + 1, m1 = m0 + 2, p = function (n) { return (n < 10 ? '0' : '') + n; };
+    var ult = new Date(Date.UTC(Number(q.ano), m1, 0)).getUTCDate();
+    return { desde: q.ano + '-' + p(m0) + '-01', hasta: q.ano + '-' + p(m1) + '-' + p(ult) };
+  }
+  /**
+   * El trimestre que se mira de entrada: el de hoy; en los primeros 20 días de un trimestre (30 en enero), el anterior, que
+   * es el que se presenta entonces (modelo 303: del 1 al 20 de abril, julio y octubre, y hasta el 30 de enero).
+   */
+  function trimestrePorDefecto(hoyIso) {
+    var q = trimestreDe(hoyIso); if (!q) return null;
+    var mes = Number(String(hoyIso).slice(5, 7)), dia = Number(String(hoyIso).slice(8, 10));
+    if ((mes - 1) % 3 === 0 && dia <= (mes === 1 ? 30 : 20)) return q.t === 1 ? { ano: String(Number(q.ano) - 1), t: 4 } : { ano: q.ano, t: q.t - 1 };
+    return q;
+  }
+  /** Los cuatro trimestres de un año, para elegir: [{ ano, t }]. */
+  function trimestresDe(ano) { return [1, 2, 3, 4].map(function (t) { return { ano: String(ano), t: t }; }); }
+  /**
+   * El libro de facturas de un trimestre, por la fecha de la factura: { q, desde, hasta, filas: [{ f, imp, nif, nombre, anulada }]
+   * (las emitidas primero, por número; después las recibidas y los tickets, por fecha), baseE, repercutido (IVA de las
+   * emitidas), baseR, soportado (el de las recibidas y los tickets), dua (el IVA de importación, que también se descuenta),
+   * ret (las retenciones de IRPF, que se pagan con el modelo 111), resultado (repercutido − soportado − dua: > 0, a pagar),
+   * sinNif (emitidas sin el NIF del cliente), sinFacGasto y sinFacCobro (movimientos del trimestre sin factura: su IVA no
+   * cuenta) }. Las anuladas salen en la lista (la serie no tiene huecos) pero no suman.
+   */
+  function libroTrimestre(d, q) {
+    var r = { q: q, filas: [], baseE: 0, repercutido: 0, baseR: 0, soportado: 0, dua: 0, ret: 0, resultado: 0, sinNif: [], sinFacGasto: [], sinFacCobro: [] };
+    if (!q) return r;
+    var fs = trimestreFechas(q), ctr = indice(d.ctr), cat = indice(d.cat);
+    r.desde = fs.desde; r.hasta = fs.hasta;
+    function dentro(x) { var s = String(x.FECHA || '').slice(0, 10); return s >= fs.desde && s <= fs.hasta; }
+    function numero(x) { var m = /(\d+)\s*$/.exec(String(x.NUMERO || '')); return m ? Number(m[1]) : 0; }
+    d.fac.filter(dentro).sort(function (a, b) {
+      var ea = a.TIPO === 'Emitida' ? 0 : 1, eb = b.TIPO === 'Emitida' ? 0 : 1;
+      if (ea !== eb) return ea - eb;
+      if (!ea) return numero(a) - numero(b) || (String(a.NUMERO) < String(b.NUMERO) ? -1 : 1);
+      return String(a.FECHA) < String(b.FECHA) ? -1 : String(a.FECHA) > String(b.FECHA) ? 1 : 0;
+    }).forEach(function (x) {
+      var i = importe(x), c = ctr[x.ID_CONTRAPARTE] || {}, anul = x.ESTADO === 'Anulada';
+      r.filas.push({ f: x, imp: i, nif: String(c.NIF || '').trim(), nombre: String(c.NOMBRE || ''), anulada: anul });
+      if (anul) return;
+      if (x.TIPO === 'Emitida') { r.baseE += i.base; r.repercutido += i.cuota; if (!String(c.NIF || '').trim()) r.sinNif.push(x); }
+      else { r.baseR += i.base; r.soportado += i.cuota; r.dua += i.dua; r.ret += i.ret; }
+    });
+    r.resultado = r.repercutido - r.soportado - r.dua;
+    d.mov.filter(dentro).forEach(function (m) {
+      if (m.ID_FACTURA || esReparto(d, cat[m.ID_CATEGORIA])) return;
+      if (m.TIPO === 'Gasto') r.sinFacGasto.push(m);
+      else if (m.TIPO === 'Ingreso' && importe(m).iva) r.sinFacCobro.push(m);
+    });
+    return r;
+  }
+  /**
+   * El libro de un trimestre como texto para la gestoría: CSV (sep «;», el que abre bien Excel en español) o, con sep «\t»,
+   * para pegar en una hoja. Una fila por factura (también las anuladas), con importes «1234,56» sin separador de miles.
+   * Un texto que empieza por = + - @ va con un apóstrofo delante: no es una fórmula al abrirlo.
+   */
+  function csvLibro(lib, sep) {
+    sep = sep || ';';
+    var cab = ['Tipo', 'Fecha', 'Número', 'NIF', 'Nombre', 'Base', '% IVA', 'Cuota IVA', 'IVA importación (DUA)', '% retención', 'Retención', 'Total', 'Estado', 'PDF'];
+    function num(c) { return (c < 0 ? '-' : '') + (Math.abs(c) / 100).toFixed(2).replace('.', ','); }
+    function txt(v) {
+      v = String(v == null ? '' : v).replace(/\r?\n/g, ' ');
+      if (/^[=+\-@]/.test(v)) v = "'" + v;
+      return v.indexOf(sep) >= 0 || /["\t]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+    }
+    var filas = (lib.filas || []).map(function (x) {
+      var f = x.f, i = x.imp, ret = pct(f.RETENCION);
+      return [txt(f.TIPO), fecha(String(f.FECHA || '').slice(0, 10)), txt(f.NUMERO), txt(x.nif), txt(x.nombre), num(i.base), txt(tipoIva(f.TIPO_IVA) || '0%'), num(i.cuota),
+        i.dua ? num(i.dua) : '', ret ? txt(tipoIva(f.RETENCION)) : '', i.ret ? num(i.ret) : '', num(i.total), txt(f.ESTADO), txt(f.ARCHIVO_URL)].join(sep);
+    });
+    return [cab.join(sep)].concat(filas).join('\r\n') + '\r\n';
+  }
+  /**
+   * T0733 (R94) · Las fechas que la factura de un pedido lleva además de la suya (Reglamento de facturación, art. 6.1.f):
+   * FECHA_OPERACION, la de la entrega del pedido si es otra; VENCIMIENTO, si la forma de pago dice «a 30 días», la fecha
+   * de la factura más esos días. → { FECHA_OPERACION?, VENCIMIENTO? }
+   */
+  function fechasFactura(fechaFac, venta, formaPago) {
+    var o = {}, fe = String(fechaFac || '').slice(0, 10), en = String((venta && venta.FECHA_ENTREGA) || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(en) && en !== fe) o.FECHA_OPERACION = en;
+    var m = /(\d{1,3})\s*d[ií]as/i.exec(String(formaPago || ''));
+    if (m && Number(m[1]) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(fe)) {
+      var t = new Date(fe + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + Number(m[1]));
+      o.VENCIMIENTO = t.toISOString().slice(0, 10);
+    }
+    return o;
+  }
+
   var CALC = { facturaDeVenta: facturaDeVenta, ventasSinFactura: ventasSinFactura, lineaDeVenta: lineaDeVenta, facturaDelCobro: facturaDelCobro, numeroTicket: numeroTicket, facturaCerrada: facturaCerrada, puedeSacarPdf: puedeSacarPdf, faltaCantidad: faltaCantidad, ultimaEmitida: ultimaEmitida, fechaEmitidaMal: fechaEmitidaMal,
     filtrosMovPuestos: filtrosMovPuestos, cajaPartes: cajaPartes, clientesFactura: clientesFactura, direccionCliente: direccionCliente, categoriaUnica: categoriaUnica, cts: cts, pct: pct, tipoIva: tipoIva, opciones: opciones, opcionesConValor: opcionesConValor, importe: importe, baseDeTotal: baseDeTotal, eur: eur, eur0: eur0, fecha: fecha, periodos: periodos, periodoActual: periodoActual,
     anteriores: anteriores, movDe: movDe, facDe: facDe, preDe: preDe, resumen: resumen, saldos: saldos, cuenta: cuenta, pendientes: pendientes,
@@ -978,7 +1088,9 @@
     articulos: articulos, buscarArt: buscarArt, artDe: artDe, ultimoPrecio: ultimoPrecio, precioOpcion: precioOpcion, conQuien: conQuien,
     fraccion: fraccion, diasEntre: diasEntre, venta: venta, ventas: ventas, minimoDe: minimoDe, ventasPorQuien: ventasPorQuien,
     palabraVenta: palabraVenta, decir: decir, pasoDicho: pasoDicho, listaY: listaY, enPeriodo: enPeriodo, numeroEscrito: numeroEscrito, numTxt: numTxt, monedas: monedas,
-    aEuros: aEuros, notasConCambio: notasConCambio, faltanFactura: faltanFactura, faltanTexto: faltanTexto };
+    aEuros: aEuros, notasConCambio: notasConCambio, faltanFactura: faltanFactura, faltanTexto: faltanTexto,
+    trimestreDe: trimestreDe, trimestreNombre: trimestreNombre, trimestreFechas: trimestreFechas, trimestrePorDefecto: trimestrePorDefecto, trimestresDe: trimestresDe,
+    libroTrimestre: libroTrimestre, csvLibro: csvLibro, fechasFactura: fechasFactura };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -987,7 +1099,7 @@
   // T0726 (R56): el del PDF de una factura (una hoja con la esquina doblada), como los enlaces del Listado.
   var ICONO_PDF = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 15.5h5"/></svg>';
   var ICONO_FILTRO = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8L4 5z"/></svg>';
-  var PESTANAS = { RESUMEN: 'Resumen', VENTAS: 'Ventas', MOVIMIENTOS: 'Movimientos', CAJA: 'Caja', PENDIENTE: 'Pendiente', FACTURAS: 'Facturas', PRESUPUESTO: 'Presupuesto' };
+  var PESTANAS = { RESUMEN: 'Resumen', VENTAS: 'Ventas', MOVIMIENTOS: 'Movimientos', CAJA: 'Caja', PENDIENTE: 'Pendiente', FACTURAS: 'Facturas', PRESUPUESTO: 'Presupuesto', GESTORIA: 'Para tu gestoría' }; // T0733: GESTORIA
   var VER = 150; // filas de una lista larga antes de «Ver más»
   // T0689 · La foto de un ticket: como mucho 20 MB al elegirla; se manda reducida (1.600 px, JPEG), que basta para leerla.
   var MAX_FOTO = 20 * 1024 * 1024, LADO_FOTO = 1600;
@@ -1078,7 +1190,7 @@
       var volverTras = null; // T0689 · la sección de la que se viene con un enlace para hacer una factura ({ id, titulo })
       function movVacio() { return { tipo: '', cat: '', cue: '', q: '', sinFac: false, cruz: false, ver: VER, desde: '' }; }
       var S = { tab: pest.indexOf(guardado(CLAVE + 'tab')) >= 0 ? guardado(CLAVE + 'tab') : pest[0], per: guardado(CLAVE + 'per'), des: '',
-        mov: movVacio(), fac: { tipo: '', estado: '' }, caja: { cue: '', ceros: false }, ven: { id: '', des: '', volver: null }, ab: {}, ceros: false, medidas: null, leido: false };
+        mov: movVacio(), fac: { tipo: '', estado: '' }, gest: { q: null }, caja: { cue: '', ceros: false }, ven: { id: '', des: '', volver: null }, ab: {}, ceros: false, medidas: null, leido: false };
       // T0692 · ?venta=VEN0001 (desde la ficha de una marca en Clientes): abre esa venta, con «‹ Volver a …» a la ficha de la que
       // se viene. Se quita de la dirección: el atrás del navegador ya vuelve a la ficha.
       (function () {
@@ -1120,7 +1232,13 @@
       /* ---------- datos ---------- */
 
       /** T0725 (R03): TIPO_IVA, como lo enseña la web («0%»), aunque el Excel lo guarde como número. */
-      function ivaLeido(xs) { (xs || []).forEach(function (x) { if (x && 'TIPO_IVA' in x) { var t = tipoIva(x.TIPO_IVA); if (t !== x.TIPO_IVA) x.TIPO_IVA = t; } }); return xs; }
+      function ivaLeido(xs) {
+        (xs || []).forEach(function (x) {
+          if (x && 'TIPO_IVA' in x) { var t = tipoIva(x.TIPO_IVA); if (t !== x.TIPO_IVA) x.TIPO_IVA = t; }
+          if (x && x.RETENCION !== '' && x.RETENCION != null) { var r = tipoIva(x.RETENCION); if (r !== x.RETENCION) x.RETENCION = r; } // T0733: 0,15 → «15%»
+        });
+        return xs;
+      }
       function datos() {
         return {
           cfg: cfg, mov: ivaLeido(T.filas('MOVIMIENTOS')), cat: T.filas('CATEGORIAS'), cue: T.filas('CUENTAS'), ctr: T.filas('CONTRAPARTES'),
@@ -1168,7 +1286,7 @@
           if (si && b.parentNode.scrollWidth > b.parentNode.clientWidth) b.parentNode.scrollLeft = Math.max(0, b.offsetLeft - b.parentNode.offsetLeft - 16); // en el móvil, que se vea
         });
         el.querySelector('.eco-fab').hidden = S.tab !== 'MOVIMIENTOS'; // T0272: añadir un movimiento, solo desde Movimientos
-        el.querySelector('.eco-per').style.display = S.tab === 'VENTAS' || S.tab === 'CAJA' ? 'none' : ''; // T0628: las ventas, desde el principio (no por periodo). T0679: Caja tampoco (sus saldos son de siempre): el año sale solo donde cuenta
+        el.querySelector('.eco-per').style.display = S.tab === 'VENTAS' || S.tab === 'CAJA' || S.tab === 'GESTORIA' ? 'none' : ''; // T0733: la gestoría elige su trimestre; // T0628: las ventas, desde el principio (no por periodo). T0679: Caja tampoco (sus saldos son de siempre): el año sale solo donde cuenta
         cont.classList.toggle('eco-con-fab', S.tab === 'MOVIMIENTOS'); // T0644: con sitio abajo para el botón
         var np = pendientes(d).filter(function (x) { return x.falta > 0; }).length + sinFactura(d, per).length, nb = el.querySelector('#eco-npend');
         if (nb) { nb.textContent = np; nb.hidden = !np; }
@@ -1177,7 +1295,7 @@
           return;
         }
         // Cada tabla en su caja: si no cabe en el móvil, se desplaza ella y no la página.
-        cont.innerHTML = ({ RESUMEN: htmlResumen, VENTAS: htmlVentas, MOVIMIENTOS: htmlMovimientos, CAJA: htmlCaja, PENDIENTE: htmlPendiente, FACTURAS: htmlFacturas, PRESUPUESTO: htmlPresupuesto })[S.tab]()
+        cont.innerHTML = ({ RESUMEN: htmlResumen, VENTAS: htmlVentas, MOVIMIENTOS: htmlMovimientos, CAJA: htmlCaja, PENDIENTE: htmlPendiente, FACTURAS: htmlFacturas, PRESUPUESTO: htmlPresupuesto, GESTORIA: htmlGestoria })[S.tab]()
           .replace(/<table class="u-tabla eco-tabla">/g, '<div class="u-tabla-caja"><table class="u-tabla eco-tabla">').replace(/<\/table>/g, '</table></div>');
         var q = cont.querySelector('#eco-q');
         if (q && S.foco) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
@@ -1244,7 +1362,10 @@
           '<div class="eco-kpi"><b>Ingresos</b><span class="eco-val">' + eur0(r.ingresos.base) + '</span><span class="eco-sub">' + (pi ? 'de ' + eur0(pi) + ' previstos' : 'sin IVA') + '</span></div>' +
           '<div class="eco-kpi"><b>Gastos</b><span class="eco-val">' + eur0(r.gastos.base) + '</span><span class="eco-sub">' + (pg ? 'de ' + eur0(pg) + ' previstos' : 'sin IVA') + '</span></div></div>';
         var pend = pendientes(d).filter(function (x) { return x.falta > 0; }), sf = sinFactura(d, per, S.des);
-        h += '<div class="eco-mini"><button type="button" data-abrir="iva"><strong>' + eur0(Math.abs(r.iva)) + '</strong><small>IVA ' + (r.iva >= 0 ? 'a pagar' : 'a devolver') + '</small></button>' +
+        // T0733 (R57): con «Para tu gestoría», el IVA es el del trimestre, de las facturas (el que se declara), y lleva allí.
+        var qR = pest.indexOf('GESTORIA') >= 0 ? trimestreResumen() : null, LR = qR ? libroTrimestre(d, qR) : null;
+        h += '<div class="eco-mini">' + (LR ? '<button type="button" data-ir="GESTORIA" data-trim-ir="' + qR.ano + '-' + qR.t + '"><strong>' + eur0(Math.abs(LR.resultado)) + '</strong><small>IVA del ' + texto(trimestreNombre(qR)) + (LR.resultado >= 0 ? '' : ' a tu favor') + ' ›</small></button>'
+          : '<button type="button" data-abrir="iva"><strong>' + eur0(Math.abs(r.iva)) + '</strong><small>IVA ' + (r.iva >= 0 ? 'a pagar' : 'a devolver') + '</small></button>') +
           '<button type="button" data-ir="PENDIENTE"><strong' + (sf.length ? ' class="u-mal"' : '') + '>' + sf.length + '</strong><small>Gastos sin factura ›</small></button>' +
           '<button type="button" data-ir="PENDIENTE"><strong>' + pend.length + '</strong><small>Facturas pendientes ›</small></button></div></div>';
         h += '<details class="eco-card eco-desp" id="eco-iva"' + (S.ab.iva ? ' open' : '') + '><summary><b><span class="eco-flecha" aria-hidden="true">›</span> Ingresos, gastos e IVA</b>' +
@@ -1253,8 +1374,9 @@
           '<tr><td class="u-tabla-t">Ingresos</td><td class="num">' + eur(r.ingresos.base) + '</td><td class="num">' + eur(r.ingresos.iva) + '</td><td class="num u-solo-ancho">' + eur(r.ingresos.total) + '</td></tr>' +
           '<tr><td class="u-tabla-t">Gastos</td><td class="num">' + eur(r.gastos.base) + '</td><td class="num">' + eur(r.gastos.iva) + '</td><td class="num u-solo-ancho">' + eur(r.gastos.total) + '</td></tr>' +
           '<tr class="eco-total"><td class="u-tabla-t">Beneficio</td><td class="num">' + cifra(r.resultado, true) + '</td><td class="num">' + eur(r.iva) + '</td><td class="num u-solo-ancho"></td></tr>' +
-          '</tbody></table><p class="u-nota">' + (r.iva >= 0 ? 'IVA a pagar: ' + eur(r.iva) : 'IVA a devolver: ' + eur(-r.iva)) +
-          ' (el de los ingresos menos el de los gastos' + (r.reparto ? ', también el del reparto' : '') + '). Los movimientos entre cuentas no cuentan.</p></details>';
+          '</tbody></table><p class="u-nota">' + (LR ? 'IVA cobrado menos pagado: ' + eur(r.iva) : r.iva >= 0 ? 'IVA a pagar: ' + eur(r.iva) : 'IVA a devolver: ' + eur(-r.iva)) +
+          ' (el de los ingresos menos el de los gastos' + (r.reparto ? ', también el del reparto' : '') + '). Los movimientos entre cuentas no cuentan.' +
+          (LR ? ' El que declaras sale de las facturas, por trimestre: <button type="button" class="u-btn u-btn-texto" data-ir="GESTORIA">Para tu gestoría</button>.' : '') + '</p></details>';
         h += htmlReparto(r);
         h += '<div class="eco-bloques">' + htmlGrupos(gs, 'Ingreso') + htmlGrupos(gs, 'Gasto') + '</div>';
         if (ds && ds.length > 1 && !S.des) {
@@ -1426,14 +1548,99 @@
         var sinPdf = fs.filter(function (x) { return !x.ARCHIVO_URL; }).length;
         // T0673 · En el móvil, una tarjeta como Movimientos: sin la columna del PDF (el enlace, si lo hay, va debajo; los que no tienen, los cuenta la nota del final).
         // T0726 (R56): el estado, en su píldora, y el PDF, como un enlace del Listado («Ver el PDF»); sin archivo, la celda vacía.
-        return h + '<table class="u-tabla eco-tabla"><thead><tr><th>Factura</th><th class="u-solo-ancho">PDF</th><th class="num">Total</th></tr></thead><tbody>' + fs.map(function (x) {
+        // T0733 (R58): en el ordenador, también la base y el IVA de cada una (lo que mira la gestoría).
+        return h + '<table class="u-tabla eco-tabla"><thead><tr><th>Factura</th><th class="u-solo-ancho">PDF</th><th class="num u-solo-ancho">Base</th><th class="num u-solo-ancho">IVA</th><th class="num">Total</th></tr></thead><tbody>' + fs.map(function (x) {
+          var im = importe(x), an = x.ESTADO === 'Anulada' ? ' eco-anulada' : '';
           return '<tr tabindex="0" data-fac="' + texto(x.ID) + '"><td class="u-tabla-t">' + texto(numFac(x)) + (x.ID_CONTRAPARTE ? ' · ' + texto(nombre('ctr', x.ID_CONTRAPARTE)) : '') + chip(x) + // T0689: un ticket sin a quién, sin «·» de más
             '<div class="u-nota eco-fac-l">' + [texto(fecha(x.FECHA)), x.TIPO === 'Emitida' ? 'Emitida<span class="u-solo-ancho"> (a un cliente)</span>' : x.TIPO === 'Ticket' ? 'Ticket' : 'Recibida<span class="u-solo-ancho"> (de un proveedor)</span>'].join(' · ') + pildoraFac(x) + '</div>' +
             (x.ARCHIVO_URL ? '<div class="u-nota u-solo-movil">' + enlaceDrive(x) + '</div>' : '') + '</td>' +
             '<td class="u-solo-ancho">' + enlaceDrive(x) + '</td>' +
-            '<td class="num"><span class="u-cifra' + (x.ESTADO === 'Anulada' ? ' eco-anulada' : '') + '">' + eur(importe(x).total) + '</span></td></tr>';
+            '<td class="num u-solo-ancho"><span class="u-cifra' + an + '">' + eur(im.base) + '</span></td>' +
+            '<td class="num u-solo-ancho"><span class="u-cifra' + an + '">' + eur(im.iva) + '</span></td>' +
+            '<td class="num"><span class="u-cifra' + an + '">' + eur(im.total) + '</span></td></tr>';
         }).join('') + '</tbody></table>' +
           (sinPdf ? '<p class="u-nota">' + sinPdf + (sinPdf === 1 ? ' factura no tiene' : ' facturas no tienen') + ' su archivo enlazado: ábrela y pega en «Enlace en Drive» el enlace del PDF (en Drive, Compartir › Copiar enlace).</p>' : '') + emp;
+      }
+
+      /* ----- T0733 · Para tu gestoría: el IVA del trimestre de las facturas (modelo 303), las retenciones (111) y la descarga ----- */
+
+      function trimestreVisto() { return S.gest.q || trimestrePorDefecto(hoy()); }
+      /** El trimestre del Resumen: el de entrada si el año mirado es el de hoy (o no es un año); si es otro año, su 4T. */
+      function trimestreResumen() {
+        var q = trimestrePorDefecto(hoy()), y = per && /^\d{4}$/.test(per.id) ? per.id : '';
+        return y && y !== q.ano ? { ano: y, t: 4 } : q;
+      }
+      function libroAhora() { return libroTrimestre(d, trimestreVisto()); }
+      /** Los años que se pueden mirar: el de hoy y los que tienen facturas, el más reciente primero. */
+      function anosGestoria() {
+        var o = {}; o[hoy().slice(0, 4)] = 1; o[trimestreVisto().ano] = 1;
+        d.fac.forEach(function (f) { var y = String(f.FECHA || '').slice(0, 4); if (/^\d{4}$/.test(y)) o[y] = 1; });
+        return Object.keys(o).sort().reverse();
+      }
+      function htmlGestoria() {
+        var q = trimestreVisto(), L = libroAhora(), nq = trimestreNombre(q), aPagar = L.resultado >= 0;
+        var h = '<div class="eco-trim-barra"><div class="eco-sw eco-trim" role="group" aria-label="Trimestre">' + trimestresDe(q.ano).map(function (x) {
+          return '<button type="button" data-trim="' + x.t + '" aria-pressed="' + (x.t === q.t ? 'true' : 'false') + '">' + x.t + 'T</button>';
+        }).join('') + '</div><label class="u-campo eco-trim-ano"><span class="u-etiqueta">Año</span><select id="eco-gano">' +
+          opciones(anosGestoria().map(function (y) { return [y, y]; }), q.ano) + '</select></label></div>';
+        h += '<div class="eco-kpis eco-gest-kpis"><div class="eco-kpi eco-grande"><b>IVA del ' + texto(nq) + '</b><span class="eco-val">' + eur(Math.abs(L.resultado)) + '</span>' +
+          '<span class="eco-sub">' + (L.resultado === 0 ? 'Ni a pagar ni a devolver' : aPagar ? 'A pagar' : 'A tu favor: se compensa o se devuelve') + '. Sale de las facturas, no de los cobros.</span></div>' +
+          '<div class="eco-kpi"><b>De tus facturas</b><span class="eco-val">' + eur(L.repercutido) + '</span><span class="eco-sub">IVA de ' + eur(L.baseE) + ' facturados</span></div>' +
+          '<div class="eco-kpi"><b>De lo que te facturan</b><span class="eco-val">' + eur(L.soportado + L.dua) + '</span><span class="eco-sub">' +
+          (L.dua ? 'Con ' + eur(L.dua) + ' de IVA de aduana (DUA)' : 'Recibidas y tickets') + '</span></div></div>';
+        if (L.ret) h += '<p class="eco-gest-ret">Retenciones de IRPF que pagas tú a Hacienda (modelo 111): <b class="u-cifra">' + eur(L.ret) + '</b></p>';
+        h += '<div class="n-botones eco-gest-bot"><button type="button" class="u-btn u-btn-accion" data-accion="gestcsv"' + (L.filas.length ? '' : ' disabled') + '>Descargar (CSV)</button>' +
+          '<button type="button" class="u-btn" data-accion="gestcopiar"' + (L.filas.length ? '' : ' disabled') + '>Copiar</button></div>' +
+          '<p class="u-nota">Para mandárselo a tu gestoría: fecha, número, NIF, nombre, base, % de IVA, cuota, retención, total, estado y PDF de cada factura del ' + texto(nq) + '. «Copiar» es para pegarlo en una hoja de cálculo.</p>';
+        // Lo que hay que arreglar antes de mandarlo, en palabras.
+        var av = [];
+        if (L.sinNif.length) av.push(L.sinNif.length === 1 ? 'La ' + texto(numFac(L.sinNif[0])) + ' no tiene el CIF o NIF del cliente: ábrela y ponlo.' :
+          L.sinNif.length + ' facturas tuyas no tienen el CIF o NIF del cliente (' + texto(listaY(L.sinNif.map(numFac))) + '): ábrelas y ponlo.');
+        if (L.sinFacGasto.length) {
+          var ig = 0; L.sinFacGasto.forEach(function (m) { ig += importe(m).iva; });
+          av.push(deMas(L.sinFacGasto.length, 'gasto', 'gastos') + ' del trimestre sin factura' + (ig ? ': su IVA (' + eur(ig) + ') no se puede descontar hasta que la tengas.' : '.') +
+            (pest.indexOf('PENDIENTE') >= 0 ? ' <button type="button" class="u-btn u-btn-texto" data-ir="PENDIENTE">Verlos en Pendiente</button>' : ''));
+        }
+        if (L.sinFacCobro.length) {
+          var ic = 0; L.sinFacCobro.forEach(function (m) { ic += importe(m).iva; });
+          av.push(deMas(L.sinFacCobro.length, 'cobro', 'cobros') + ' del trimestre sin factura, con ' + eur(ic) + ' de IVA: lo cobrado también se declara aunque aún no hayas hecho la factura.');
+        }
+        if (av.length) h += '<div class="eco-aviso eco-amb"><b>Antes de mandarlo</b>' + av.map(function (x) { return '<p>' + x + '</p>'; }).join('') + '</div>';
+        if (!L.filas.length) return h + '<p class="u-vacio">No hay facturas del ' + texto(nq) + '. Las que hagas o apuntes con fecha de este trimestre salen aquí.</p>';
+        h += '<h2 class="n-grupo">Las facturas del ' + texto(nq) + ' <span class="u-nota">' + deMas(L.filas.length, 'factura', 'facturas') + '</span></h2>' +
+          '<table class="u-tabla eco-tabla"><thead><tr><th>Factura</th><th class="u-solo-ancho">CIF o NIF</th><th class="num u-solo-ancho">Base</th><th class="num">IVA</th><th class="num u-solo-ancho">Total</th></tr></thead><tbody>' +
+          L.filas.map(function (x) {
+            var f = x.f, i = x.imp, an = x.anulada ? ' eco-anulada' : '', extra = [];
+            if (i.dua) extra.push('IVA de aduana ' + eur(i.dua));
+            if (i.ret) extra.push('retención ' + tipoIva(f.RETENCION) + ' ' + eur(i.ret));
+            return '<tr tabindex="0" data-fac="' + texto(f.ID) + '"><td class="u-tabla-t">' + texto(numFac(f)) + (x.nombre ? ' · ' + texto(x.nombre) : '') +
+              '<div class="u-nota">' + [texto(fecha(f.FECHA)), f.TIPO === 'Emitida' ? 'Emitida' : f.TIPO === 'Ticket' ? 'Ticket' : 'Recibida'].concat(extra.map(texto)).join(' · ') + pildoraFac(f) + '</div>' +
+              '<div class="u-nota u-solo-movil">' + (x.nif ? 'CIF/NIF ' + texto(x.nif) + ' · ' : '') + 'base ' + eur(i.base) + ' · total ' + eur(i.total) + '</div></td>' +
+              '<td class="u-solo-ancho">' + (x.nif ? texto(x.nif) : f.TIPO === 'Emitida' && !x.anulada ? '<span class="u-mal">Falta</span>' : '') + '</td>' +
+              '<td class="num u-solo-ancho"><span class="u-cifra' + an + '">' + eur(i.base) + '</span></td>' +
+              '<td class="num"><span class="u-cifra' + an + '">' + eur(i.iva) + '</span><div class="u-nota">' + texto(tipoIva(f.TIPO_IVA) || '0%') + '</div></td>' +
+              '<td class="num u-solo-ancho"><span class="u-cifra' + an + '">' + eur(i.total) + '</span></td></tr>';
+          }).join('') + '</tbody></table><p class="u-nota">Por la fecha de cada factura. Las anuladas salen tachadas y no suman.</p>';
+        return h;
+      }
+      /** El nombre del archivo: «Facturas 4T 2026 · Telas Ejemplo S.L.csv». */
+      function archivoGestoria() {
+        var e = LINEAS ? empresaAhora() : null, n = String((e && e.NOMBRE) || '').replace(/[\\/:*?"<>|\r\n]+/g, ' ').trim();
+        return 'Facturas ' + trimestreNombre(trimestreVisto()) + (n ? ' · ' + n : '') + '.csv';
+      }
+      function descargarGestoria() {
+        var csv = '﻿' + csvLibro(libroAhora(), ';'); // con BOM: Excel lo abre con sus tildes
+        try {
+          var a = document.createElement('a'), url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+          a.href = url; a.download = archivoGestoria(); document.body.appendChild(a); a.click();
+          setTimeout(function () { a.remove(); URL.revokeObjectURL(url); }, 1000);
+        } catch (e) { ctx.aviso('No se ha podido descargar: prueba con «Copiar».'); }
+      }
+      function copiarGestoria() {
+        var tsv = csvLibro(libroAhora(), '\t'), n = libroAhora().filas.length;
+        var ok = function () { if (ctx.abierta()) ctx.aviso('Copiadas las ' + n + ' facturas del ' + trimestreNombre(trimestreVisto()) + ': pégalas en una hoja de cálculo.'); };
+        try { navigator.clipboard.writeText(tsv).then(ok, function () { ctx.aviso('No se ha podido copiar: usa «Descargar (CSV)».'); }); }
+        catch (e) { ctx.aviso('No se ha podido copiar: usa «Descargar (CSV)».'); }
       }
       /** T0646 · Los filtros de Facturas, en su ventana (como «Filtrar» del Listado): nada cambia hasta «Ver». */
       /** T0644 · Filtrar · Movimientos: tipo, categoría (las de ese tipo), cuenta y gastos sin factura, con cuántos se verían. */
@@ -1564,7 +1771,40 @@
       /** La base escrita (en céntimos), o la que sale del total si la casilla del IVA incluido está marcada. */
       function baseEn(pre) {
         var mx = enOtraMoneda(pre), x = mx ? (mx.euros ? mx.euros.cts : 0) : cts(val(pre + '-BASE')), c = vent.querySelector('#' + pre + '-coniva');
-        return c && c.checked ? baseDeTotal(x, val(pre + '-TIPO_IVA')) : x;
+        // T0733: con el IVA incluido, lo escrito es lo que se paga: sin el IVA de aduana y con la retención ya descontada.
+        return c && c.checked ? baseDeTotal(x - duaEn(pre), val(pre + '-TIPO_IVA'), retEn(pre)) : x;
+      }
+      /* ----- T0733 (R101) · la retención de IRPF y el IVA de aduana (DUA) de una factura recibida o un gasto ----- */
+
+      /** ¿Tiene la tabla las columnas? (Konamigas no: no se enseñan.) */
+      function conRetDua(cols) { return { ret: cols.indexOf('RETENCION') >= 0, dua: cols.indexOf('IVA_IMPORTACION') >= 0 }; }
+      /** La caja plegada «+ Retención de IRPF o IVA de aduana (DUA)», abierta si ya lleva alguno. */
+      function cajaRetDua(pre, v, cols) {
+        var c = conRetDua(cols); if (!c.ret && !c.dua) return '';
+        var abierta = pct(v.RETENCION) > 0 || cts(v.IVA_IMPORTACION) > 0;
+        var que = c.ret && c.dua ? 'Retención de IRPF o IVA de aduana (DUA)' : c.ret ? 'Retención de IRPF' : 'IVA de aduana (DUA)';
+        return '<div class="u-ancho eco-retdua" id="' + pre + '-retdua"><button type="button" class="u-btn u-btn-texto" id="' + pre + '-retdua-b"' + (abierta ? ' hidden' : '') + '>+ ' + que + '</button>' +
+          '<div class="u-campos" id="' + pre + '-retdua-c"' + (abierta ? '' : ' hidden') + '>' +
+          (c.ret ? campo('Retención de IRPF', '<select id="' + pre + '-RETENCION">' + opcionesConValor([['0%', 'Sin retención'], ['7%', '7 %'], ['15%', '15 %']], tipoIva(v.RETENCION) || '0%') + '</select>') : '') +
+          (c.dua ? campo('IVA de aduana (DUA)', '<input type="text" inputmode="decimal" id="' + pre + '-IVA_IMPORTACION" value="' + texto(cts(v.IVA_IMPORTACION) ? (cts(v.IVA_IMPORTACION) / 100).toFixed(2).replace('.', ',') : '') + '" placeholder="0,00">') : '') +
+          '<p class="u-nota u-ancho">' + [c.ret ? 'Retención: la de las facturas de profesionales (gestoría, abogados). Pagas menos a quien te factura y ese dinero lo ingresas tú a Hacienda cada trimestre.' : '',
+            c.dua ? 'IVA de aduana: el que pagas al traer las telas, que viene en el DUA. Se recupera: no es un gasto del pedido.' : ''].filter(Boolean).join(' ') + '</p></div></div>';
+      }
+      function retDuaVisible(pre) { var x = vent.querySelector('#' + pre + '-retdua'); return !!x && !x.hidden; }
+      function retEn(pre) { var e = vent.querySelector('#' + pre + '-RETENCION'); return e && retDuaVisible(pre) ? e.value : ''; }
+      function duaEn(pre) { var e = vent.querySelector('#' + pre + '-IVA_IMPORTACION'); return e && retDuaVisible(pre) ? Math.max(0, cts(e.value)) : 0; }
+      /** Lo que se guarda de las dos (solo las columnas que hay): { RETENCION, IVA_IMPORTACION }; sin enseñar, vacías. */
+      function valoresRetDua(pre, cols) {
+        var c = conRetDua(cols), o = {};
+        if (c.ret) o.RETENCION = retEn(pre) && retEn(pre) !== '0%' ? retEn(pre) : '';
+        if (c.dua) o.IVA_IMPORTACION = duaEn(pre) ? duaEn(pre) / 100 : '';
+        return o;
+      }
+      function oirRetDua(pre, refrescar) {
+        var b = vent.querySelector('#' + pre + '-retdua-b'); if (!b) return;
+        b.onclick = function () { b.hidden = true; vent.querySelector('#' + pre + '-retdua-c').hidden = false; var s = vent.querySelector('#' + pre + '-RETENCION, #' + pre + '-IVA_IMPORTACION'); if (s) s.focus(); };
+        var r = vent.querySelector('#' + pre + '-RETENCION'); if (r) r.addEventListener('change', refrescar);
+        var dd = vent.querySelector('#' + pre + '-IVA_IMPORTACION'); if (dd) dd.addEventListener('input', refrescar);
       }
       /* ----- T0726 (R61) · un gasto en rupias o dólares, pasado a euros con su cambio ----- */
 
@@ -1643,11 +1883,14 @@
 
       /** Etiqueta del importe y, debajo, la cuenta: «82,64 € + IVA 17,36 € = 100,00 €». etCon: cómo se llama con IVA. */
       function pintaImporte(pre, etBase, etCon) {
-        var ci = vent.querySelector('#' + pre + '-coniva').checked, b = baseEn(pre), t = importe({ BASE: b / 100, TIPO_IVA: val(pre + '-TIPO_IVA') });
-        vent.querySelector('#' + pre + '-imp-et').textContent = ci ? etCon || 'Importe con IVA' : etBase;
+        var ci = vent.querySelector('#' + pre + '-coniva').checked, b = baseEn(pre), t = importe({ BASE: b / 100, TIPO_IVA: val(pre + '-TIPO_IVA'), RETENCION: retEn(pre), IVA_IMPORTACION: duaEn(pre) / 100 });
+        // T0733: con retención, lo escrito con el IVA incluido es lo que se paga (base + IVA − retención).
+        vent.querySelector('#' + pre + '-imp-et').textContent = ci ? (t.ret ? 'Lo que pagas' : etCon || 'Importe con IVA') : etBase;
         var bc = vent.querySelector('#' + pre + '-iva-cambio'); if (bc) bc.textContent = ci ? 'Lo tengo sin IVA' : 'Lo tengo con el IVA incluido';
         var mx = enOtraMoneda(pre), cambio = !mx ? '' : mx.euros ? mx.euros.cuenta + ' · ' : isNaN(mx.n) ? '' : 'Falta el cambio: cuántos ' + mx.m.sim + ' hay en un euro. ';
-        vent.querySelector('#' + pre + '-total').textContent = cambio + eur(t.base) + ' + IVA ' + eur(t.iva) + ' = ' + eur(t.total) + (ci ? '' : ' con IVA');
+        // T0733: «100,00 € + IVA 21,00 € − retención 15,00 € = 106,00 €» (y el IVA de aduana, aparte).
+        vent.querySelector('#' + pre + '-total').textContent = cambio + eur(t.base) + ' + IVA ' + eur(t.cuota) + (t.dua ? ' + IVA de aduana ' + eur(t.dua) : '') +
+          (t.ret ? ' − retención ' + eur(t.ret) : '') + ' = ' + eur(t.total) + (ci ? '' : t.ret ? ' a pagar' : ' con IVA');
       }
       function oirImporte(pre, refrescar) {
         var ci = vent.querySelector('#' + pre + '-coniva');
@@ -1671,7 +1914,9 @@
             dato(m.TIPO === 'Ingreso' ? 'Entra en' : 'Sale de', texto(nombre('cue', m.ID_CUENTA))) +
             dato(m.TIPO === 'Ingreso' ? 'Quién paga' : 'Quién cobra', texto(nombre('ctr', m.ID_CONTRAPARTE)))) +
           (P && m[P] ? dato(nomPer, texto(nombre('per', m[P]))) : '') + (DS && m[DS] ? dato(nomDes, texto(nombre('des', m[DS]))) : '') +
-          dato('Sin IVA', eur(x.base)) + dato('IVA', texto(m.TIPO_IVA || '0%') + ' · ' + eur(x.iva)) + dato('Total', eur(x.total)) +
+          dato('Sin IVA', eur(x.base)) + dato('IVA', texto(m.TIPO_IVA || '0%') + ' · ' + eur(x.cuota)) +
+          (x.dua ? dato('IVA de aduana (DUA)', eur(x.dua)) : '') + (x.ret ? dato('Retención de IRPF', texto(tipoIva(m.RETENCION)) + ' · −' + eur(x.ret)) : '') + // T0733
+          dato('Total', eur(x.total)) +
           (interno ? '' : dato('Factura o ticket', f ? '<button type="button" class="u-btn u-btn-texto" data-verfac="' + texto(f.ID) + '">' + texto(numFac(f)) + ' ›</button>' + (f.ARCHIVO_URL ? ' · ' + enlaceDrive(f) : '') : sinFac(m) ? '<span class="u-mal">Falta</span>' : 'No lleva')) +
           dato('Notas', texto(m.NOTAS)) + '</div>' +
           (m.LOG ? '<details class="eco-hist"><summary>Historial de cambios</summary><pre>' + texto(m.LOG) + '</pre></details>' : '') +
@@ -1685,7 +1930,8 @@
           var bf = vent.querySelector('#d-factura');
           if (bf) bf.onclick = function () {
             var emit = m.TIPO === 'Ingreso';
-            formFac(null, { TIPO: emit ? 'Emitida' : 'Recibida', FECHA: emit ? hoy() : m.FECHA, ID_CONTRAPARTE: m.ID_CONTRAPARTE, BASE: x.base / 100, TIPO_IVA: m.TIPO_IVA || '21%',
+            formFac(null, { TIPO: emit ? 'Emitida' : 'Recibida', FECHA: emit ? hoy() : m.FECHA, ID_CONTRAPARTE: m.ID_CONTRAPARTE, BASE: emit ? x.base / 100 : m.BASE, TIPO_IVA: m.TIPO_IVA || '21%',
+              RETENCION: emit ? '' : m.RETENCION || '', IVA_IMPORTACION: emit ? '' : m.IVA_IMPORTACION || '', // T0733
               ESTADO: 'Pagada', NOTAS: (emit ? 'Del cobro ' : 'Del pago ') + m.ID + ' · ' + String(m.CONCEPTO || '') }, m.ID);
           };
           var vf = vent.querySelector('[data-verfac]');
@@ -1735,6 +1981,7 @@
           campo('IVA', '<select id="m-TIPO_IVA">' + opcionesConValor(ivas().map(function (x) { return [x, x]; }), v.TIPO_IVA) + '</select>') +
           casillaIva('m') +
           '<p class="u-nota u-ancho" id="m-total"></p>' +
+          cajaRetDua('m', v, d.colsMov) + // T0733 (R101): solo en un gasto
           campo('Concepto', '<input type="text" id="m-CONCEPTO" value="' + texto(v.CONCEPTO) + '" maxlength="200" placeholder="Por ejemplo: el dominio de la web">', 'u-ancho') +
           campo('Fecha', '<input type="date" id="m-FECHA" value="' + texto(v.FECHA) + '">') +
           (tienePer ? campo(texto(nomPer), '<select id="m-PER">' + opciones(lista.map(function (p) { return [p.id, p.nombre]; }), v[P], 'Elige') + '</select>') : '') +
@@ -1777,12 +2024,14 @@
             sf.innerHTML = opciones(fs.map(function (f) { return [f.ID, numFac(f) + ' · ' + fecha(f.FECHA) + ' · ' + eur(importe(f).total)]; }), fa, 'Sin factura');
             pintaImporte('m', 'Importe sin IVA', tipo === 'Gasto' ? 'Lo que pagaste, con IVA' : tipo === 'Ingreso' ? 'Lo que cobraste, con IVA' : 'Importe con IVA');
             var cf = vent.querySelector('#m-foto-caja'); if (cf) cf.hidden = tipo !== 'Gasto';
+            var rd = vent.querySelector('#m-retdua'); if (rd && rd.hidden !== (tipo !== 'Gasto')) { rd.hidden = tipo !== 'Gasto'; pintaImporte('m', 'Importe sin IVA', tipo === 'Gasto' ? 'Lo que pagaste, con IVA' : tipo === 'Ingreso' ? 'Lo que cobraste, con IVA' : 'Importe con IVA'); }
           }
           refrescar();
           vent.querySelector('.eco-sw').onclick = function (e) { var b = e.target.closest('[data-tipo]'); if (b) { st.tipo = b.getAttribute('data-tipo'); refrescar(); } };
           ['m-TIPO_IVA', 'm-ID_CONTRAPARTE', 'm-PER'].forEach(function (id) { var e = vent.querySelector('#' + id); if (e) e.addEventListener('change', refrescar); });
           vent.querySelector('#m-BASE').addEventListener('input', refrescar);
           oirImporte('m', refrescar);
+          oirRetDua('m', refrescar);
           oirMoneda('m', refrescar);
           oirFoto('m');
           // T0293 · Alta rápida de quién paga o cobra (ALTA_CONTRAPARTE): se crea al momento y queda elegida.
@@ -1812,6 +2061,7 @@
             var nv = { FECHA: val('m-FECHA'), TIPO: tipo, CONCEPTO: val('m-CONCEPTO'), BASE: baseEn('m') / 100, TIPO_IVA: val('m-TIPO_IVA'),
               ID_CATEGORIA: interno ? '' : val('m-ID_CATEGORIA'), ID_CUENTA: val('m-ID_CUENTA'), ID_CUENTA_DESTINO: interno ? val('m-ID_CUENTA_DESTINO') : '',
               ID_CONTRAPARTE: interno ? '' : val('m-ID_CONTRAPARTE'), ID_FACTURA: interno ? '' : val('m-ID_FACTURA'), NOTAS: val('m-NOTAS') };
+            Object.assign(nv, valoresRetDua('m', d.colsMov)); // T0733: vacías si no es un gasto (la caja no se ve)
             if (tienePer) nv[P] = val('m-PER');
             if (tieneDes) nv[DS] = interno ? '' : val('m-DES');
             // T0689: un cobro de un pedido con factura la lleva aunque no se elija.
@@ -1840,14 +2090,16 @@
        * Ticket, Pagada, con el mismo importe), unido al gasto. Si el gasto ya llevaba una factura sin archivo, la foto va a
        * esa. El gasto ya está apuntado: si la foto falla, lo dice y queda como gasto sin factura (sale en Pendiente).
        */
+      /** T0733 · La retención y el IVA de aduana del gasto, para su ticket (solo las columnas que tiene FACTURAS). */
+      function ticketRetDua(nv) { var o = {}; ['RETENCION', 'IVA_IMPORTACION'].forEach(function (k) { if (d.colsFac.indexOf(k) >= 0 && nv[k]) o[k] = nv[k]; }); return o; }
       function ticketDelGasto(idMov, nv, foto) {
         if (!idMov) return;
         if (ctx.abierta()) ctx.aviso('Gasto apuntado. Subiendo la foto del ticket…');
         subirArchivo(foto, nv.CONCEPTO || 'Ticket', nv.FECHA).then(function (url) {
           var ya = nv.ID_FACTURA ? ix.fac[nv.ID_FACTURA] : null;
           if (ya) return ya.ARCHIVO_URL ? null : T.actualizar('FACTURAS', ya.ID, { ARCHIVO_URL: url });
-          return T.crear('FACTURAS', { TIPO: 'Ticket', NUMERO: numeroTicket(nv.CONCEPTO, nv.FECHA), FECHA: nv.FECHA, ID_CONTRAPARTE: nv.ID_CONTRAPARTE || '',
-            BASE: nv.BASE, TIPO_IVA: nv.TIPO_IVA, ESTADO: 'Pagada', ARCHIVO_URL: url }).then(function (rf) {
+          return T.crear('FACTURAS', Object.assign({ TIPO: 'Ticket', NUMERO: numeroTicket(nv.CONCEPTO, nv.FECHA), FECHA: nv.FECHA, ID_CONTRAPARTE: nv.ID_CONTRAPARTE || '',
+            BASE: nv.BASE, TIPO_IVA: nv.TIPO_IVA, ESTADO: 'Pagada', ARCHIVO_URL: url }, ticketRetDua(nv))).then(function (rf) {
             var idf = rf && (rf.id || (rf.fila && rf.fila.ID));
             if (idf) return T.actualizar('MOVIMIENTOS', idMov, { ID_FACTURA: idf });
           });
@@ -2006,6 +2258,7 @@
           campo('IVA', '<select id="f-TIPO_IVA">' + opcionesConValor(ivas().map(function (x) { return [x, x]; }), v.TIPO_IVA) + '</select>') +
           casillaIva('f') +
           '<div class="u-nota u-ancho" id="f-total"></div>' +
+          (cerrada ? '' : cajaRetDua('f', v, d.colsFac)) + // T0733 (R101): solo en una recibida o un ticket
           campo('Estado', '<select id="f-ESTADO">' + opciones([['Pendiente', 'Pendiente'], ['Pagada', 'Pagada'], ['Anulada', 'Anulada']], v.ESTADO, 'Sin estado') + '</select>') +
           // T0689 · La foto o el PDF de una recibida o un ticket, desde el móvil (la sube el motor a Drive al guardar).
           (TICKETS && !(f && f.ARCHIVO_URL) ? cajaFoto('f', 'Foto o PDF de la factura') : '') +
@@ -2220,6 +2473,7 @@
               vent.querySelector('#f-url-nota').hidden = lin && pdf;
             }
             var cf = vent.querySelector('#f-foto-caja'); if (cf) cf.hidden = tipo === 'Emitida';
+            var rd = vent.querySelector('#f-retdua'); if (rd) rd.hidden = tipo === 'Emitida';
             pintaEmpresa();
             pintaTot();
           }
@@ -2337,12 +2591,16 @@
           vent.querySelector('#f-ID_CONTRAPARTE').addEventListener('change', function () { pintaCliente(); if (porLineas()) pintaLineas(); });
           vent.querySelector('#f-BASE').addEventListener('input', refrescar);
           oirImporte('f', refrescar);
+          oirRetDua('f', refrescar);
           oirFoto('f');
           /** Lo que hay en pantalla, para el documento (el número, el que tiene; una nueva aún no lo tiene). */
           function documento(numero) {
             var c = clienteElegido() || {};
+            // T0733 (R94): la de un pedido lleva la fecha de su entrega (si es otra) y, si la forma de pago dice «a 30 días», el vencimiento.
+            var vta = deVenta || (f && DS && f[DS] ? ix.des[String(f[DS])] || null : null), emp = empresaAhora() || {};
             return {
-              factura: { ID: (f && f.ID) || '', NUMERO: numero || (f && f.NUMERO) || '', FECHA: val('f-FECHA'), TIPO_IVA: val('f-TIPO_IVA'), NOTAS: val('f-NOTAS'), ESTADO: val('f-ESTADO'), ARCHIVO_URL: val('f-ARCHIVO_URL') },
+              factura: Object.assign({ ID: (f && f.ID) || '', NUMERO: numero || (f && f.NUMERO) || '', FECHA: val('f-FECHA'), TIPO_IVA: val('f-TIPO_IVA'), NOTAS: val('f-NOTAS'), ESTADO: val('f-ESTADO'), ARCHIVO_URL: val('f-ARCHIVO_URL') },
+                fechasFactura(val('f-FECHA'), vta, emp.FORMA_PAGO || cfg.FACTURA_PAGO || '')),
               cliente: { NOMBRE: c.NOMBRE || '', NIF: datosCli ? val('f-NIF') : c.NIF || '', DIRECCION: datosCli ? val('f-DIRECCION') : c.DIRECCION || '' },
               lineas: lineasAhora(), base: baseEn('f') / 100, empresa: empresaAhora()
             };
@@ -2355,6 +2613,7 @@
             var tipo = tipoAhora(), em = tipo === 'Emitida' && !f, lin = porLineas(), conNumero = tipo !== 'Emitida';
             var nv = { FECHA: val('f-FECHA'), ID_CONTRAPARTE: val('f-ID_CONTRAPARTE'), BASE: baseEn('f') / 100, TIPO_IVA: val('f-TIPO_IVA'),
               ESTADO: val('f-ESTADO'), ARCHIVO_URL: val('f-ARCHIVO_URL'), NOTAS: val('f-NOTAS') };
+            Object.assign(nv, valoresRetDua('f', d.colsFac)); // T0733: vacías en una emitida (la caja no se ve)
             if (conNumero) nv.NUMERO = val('f-NUMERO');
             if (deVenta && tipo === 'Emitida') nv[DS] = deVenta.ID; // T0689: unida a su pedido
             var mal = [], ls = lin ? lineasAhora() : [];
@@ -2527,9 +2786,11 @@
           };
           var ba = vent.querySelector('#f-apuntar');
           if (ba) ba.onclick = function () {
-            var t = importe(f), falta = t.total - pagado, base = Math.round(falta * 100 / (100 + pct(f.TIPO_IVA)));
+            // T0733: con la retención y el IVA de aduana de la factura; si ya se ha pagado una parte, en proporción a lo que falta.
+            var t = importe(f), falta = t.total - pagado, k = t.total ? falta / t.total : 1, base = pagado ? Math.round(cts(f.BASE) * k) : null;
             var pre = { TIPO: f.TIPO === 'Emitida' ? 'Ingreso' : 'Gasto', CONCEPTO: (f.TIPO === 'Emitida' ? 'Cobro ' : 'Pago ') + numFac(f), ID_CONTRAPARTE: f.ID_CONTRAPARTE,
-              ID_FACTURA: f.ID, TIPO_IVA: f.TIPO_IVA, BASE: base / 100 };
+              ID_FACTURA: f.ID, TIPO_IVA: f.TIPO_IVA, BASE: base === null ? f.BASE : base / 100, RETENCION: f.RETENCION || '',
+              IVA_IMPORTACION: t.dua ? Math.round(t.dua * (pagado ? k : 1)) / 100 : '' };
             formMov(null, pre);
           };
         });
@@ -2921,8 +3182,13 @@
         if (ab) { var dt = el.querySelector('#eco-' + ab.getAttribute('data-abrir')); if (dt) { dt.open = true; S.ab[ab.getAttribute('data-abrir')] = true; dt.scrollIntoView({ block: 'start' }); } return; }
         var dv = t.closest('[data-desv]'); // T0628: de dónde sale una cifra de Ventas
         if (dv) { var kd = dv.getAttribute('data-desv'); S.ven.des = S.ven.des === kd ? '' : kd; pintar(); return; }
+        var tb = t.closest('[data-trim]'); // T0733: el trimestre de «Para tu gestoría»
+        if (tb) { S.gest.q = { ano: trimestreVisto().ano, t: Number(tb.getAttribute('data-trim')) }; pintar(); return; }
         var ir = t.closest('button[data-ir]');
-        if (ir) { if (pest.indexOf(ir.getAttribute('data-ir')) >= 0) irA(ir.getAttribute('data-ir')); return; }
+        if (ir) {
+          var ti = /^(\d{4})-(\d)$/.exec(ir.getAttribute('data-trim-ir') || ''); if (ti) S.gest.q = { ano: ti[1], t: Number(ti[2]) }; // T0733: el del Resumen
+          if (pest.indexOf(ir.getAttribute('data-ir')) >= 0) irA(ir.getAttribute('data-ir')); return;
+        }
         var a = t.closest('[data-accion]');
         if (a) {
           var ac = a.getAttribute('data-accion');
@@ -2949,6 +3215,8 @@
           else if (ac === 'todasventas') { S.ven.id = ''; pintar(); arriba(); }
           else if (ac === 'volverficha') { S.ven.volver = null; ctx.volver(); }
           else if (ac === 'cerrardes') { S.ven.des = ''; pintar(); }
+          else if (ac === 'gestcsv') descargarGestoria(); // T0733
+          else if (ac === 'gestcopiar') copiarGestoria();
           return;
         }
         var tr = t.closest('tr[tabindex]');
@@ -2973,6 +3241,7 @@
         if (velo.contains(t)) return;
         if (t === selPer) { S.per = t.value; S.des = ''; guardado(CLAVE + 'per', t.value); S.mov.ver = VER; pintar(); return; }
         if (t.id === 'eco-des') { S.des = t.value; pintar(); return; }
+        if (t.id === 'eco-gano') { S.gest.q = { ano: t.value, t: trimestreVisto().t }; pintar(); return; }
         if (t.hasAttribute('data-filtro')) { var k = t.getAttribute('data-filtro'); S.mov[k] = t.type === 'checkbox' ? t.checked : t.value; if (k === 'tipo') S.mov.cat = ''; S.mov.ver = VER; pintar(); return; }
       });
       var tq = 0;
