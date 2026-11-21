@@ -1538,13 +1538,15 @@
   },
   "T0745-quitar-copia": {
    "tarea": "T0745",
-   "titulo": "Registro de instalaciones y CHANGELOG · supabase-utilo-20261121-1153 (acción Publicar)",
+   "titulo": "Quitar del todo la copia del Excel de Marta",
    "pr": null,
-   "commit": "4d1f4920",
-   "ultimo": "Registro de instalaciones y CHANGELOG · supabase-utilo-20261121-1153 (acción Publicar)",
-   "quien": "Utilo (Publicar · javiercanela3)",
-   "fecha": "2026-11-21T11:24:19.875Z",
-   "toca": [],
+   "commit": "5675ce14",
+   "ultimo": "T0745: Quitar del todo la copia del Excel de Marta",
+   "quien": "Javi Canela",
+   "fecha": "2026-11-21T11:24:47.252Z",
+   "toca": [
+    "telas"
+   ],
    "comun": false,
    "paginas": [
     {
@@ -1711,7 +1713,7 @@
        "nombre": "Admin"
       }
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/",
@@ -1729,7 +1731,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/catalogo/",
@@ -1744,7 +1746,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     }
    ],
    "migraciones": {
