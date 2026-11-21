@@ -141,14 +141,18 @@
       return new Promise(function (ok, ko) {
         var v = document.createElement('div');
         v.setAttribute('role', 'alertdialog');
-        v.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:100000;background:var(--color-texto);color:var(--color-superficie);' +
+        // T0749: a lo ancho (16 px a cada lado, hasta 560) y centrado sin left:50%, que lo dejaba en media pantalla y partía el
+        // texto; con la barra de secciones abajo (núcleo, móvil), por encima de ella: .ug-clic en estilos/nucleo.css.
+        v.className = 'ug-clic';
+        v.style.cssText = 'position:fixed;left:16px;right:16px;margin:0 auto;width:max-content;max-width:min(560px,calc(100vw - 32px));box-sizing:border-box;' +
+          'bottom:calc(24px + env(safe-area-inset-bottom, 0px));z-index:100000;background:var(--color-texto);color:var(--color-superficie);' +
           'padding:12px 14px;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.25);display:flex;gap:12px;align-items:center;' +
-          'font:15px/1.35 system-ui,sans-serif;max-width:calc(100vw - 32px)';
-        v.innerHTML = '<span>Tu sesión de Google ha caducado.</span>';
+          'font:15px/1.35 system-ui,sans-serif';
+        v.innerHTML = '<span style="flex:1 1 auto;min-width:0">Tu sesión de Google ha caducado.</span>';
         var b = document.createElement('button');
         b.type = 'button';
         b.textContent = 'Continuar';
-        b.style.cssText = 'border:0;border-radius:8px;padding:8px 14px;font:600 15px system-ui,sans-serif;background:var(--color-superficie);color:var(--color-texto);cursor:pointer';
+        b.style.cssText = 'flex:none;border:0;border-radius:8px;padding:8px 14px;font:600 15px system-ui,sans-serif;background:var(--color-superficie);color:var(--color-texto);cursor:pointer';
         b.onclick = function () {
           b.disabled = true;
           UG.entrar().then(function (t) { v.remove(); ok(t); }, function (e) { v.remove(); ko(e); });
