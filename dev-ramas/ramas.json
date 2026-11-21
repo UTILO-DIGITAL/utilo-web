@@ -963,10 +963,10 @@
    "tarea": "T0734",
    "titulo": "Proveedores se lee entero en un portátil, con las mismas palabras que el resto",
    "pr": 419,
-   "commit": "dafaf43a",
-   "ultimo": "T0734: Proveedores cabe en el portátil y dice lo mismo que el resto de la app",
+   "commit": "6dcd1ed9",
+   "ultimo": "T0734: Al día con main (T0730, T0733)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-21T00:34:12.571Z",
+   "fecha": "2026-11-21T00:41:21.533Z",
    "toca": [
     "telas"
    ],
