@@ -103,7 +103,8 @@
       if (!codigo) return; // sin código no se puede abrir
       var textos = [];
       (g.buscar || []).forEach(function (b, k) {
-        if (b.tabla) (deOtra[k] && deOtra[k][codigo] || []).forEach(function (v) { textos.push({ t: v, titulo: b.titulo }); });
+        // T0730: con «con», se cruza por esa columna de la fila (la composición de una tela, por su diseño).
+        if (b.tabla) (deOtra[k] && deOtra[k][b.con ? String(f[b.con]) : codigo] || []).forEach(function (v) { textos.push({ t: v, titulo: b.titulo }); });
         else { var v = valor(b.campo); if (!vacio(v)) textos.push({ t: String(v), titulo: b.titulo }); }
       });
       var detalle = (g.detalle || []).map(function (d) { return textoDetalle(d, valor(d.campo)); }).filter(Boolean);

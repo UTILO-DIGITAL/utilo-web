@@ -963,10 +963,10 @@
    "tarea": "T0737",
    "titulo": "Sigue el estado de la muestra de cada tela con cada marca",
    "pr": 420,
-   "commit": "e4e0f2b7",
-   "ultimo": "T0737: Foto de GESTION con INTERESES.ESTADO (añadida en producción con permiso de Javi)",
+   "commit": "107b5760",
+   "ultimo": "T0737: Al día con main (T0730, T0733)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-21T00:43:31.702Z",
+   "fecha": "2026-11-21T00:46:18.216Z",
    "toca": [
     "telas"
    ],

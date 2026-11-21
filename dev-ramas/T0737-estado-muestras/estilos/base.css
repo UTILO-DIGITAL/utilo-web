@@ -650,6 +650,12 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .eco-sw button[aria-pressed=true] { border-color: var(--color-linea); background: var(--color-superficie); color: var(--color-texto); }
 .u .eco-sw button[aria-pressed=true][data-tipo=Ingreso] { color: var(--color-bien); }
 .u .eco-sw button[aria-pressed=true][data-tipo=Gasto] { color: var(--color-error); }
+/* T0733 · Para tu gestoría: el trimestre (1T…4T) y el año en una fila; las retenciones y los botones, debajo de las cifras */
+.u .eco-trim-barra { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--e2) var(--e3); margin: 0 0 var(--e3); }
+.u .eco-trim { grid-template-columns: repeat(4, minmax(0, 1fr)); flex: 0 1 360px; margin: 0; }
+.u .eco-trim-ano { flex: 0 0 120px; }
+.u .eco-gest-ret { margin: 0 0 var(--e2); font-size: 15px; }
+.u .eco-gest-bot { margin: var(--e2) 0 var(--e1); }
 .u .u-campo input.eco-imp { font-size: 22px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
 .u .eco-opc { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--color-suave); }
 /* T0689 · Con o sin IVA: un botón de texto debajo del importe (la casilla va escondida) */
@@ -3165,6 +3171,8 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
 .u .li-junta .li-rel-f { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e1) var(--e3); }
 .u .li-junta .li-rel-n { font-weight: 500; flex: 1 1 auto; }
 .u .li-gal-c.li-gal-sin { color: var(--color-suave); font-weight: 400; }
+/* T0730 (R41): el aviso cuando falta la cifra («Falta el coste»), una pastilla de su color. */
+.u .li-gal-c.li-gal-av { align-self: flex-start; color: var(--li-c); background: var(--li-fondo); border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 600; }
 /* ==========================================================================================================================
  * T0684 · Elegir escribiendo (nucleo/elegir.js): un desplegable largo es un botón como los demás campos (las mismas esquinas,
  * letra y flecha) que abre una lista con un buscador encima. En el ordenador, debajo del campo; en el móvil, desde abajo,

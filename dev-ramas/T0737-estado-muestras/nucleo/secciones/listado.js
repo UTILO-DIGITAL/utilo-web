@@ -795,7 +795,11 @@
       // T0691: el muestrario, con columnas que existen; y no es además un tablero.
       if (v.galeria) {
         if (typeof v.galeria !== 'object' || Array.isArray(v.galeria)) errores.push(donde + 'el muestrario de la vista «' + v.id + '» es { "foto", "titulo", "debajo", "cifra" }.');
-        else [v.galeria.foto, v.galeria.titulo, v.galeria.cifra].concat(lista(v.galeria.debajo)).forEach(function (c) { if (c) hay(c, 'el muestrario de la vista «' + v.id + '» usa'); });
+        else {
+          [v.galeria.foto, v.galeria.titulo, v.galeria.cifra].concat(lista(v.galeria.debajo)).forEach(function (c) { if (c) hay(c, 'el muestrario de la vista «' + v.id + '» usa'); });
+          // T0730: «avisoSinCifra», el id de uno de sus AVISOS.
+          if (v.galeria.avisoSinCifra !== undefined && !ap.avisos.some(function (x) { return x.id === v.galeria.avisoSinCifra; })) errores.push(donde + 'el muestrario de la vista «' + v.id + '»: avisoSinCifra «' + v.galeria.avisoSinCifra + '» no es ninguno de sus avisos (' + ap.avisos.map(function (x) { return x.id; }).join(', ') + ').');
+        }
         if (v.tablero) errores.push(donde + 'la vista «' + v.id + '» es un muestrario: no es además un tablero.');
       }
       if (v.tablero) {
@@ -1605,6 +1609,12 @@
   /** T0624 · Una señal por cosa: la fecha que hace saltar un aviso de nivel alto (vencido) o medio (pendiente) se pinta con
    *  su color, y la franja de la fila con el mismo; lo demás (estado, botones de aviso) va neutro. Da el nivel del primer
    *  aviso de la fila que mira esa columna, o '' (ninguno, o solo de nivel info: «Sin fecha» no pinta nada). */
+  /** T0730 (R41) · El color de la franja de la fila: el del primer aviso que la pinta (`"fila": false` no la pinta: «Falta el
+   *  coste» se dice en palabras, sin parecer atrasado); '' si ninguno. */
+  function franja(avs) {
+    var x = (avs || []).filter(function (a) { return a.fila !== false; })[0];
+    return x ? (x.nivel || 'medio') : '';
+  }
   function nivelDeCampo(avs, c) {
     for (var i = 0; i < (avs || []).length; i++) {
       var n = avs[i].nivel || 'medio';
@@ -2073,7 +2083,7 @@
 
   var CALC = { pctVer: pctVer, pctEscrito: pctEscrito, deEscrito: deEscrito, nuevoId: nuevoId, altaNuevoDe: altaNuevoDe, codigoAltaNuevo: codigoAltaNuevo, plantillaPrefijo: plantillaPrefijo, codigoNuevo: codigoNuevo, esRuta: esRuta, destinoDe: destinoDe, avisoRuta: avisoRuta, borrarDe: borrarDe, queBorra: queBorra, borrarCon: borrarCon, seccionDeFila: seccionDeFila, seccionesRel: seccionesRel, plantillaPara: plantillaPara, sinMarcas: sinMarcas, sinComunes: sinComunes, palabraTodos: palabraTodos, yaEsta: yaEsta, yaPuestos: yaPuestos, esSoporte: esSoporte, htmlErrores: htmlErrores, cuantas: cuantas, yJuntos: yJuntos, relEdicion: relEdicion, altaRelacionada: altaRelacionada, paraElegir: paraElegir, sufijoFijo: sufijoFijo,
     fechaDia: fechaDia, webCorta: webCorta, webSitio: webSitio, textoCorto: textoCorto, gruposConQuien: gruposConQuien, nombreCorto: nombreCorto, deshacerEnOrden: deshacerEnOrden, loDiceUnAviso: loDiceUnAviso, contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
-    textoVuelta: textoVuelta, QUITAR_DE_VUELTA: QUITAR_DE_VUELTA, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
+    textoVuelta: textoVuelta, QUITAR_DE_VUELTA: QUITAR_DE_VUELTA, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, franja: franja, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, resumenCifras: resumenCifras, arribaDe: arribaDe, filasArriba: filasArriba, rangoFechas: rangoFechas, lineaArriba: lineaArriba, cifrasResumen: cifrasResumen, seguirCrudo: seguirCrudo, tablasDeRuta: tablasDeRuta, conCamposPropios: conCamposPropios, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, vistaDeFila: vistaDeFila, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, recomendacionDe: recomendacionDe, camposCond: camposCond, irA: irA, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir, valorCon: valorCon, columnasCon: columnasCon, cambioCampo: cambioCampo, textoCambio: textoCambio, miasDe: miasDe, equipoLimpio: equipoLimpio, hayMias: hayMias, esMia: esMia, nombrePara: nombrePara, conEquipo: conEquipo,
     avisosDe: avisosDe, avisosActivos: avisosActivos, avisosBarra: avisosBarra, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
@@ -2354,7 +2364,10 @@
           html += '<div class="li-rapido" role="group" aria-label="' + texto(rap.titulo) + '"><span class="li-rapido-t">' + texto(rap.titulo) + '</span>' +
             '<button type="button" class="li-fop" data-rapido="' + texto(rap.campo) + '" data-v="" aria-pressed="' + (!xr.es && !xr.vacio) + '">' + palabraTodos(rap.cp) + '</button>' + rap.opciones.map(function (o) {
               return '<button type="button" class="li-fop" data-rapido="' + texto(rap.campo) + '" data-v="' + texto(o) + '" aria-pressed="' + (xr.es !== undefined && norm(xr.es) === norm(o)) + '">' + texto(mostrar(rap.cp, o)) + '</button>';
-            }).join('') + '</div>';
+            }).join('') + (rap.vacios ? (function () { // T0730 (R42): las que no lo tienen («Sin proveedor · 21»), con cuántas son
+              var n = deVista.filter(function (f) { return nada(valorDe(a, rap.campo, f, VAL)); }).length;
+              return '<button type="button" class="li-fop" data-rapido="' + texto(rap.campo) + '" data-v="!" aria-pressed="' + !!xr.vacio + '">Sin ' + texto(rap.titulo.toLowerCase()) + ' · ' + n + '</button>';
+            })() : '') + '</div>';
         }
         // Los filtros puestos, a la vista: cada uno se quita con su ✕, o todos a la vez. El del filtro rápido ya se ve en sus
         // pastillas (li-fchip-rap, escondido); T0691: en el móvil, con cuatro opciones o más las pastillas no salen y sí él.
@@ -2589,7 +2602,7 @@
         // T0643: con lo de un toque, el círculo a la izquierda y «Pasar» a la derecha, encima de la tarjeta (no dentro: un botón no va dentro de otro).
         var r = rap && rapidaEn(a, f, hoy), ci = r ? circulo(a, f) : '', pa = r ? botonPasar(a, f) : '';
         var bc = cx ? botonCtx(a, f, celda(a, cx, f, false, cli)) : '';
-        return '<li' + (ci || pa || bc ? ' class="li-t-rap' + (ci ? ' li-t-ci' : '') + (pa ? ' li-t-pa' : '') + (bc ? ' li-t-ctx' : '') + '"' : '') + '>' + ci + '<button type="button" class="li-tarjeta' + (foto ? ' li-con-foto' : '') + (avs.length ? ' li-f-' + texto(avs[0].nivel || 'medio') : '') + '" data-id="' + texto(f[a.clave]) + '"' + (arrastrar ? ' data-mover' : '') + '>' +
+        return '<li' + (ci || pa || bc ? ' class="li-t-rap' + (ci ? ' li-t-ci' : '') + (pa ? ' li-t-pa' : '') + (bc ? ' li-t-ctx' : '') + '"' : '') + '>' + ci + '<button type="button" class="li-tarjeta' + (foto ? ' li-con-foto' : '') + (franja(avs) ? ' li-f-' + texto(franja(avs)) : '') + '" data-id="' + texto(f[a.clave]) + '"' + (arrastrar ? ' data-mover' : '') + '>' +
           (foto ? img + '<span class="li-t-txt">' + cuerpo + '</span>' : cuerpo) + '</button>' + pa + bc + '</li>';
       }
       /** T0610 · Los grupos de una vista. En el ordenador, UNA tabla: la cabecera una vez y cada grupo como una fila con su
@@ -2620,7 +2633,7 @@
           // (la fecha ya va en rojo con «hace 9 días»). En la tarjeta del móvil es al revés: se queda el aviso y se quita la etiqueta.
           var vistos = conCod.filter(function (c) { return c !== nom; }).map(function (c) { return verTexto(campo(a, c), f, VAL, PROHIB); });
           mar = mar.filter(function (x) { return !vistos.some(function (t) { return loDiceUnAviso(t, [x]); }); });
-          return '<tr tabindex="0" data-id="' + texto(f[a.clave]) + '"' + (avs.length ? ' class="li-con-aviso li-f-' + texto(avs[0].nivel || 'medio') + '"' : '') + '>' +
+          return '<tr tabindex="0" data-id="' + texto(f[a.clave]) + '"' + (franja(avs) ? ' class="li-con-aviso li-f-' + texto(franja(avs)) + '"' : '') + '>' +
             (conCi ? '<td class="li-td-ci">' + (r ? circulo(a, f) : '') + '</td>' : '') + conCod.map(function (c) {
             var cp = campo(a, c), principal = c === nom;
             // Fechas, cifras, estados y lo corto no se parten («273 / g/m²», «hace 9 / días»): lo que se estrecha es el texto largo.
@@ -2691,12 +2704,20 @@
         var foto = gl.foto || fotoDeTarjeta(a, columnasDe(a, vista)), tit = gl.titulo || a.nombre;
         var deb = lista(gl.debajo).filter(vale), cif = vale(gl.cifra) ? gl.cifra : '';
         var txt = function (c, f) { var h = celda(a, c, f, false, cli); return h.indexOf('class="li-nada') >= 0 ? '' : h; };
+        // T0730 (R41): sin cifra, el aviso de «avisoSinCifra» con su color si la fila lo cumple («Falta el coste», en ocre:
+        // le interesa a una marca); si no, «sinCifra» en gris («Sin coste aún»). En la vista para clientes, nunca el aviso.
+        var avSin = cli || !gl.avisoSinCifra ? null : (a.avisos || []).filter(function (x) { return x.id === gl.avisoSinCifra; })[0];
+        var sinCifra = function (f) {
+          var av = avSin && avisosDe(a, f, hoy, vista).filter(function (x) { return x.id === avSin.id; })[0];
+          if (av) return '<span class="li-gal-c li-gal-av li-' + texto(av.nivel || 'medio') + '">' + texto(av.titulo) + '</span>';
+          return gl.sinCifra ? '<span class="li-gal-c li-gal-sin">' + texto(gl.sinCifra) + '</span>' : '';
+        };
         var una = function (f) {
           var src = foto && !prohibido(f[foto], PROHIB).length ? imagen(f[foto]) : '';
           return '<li><button type="button" class="li-gal-t" data-id="' + texto(f[a.clave]) + '">' +
             '<span class="li-gal-foto">' + (src ? '<img class="li-gal-img" src="' + texto(src) + '" alt="" referrerpolicy="no-referrer" loading="lazy" decoding="async" data-li-foto>' : '') + '</span>' +
             '<span class="li-gal-txt"><strong>' + txt(tit, f) + '</strong>' + deb.map(function (c) { var h = txt(c, f); return h ? '<span class="li-gal-d">' + h + '</span>' : ''; }).join('') +
-            (cif ? (txt(cif, f) ? '<span class="li-gal-c">' + txt(cif, f) + '</span>' : (gl.sinCifra ? '<span class="li-gal-c li-gal-sin">' + texto(gl.sinCifra) + '</span>' : '')) : '') + '</span></button></li>';
+            (cif ? (txt(cif, f) ? '<span class="li-gal-c">' + txt(cif, f) + '</span>' : sinCifra(f)) : '') + '</span></button></li>';
         };
         // T0690: 48 por grupo (ocho filas de seis) y «Ver más».
         return '<div class="li-galerias">' + gs.map(function (g) {
@@ -3812,7 +3833,7 @@
         var rp = ev.target.closest('[data-rapido]');
         if (rp) { // T0679: el filtro rápido de encima de la lista
           var c = rp.getAttribute('data-rapido'), v = rp.getAttribute('data-v');
-          if (v && rp.getAttribute('aria-pressed') !== 'true') S.filtros[c] = { es: v }; else delete S.filtros[c];
+          if (v && rp.getAttribute('aria-pressed') !== 'true') S.filtros[c] = v === '!' ? { vacio: true } : { es: v }; else delete S.filtros[c];
           pintar(); return;
         }
         // T0643: el círculo, «Pasar» y su menú. Con el menú abierto, tocar fuera solo lo cierra.
