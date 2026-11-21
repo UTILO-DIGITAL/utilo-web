@@ -1648,6 +1648,15 @@
    "quien": "Javi Canela",
    "rama": "T0702-comprobacion-final",
    "carpeta": "T0702-comprobacion-final"
+  },
+  "DEV-3": {
+   "cliente": "telas",
+   "modo": "ejemplo",
+   "commit": "abaf9572",
+   "subido": "21/11/26, 11:40",
+   "quien": "Javi Canela",
+   "rama": "T0749-rematar-revision-telas",
+   "carpeta": "T0749-rematar-revision-telas"
   }
  }
 }
