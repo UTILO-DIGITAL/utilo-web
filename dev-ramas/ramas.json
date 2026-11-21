@@ -1280,9 +1280,9 @@
    ]
   },
   "utilo": {
-   "rama": "T0719-claude-de-marta",
-   "commit": "b49a1c9f",
-   "fecha": "2026-11-20T22:48:54.706Z",
+   "rama": "main y las ramas abiertas",
+   "commit": "f7a9e002",
+   "fecha": "2026-11-21T11:46:50.393Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
