@@ -11,6 +11,7 @@
       ir: d.ir && d.ir.seccion ? { seccion: String(d.ir.seccion), texto: d.ir.texto || '' } : null, // T0651: un «de» que lleva a su fila
       genero: d.genero === 'f' ? 'f' : '', // T0724 (R38): «Todas» en su filtro (Fase, Prioridad)
       siVacio: d.siVacio ? String(d.siVacio) : '', // T0731 (R67, R71): lo que dice en una lista si está vacío («Contacto», «Sin nada pendiente»)
+      mayuscula: !!d.mayuscula, // T0751: lo escrito, con la primera letra en mayúscula al enseñarlo (lo guardado no cambia)
       soloAlta: !!d.soloAlta }; // T0651: se elige al dar de alta y después no se cambia (el diseño de una tela: su código sale de él)
   }
   /** T0642 · Un valor como se enseña: sin el número de delante («1 Contactado» → «Contactado», con «sinNumero») y con su
@@ -19,6 +20,7 @@
     var s = String(v === undefined || v === null ? '' : v);
     if (cp && cp.nombres) { var k = Object.keys(cp.nombres).filter(function (x) { return norm(x) === norm(s); })[0]; if (k !== undefined) s = cp.nombres[k]; }
     if (cp && cp.sinNumero) s = s.replace(/^\s*\d+[.)]?\s+(?=\S)/, '');
+    if (cp && cp.mayuscula) s = s.replace(/^(\s*)(\S)/, function (x, e, l) { return e + l.toLocaleUpperCase('es'); }); // T0751
     return s;
   }
   function columnasDe(ap, vista) { return (vista && vista.columnas) || (ap.columnas && ap.columnas.length ? ap.columnas : [ap.nombre]); }

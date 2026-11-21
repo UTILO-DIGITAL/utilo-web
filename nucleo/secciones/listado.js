@@ -281,6 +281,9 @@
       deducir: cfg.DEDUCIR || {}, acciones: cfg.ACCIONES || [], contexto: contextoDe(cfg.CONTEXTO), resumen: resumenCifras(cfg.RESUMEN), arriba: arribaDe(cfg.ARRIBA),
       // T0689: la ficha guarda sola cada campo al cambiarlo; con GUARDAR: "boton", como antes (con «Guardar»). MIAS: Mías / Todas.
       guardar: cfg.GUARDAR === 'boton' ? 'boton' : 'solo', mias: miasDe(cfg.MIAS),
+      // T0752: AYUDA: false, sin la línea que explica la vista (ni su «i» en el móvil); RAPIDO: false, sin el filtro rápido
+      // en pastillas (sigue en Filtrar). Telas, para que la cabecera de cada sección tenga lo mismo y poco ruido.
+      ayuda: cfg.AYUDA !== false, rapido: cfg.RAPIDO !== false,
       // T0651: borrar (dentro de «Más»), el código de una fila nueva (sin prefijo en su tabla) y los prefijos que da montar.js.
       borrar: borrarDe(cfg.BORRAR), nuevoId: cfg.NUEVO_ID || '', prefijos: cfg._prefijos || {} };
   }
@@ -522,6 +525,7 @@
       ir: d.ir && d.ir.seccion ? { seccion: String(d.ir.seccion), texto: d.ir.texto || '' } : null, // T0651: un «de» que lleva a su fila
       genero: d.genero === 'f' ? 'f' : '', // T0724 (R38): «Todas» en su filtro (Fase, Prioridad)
       siVacio: d.siVacio ? String(d.siVacio) : '', // T0731 (R67, R71): lo que dice en una lista si está vacío («Contacto», «Sin nada pendiente»)
+      mayuscula: !!d.mayuscula, // T0751: lo escrito, con la primera letra en mayúscula al enseñarlo (lo guardado no cambia)
       soloAlta: !!d.soloAlta }; // T0651: se elige al dar de alta y después no se cambia (el diseño de una tela: su código sale de él)
   }
   /** T0642 · Un valor como se enseña: sin el número de delante («1 Contactado» → «Contactado», con «sinNumero») y con su
@@ -530,6 +534,7 @@
     var s = String(v === undefined || v === null ? '' : v);
     if (cp && cp.nombres) { var k = Object.keys(cp.nombres).filter(function (x) { return norm(x) === norm(s); })[0]; if (k !== undefined) s = cp.nombres[k]; }
     if (cp && cp.sinNumero) s = s.replace(/^\s*\d+[.)]?\s+(?=\S)/, '');
+    if (cp && cp.mayuscula) s = s.replace(/^(\s*)(\S)/, function (x, e, l) { return e + l.toLocaleUpperCase('es'); }); // T0751
     return s;
   }
   function columnasDe(ap, vista) { return (vista && vista.columnas) || (ap.columnas && ap.columnas.length ? ap.columnas : [ap.nombre]); }
@@ -2480,11 +2485,14 @@
         var html = '';
         html += htmlErrores(errores, SOPORTE_YO);
         var vs = vistasDe(a);
+        // T0752: sin vistas para elegir (Hoy), Mías / Todas van arriba, como las pestañas de las demás secciones.
+        var miasArriba = MIAS && vs.length <= 1;
         html += '<div class="li-arriba">' + (vs.length > 1 ? '<div class="u-pestanas li-vistas" role="tablist" aria-label="Vistas">' + vs.map(function (v) {
           return '<button type="button" role="tab" data-vista="' + texto(v.id) + '" aria-selected="' + (v.id === vista.id) + '">' + texto(v.titulo) + (v.cliente ? ' <span class="li-cli">para clientes</span>' : '') + '</button>';
-        }).join('') + '</div>' : '<div class="li-vistas"></div>');
-        // T0644: Personalizar va al Perfil; lo que es la vista, a mano en el ordenador y tras «i» en el móvil.
-        var ayuda = textoDe(a, vista);
+        }).join('') + '</div>' : miasArriba ? '<div class="u-pestanas li-vistas" role="tablist" aria-label="De quién">' + [['mias', 'Mías'], ['todas', 'Todas']].map(function (o) {
+          return '<button type="button" role="tab" data-mias="' + o[0] + '" aria-selected="' + (S.mias === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</div>' : '<div class="li-vistas"></div>');
+        // T0644: Personalizar va al Perfil; lo que es la vista, a mano en el ordenador y tras «i» en el móvil. T0752: sin AYUDA, nada.
+        var ayuda = a.ayuda ? textoDe(a, vista) : '';
         html += '<span class="u-nota li-cuenta">@@CUENTA@@</span>';
         if (cfg._soloMirar) html += '<span class="u-nota li-solo">Solo para mirar</span>'; // T0717
         if (ayuda) html += '<button type="button" class="u-btn u-btn-icono li-qes" data-qes aria-expanded="' + !!S.qes + '" aria-controls="li-texto" aria-label="Qué es esta vista">' + ICONO_INFO + '</button>';
@@ -2495,18 +2503,6 @@
         if (cifras.length) html += '<div class="li-resumen" role="group" aria-label="Resumen">' + cifras.map(function (x) {
           return '<span class="li-cifra"><b>' + texto(num(x.n, 0)) + '</b> ' + texto(x.nombre) + '</span>';
         }).join('') + (a.resumen.texto ? '<span class="li-resumen-t">' + texto(a.resumen.texto) + '</span>' : '') + '</div>';
-        // T0710: lo de otra tabla que pide una decisión (la feria a 45 días sin decidir), arriba, con sus botones.
-        if (!vista.cliente) a.arriba.forEach(function (x, ix) {
-          filasArriba(x, filas(x.tabla), hoy).forEach(function (f) {
-            var l = lineaArriba(x, f, hoy), id = f[x.clave];
-            html += '<div class="li-arriba-av" role="group" aria-label="' + texto(l.titulo) + '">' +
-              '<div class="li-arriba-tx">' + (l.etiqueta ? '<span class="li-arriba-et">' + texto(l.etiqueta) + '</span>' : '') +
-              '<strong>' + texto(l.titulo) + '</strong>' + (l.debajo ? '<span class="u-nota">' + texto(l.debajo) + '</span>' : '') + '</div>' +
-              '<div class="li-arriba-bt">' + x.botones.map(function (b, ib) {
-                return '<button type="button" class="u-btn' + (ib ? '' : ' u-btn-accion') + '" data-arriba="' + ix + '" data-arriba-b="' + ib + '" data-arriba-id="' + texto(id) + '">' + texto(b.titulo) + '</button>';
-              }).join('') + (x.ver && x.seccion && veo[x.seccion.toUpperCase()] ? '<a class="u-btn" href="?s=' + encodeURIComponent(x.seccion) + '&ficha=' + encodeURIComponent(id) + '" data-sx="' + texto(x.seccion.toUpperCase()) + '">' + texto(x.ver) + '</a>' : '') + '</div></div>';
-          });
-        });
         if (vista.cliente) {
           var nombres = []; ocultas(a, vista).forEach(function (c) { var t = campo(a, c).titulo; if (nombres.indexOf(t) < 0) nombres.push(t); });
           html += '<p class="li-cliente">Vista para enseñar a un cliente: sin avisos y sin ' + (nombres.length ? nombres.map(function (t) { return t.toLowerCase(); }).join(', ').replace(/, ([^,]*)$/, ' ni $1') : 'los datos privados') + '.</p>';
@@ -2525,12 +2521,12 @@
         S.todo = !!(S.q || nf || S.aviso);
         var fs = filtrar(a, vista, todas, { hoy: hoy, q: S.q, aviso: S.aviso, filtros: S.filtros, valores: VAL, orden: S.orden });
         html = html.replace('@@CUENTA@@', texto(cuenta(a, vista, fs.length, deVista.length)));
-        html += '<div class="li-barra">' + (MIAS ? '<div class="li-mias" role="group" aria-label="De quién">' + [['mias', 'Mías'], ['todas', 'Todas']].map(function (o) {
+        html += '<div class="li-barra">' + (MIAS && !miasArriba ? '<div class="li-mias" role="group" aria-label="De quién">' + [['mias', 'Mías'], ['todas', 'Todas']].map(function (o) {
           return '<button type="button" data-mias="' + o[0] + '" aria-pressed="' + (S.mias === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</div>' : '') + '<div class="li-buscar"><label class="u-oculto" for="li-q">Buscar</label><input id="li-q" type="search" placeholder="Buscar en ' + texto((a.titulo || '').toLowerCase()) + '" value="' + texto(S.q) + '" autocomplete="off"></div>' +
           (disp.length ? '<button type="button" class="u-btn li-filtrar" data-filtrar aria-haspopup="dialog"' + (nf ? ' aria-pressed="true"' : '') + '>' + ICONO_FILTRO + '<span class="li-bt">Filtrar</span>' + (nf ? ' <span class="li-nf" aria-label="' + nf + (nf === 1 ? ' puesto' : ' puestos') + '">' + nf + '</span>' : '') + '</button>' : '') +
           (a.crear && editables(a).length && !vista.cliente ? '<button type="button" class="u-btn u-btn-accion li-nueva" data-nueva aria-label="Añadir">' + ICONO_MAS + '<span class="li-bt">Añadir</span></button>' : '') + '</div>';
         // T0679: el primer filtro de pocas opciones (hasta 5), a la vista sobre la lista: «Todas» y cada opción, en pastillas.
-        var rap = disp.filter(function (d) { return d.tipo === 'lista' && d.opciones.length >= 2 && d.opciones.length <= 5; })[0];
+        var rap = a.rapido ? disp.filter(function (d) { return d.tipo === 'lista' && d.opciones.length >= 2 && d.opciones.length <= 5; })[0] : null;
         if (rap) {
           var xr = S.filtros[rap.campo] || {};
           html += '<div class="li-rapido" role="group" aria-label="' + texto(rap.titulo) + '"><span class="li-rapido-t">' + texto(rap.titulo) + '</span>' +
@@ -2550,6 +2546,19 @@
         if (avs.length) html += '<div class="li-avisos" role="group" aria-label="Avisos">' + avs.map(function (x) {
           return '<button type="button" class="li-av li-' + texto(x.a.nivel || 'medio') + '" data-aviso="' + texto(x.a.id) + '" aria-pressed="' + (S.aviso === x.a.id) + '"><b>' + x.n + '</b> ' + texto(x.a.titulo) + '</button>';
         }).join('') + (S.aviso ? '<button type="button" class="u-btn u-btn-texto" data-aviso="">Ver todas</button>' : '') + '</div>';
+        // T0710: lo de otra tabla que pide una decisión (la feria a 45 días sin decidir), arriba, con sus botones. T0752: debajo
+        // de la cabecera (vistas, buscar y avisos), justo encima de la lista: la cabecera es igual en todas las secciones.
+        if (!vista.cliente) a.arriba.forEach(function (x, ix) {
+          filasArriba(x, filas(x.tabla), hoy).forEach(function (f) {
+            var l = lineaArriba(x, f, hoy), id = f[x.clave];
+            html += '<div class="li-arriba-av" role="group" aria-label="' + texto(l.titulo) + '">' +
+              '<div class="li-arriba-tx">' + (l.etiqueta ? '<span class="li-arriba-et">' + texto(l.etiqueta) + '</span>' : '') +
+              '<strong>' + texto(l.titulo) + '</strong>' + (l.debajo ? '<span class="u-nota">' + texto(l.debajo) + '</span>' : '') + '</div>' +
+              '<div class="li-arriba-bt">' + x.botones.map(function (b, ib) {
+                return '<button type="button" class="u-btn' + (ib ? '' : ' u-btn-accion') + '" data-arriba="' + ix + '" data-arriba-b="' + ib + '" data-arriba-id="' + texto(id) + '">' + texto(b.titulo) + '</button>';
+              }).join('') + (x.ver && x.seccion && veo[x.seccion.toUpperCase()] ? '<a class="u-btn" href="?s=' + encodeURIComponent(x.seccion) + '&ficha=' + encodeURIComponent(id) + '" data-sx="' + texto(x.seccion.toUpperCase()) + '">' + texto(x.ver) + '</a>' : '') + '</div></div>';
+          });
+        });
         if (!todas.length) html += '<p class="u-vacio">' + texto(a.vacio || 'Todavía no hay nada en ' + (a.titulo || '').toLowerCase() + '.') + '</p>';
         else if (!fs.length) html += '<p class="u-vacio">' + (S.q ? 'Nada con «' + texto(S.q) + '»' + (nf ? ' y estos filtros.' : '.') : (nf ? 'Nada con estos filtros.' : 'Nada en esta vista.')) + '</p>';
         else if (vista.tablero) html += pintarTablero(a, vista, fs, hoy);

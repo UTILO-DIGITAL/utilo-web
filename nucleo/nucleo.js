@@ -40,12 +40,29 @@
   /** T0736 · Sin tildes ni mayúsculas, para buscar y comparar: «Ébano» → «ebano». La misma para todas las secciones (UN.plano),
    *  buscar.js y elegir.js; catalogo.js, la página pública, lleva la suya. Mantiene la longitud (para resaltar lo que casa:
    *  los saltos de línea y tabuladores, espacios) y no recorta: quien compara valores, con .trim(). null o undefined son '';
-   *  el 0, «0». En Node (las pruebas), solo esto y cumpleCifra. */
+   *  el 0, «0». En Node (las pruebas), solo esto, cumpleCifra y nombreCifra (T0751). */
   function plano(s) {
     var t = s == null ? '' : String(s);
     return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\S ]/g, ' ').slice(0, t.length);
   }
-  if (typeof window === 'undefined') { if (typeof module !== 'undefined') module.exports = { plano: plano, cumpleCifra: cumpleCifra }; return; }
+  /** T0283 · T0751 · Las versiones con novedades sin ver aquí (vs, la más reciente primero; vista, la última vista o null). La
+   *  primera vez (null) o si la vista ya no está, desde la última que trae novedades; si no, las de después de la vista. */
+  function versionesSinVer(vs, vista) {
+    var i = -1;
+    vs.forEach(function (x, k) { if (i < 0 && x.v === vista) i = k; });
+    var con = vs.filter(function (x) { return (x.novedades || []).length; });
+    if (vista === null || vista === undefined) return con.slice(0, 1);
+    return (i < 0 ? vs : vs.slice(0, i)).filter(function (x) { return (x.novedades || []).length; });
+  }
+  /** T0751 · Más de NOVEDADES_CORTA líneas sin ver: { version, lineas: lo principal (o sus 5 primeras), total }; si no, null. */
+  var NOVEDADES_CORTA = 8;
+  function novedadesCortas(sv) {
+    var total = sv.reduce(function (n, x) { return n + (x.novedades || []).length; }, 0);
+    if (!sv.length || total <= NOVEDADES_CORTA) return null;
+    var x = sv[0], p = Array.isArray(x.principal) && x.principal.length ? x.principal : (x.novedades || []).slice(0, 5);
+    return { version: x, lineas: p, total: total };
+  }
+  if (typeof window === 'undefined') { if (typeof module !== 'undefined') module.exports = { plano: plano, cumpleCifra: cumpleCifra, nombreCifra: nombreCifra, miaCifra: miaCifra, versionesSinVer: versionesSinVer, novedadesCortas: novedadesCortas }; return; }
   var C = window.KANBAN || {};
   var CLAVE = 'nucleo_' + (C.clave || 'negocio');
   // Raíz de utilo-web (…/utilo-web/): de aquí cuelgan nucleo/, kanban4/, estilos/ y la carpeta de cada negocio.
@@ -544,8 +561,10 @@
    * cambia algo en las tablas de «directo» (Realtime). Sin nada que contar, no se ve. */
   var cifrasDirecto = [];
   /** T0710 · Las condiciones de una cifra («si»), como las de Listado: es, no, vacio y, en una fecha, desde y hasta en días
-   * desde hoy (incluidos; «dias» es el «dias» de la cifra). Sin condiciones, todas. */
-  function cumpleCifra(f, si, dias) {
+   * desde hoy (incluidos; «dias» es el «dias» de la cifra). Sin condiciones, todas.
+   * T0751 · nombre(campo, valor): en una columna que apunta a otra tabla (ID_ESTADO), el nombre de esa fila («Hecha»); «es» y
+   * «no» valen con el nombre, como en Listado, o con el código guardado (EST04). */
+  function cumpleCifra(f, si, dias, nombre) {
     function norm(v) { return plano(v).trim(); }
     function lista(x) { return Array.isArray(x) ? x : [x]; }
     function dia(v) {
@@ -559,24 +578,51 @@
     var h = new Date(); h = new Date(h.getFullYear(), h.getMonth(), h.getDate());
     return (si || []).every(function (c) {
       var v = f[c.campo], vac = norm(v) === '';
-      if (c.es !== undefined && lista(c.es).map(norm).indexOf(norm(v)) < 0) return false;
-      if (c.no !== undefined && lista(c.no).map(norm).indexOf(norm(v)) >= 0) return false;
+      var n = nombre && !vac ? nombre(c.campo, v) : undefined, vs = [norm(v)].concat(n !== undefined && n !== null ? [norm(n)] : []);
+      function hay(x) { var l = lista(x).map(norm); return vs.some(function (y) { return l.indexOf(y) >= 0; }); }
+      if (c.es !== undefined && !hay(c.es)) return false;
+      if (c.no !== undefined && hay(c.no)) return false;
       if (c.vacio !== undefined && vac !== !!c.vacio) return false;
       if (c.desde !== undefined || c.hasta !== undefined) {
         var x = dia(v); if (!x) return false;
-        var n = Math.round((x - h) / 864e5);
-        if (c.desde !== undefined && n < d(c.desde)) return false;
-        if (c.hasta !== undefined && n > d(c.hasta)) return false;
+        var k = Math.round((x - h) / 864e5);
+        if (c.desde !== undefined && k < d(c.desde)) return false;
+        if (c.hasta !== undefined && k > d(c.hasta)) return false;
       }
       return true;
     });
+  }
+  /** T0751 · El nombre de lo guardado en una columna con referencia (refs: { ID_ESTADO: 'ESTADOS_TAREA' }), como lo enseña
+   *  Listado: NOMBRE, TITULO o DETALLE de esa fila. fila(tabla, id) la busca. Sin refs, null (se compara lo guardado). */
+  function nombreCifra(refs, fila) {
+    if (!refs || !fila || !Object.keys(refs).length) return null;
+    return function (campo, v) {
+      if (!refs[campo]) return undefined;
+      var x = fila(refs[campo], v);
+      if (!x) return undefined;
+      var k = ['NOMBRE', 'TITULO', 'DETALLE'].filter(function (y) { return x[y] !== undefined && x[y] !== null && String(x[y]).trim() !== ''; })[0];
+      return k ? String(x[k]) : undefined;
+    };
+  }
+  /** T0752 · Si la sección abre en «Mías» (cifra.mias: { campo, sinNadie }, de su MIAS) y en el equipo hay alguien más, la cifra
+   *  cuenta solo las filas de quien entra, como la lista al abrirla (esMia de Listado): la de su correo y la que no es de nadie,
+   *  si administra o su perfil está en sinNadie. Sin eso, todas. q: { correo, perfil, admin, equipo }. */
+  function miaCifra(mias, q) {
+    var yo = String((q && q.correo) || '').trim().toLowerCase();
+    var otro = ((q && q.equipo) || []).some(function (p) { var c = String((p && p.correo) || '').trim().toLowerCase(); return c && c !== yo; });
+    if (!mias || !mias.campo || !otro) return function () { return true; };
+    return function (f) {
+      var v = String((f && f[mias.campo]) || '').trim().toLowerCase();
+      return v ? v === yo : !!q.admin || (mias.sinNadie || []).indexOf(String(q.perfil || '')) >= 0;
+    };
   }
   function contarCifras(tabla) {
     if (!cred || !T) return;
     menu().forEach(function (s) {
       var c = s.cifra;
       if (!c || (tabla && tabla !== c.tabla)) return;
-      var n = T.filas(c.tabla).filter(function (f) { return Object.keys(c.donde || {}).every(function (k) { return f[k] === c.donde[k]; }) && cumpleCifra(f, c.si, c.dias); }).length;
+      var nom = nombreCifra(c.refs, T.fila ? function (t, id) { return T.fila(t, id); } : null), mia = miaCifra(c.mias, cred);
+      var n = T.filas(c.tabla).filter(function (f) { return Object.keys(c.donde || {}).every(function (k) { return f[k] === c.donde[k]; }) && mia(f) && cumpleCifra(f, c.si, c.dias, nom); }).length;
       var b = document.querySelector('[data-cifra="' + s.id + '"]');
       if (!b) return;
       b.textContent = n ? String(n) : ''; b.hidden = !n;
@@ -590,7 +636,8 @@
     cifrasDirecto = [];
     menu().filter(function (s) { return s.cifra; }).forEach(function (s) {
       var c = s.cifra, t = tablas(), espera = 0;
-      t.leer([c.tabla]).then(function () { contarCifras(c.tabla); }, function () {});
+      var refs = Object.keys(c.refs || {}).map(function (k) { return c.refs[k]; }); // T0751: para saber sus nombres
+      t.leer([c.tabla].concat(refs)).then(function () { contarCifras(c.tabla); }, function () {});
       if (c.directo && c.directo.length && window.UG && typeof window.UG.enDirecto === 'function') {
         var d = window.UG.enDirecto(c.directo, function () {
           if (espera) return;
@@ -609,12 +656,9 @@
   function marcarVista() { var v = cred && cred.versiones && cred.versiones[0]; if (v) try { localStorage.setItem(vista(), v.v); } catch (e) {} }
   var cerrarVersiones = null; // la ventana abierta: cerrarVersiones(darPorVista)
 
-  /** Las versiones con novedades que no se han visto en este dispositivo (la primera vez, solo la actual, si trae). */
-  function sinVer() {
-    var vs = (cred && cred.versiones) || [], vista = leerVista(), i = -1;
-    vs.forEach(function (x, k) { if (i < 0 && x.v === vista) i = k; });
-    return (vista === null ? vs.slice(0, 1) : i < 0 ? vs : vs.slice(0, i)).filter(function (x) { return (x.novedades || []).length; });
-  }
+  /** Las versiones con novedades que no se han visto en este dispositivo. La primera vez, solo la última que trae novedades
+   *  (T0751: aunque después haya salido una de arreglos, que no trae; antes, si la última no traía, no se veía nada). */
+  function sinVer() { return versionesSinVer((cred && cred.versiones) || [], leerVista()); }
 
   /** El bloque «Versión» de Perfil: cuál es y, si hay lista, el botón para ver las novedades. */
   function htmlVersion() {
@@ -626,23 +670,40 @@
         (nuevas ? ' <span class="n-nuevo">' + (nuevas === 1 ? 'nueva' : nuevas + ' nuevas') + '</span>' : '') + '</button></div>' : '') + '</section>';
   }
 
-  /** La ventana con las versiones publicadas y sus novedades, la más reciente arriba. Las no vistas, marcadas «Nueva». */
-  function verVersiones() {
+  /** La ventana con las versiones publicadas y sus novedades, la más reciente arriba. Las no vistas, marcadas «Nueva».
+   *  T0751 · Al entrar (corta: true), si lo nuevo pasa de NOVEDADES_CORTA líneas, solo lo principal de la última y «Ver todas
+   *  las novedades», que abre la lista entera en la misma ventana. */
+  function verVersiones(corta) {
     if (!cred || !(cred.versiones || []).length || $('n-ver-velo')) return;
-    var nuevas = sinVer().map(function (x) { return x.v; }), antes = document.activeElement;
+    var sv = sinVer(), nuevas = sv.map(function (x) { return x.v; }), antes = document.activeElement;
+    var resumen = corta ? novedadesCortas(sv) : null;
     var velo = document.createElement('div');
     velo.className = 'u-velo abierto'; velo.id = 'n-ver-velo';
-    velo.innerHTML = '<div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="n-ver-t"><div class="n-ventana">' +
-      '<h2 id="n-ver-t">' + (nuevas.length ? 'Novedades' : 'Versiones') + '</h2>' +
-      '<ol class="n-versiones">' + cred.versiones.map(function (x, k) {
+    function todas() {
+      return '<ol class="n-versiones">' + cred.versiones.map(function (x, k) {
         var ns = x.novedades || [], primera = k === cred.versiones.length - 1;
         return '<li><h3>Versión ' + texto(x.v) + (nuevas.indexOf(x.v) >= 0 ? ' <span class="n-nuevo">Nueva</span>' : '') +
           (x.fecha ? ' <small>' + texto(x.fecha) + '</small>' : '') + '</h3>' +
           (ns.length ? '<ul>' + ns.map(function (n) { return '<li>' + texto(n) + '</li>'; }).join('') + '</ul>'
             : '<p class="u-nota">' + (primera ? 'Primera versión.' : 'Arreglos y mejoras por dentro: nada cambia en cómo se usa.') + '</p>') + '</li>';
-      }).join('') + '</ol>' +
-      '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="n-ver-cerrar">Entendido</button></div></div></div>';
+      }).join('') + '</ol>';
+    }
+    function corto() {
+      var x = resumen.version;
+      return '<ol class="n-versiones"><li><h3>Versión ' + texto(x.v) + ' <span class="n-nuevo">Nueva</span>' + (x.fecha ? ' <small>' + texto(x.fecha) + '</small>' : '') + '</h3>' +
+        '<p class="u-nota">Lo principal:</p><ul>' + resumen.lineas.map(function (n) { return '<li>' + texto(n) + '</li>'; }).join('') + '</ul></li></ol>';
+    }
+    velo.innerHTML = '<div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="n-ver-t"><div class="n-ventana">' +
+      '<h2 id="n-ver-t">' + (nuevas.length ? 'Novedades' : 'Versiones') + '</h2>' +
+      '<div id="n-ver-lista">' + (resumen ? corto() : todas()) + '</div>' +
+      '<div class="n-botones">' + (resumen ? '<button type="button" class="u-btn" id="n-ver-todas">Ver todas las novedades (' + resumen.total + ')</button>' : '') +
+      '<button type="button" class="u-btn u-btn-accion" id="n-ver-cerrar">Entendido</button></div></div></div>';
     document.body.appendChild(velo);
+    if (resumen) $('n-ver-todas').onclick = function () {
+      $('n-ver-lista').innerHTML = todas();
+      this.parentNode.removeChild(this);
+      $('n-ver-cerrar').focus();
+    };
     function cerrar(darPorVista) {
       cerrarVersiones = null;
       document.removeEventListener('keydown', tecla, true);
@@ -691,7 +752,7 @@
 
   /** Al entrar: si hay novedades sin ver, la ventana se abre sola (una vez; viendo como otra persona, no). */
   function avisarVersiones() {
-    if (cred && !cred.como && sinVer().length) verVersiones();
+    if (cred && !cred.como && sinVer().length) verVersiones(true);
   }
 
   /* ---------- T0273 · entrar como otra persona ---------- */
@@ -705,12 +766,18 @@
   }
   /** Lo que ocupa la franja (--tope), para que lo que se queda fijo arriba al bajar (cabeceras de tabla…) quede debajo. */
   var obsTope = null;
+  // T0752: y --alto-cab, lo que ocupa la cabecera de la sección cuando se queda fija arriba (en el móvil, nucleo-2.css), para
+  // que lo demás que se pega arriba quede debajo de ella.
   function tope() {
     if (obsTope) { obsTope.disconnect(); obsTope = null; }
-    var f = $('n-como'), poner = function () { document.body.style.setProperty('--tope', (f ? f.offsetHeight : 0) + 'px'); };
-    if (!f) { document.body.style.removeProperty('--tope'); return; }
+    var f = $('n-como'), c = document.querySelector('.n-cab');
+    var poner = function () {
+      var st = document.body.style, fija = c && window.getComputedStyle(c).position === 'sticky';
+      if (f) st.setProperty('--tope', f.offsetHeight + 'px'); else st.removeProperty('--tope');
+      if (fija) st.setProperty('--alto-cab', c.offsetHeight + 'px'); else st.removeProperty('--alto-cab');
+    };
     poner();
-    if (window.ResizeObserver) { obsTope = new ResizeObserver(poner); obsTope.observe(f); }
+    if (window.ResizeObserver && (f || c)) { obsTope = new ResizeObserver(poner); if (f) obsTope.observe(f); if (c) obsTope.observe(c); }
   }
 
   /** La ventana para elegir como quién entrar: las personas de la tabla de accesos (solo quien administra; lo comprueba el motor). */

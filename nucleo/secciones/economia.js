@@ -3256,7 +3256,7 @@
             return '<li><button type="button" class="eco-lv" data-linea="' + texto(l.ID) + '"><span class="eco-lv-t"><b>' + texto(nombreTela(l.ARTICULO)) + '</b>' +
               '<span class="u-nota">' + texto([metrosDe(l), quien ? 'taller ' + quien : 'sin taller'].join(' · ')) + '</span></span>' +
               '<span class="eco-lv-e' + (env === 'Por salir' ? ' eco-lv-por' : '') + '">' + texto(env) + '</span></button></li>';
-          }).join('') + '</ul>' : '<p class="u-vacio">' + V('Aún no has apuntado las telas de {este} {venta}.') + '</p>') +
+          }).join('') + '</ul>' : '<p class="u-vacio">' + V('Aún no has apuntado las telas de {esta} {venta}.') + '</p>') +
             '<p><button type="button" class="u-btn u-btn-texto" data-accion="nuevalinea">+ Añadir línea</button></p>';
         }
         // T0689 · Su factura (la emitida que la elige), como un paso más y, abajo, para abrirla o hacerla.

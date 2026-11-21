@@ -14,6 +14,9 @@
       deducir: cfg.DEDUCIR || {}, acciones: cfg.ACCIONES || [], contexto: contextoDe(cfg.CONTEXTO), resumen: resumenCifras(cfg.RESUMEN), arriba: arribaDe(cfg.ARRIBA),
       // T0689: la ficha guarda sola cada campo al cambiarlo; con GUARDAR: "boton", como antes (con «Guardar»). MIAS: Mías / Todas.
       guardar: cfg.GUARDAR === 'boton' ? 'boton' : 'solo', mias: miasDe(cfg.MIAS),
+      // T0752: AYUDA: false, sin la línea que explica la vista (ni su «i» en el móvil); RAPIDO: false, sin el filtro rápido
+      // en pastillas (sigue en Filtrar). Telas, para que la cabecera de cada sección tenga lo mismo y poco ruido.
+      ayuda: cfg.AYUDA !== false, rapido: cfg.RAPIDO !== false,
       // T0651: borrar (dentro de «Más»), el código de una fila nueva (sin prefijo en su tabla) y los prefijos que da montar.js.
       borrar: borrarDe(cfg.BORRAR), nuevoId: cfg.NUEVO_ID || '', prefijos: cfg._prefijos || {} };
   }
