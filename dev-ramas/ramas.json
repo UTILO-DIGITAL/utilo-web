@@ -1533,12 +1533,12 @@
   },
   "T0734-proveedores-portatil": {
    "tarea": "T0734",
-   "titulo": "Proveedores cabe en el portátil y dice lo mismo que el resto de la app",
-   "pr": null,
+   "titulo": "Proveedores se lee entero en un portátil, con las mismas palabras que el resto",
+   "pr": 419,
    "commit": "dafaf43a",
    "ultimo": "T0734: Proveedores cabe en el portátil y dice lo mismo que el resto de la app",
    "quien": "Javi Canela",
-   "fecha": "2026-11-21T00:33:14.109Z",
+   "fecha": "2026-11-21T00:34:12.571Z",
    "toca": [
     "telas"
    ],
