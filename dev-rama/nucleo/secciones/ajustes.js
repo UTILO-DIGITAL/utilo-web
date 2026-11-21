@@ -41,7 +41,10 @@
   function etiqueta(spec, c) { return (spec && spec.titulos && spec.titulos[c]) || titulo(c); }
   function colDe(e, n) { for (var i = 0; i < e.columnas.length; i++) if (e.columnas[i].n === n) return e.columnas[i]; return null; }
   function vacio(v) { return v === '' || v === null || v === undefined; }
-  function norm(s) { return String(s == null ? '' : s).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  /** T0736 · Sin tildes ni mayúsculas: la del núcleo (UN.plano; en Node, las pruebas, la de nucleo.js). */
+  var UNT = null;
+  function plano(s) { return (UNT || (UNT = typeof module !== 'undefined' && module.exports ? require('../nucleo.js') : window.UN)).plano(s); }
+  function norm(s) { return plano(s).trim(); }
   function dos(n) { return (n < 10 ? '0' : '') + n; }
 
   /** ¿Está dada de baja? (la fila tiene lo que pone la baja: ACTIVO = false, ESTADO = Cerrada…) */
