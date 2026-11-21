@@ -17,7 +17,7 @@
  *   Acción   el JS del cliente (ACCIONES), que se registra con UN.ajustes('ID', { abrir(el, ctx), cerrar() }) y
  *            recibe el ctx de la sección más volver() y raiz (la carpeta de la web). Con una acción «inicio» (T0294),
  *            el inicio tiene dos pestañas: esa acción, que se abre al entrar (el camino para preparar la temporada),
- *            y «Todas las tablas».
+ *            y «Todas las tablas» (sin ella, con TODAS: false; T0729).
  * Quien está en SOLO_LEER lo ve todo sin botones de cambiar (el motor tampoco le deja: soloLeer en los permisos).
  * Personalización y claves de cada tabla: docs/SECCION_AJUSTES.md.
  */
@@ -423,10 +423,12 @@
           }).join('');
         // T0294 (Javi): con una acción de inicio (el camino de la temporada), dos pestañas: la acción, que se abre al
         // entrar, y «Todas las tablas». Se recuerda la última. Si la acción ya está abierta, se repinta ella sola.
-        var pest = arriba && guardado(CLAVE + 'inicio') !== 'TABLAS' ? 'ACCION' : 'TABLAS';
+        // T0729: con TODAS: false (Telas), sin «Todas las tablas»: la acción de inicio es todo el inicio.
+        var sinTodas = !!arriba && cfg.TODAS === false;
+        var pest = arriba && (sinTodas || guardado(CLAVE + 'inicio') !== 'TABLAS') ? 'ACCION' : 'TABLAS';
         if (pest === 'ACCION' && abiertaAccion === claveInicio() && cont.querySelector('#aj-accion.aj-inicio')) return;
         if (pest === 'TABLAS' && abiertaAccion) cerrarAccion();
-        cont.innerHTML = (arriba ? '<div class="u-pestanas aj-modos" role="tablist">' + [['ACCION', arriba.titulo], ['TABLAS', 'Todas las tablas']].map(function (x) {
+        cont.innerHTML = (arriba && !sinTodas ? '<div class="u-pestanas aj-modos" role="tablist">' + [['ACCION', arriba.titulo], ['TABLAS', 'Todas las tablas']].map(function (x) {
             return '<button type="button" role="tab" data-inicio="' + x[0] + '" aria-selected="' + (x[0] === pest) + '">' + texto(x[1]) + '</button>';
           }).join('') + '</div>' : '') +
           (!puede ? '<p class="u-aviso">Puedes mirarlo todo, pero no cambiar nada.</p>' : '') +

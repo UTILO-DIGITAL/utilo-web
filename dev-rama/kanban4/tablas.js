@@ -277,6 +277,11 @@
       refrescar: function (nombres, fresco) { return refrescarTodo([].concat(nombres), fresco); },
       /** T0256 · ¿Tiene ya la copia esa tabla, o esa parte ({ clave })? Para pintar al momento sin esperar. */
       tiene: function (n, p) { return tiene(n, p); },
+      /**
+       * T0726 · Lo que devuelve una función de una sección que ha escrito filas (r.otras = { TABLA: [filas] }: las líneas de
+       * una factura, su PDF) → a la copia al momento, sin volver a leer el Excel. Como lo que llega con un alta o un cambio.
+       */
+      anotar: function (r) { otras(r); },
       /** Filas de la copia (las que ya se han leído). */
       filas: function (n) { return mem[n] ? mem[n].filas : []; },
       fila: function (n, id) { return mem[n] ? mem[n].ids[String(id)] || null : null; },
@@ -349,6 +354,7 @@
        * op.fn (opcional): una función de la sección que hace el alta en el motor y devuelve lo mismo que tablasCrear
        * ({ id, fila, v }), con otras si ha cambiado más filas. Recibe op.args (T0254) o, si no hay, [valores] (T0257:
        * economiaEmitir, que pone el número de la factura).
+       * T0724 · op.callado: si el motor dice que no, sin el aviso de siempre (quien llama lo dice donde se ve, en palabras).
        */
       crear: function (n, valores, op) {
         op = op || {};
@@ -377,7 +383,7 @@
           delete mm.ids[tmp];
           emitir('cambio', n, { id: tmp, deshecho: true });
           emitir('error', e, { tabla: n, valores: valores });
-          avisar('No se ha creado: ' + limpio(e.message));
+          if (!op.callado) avisar('No se ha creado: ' + limpio(e.message)); // T0724: op.callado, quien llama lo dice a su manera
           throw e;
         });
       },

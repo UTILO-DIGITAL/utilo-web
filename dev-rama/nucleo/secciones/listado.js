@@ -490,6 +490,7 @@
       ayuda: d.ayuda || '', sinNumero: !!d.sinNumero, nombres: d.nombres || null, comun: d.comun || null, signo: d.signo || null, desglose: d.desglose || null, plantilla: d.plantilla || '', varios: !!d.varios,
       palabras: Array.isArray(d.palabras) && d.palabras.length >= 2 ? d.palabras : null,
       ir: d.ir && d.ir.seccion ? { seccion: String(d.ir.seccion), texto: d.ir.texto || '' } : null, // T0651: un «de» que lleva a su fila
+      genero: d.genero === 'f' ? 'f' : '', // T0724 (R38): «Todas» en su filtro (Fase, Prioridad)
       soloAlta: !!d.soloAlta }; // T0651: se elige al dar de alta y después no se cambia (el diseño de una tela: su código sale de él)
   }
   /** T0642 · Un valor como se enseña: sin el número de delante («1 Contactado» → «Contactado», con «sinNumero») y con su
@@ -942,6 +943,8 @@
       var deCampos = function (c) { var d = (r.campos || {})[c]; return !!(d && (d.calculo || d.plantilla || d.de || d.primero)); };
       if (cs) [r.campo].concat((r.columnas || []).filter(function (c) { return !deCampos(c); })).forEach(function (c) { hay(String(c).split('.')[0], q + ' usa', r.tabla, cs); });
       if (r.nueva && !r.seccion) errores.push(donde + q + ': «nueva» necesita la sección a la que lleva (seccion).');
+      // T0724: «seccion» por fila, una lista de secciones o de { id, si }.
+      if (r.seccion && typeof r.seccion !== 'string' && seccionesRel(r).length !== lista(r.seccion).length) errores.push(donde + q + ': cada «seccion» es el nombre de una sección o { "id", "si" }.');
       // T0641: en una «tarjeta», cada campo es una columna de esa tabla, una ruta o uno de sus «campos» (calculado, plantilla, «de»).
       if (cs && r.tarjeta) camposTarjeta(r).forEach(function (c) {
         var d = (r.campos || {})[c];
@@ -954,6 +957,7 @@
         if (cs) e.editar.concat(e.crear ? e.alta : [], e.elegir ? [e.elegir] : [], e.obligatorias).forEach(function (c) { hay(c, q + ' edita', r.tabla, cs); });
         if (e.crear && !e.elegir && !e.alta.length) errores.push(donde + q + ': «crear» necesita lo que se pide al añadir («alta» o «editar»).');
         if (r.elegir && !r.crear) errores.push(donde + q + ': «elegir» va con «crear».');
+        if (r.quitar != null && r.quitar !== true && r.quitar !== false && r.quitar !== 'admin') errores.push(donde + q + ': «quitar» es true o "admin" (solo quien administra).');
         if (e.crear && lista(r.filas).length < 2) errores.push(donde + q + ': «crear» lleva «filas» (cómo se llama cada una: ["persona de contacto", "personas de contacto"]), para «+ Añadir …».');
         if (e.id && cs) enPlantilla(e.id).filter(function (c) { return /^[A-Z0-9_]+$/.test(c); }).forEach(function (c) { hay(c, q + ': «id» usa', r.tabla, cs); });
       }
@@ -1538,6 +1542,8 @@
 
   /** T0642 · Volver de una ficha a la que se ha llegado desde otra: a esa ficha («‹ Volver a Casa Albero») si se viene de
    *  una; si no, a la sección de la que se viene («‹ Volver a Clientes»); '' si no se viene de ninguna. */
+  /** T0724 (R24) · Lo que no es el nombre en el título de una ficha: su código, la etiqueta del título que se toca («Marca»), «Guardado». */
+  var QUITAR_DE_VUELTA = '.li-cod, .u-etiqueta, .li-guardado, .li-para';
   function textoVuelta(deFicha, desde) { var t = deFicha || (desde && desde.titulo) || ''; return t ? '‹ Volver a ' + t : ''; }
   /** T0642 · La dirección de ahora con la ficha abierta (?ficha=M-001) y sin lo de «+ Nueva …», para que «atrás» la vuelva a abrir. */
   function conFicha(search, id, quitar) {
@@ -1770,22 +1776,26 @@
   /**
    * T0692 · «Sus ventas» en la ficha: lo que dice de un vistazo (la última, lo de este año y lo que debe) y cada venta, que
    * abre su sección (o.seccion, o.va: su título si quien mira la ve) con ella (?venta=). q: las de ventasPorQuien de Economía
-   * de esta fila; undefined, aún no han llegado («Mirando sus ventas…»); null o sin ventas, nada. o: { titulo, seccion, va, max, hoy }.
+   * de esta fila; undefined, aún no han llegado («Mirando sus ventas…»); null o sin ventas, nada. o: { titulo, seccion, va, max, hoy, nombre }.
+   * T0726 (R26) · nombre: cómo se llaman allí («pedido» en Telas; vacío, «venta»), para que diga lo mismo en todas partes.
    */
   function htmlVentas(q, o) {
-    var tit = texto(o.titulo || 'Sus ventas');
-    if (q === undefined) return '<section class="li-fgrupo"><h3 class="li-fg-t">' + tit + '</h3><p class="u-nota">Mirando sus ventas…</p></section>';
+    var uno = String(o.nombre || 'venta').toLowerCase(), varios = /[aeiouáéó]$/.test(uno) ? uno + 's' : uno + 'es', f = /a$/.test(uno);
+    var tit = texto(o.titulo || 'Sus ' + varios);
+    if (q === undefined) return '<section class="li-fgrupo"><h3 class="li-fg-t">' + tit + '</h3><p class="u-nota">Mirando sus ' + texto(varios) + '…</p></section>';
     if (!q || !q.ventas || !q.ventas.length) return '';
     var eur = function (c) { return num(c / 100, c % 100 ? 2 : 0) + ' €'; };
-    var partes = ['Última venta ' + (cuando(q.ultima, o.hoy) || fechaCorta(q.ultima))];
-    if (q.enAnio) partes.push(q.anio ? eur(q.anio) + ' este año' : (q.enAnio === 1 ? '1 venta' : q.enAnio + ' ventas') + ' este año, sin precio cerrado');
-    var debe = q.debe > 0 ? '<span class="u-mal">Te debe ' + eur(q.debe) + '</span>' : (q.sinPrecio ? 'Sin precio cerrado en ' + (q.sinPrecio === 1 ? 'una' : q.sinPrecio) : '<span class="u-bien">Al día</span>');
+    var partes = [(f ? 'Última ' : 'Último ') + uno + ' ' + (cuando(q.ultima, o.hoy) || fechaCorta(q.ultima))];
+    if (q.enAnio) partes.push(q.anio ? eur(q.anio) + ' este año' : (q.enAnio === 1 ? '1 ' + uno : q.enAnio + ' ' + varios) + ' este año, sin precio cerrado');
+    var debe = q.debe > 0 ? '<span class="u-mal">Te debe ' + eur(q.debe) + '</span>' : (q.sinPrecio ? 'Sin precio cerrado en ' + (q.sinPrecio === 1 ? (f ? 'una' : 'uno') : q.sinPrecio) : '<span class="u-bien">Al día</span>');
+    // El paso, concordando con la palabra: «Pedido», «Cobrado».
+    var paso = function (t) { return f ? String(t || '') : String(t || '').replace(/^(Pedid|Cobrad|Entregad|Pagad|Facturad)a\b/, '$1o'); };
     var sec = String(o.seccion || ''), va = o.va, max = o.max || 10;
     return '<section class="li-fgrupo li-ventas"><h3 class="li-fg-t">' + tit + ' <span class="u-cifra">' + q.ventas.length + '</span></h3>' +
       '<p class="li-ven-res">' + partes.map(texto).join(' · ') + ' · ' + debe + '</p><ul class="li-rel">' + q.ventas.slice(0, max).map(function (x) {
-        var paso = x.paso + (x.fechaPaso ? ' ' + fechaCorta(x.fechaPaso) : ''), extra = x.cobrada || x.adelantado ? (x.importe !== null ? eur(x.importe) : '') :
+        var pasoT = paso(x.paso) + (x.fechaPaso ? ' ' + fechaCorta(x.fechaPaso) : ''), extra = x.cobrada || x.adelantado ? (x.importe !== null ? eur(x.importe) : '') :
           (x.debe === null ? 'Sin precio cerrado' : x.debe > 0 ? 'Te debe ' + eur(x.debe) : '');
-        var dentro = '<span class="li-rel-n">' + texto(x.v.NOMBRE || x.v.ID) + '</span><span>' + texto(paso) + '</span>' +
+        var dentro = '<span class="li-rel-n">' + texto(x.v.NOMBRE || x.v.ID) + '</span><span>' + texto(pasoT) + '</span>' +
           (extra ? '<span' + (x.debe > 0 && !x.cobrada && !x.adelantado ? ' class="u-mal"' : '') + '>' + texto(extra) + '</span>' : '');
         return '<li>' + (va ? '<a class="li-rel-f" href="?s=' + encodeURIComponent(sec.toLowerCase()) + '&venta=' + encodeURIComponent(x.v.ID) + '" data-sx="' + texto(sec) + '">' + dentro + '<span class="li-ir">' + texto(va) + ' ›</span></a>' : '<div class="li-rel-f">' + dentro + '</div>') + '</li>';
       }).join('') + '</ul>' + (q.ventas.length > max ? '<p class="u-nota">Y ' + (q.ventas.length - max) + ' más, en ' + texto(va || 'Pedidos') + '.</p>' : '') + '</section>';
@@ -1891,22 +1901,99 @@
   }
 
   /**
+   * T0724 (R07) · Lo que se va con la fila, como lo pide el motor (tablasBorrar con { con }): [{ tabla, campo }], sin repetir.
+   * El motor comprueba antes todos los usos, también en las tablas que quien borra no ve (la Comparativa para Ayuda), y si
+   * algo bloquea no borra nada. Así no se borran sus personas antes de saber si la marca se puede borrar.
+   */
+  function borrarCon(ap) {
+    var b = ap && ap.borrar, out = [], vistos = {};
+    (b ? b.con : []).forEach(function (x) { var k = x.tabla + '.' + x.campo; if (!vistos[k]) { vistos[k] = 1; out.push({ tabla: x.tabla, campo: x.campo }); } });
+    return out;
+  }
+  /**
+   * T0724 (para R18) · A qué sección lleva cada fila de lo relacionado: «seccion» es una (string) o una lista de { id, si }
+   * (la primera cuyo «si» cumple la fila y que quien mira ve; un string en la lista, sin condición). → su id en mayúsculas o ''.
+   * Así lo pendiente del seguimiento de una marca puede llevar a Hoy y lo hecho, a Historial.
+   */
+  function seccionesRel(r) {
+    return lista(r && r.seccion).map(function (s) { return typeof s === 'string' ? { id: s, si: [] } : { id: String((s && s.id) || ''), si: lista(s && s.si) }; }).filter(function (s) { return s.id; });
+  }
+  function seccionDeFila(r, x, veo) {
+    var crudo = (x && x.__crudo) || x || {};
+    var s = seccionesRel(r).filter(function (y) { return (!y.si.length || cumple(crudo, y.si, {})) && (!veo || veo[y.id.toUpperCase()]); })[0];
+    return s ? s.id.toUpperCase() : '';
+  }
+  /**
+   * T0724 (R20) · Las columnas de la lista sin las que no dicen nada en ninguna fila: con «comun», si todas sus filas tienen lo
+   * de siempre (todo es «Tarea»), la columna entera saldría vacía y no se pinta. Las demás, como estaban.
+   */
+  function sinComunes(ap, cols, fs, valores, prohib) {
+    return cols.filter(function (c) {
+      var cp = campo(ap, c), cm = cp.comun ? lista(cp.comun) : null;
+      if (!cm || !fs.length) return true;
+      return fs.some(function (f) { var t = verTexto(cp, f, valores, prohib); return t !== '' && cm.indexOf(t) < 0; });
+    });
+  }
+  /** T0724 (R38) · «Todas» o «Todos» delante de las opciones de un filtro, según el campo («genero»: "f" en CAMPOS: Fase, Prioridad). */
+  function palabraTodos(cp) { return cp && cp.genero === 'f' ? 'Todas' : 'Todos'; }
+  function primeraMay(s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
+  /**
+   * T0724 (R35) · El «ID: ya hay un BOR-004 en DISENOS» del motor, en palabras de la sección: «BOR-004 ya está en sus diseños.»
+   * o, si el código no lo ha escrito quien añade (sale de la plantilla: «DIS-001·FIB-002»), con el nombre de lo elegido: «Lino
+   * ya está en composición.». o: { escritos: lo del formulario, nombre, donde: el título de lo relacionado }. Los demás
+   * errores, sin su prefijo (VALIDAR:).
+   */
+  function yaEsta(msg, o) {
+    o = o || {};
+    var m = String((msg && msg.message) || msg || ''), x = /ya hay una? (.+?) en [A-Z0-9_]+\.?$/.exec(m);
+    if (!x) return m.replace(/^[A-Z]+:\s*/, '');
+    var cod = x[1], escrito = Object.keys(o.escritos || {}).some(function (k) { return String(o.escritos[k]).trim() === cod; });
+    return primeraMay(escrito || !o.nombre ? cod : o.nombre) + ' ya está' + (o.donde ? ' en ' + String(o.donde).toLowerCase() : '') + '.';
+  }
+  /**
+   * T0724 (R35) · Lo que ya está y no se vuelve a ofrecer al añadir lo relacionado: las columnas de su «id» (la plantilla,
+   * «{ID_DISENO}·{ID_FIBRA}») que no son la que lo une, con los valores que ya tienen sus filas: { ID_FIBRA: ['FIB-002'] }.
+   */
+  function yaPuestos(r, rs) {
+    var e = relEdicion(r), out = {};
+    if (!e.id) return out;
+    enPlantilla(e.id).filter(function (c) { return /^[A-Z0-9_]+$/.test(c) && c !== r.campo; }).forEach(function (c) {
+      out[c] = lista(rs).map(function (y) { var v = ((y && y.__crudo) || y || {})[c]; return v == null ? '' : String(v); }).filter(function (v) { return v !== ''; });
+    });
+    return out;
+  }
+  /**
+   * T0724 (R16) · El aviso de la configuración que no cuadra: a soporte (la cuenta de Utilo), la lista técnica; a quien
+   * administra (Marta), una frase sin jerga. La lista va también en la consola y, escondida dentro del aviso, en lo que apunta
+   * el uso de la app (nucleo/uso.js lee el texto entero de cada .u-error): por eso «Utilo ya lo sabe». Sin errores, ''.
+   */
+  var SOPORTE = /^utilo\.digital@gmail\.com$/i;
+  function esSoporte(correo) { return SOPORTE.test(String(correo || '').trim()); }
+  function htmlErrores(errores, soporte) {
+    if (!errores || !errores.length) return '';
+    if (soporte) return '<div class="u-bloque li-errores"><strong>La configuración de esta sección tiene cosas que no cuadran (solo lo ve soporte):</strong><ul>' + errores.map(function (e) { return '<li>' + texto(e) + '</li>'; }).join('') + '</ul></div>';
+    return '<p class="u-error li-errores" role="status">Hay algo de esta sección que no se ha podido preparar. Utilo ya lo sabe.<span hidden> · ' + texto(errores.join(' · ')) + '</span></p>';
+  }
+
+  /**
    * T0651 · Lo que se puede hacer desde la ficha con lo relacionado (las personas de contacto de una marca): «editar» (sus
    * columnas, o true: las de «columnas» que no son rutas), «crear» (+ Añadir, con «alta»: las que pide, o las de editar),
    * «elegir» (añadir eligiendo una fila de la tabla a la que apunta esa columna: la tela que le interesa), «quitar» (con
    * confirmación y Deshacer), «id» (la plantilla del código, si su tabla no tiene prefijo), «obligatorias» y «filas» (cómo
    * se llama cada una: «+ Añadir persona de contacto»). La columna que la une (campo) no se edita: se pone sola.
+   * T0728: «quitar»: "admin", solo quien administra (los precios propuestos a una marca: solo Marta); admin = si lo es quien ve.
    */
-  function relEdicion(r) {
+  function relEdicion(r, admin) {
     var ed = r.editar === true ? lista(r.columnas).filter(function (c) { return !esRuta(c); }) : lista(r.editar);
     ed = ed.filter(function (c, i) { return c !== r.campo && ed.indexOf(c) === i && !esRuta(c); });
     var crear = !!r.crear && !r.contiene, elegir = crear && r.elegir ? String(r.elegir) : '';
-    return { editar: r.contiene ? [] : ed, crear: crear, elegir: elegir, quitar: !!r.quitar && !r.contiene,
+    var quitar = (r.quitar === 'admin' ? !!admin : !!r.quitar) && !r.contiene;
+    return { editar: r.contiene ? [] : ed, crear: crear, elegir: elegir, quitar: quitar,
       alta: (lista(r.alta).length ? lista(r.alta) : ed).filter(function (c) { return c !== r.campo; }), obligatorias: lista(r.obligatorias),
       // La clave de su tabla (para cambiarla o quitarla): «claveTabla»; si no, ID cuando lleva a una sección (entonces «clave» es la
       // de la fila a la que lleva: la tela que le interesa) y, si no, su «clave» (NECESIDADES: ID_MARCA).
       filas: lista(r.filas).length >= 2 ? r.filas : ['fila', 'filas'], id: r.id || '', clave: r.claveTabla || (r.seccion ? 'ID' : r.clave || 'ID'),
-      algo: !r.contiene && (ed.length > 0 || !!r.crear || !!r.quitar) };
+      algo: !r.contiene && (ed.length > 0 || !!r.crear || quitar) };
   }
   /**
    * T0651 · La fila nueva de lo relacionado: lo escrito (sin lo vacío), la columna que la une (r.campo = el «con» de esta
@@ -1946,9 +2033,9 @@
   /** T0651 · La palabra pequeña junto a la etiqueta de lo que no se edita en una ficha que sí: «calculado» o la del «ir» de un «de». */
   function sufijoFijo(cp) { return cp.calculo ? 'calculado' : (cp.de && cp.ir && cp.ir.texto ? String(cp.ir.texto) : ''); }
 
-  var CALC = { pctVer: pctVer, pctEscrito: pctEscrito, deEscrito: deEscrito, nuevoId: nuevoId, altaNuevoDe: altaNuevoDe, codigoAltaNuevo: codigoAltaNuevo, plantillaPrefijo: plantillaPrefijo, codigoNuevo: codigoNuevo, esRuta: esRuta, destinoDe: destinoDe, avisoRuta: avisoRuta, borrarDe: borrarDe, queBorra: queBorra, cuantas: cuantas, yJuntos: yJuntos, relEdicion: relEdicion, altaRelacionada: altaRelacionada, paraElegir: paraElegir, sufijoFijo: sufijoFijo,
-    fechaDia: fechaDia, webCorta: webCorta, textoCorto: textoCorto, gruposConQuien: gruposConQuien, nombreCorto: nombreCorto, deshacerEnOrden: deshacerEnOrden, loDiceUnAviso: loDiceUnAviso, contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
-    textoVuelta: textoVuelta, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
+  var CALC = { pctVer: pctVer, pctEscrito: pctEscrito, deEscrito: deEscrito, nuevoId: nuevoId, altaNuevoDe: altaNuevoDe, codigoAltaNuevo: codigoAltaNuevo, plantillaPrefijo: plantillaPrefijo, codigoNuevo: codigoNuevo, esRuta: esRuta, destinoDe: destinoDe, avisoRuta: avisoRuta, borrarDe: borrarDe, queBorra: queBorra, borrarCon: borrarCon, seccionDeFila: seccionDeFila, sinComunes: sinComunes, palabraTodos: palabraTodos, yaEsta: yaEsta, yaPuestos: yaPuestos, esSoporte: esSoporte, htmlErrores: htmlErrores, cuantas: cuantas, yJuntos: yJuntos, relEdicion: relEdicion, altaRelacionada: altaRelacionada, paraElegir: paraElegir, sufijoFijo: sufijoFijo,
+    fechaDia: fechaDia, webCorta: webCorta, webSitio: webSitio, textoCorto: textoCorto, gruposConQuien: gruposConQuien, nombreCorto: nombreCorto, deshacerEnOrden: deshacerEnOrden, loDiceUnAviso: loDiceUnAviso, contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
+    textoVuelta: textoVuelta, QUITAR_DE_VUELTA: QUITAR_DE_VUELTA, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, resumenCifras: resumenCifras, arribaDe: arribaDe, filasArriba: filasArriba, rangoFechas: rangoFechas, lineaArriba: lineaArriba, cifrasResumen: cifrasResumen, seguirCrudo: seguirCrudo, tablasDeRuta: tablasDeRuta, conCamposPropios: conCamposPropios, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, vistaDeFila: vistaDeFila, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, recomendacionDe: recomendacionDe, camposCond: camposCond, irA: irA, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir, valorCon: valorCon, columnasCon: columnasCon, cambioCampo: cambioCampo, textoCambio: textoCambio, miasDe: miasDe, equipoLimpio: equipoLimpio, hayMias: hayMias, esMia: esMia, nombrePara: nombrePara, conEquipo: conEquipo,
     avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
@@ -1977,6 +2064,8 @@
   var ICONO_FOTO = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg>';
   /** La dirección de una web, corta y sin «https://www.» (ejemplo.com/casa). */
   function webCorta(v) { return String(v).replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, ''); }
+  /** T0724 (R44) · En la tabla, solo el sitio («docs.google.com»): la dirección entera va al pasar por encima y en la ficha. */
+  function webSitio(v) { return webCorta(v).replace(/[\/?#].*$/, ''); }
   var ICONO_FLECHA = '<svg class="u-icono li-flecha" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
   var ICONO_MAS = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
   var ICONO_MOVER = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="13" height="14" rx="2"/><path d="M3.5 9.5h13M7.5 3v4M12.5 3v4M15 15h6M18.5 12.5L21 15l-2.5 2.5"/></svg>';
@@ -2065,13 +2154,13 @@
       function filaVista(a, id) { return vistas(a).filter(function (f) { return String(f[a.clave]) === String(id); })[0] || null; }
       function vistaActual(a) { var vs = vistasDe(a); return vs.filter(function (v) { return v.id === S.vista; })[0] || vs[0]; }
       var VAL = {};
-      var errores = null, pintado = '';
+      var errores = null, pintado = '', SOPORTE_YO = esSoporte(ctx.correo);
 
       /* ---------- T0692 · ventas (de Pedidos) ---------- */
       var VENTAS = cfg.VENTAS && cfg.VENTAS.seccion ? cfg.VENTAS : null, venSec = VENTAS ? String(VENTAS.seccion).toUpperCase() : '';
       /** «Sus ventas» de una fila (vacío si no tiene; «Mirando…» mientras no han llegado). */
       function htmlVentasDe(crudo, hoy) {
-        return htmlVentas(D.ventas ? D.ventas[String(crudo[BASE.clave])] || null : undefined, { titulo: VENTAS.titulo, seccion: venSec, va: veo[venSec], max: VENTAS.max, hoy: hoy });
+        return htmlVentas(D.ventas ? D.ventas[String(crudo[BASE.clave])] || null : undefined, { titulo: VENTAS.titulo, nombre: VENTAS.nombre, seccion: venSec, va: veo[venSec], max: VENTAS.max, hoy: hoy });
       }
       /** Las ventas de cada fila, de su sección (sin abrirla). Al llegar, la lista (Última venta) y la ficha abierta las enseñan. */
       function leerVentas() {
@@ -2089,21 +2178,22 @@
       }
 
       /* ---------- pintar ---------- */
+      /** conEnlaces: true en la ficha (enlaces y fotos); 'tabla' en la tabla del ordenador (T0724, R44: solo los enlaces, cortos). */
       function celda(a, c, f, conEnlaces, cliente) {
-        var cp = campo(a, c), t = verTexto(cp, f, VAL, PROHIB);
+        var cp = campo(a, c), t = verTexto(cp, f, VAL, PROHIB), enTabla = conEnlaces === 'tabla';
         if (c === a.codigo && t) return '<span class="li-cod">' + texto(t) + '</span>';
         if (t === '') return '<span class="li-nada">—</span>';
         // T0679: en la lista, lo de siempre («Tarea», «Pendiente») no se repite en cada fila: solo sale lo que es distinto.
-        if (!conEnlaces && cp.comun && lista(cp.comun).indexOf(t) >= 0) return '<span class="li-nada li-comun"></span>';
+        if (conEnlaces !== true && cp.comun && lista(cp.comun).indexOf(t) >= 0) return '<span class="li-nada li-comun"></span>';
         var v = f[c];
         if (cp.calculo && cp.envio && t.indexOf('Falta') === 0) return cliente ? 'Precio a consultar' : '<span class="u-mal">' + texto(t) + '</span>';
         if (cp.signo) { var sv = calcular(cp.calculo, f, VAL); return '<span class="' + (sv > 0.00001 ? 'li-signo-mas' : (sv < -0.00001 ? 'li-signo-menos' : '')) + '">' + texto(t) + '</span>'; }
         if (conEnlaces && !cp.calculo && !prohibido(v, PROHIB).length) {
-          if (cp.tipo === 'enlace' && /^https?:\/\//i.test(String(v))) return '<a class="li-enl" href="' + texto(v) + '" target="_blank" rel="noopener">' + ICONO_WEB + '<span>' + texto(webCorta(v)) + '</span></a>';
+          if (cp.tipo === 'enlace' && /^https?:\/\//i.test(String(v))) return '<a class="li-enl" href="' + texto(v) + '" target="_blank" rel="noopener"' + (enTabla ? ' title="' + texto(v) + '"' : '') + '>' + ICONO_WEB + '<span>' + texto(enTabla ? webSitio(v) : webCorta(v)) + '</span></a>';
           if (cp.tipo === 'instagram' && instagramUrl(v)) return '<a class="li-enl" href="' + texto(instagramUrl(v)) + '" target="_blank" rel="noopener">' + ICONO_IG + '<span>' + texto(cuentaInstagram(v)) + '</span></a>';
           if (cp.tipo === 'email' && /@/.test(String(v))) return '<a class="li-enl" href="mailto:' + texto(v) + '">' + ICONO_MAIL + '<span>' + texto(v) + '</span></a>';
           if (cp.tipo === 'telefono' && esTelefono(v)) return '<a class="li-enl" href="tel:' + texto(telDe(v)) + '">' + ICONO_TEL + '<span>' + texto(v) + '</span></a>';
-          if (cp.tipo === 'foto' && imagen(v)) return '<img class="li-foto" src="' + texto(imagen(v)) + '" alt="" referrerpolicy="no-referrer" data-li-foto>' +
+          if (cp.tipo === 'foto' && imagen(v) && !enTabla) return '<img class="li-foto" src="' + texto(imagen(v)) + '" alt="" referrerpolicy="no-referrer" data-li-foto>' +
             (/^https?:/i.test(String(v)) ? ' <a class="li-enl li-verfoto" href="' + texto(v) + '" target="_blank" rel="noopener">' + ICONO_FOTO + '<span>Ver foto</span></a>' : '');
         }
         if (cp.tipo === 'foto') return imagen(v) ? '<img class="li-mini" src="' + texto(imagen(v)) + '" alt="" referrerpolicy="no-referrer" data-li-foto>' : texto(t);
@@ -2158,12 +2248,17 @@
       function pintar() {
         if (!S.leido) return;
         VAL = valoresDe(cfg.VALORES, filaDe);
-        if (errores === null) errores = ctx.admin ? comprobar(cfg, function (t) { var c = T.columnas && T.columnas(t); return c && c.length ? c : null; }, '') : [];
+        // T0724 (R16): se comprueba con las columnas que hay; al llegar las del motor (la copia del dispositivo puede ser de antes
+        // de una publicación que añade columnas), otra vez (ver alCambiar). Lo ven quien administra y soporte, cada uno a su manera.
+        if (errores === null) {
+          errores = ctx.admin || SOPORTE_YO ? comprobar(cfg, function (t) { var c = T.columnas && T.columnas(t); return c && c.length ? c : null; }, '') : [];
+          if (errores.length && window.console) console.warn('Listado ' + ctx.id + ': la configuración tiene cosas que no cuadran.\n' + errores.join('\n'));
+        }
         var a = ap(), vista = vistaActual(a), hoy = hoyIso(), todas = vistas(a);
         if (MIAS && S.mias === 'mias') todas = todas.filter(function (f) { return esMia(MIAS, f, YO); }); // T0689
         S.vista = vista.id;
         var html = '';
-        if (errores.length) html += '<div class="u-bloque li-errores"><strong>La configuración de esta sección tiene cosas que no cuadran (solo lo ve quien administra):</strong><ul>' + errores.map(function (e) { return '<li>' + texto(e) + '</li>'; }).join('') + '</ul></div>';
+        html += htmlErrores(errores, SOPORTE_YO);
         var vs = vistasDe(a);
         html += '<div class="li-arriba">' + (vs.length > 1 ? '<div class="u-pestanas li-vistas" role="tablist" aria-label="Vistas">' + vs.map(function (v) {
           return '<button type="button" role="tab" data-vista="' + texto(v.id) + '" aria-selected="' + (v.id === vista.id) + '">' + texto(v.titulo) + (v.cliente ? ' <span class="li-cli">para clientes</span>' : '') + '</button>';
@@ -2218,7 +2313,7 @@
         if (rap) {
           var xr = S.filtros[rap.campo] || {};
           html += '<div class="li-rapido" role="group" aria-label="' + texto(rap.titulo) + '"><span class="li-rapido-t">' + texto(rap.titulo) + '</span>' +
-            '<button type="button" class="li-fop" data-rapido="' + texto(rap.campo) + '" data-v="" aria-pressed="' + (!xr.es && !xr.vacio) + '">Todos</button>' + rap.opciones.map(function (o) {
+            '<button type="button" class="li-fop" data-rapido="' + texto(rap.campo) + '" data-v="" aria-pressed="' + (!xr.es && !xr.vacio) + '">' + palabraTodos(rap.cp) + '</button>' + rap.opciones.map(function (o) {
               return '<button type="button" class="li-fop" data-rapido="' + texto(rap.campo) + '" data-v="' + texto(o) + '" aria-pressed="' + (xr.es !== undefined && norm(xr.es) === norm(o)) + '">' + texto(mostrar(rap.cp, o)) + '</button>';
             }).join('') + '</div>';
         }
@@ -2469,7 +2564,8 @@
         if (delGrupo && delGrupo !== nom && gs.length > 1) fuera = fuera.concat([delGrupo]);
         var cols = columnasDe(a, vista).filter(function (c) { return fuera.indexOf(c) < 0 && c !== a.codigo; });
         // En la tabla, el código va en su columna, la primera (en las tarjetas, delante del nombre).
-        var conCod = cols; // T0642: sin la columna del código
+        // T0724 (R20): sin las columnas que en todas sus filas dicen lo de siempre (el Tipo de Hoy, todo «Tarea»).
+        var conCod = sinComunes(a, cols, [].concat.apply([], gs.map(function (g) { return g.filas; })), VAL, PROHIB); // T0642: sin la columna del código
         var det = (a.detalle.length ? a.detalle : cols.filter(function (c) { return c !== nom; }).slice(0, 2)).filter(function (c) { return fuera.indexOf(c) < 0 && c !== nom && (!cli || cols.indexOf(c) >= 0); });
         var num = function (cp) { return /importe|numero|porcentaje/.test(cp.tipo); };
         var cabG = function (g) { return '<h2 class="n-grupo">' + texto(g.titulo) + ' <span class="u-cifra">' + g.filas.length + '</span></h2>'; };
@@ -2489,7 +2585,7 @@
             (conCi ? '<td class="li-td-ci">' + (r ? circulo(a, f) : '') + '</td>' : '') + conCod.map(function (c) {
             var cp = campo(a, c), principal = c === nom;
             // Fechas, cifras, estados y lo corto no se parten («273 / g/m²», «hace 9 / días»): lo que se estrecha es el texto largo.
-            var h = fechaAviso(a, c, celda(a, c, f, false, cli), avs);
+            var h = fechaAviso(a, c, celda(a, c, f, 'tabla', cli), avs);
             if (!cli && a.contexto && c === a.contexto.campo) h = botonCtx(a, f, h);
             if (principal) h += etPara(f); // T0689: en «Todas», para quién es la que no es mía
             var corta = !principal && (num(cp) || /^(fecha|estado|sino)$/.test(cp.tipo) || h.replace(/<[^>]*>/g, '').length <= 14);
@@ -2831,7 +2927,9 @@
             var y = conNombres(a, D, r.tabla, x);
             (r.columnas || []).forEach(function (c) { if (String(c).indexOf('.') > 0) y[c] = seguir(a, D, r.tabla, x, c); });
             return y;
-          })), sec = String(r.seccion || '').toUpperCase(), va = sec && veo[sec];
+          })), sec = ((seccionesRel(r)[0] || {}).id || '').toUpperCase(), va = sec && veo[sec];
+          // T0724 (para R18): cada fila, a su sección (la primera de «seccion» que cumple y que se ve).
+          var irA = function (x) { var sx = seccionDeFila(r, x, veo); return sx ? { sec: sx, va: veo[sx] } : null; };
           if (r.orden) rs = rs.slice().sort(comparar(r.orden));
           if (!rs.length && r.siHay && !r.nueva) return; // T0602: lo que casi nunca hay (a quién se compra a través de este), solo si hay
           var otro = { id: sec, titulo: r.titulo, tabla: r.tabla, refs: a.refs, clave: r.clave || 'ID', codigo: r.codigo || '', nombre: r.nombre || (r.columnas || [r.clave || 'ID'])[0], campos: r.campos || {} };
@@ -2848,7 +2946,7 @@
           var cab = '<h3 class="li-fg-t">' + texto(r.titulo || r.tabla) + (r.datos ? '' : ' <span class="u-cifra">' + rs.length + '</span>') + '</h3>';
           var cuerpo;
           // T0651: lo de dentro que se edita, se añade o se quita desde la ficha (las personas de contacto de una marca).
-          var ri = a.relacionados.indexOf(r), e = relEdicion(r), conEd = e.algo && !r.tarjeta && !!T.actualizar;
+          var ri = a.relacionados.indexOf(r), e = relEdicion(r, YO.admin), conEd = e.algo && !r.tarjeta && !!T.actualizar;
           if (conEd) relAps[ri] = enriquecer(apartado({ TABLA: r.tabla, CLAVE: e.clave, CAMPOS: r.campos || {}, COLUMNAS: cols, _refs: a.refs }), D);
           var claveDe = function (x) { return (x.__crudo || x)[e.clave]; };
           if (!rs.length) cuerpo = '<p class="u-vacio">' + texto(r.vacio || 'Nada todavía.') + '</p>';
@@ -2874,12 +2972,12 @@
             // «Quitar»); solo con «quitar», su ✕ al lado (y sigue llevando a su sección).
             cuerpo = '<ul class="li-rel li-rel-ed">' + rs.map(function (x, i) {
               var k = claveDe(x), kIr = (x.__crudo || x)[otro.clave], dentro = cols.map(function (c, j) { var t = celda(otro, c, x, false); return t.indexOf('class="li-nada"') >= 0 ? '' : '<span' + (j ? '' : ' class="li-rel-n"') + '>' + t + '</span>'; }).join('');
-              var abre = !!relAbiertas[ri + '|' + k], ir = va ? '<a class="li-rel-ir" href="?s=' + encodeURIComponent(sec.toLowerCase()) + '&ficha=' + encodeURIComponent(kIr) + '" data-sx="' + texto(sec) + '">Abrir en ' + texto(va) + ' ›</a>' : '';
+              var ix = irA(x), abre = !!relAbiertas[ri + '|' + k], ir = ix ? '<a class="li-rel-ir" href="?s=' + encodeURIComponent(ix.sec.toLowerCase()) + '&ficha=' + encodeURIComponent(kIr) + '" data-sx="' + texto(ix.sec) + '">Abrir en ' + texto(ix.va) + ' ›</a>' : '';
               var li;
               if (e.editar.length) li = '<button type="button" class="li-rel-f li-rel-abre" data-rel-abre aria-expanded="' + abre + '"><span class="li-rel-dentro">' + dentro + '</span>' + ICONO_FLECHA.replace('li-flecha', 'li-flecha li-rel-chev') + '</button>' +
                 '<div class="li-rel-d"' + (abre ? '' : ' hidden') + '><div class="u-campos">' + e.editar.map(function (c) { return datoRel(ri, k, c, x); }).join('') + '</div>' +
                 (ir || e.quitar ? '<div class="li-rel-acc">' + ir + (e.quitar ? '<button type="button" class="u-btn u-btn-texto li-rel-quitar" data-rel-quitar>Quitar</button>' : '') + '</div>' : '') + '</div>';
-              else li = '<div class="li-rel-linea">' + (va ? '<a class="li-rel-f" href="?s=' + encodeURIComponent(sec.toLowerCase()) + '&ficha=' + encodeURIComponent(kIr) + '" data-sx="' + texto(sec) + '">' + dentro + '<span class="li-ir">' + texto(va) + ' ›</span></a>' : '<div class="li-rel-f">' + dentro + '</div>') +
+              else li = '<div class="li-rel-linea">' + (ix ? '<a class="li-rel-f" href="?s=' + encodeURIComponent(ix.sec.toLowerCase()) + '&ficha=' + encodeURIComponent(kIr) + '" data-sx="' + texto(ix.sec) + '">' + dentro + '<span class="li-ir">' + texto(ix.va) + ' ›</span></a>' : '<div class="li-rel-f">' + dentro + '</div>') +
                 (e.quitar ? '<button type="button" class="u-btn u-btn-icono li-rel-x" data-rel-quitar aria-label="' + texto('Quitar ' + String(k)) + '">' + ICONO_X + '</button>' : '') + '</div>';
               return '<li data-rel-fila="' + texto(k) + '"' + (i >= max ? ' hidden data-resto' : '') + '>' + li + '</li>';
             }).join('') + '</ul>';
@@ -2894,8 +2992,8 @@
               }).join('') + '</div>';
             }).join('');
           } else cuerpo = '<ul class="li-rel">' + rs.map(function (x, i) {
-              var dentro = cols.map(function (c, k) { var t = celda(otro, c, x, !va); return t.indexOf('class="li-nada"') >= 0 ? '' : '<span' + (k ? '' : ' class="li-rel-n"') + '>' + t + '</span>'; }).join('');
-              return '<li' + (i >= max ? ' hidden data-resto' : '') + '>' + (va ? '<a class="li-rel-f" href="?s=' + encodeURIComponent(sec.toLowerCase()) + '&ficha=' + encodeURIComponent((x.__crudo || x)[otro.clave]) + '" data-sx="' + texto(sec) + '">' + dentro + '<span class="li-ir">' + texto(va) + ' ›</span></a>' : '<div class="li-rel-f">' + dentro + '</div>') + '</li>';
+              var ix = irA(x), dentro = cols.map(function (c, k) { var t = celda(otro, c, x, !ix); return t.indexOf('class="li-nada"') >= 0 ? '' : '<span' + (k ? '' : ' class="li-rel-n"') + '>' + t + '</span>'; }).join('');
+              return '<li' + (i >= max ? ' hidden data-resto' : '') + '>' + (ix ? '<a class="li-rel-f" href="?s=' + encodeURIComponent(ix.sec.toLowerCase()) + '&ficha=' + encodeURIComponent((x.__crudo || x)[otro.clave]) + '" data-sx="' + texto(ix.sec) + '">' + dentro + '<span class="li-ir">' + texto(ix.va) + ' ›</span></a>' : '<div class="li-rel-f">' + dentro + '</div>') + '</li>';
             }).join('') + '</ul>';
           // T0690: las primeras «max» (20 si no lo dice) y «Ver todo»: las demás van escondidas y salen al tocarlo.
           if (resto > 0) cuerpo += '<button type="button" class="li-vermas li-vertodo" data-ver-todo>Ver todo <span class="u-nota">· ' + num(rs.length) + ' en total</span></button>';
@@ -3142,23 +3240,27 @@
         }
         /** «+ Añadir …»: un formulario corto ahí mismo (o, con «elegir», un buscador de lo que se puede añadir). */
         function nuevaRel(b) {
-          var s = b.closest('[data-rel]'), ri = +s.getAttribute('data-rel'), r = a.relacionados[ri], ra = relAps[ri], e = relEdicion(r);
+          var s = b.closest('[data-rel]'), ri = +s.getAttribute('data-rel'), r = a.relacionados[ri], ra = relAps[ri], e = relEdicion(r, YO.admin);
           var existentes = function () { return filas(r.tabla).map(function (y) { return y[e.clave]; }); };
-          var anadir = function (valores, nombre) {
+          // T0724 (R35): lo escrito sigue ahí hasta que el motor dice que sí; si dice que no, alFallar(lo que pasa, en palabras).
+          var anadir = function (valores, nombre, alFallar) {
             var q = altaRelacionada(r, crudo, valores, existentes(), a.prefijos);
             if (q.faltan.length) return 'Falta ' + yJuntos(q.faltan.map(function (c) { return campo(ra, c).titulo.toLowerCase(); })) + '.';
-            Promise.resolve(T.crear(r.tabla, q.valores)).then(function (out) {
+            Promise.resolve(T.crear(r.tabla, q.valores, { callado: true })).then(function (out) {
               rehacer();
               var nid = (out && (out.id || (out.fila && out.fila[e.clave]))) || q.valores[e.clave];
               if (nid) deshacible(primeraMayuscula(e.filas[0]) + ': ' + textoCorto(nombre, 40), function () { return Promise.resolve(T.borrar(r.tabla, nid)).then(rehacer); });
-            }, function () { rehacer(); });
+            }, function (e2) {
+              var m = yaEsta(e2, { escritos: valores, nombre: nombre, donde: r.titulo || '' });
+              if (alFallar && caja.isConnected) alFallar('No se ha añadido: ' + m); else { ctx.aviso('No se ha añadido: ' + m); rehacer(); }
+            });
             return '';
           };
           var caja = document.createElement('div');
           if (e.elegir) {
             caja.className = 'li-rel-elegir';
             caja.innerHTML = '<label class="u-etiqueta" for="li-re' + ri + '">Busca por el código o el nombre</label><input type="search" id="li-re' + ri + '" autocomplete="off">' +
-              '<ul class="li-rel-opc" role="list"></ul><div class="n-botones"><button type="button" class="u-btn u-btn-texto" data-no>Cancelar</button></div>';
+              '<ul class="li-rel-opc" role="list"></ul><p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-texto" data-no>Cancelar</button></div>';
             var inp = caja.querySelector('input'), ul = caja.querySelector('ul');
             var ya = relacionadas(r, f, filas(r.tabla)).map(function (y) { return (y.__crudo || y)[e.elegir]; });
             var pinta = function () {
@@ -3169,18 +3271,37 @@
             ul.addEventListener('click', function (ev) {
               var o = ev.target.closest('[data-elegido]'); if (!o) return;
               var v = {}; v[e.elegir] = o.getAttribute('data-elegido');
-              anadir(v, o.textContent);
+              [].forEach.call(ul.querySelectorAll('button'), function (x) { x.disabled = true; });
+              var nomE = o.textContent;
+              anadir(v, nomE, function (m) {
+                [].forEach.call(ul.querySelectorAll('button'), function (x) { x.disabled = false; });
+                var er = caja.querySelector('.u-error'); er.textContent = m; er.hidden = false;
+              });
             });
             pinta();
           } else {
             caja.innerHTML = '<form class="li-rel-alta" novalidate><div class="u-campos">' + e.alta.map(function (c) { return entradaRel(ra, c, {}, 'li-ra' + ri + '-'); }).join('') + '</div>' +
               '<p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="submit" class="u-btn u-btn-accion">Añadir ' + texto(e.filas[0]) + '</button><button type="button" class="u-btn u-btn-texto" data-no>Cancelar</button></div></form>';
             caja = caja.firstChild;
+            // T0724 (R35): lo que ya está (la fibra que ya tiene este diseño) no se vuelve a ofrecer.
+            var yp = yaPuestos(r, relacionadas(r, f, filas(r.tabla)));
+            Object.keys(yp).forEach(function (c) {
+              var sl = caja.querySelector('select[data-rc="' + c + '"]');
+              if (sl) [].slice.call(sl.options).forEach(function (op) { if (op.value && yp[c].indexOf(op.value) >= 0) sl.removeChild(op); });
+            });
+            // El nombre para el aviso: lo que se ve del campo que da nombre a la fila (el de la fibra, no su código).
+            var nombreAlta = function (l) {
+              var cn = r.nombre && e.alta.indexOf(r.nombre) >= 0 ? r.nombre : e.alta[0], i = caja.querySelector('[data-rc="' + cn + '"]');
+              if (i && i.tagName === 'SELECT' && i.selectedIndex > 0) return i.options[i.selectedIndex].text;
+              return l.valores[cn] || e.filas[0];
+            };
             caja.addEventListener('submit', function (ev) {
               ev.preventDefault();
-              var l = leidos(ra, caja), er = caja.querySelector('.u-error');
-              var msg = l.mal.length ? textoProhibido(l.mal) : anadir(l.valores, l.valores[e.alta[0]] || e.filas[0]);
+              var l = leidos(ra, caja), er = caja.querySelector('.u-error'), bt = caja.querySelector('[type=submit]');
+              if (bt.disabled) return;
+              var msg = l.mal.length ? textoProhibido(l.mal) : anadir(l.valores, nombreAlta(l), function (m) { bt.disabled = false; bt.textContent = 'Añadir ' + e.filas[0]; er.textContent = m; er.hidden = false; });
               if (msg) { er.textContent = msg; er.hidden = false; }
+              else if (!l.mal.length) { er.hidden = true; bt.disabled = true; bt.textContent = 'Añadiendo…'; }
             });
           }
           caja.addEventListener('click', function (ev) { if (ev.target.closest('[data-no]')) rehacer(); });
@@ -3259,9 +3380,9 @@
             }
             if (!ev.target.closest('[data-borrar-si]')) return;
             [].forEach.call(sitio.querySelectorAll('button'), function (x) { x.disabled = true; });
-            // Primero lo que se va con ella (sus personas de contacto…) y después ella: el motor no borra lo que algo usa.
-            var cadena = qb.van.reduce(function (p, x) { return x.ids.reduce(function (pp, idx) { return pp.then(function () { return T.borrar(x.tabla, idx); }); }, p); }, Promise.resolve());
-            cadena.then(function () { return T.borrar(a.tabla, id); }).then(function () {
+            // T0724 (R07): ella y lo que se va con ella, en una sola llamada (la de T0722). El motor mira antes todos sus usos,
+            // también en las tablas que aquí no se ven, y si algo bloquea no borra nada (y lo dice).
+            Promise.resolve(T.borrar(a.tabla, id, { con: borrarCon(a) })).then(function () {
               cerrarVentana(); ctx.aviso('Se ha borrado ' + nom + '.');
             }, function () { rehacer(); });
           };
@@ -3628,6 +3749,8 @@
 
       /* ---------- eventos ---------- */
       cont.addEventListener('click', function (ev) {
+        // T0724 (R44): un enlace de la tabla (la web, el correo) se abre él, sin abrir la ficha de su fila.
+        if (ev.target.closest('a.li-enl')) return;
         // T0710: un botón de lo de arriba (Voy / No voy): cambia esa fila de su tabla y lo dice; deja de salir sola.
         var ab = ev.target.closest('[data-arriba]');
         if (ab) {
@@ -3755,7 +3878,7 @@
         var sx = ev.target.closest('a[data-sx]');
         if (sx && abierta && !(ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button)) {
           var h2 = vent.querySelector('#li-vt'), nom = '';
-          if (h2) { var cp2 = h2.cloneNode(true); [].forEach.call(cp2.querySelectorAll('.li-cod'), function (x) { x.parentNode.removeChild(x); }); nom = cp2.textContent.trim(); }
+          if (h2) { var cp2 = h2.cloneNode(true); [].forEach.call(cp2.querySelectorAll(QUITAR_DE_VUELTA), function (x) { x.parentNode.removeChild(x); }); nom = cp2.textContent.replace(/\s+/g, ' ').trim(); }
           try { history.replaceState(history.state, '', location.pathname + conFicha(location.search, abierta.id, editables(BASE)) + location.hash); } catch (e) {}
           // T0692: a Pedidos (otra sección, no un Listado) no se le dice: lo recogería esta ficha al volver («‹ Volver a» sí misma).
           if (!(venSec && String(sx.getAttribute('data-sx')).toUpperCase() === venSec)) vueltaPendiente = nom;
@@ -3830,7 +3953,9 @@
         if (d) deshacerYDecir(d);
       });
 
-      ctx.alCambiar(function (t) {
+      ctx.alCambiar(function (t, info) {
+        // T0724 (R16): una tabla de la sección que llega del motor trae sus columnas de ahora: la configuración se vuelve a comprobar.
+        if (info && info.refresco && tablas.indexOf(t) >= 0) errores = null;
         if (t === PREF && window.UN.ordenMenu) { var m = prefDe(MENU); if (Array.isArray(m)) window.UN.ordenMenu(m); }
         if (tablas.indexOf(t) >= 0) pintar();
       });

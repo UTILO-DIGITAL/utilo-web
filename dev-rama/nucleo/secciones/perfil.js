@@ -268,7 +268,7 @@
           // Sin tareas abiertas, el bloque de tareas va después de lo demás: arriba, lo que hay que hacer.
           (d ? (d.tareas && !d.tareas.error && !d.tareas.abiertas ? bloques(d) + htmlTareas(d.tareas, d.hoy, ctx)
             : htmlTareas(d.tareas, d.hoy, ctx) + bloques(d)) : cargando()) + '</div>' +
-          '<div class="pf-col pf-lado">' + htmlPersonalizar(ctx) + htmlCuenta(ctx) + htmlDentro(ctx) + (window.UN.htmlVersion ? window.UN.htmlVersion() : '') + // T0283: versión y novedades
+          '<div class="pf-col pf-lado">' + htmlPersonalizar(ctx) + (window.UN.htmlAspecto ? window.UN.htmlAspecto() : '') + htmlCuenta(ctx) + htmlDentro(ctx) + (window.UN.htmlVersion ? window.UN.htmlVersion() : '') + // T0283: versión y novedades
           '<p class="u-nota pf-hora" id="pf-hora">' + (d ? 'Al día a las ' + hora(d.leido) + '.' : '') + '</p></div></div></div>';
       }
       var guardado = leer(ctx);
