@@ -2132,6 +2132,7 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-tabla tbody tr:last-child td { border-bottom: 0; }
 .u .li-tabla tbody:not(:last-child) tr:last-child td { border-bottom: 1px solid var(--color-linea); }
 .u .li-nada { color: var(--color-suave); }
+.u .li-sinvalor { color: var(--color-suave); } /* T0731: «Contacto», «Sin nada pendiente» */
 .u .li-estado { background: var(--color-superficie); color: var(--color-texto); border: 1px solid color-mix(in srgb, var(--color-borde-campo) 45%, var(--color-superficie)); font-weight: 600; }
 .u .li-estado.li-apagado { color: var(--color-suave); }
 /* Los demás avisos de una fila, en palabras y sin color (la franja ya dice el más importante); en la ficha, con el suyo. */

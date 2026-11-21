@@ -10,7 +10,7 @@
  */
 (function () {
   'use strict';
-  var TABLAS = ['TELAS', 'DISENOS', 'TECNICAS', 'ESTADOS_TELA', 'AJUSTES', 'MARCAS', 'COMPARATIVA', 'COMPETIDORES', 'PROPUESTAS', 'NECESIDADES'];
+  var TABLAS = ['TELAS', 'DISENOS', 'TECNICAS', 'ESTADOS_TELA', 'AJUSTES', 'MARCAS', 'COMPARATIVA', 'COMPETIDORES', 'TIPOS_PRECIO', 'PROPUESTAS', 'NECESIDADES'];
 
   /* ======================= cálculo (también para las pruebas en node) ======================= */
 
@@ -75,12 +75,20 @@
    * { id, tela, precio, ancho, de, su (su precio por tu metro), porM2 }. Por m² cuando están los dos anchos (su precio
    * pasado a tu ancho), como la ficha de la marca; si falta uno, por metro.
    */
+  /**
+   * T0731 (R19) · Qué es el precio de una fila de la Comparativa, como en la ficha de la marca: su objetivo, el de catálogo o
+   * lo que paga hoy (su tipo, de TIPOS_PRECIO; sin tipo o con otro, «Hoy paga»). → «Su objetivo: », «En catálogo: » o «Hoy paga ».
+   */
+  function quePrecio(tipo) {
+    var t = String(tipo || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+    return t === 'objetivo' ? 'Su objetivo: ' : t === 'catalogo' ? 'En catálogo: ' : 'Hoy paga ';
+  }
   function comparativa(D, marca, diseno, anchoTela) {
     var r = { misma: [], otras: [] };
     if (!marca) return r;
     (D.filas('COMPARATIVA') || []).filter(function (c) { return String(c.ID_MARCA) === String(marca) && !isNaN(aNum(c.PRECIO_A_BATIR)); }).forEach(function (c) {
       var p = aNum(c.PRECIO_A_BATIR), a = aNum(c.ANCHO), porM2 = a > 0 && anchoTela > 0;
-      var x = { id: String(c.ID), tela: String(c.SU_TELA || 'Su tela'), precio: p, ancho: a, de: nombre(D, 'COMPETIDORES', c.ID_COMPETIDOR), porM2: porM2, su: r2(porM2 ? p / a * anchoTela : p) };
+      var x = { id: String(c.ID), tela: String(c.SU_TELA || 'Su tela'), precio: p, ancho: a, de: nombre(D, 'COMPETIDORES', c.ID_COMPETIDOR), tipo: nombre(D, 'TIPOS_PRECIO', c.ID_TIPO_PRECIO), porM2: porM2, su: r2(porM2 ? p / a * anchoTela : p) };
       (diseno && String(c.ID_DISENO) === String(diseno) ? r.misma : r.otras).push(x);
     });
     return r;
@@ -217,7 +225,7 @@
   }
 
   var CALC = { vendido: vendido, sueles: sueles, SUELES: SUELES, whatsapp: whatsapp, copiable: copiable, paganHoy: paganHoy, frenteA: frenteA, propuesta: propuesta, aNum: aNum, cifra: cifra, ajustes: ajustes, telas: telas, costeEur: costeEur, envioMetro: envioMetro,
-    precioDe: precioDe, ganaDe: ganaDe, comparativa: comparativa, calcular: calcular, ofrecer: ofrecer };
+    precioDe: precioDe, ganaDe: ganaDe, comparativa: comparativa, quePrecio: quePrecio, calcular: calcular, ofrecer: ofrecer };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
@@ -414,7 +422,7 @@
 
       function linea(c, t, r, pista) {
         var h = '<div class="pr-cmp"><span class="pr-cmp-t">' + texto(c.tela) + (pista ? ' <span class="u-chip">' + pista + '</span>' : '') + '</span>';
-        h += '<span class="u-nota u-cifra">Hoy paga ' + eur(c.precio) + (c.ancho > 0 ? ' (' + cifra(c.ancho, 0) + ' cm)' : '') + (c.de ? ' · ' + texto(c.de) : '') +
+        h += '<span class="u-nota u-cifra">' + quePrecio(c.tipo) + eur(c.precio) + (c.ancho > 0 ? ' (' + cifra(c.ancho, 0) + ' cm)' : '') + (c.de ? ' · ' + texto(c.de) : '') +
           (c.porM2 && Math.abs(c.ancho - t.ancho) > 0.001 ? ' → a tu ancho, ' + eur(c.su) : '') + (!c.porM2 ? ' (sin el ancho, comparado por metro)' : '') + '</span>';
         if (!isNaN(r.precio)) {
           var dif = r2(c.su - r.precio);
