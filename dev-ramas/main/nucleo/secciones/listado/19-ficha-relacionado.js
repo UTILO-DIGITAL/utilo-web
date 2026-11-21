@@ -32,8 +32,9 @@
           var g = document.createElement('span'); g.className = 'li-guardado'; g.setAttribute('aria-live', 'polite'); u.appendChild(g);
           el.parentNode.replaceChild(u, el);
           var i = u.querySelector('input,select,textarea'); if (!i) return;
-          i.focus();
-          if (i.tagName === 'SELECT') { try { if (i.showPicker) i.showPicker(); } catch (e) {} } else if (i.select && i.type !== 'date') i.select();
+          var b2 = u.querySelector('[data-dos-v][aria-pressed=true]') || u.querySelector('[data-dos-v]'); // T0746: Sí | No, al primero
+          if (b2) b2.focus(); else i.focus();
+          if (b2) { /* sus botones */ } else if (i.tagName === 'SELECT') { try { if (i.showPicker) i.showPicker(); } catch (e) {} } else if (i.select && i.type !== 'date') i.select();
           var hecho = false;
           function cerrar(sin) {
             if (hecho) return;

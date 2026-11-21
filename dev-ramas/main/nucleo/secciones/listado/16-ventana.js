@@ -84,9 +84,23 @@
       function entradaRel(ra, c, x, pre) {
         return entrada(ra, c, x).replace(/(id|for)="li-c-/g, '$1="' + pre).replace(/ data-c="/g, ' data-rc="');
       }
+      /** T0746 · Los dos botones, como su desplegable escondido (el que guarda): el elegido, marcado y con su color. */
+      function pintarDos(sel) {
+        var g = sel.parentNode.querySelector('.li-dos'); if (!g) return;
+        [].forEach.call(g.querySelectorAll('[data-dos-v]'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-dos-v') === sel.value)); });
+      }
       function entrada(a, c, f) {
         var cp = campo(a, c), v = f ? f[c] : '', id = 'li-c-' + c;
         var et = '<label class="u-etiqueta" for="' + id + '">' + texto(cp.titulo) + '</label>';
+        var dos = dosOpciones(cp, v);
+        if (dos) {
+          // T0746: dos opciones (Sí | No), dos botones juntos; tocar el elegido lo deja vacío. Guarda su desplegable, escondido.
+          return '<div class="u-campo"><span class="u-etiqueta">' + texto(cp.titulo) + '</span><div class="li-dos" role="group" aria-label="' + texto(cp.titulo) + '">' + dos.map(function (o) {
+            return '<button type="button" class="li-dos-b' + (o.color ? ' li-' + texto(o.color) : '') + '" data-dos-v="' + texto(o.valor) + '" aria-pressed="' + (o.valor === String(v)) + '">' + texto(mostrar(cp, o.nombre)) + '</button>';
+          }).join('') + '</div><select id="' + id + '" hidden data-dos data-c="' + texto(c) + '"><option value=""></option>' + dos.map(function (o) {
+            return '<option value="' + texto(o.valor) + '"' + (o.valor === String(v) ? ' selected' : '') + '>' + texto(mostrar(cp, o.nombre)) + '</option>';
+          }).join('') + '</select></div>';
+        }
         if (cp.ids) {
           // Una columna que apunta a otra tabla: se elige por el nombre y se guarda el código.
           var ns = Object.keys(cp.ids);

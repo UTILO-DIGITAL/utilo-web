@@ -716,6 +716,16 @@
     });
   }
 
+  /** T0746 · Las dos opciones de un campo que se elige con dos botones juntos (Sí | No): [{ valor, nombre, color }], o null
+   *  si no son dos (o lo que tiene no es ninguna de las dos: entonces, su desplegable, que lo enseña). */
+  function dosOpciones(cp, v) {
+    if (cp.varios) return null;
+    var ops = cp.ids ? Object.keys(cp.ids).map(function (n) { return { valor: String(cp.ids[n]), nombre: n }; })
+      : (cp.opciones || []).map(function (o) { return { valor: String(o), nombre: String(o) }; });
+    if (ops.length !== 2 || (!vacio(v) && !ops.some(function (o) { return o.valor === String(v); }))) return null;
+    ops.forEach(function (o) { o.color = cp.colores && cp.colores[o.nombre] || ''; });
+    return ops;
+  }
   /**
    * Comprueba la configuración de una sección (para quien administra y para las pruebas): columnas que faltan, un precio
    * cuyo cálculo no lleva el envío, una vista para clientes que enseñaría algo privado, columnas con datos que no se
@@ -2219,7 +2229,7 @@
   /** T0651 · La palabra pequeña junto a la etiqueta de lo que no se edita en una ficha que sí: «calculado» o la del «ir» de un «de». */
   function sufijoFijo(cp) { return cp.calculo ? 'calculado' : (cp.de && cp.ir && cp.ir.texto ? String(cp.ir.texto) : ''); }
 
-  var CALC = { pctVer: pctVer, pctEscrito: pctEscrito, deEscrito: deEscrito, nuevoId: nuevoId, altaNuevoDe: altaNuevoDe, codigoAltaNuevo: codigoAltaNuevo, plantillaPrefijo: plantillaPrefijo, codigoNuevo: codigoNuevo, esRuta: esRuta, destinoDe: destinoDe, avisoRuta: avisoRuta, borrarDe: borrarDe, queBorra: queBorra, borrarCon: borrarCon, seccionDeFila: seccionDeFila, seccionesRel: seccionesRel, plantillaPara: plantillaPara, sinMarcas: sinMarcas, sinComunes: sinComunes, palabraTodos: palabraTodos, yaEsta: yaEsta, yaPuestos: yaPuestos, esSoporte: esSoporte, htmlErrores: htmlErrores, cuantas: cuantas, yJuntos: yJuntos, relEdicion: relEdicion, altaRelacionada: altaRelacionada, paraElegir: paraElegir, sufijoFijo: sufijoFijo,
+  var CALC = { pctVer: pctVer, pctEscrito: pctEscrito, deEscrito: deEscrito, nuevoId: nuevoId, altaNuevoDe: altaNuevoDe, codigoAltaNuevo: codigoAltaNuevo, plantillaPrefijo: plantillaPrefijo, codigoNuevo: codigoNuevo, esRuta: esRuta, destinoDe: destinoDe, avisoRuta: avisoRuta, borrarDe: borrarDe, queBorra: queBorra, borrarCon: borrarCon, seccionDeFila: seccionDeFila, seccionesRel: seccionesRel, plantillaPara: plantillaPara, sinMarcas: sinMarcas, sinComunes: sinComunes, palabraTodos: palabraTodos, yaEsta: yaEsta, yaPuestos: yaPuestos, esSoporte: esSoporte, htmlErrores: htmlErrores, cuantas: cuantas, yJuntos: yJuntos, relEdicion: relEdicion, altaRelacionada: altaRelacionada, paraElegir: paraElegir, sufijoFijo: sufijoFijo, dosOpciones: dosOpciones,
     fechaDia: fechaDia, webCorta: webCorta, webSitio: webSitio, textoCorto: textoCorto, gruposConQuien: gruposConQuien, nombreCorto: nombreCorto, deshacerEnOrden: deshacerEnOrden, guardadoSolo: guardadoSolo, loDiceUnAviso: loDiceUnAviso, contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, queHacerAtras: queHacerAtras, dirFicha: dirFicha, cambiosHecha: cambiosHecha, conHablado: conHablado, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
     textoVuelta: textoVuelta, QUITAR_DE_VUELTA: QUITAR_DE_VUELTA, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, franja: franja, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, resumenCifras: resumenCifras, arribaDe: arribaDe, filasArriba: filasArriba, rangoFechas: rangoFechas, lineaArriba: lineaArriba, cifrasResumen: cifrasResumen, seguirCrudo: seguirCrudo, tablasDeRuta: tablasDeRuta, conCamposPropios: conCamposPropios, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
@@ -3049,9 +3059,23 @@
       function entradaRel(ra, c, x, pre) {
         return entrada(ra, c, x).replace(/(id|for)="li-c-/g, '$1="' + pre).replace(/ data-c="/g, ' data-rc="');
       }
+      /** T0746 · Los dos botones, como su desplegable escondido (el que guarda): el elegido, marcado y con su color. */
+      function pintarDos(sel) {
+        var g = sel.parentNode.querySelector('.li-dos'); if (!g) return;
+        [].forEach.call(g.querySelectorAll('[data-dos-v]'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-dos-v') === sel.value)); });
+      }
       function entrada(a, c, f) {
         var cp = campo(a, c), v = f ? f[c] : '', id = 'li-c-' + c;
         var et = '<label class="u-etiqueta" for="' + id + '">' + texto(cp.titulo) + '</label>';
+        var dos = dosOpciones(cp, v);
+        if (dos) {
+          // T0746: dos opciones (Sí | No), dos botones juntos; tocar el elegido lo deja vacío. Guarda su desplegable, escondido.
+          return '<div class="u-campo"><span class="u-etiqueta">' + texto(cp.titulo) + '</span><div class="li-dos" role="group" aria-label="' + texto(cp.titulo) + '">' + dos.map(function (o) {
+            return '<button type="button" class="li-dos-b' + (o.color ? ' li-' + texto(o.color) : '') + '" data-dos-v="' + texto(o.valor) + '" aria-pressed="' + (o.valor === String(v)) + '">' + texto(mostrar(cp, o.nombre)) + '</button>';
+          }).join('') + '</div><select id="' + id + '" hidden data-dos data-c="' + texto(c) + '"><option value=""></option>' + dos.map(function (o) {
+            return '<option value="' + texto(o.valor) + '"' + (o.valor === String(v) ? ' selected' : '') + '>' + texto(mostrar(cp, o.nombre)) + '</option>';
+          }).join('') + '</select></div>';
+        }
         if (cp.ids) {
           // Una columna que apunta a otra tabla: se elige por el nombre y se guarda el código.
           var ns = Object.keys(cp.ids);
@@ -3128,13 +3152,14 @@
         var puestos = [];
         // T0630: lo que tiene algo, cada uno en su sitio; lo vacío, junto en una línea al final de su apartado («Sin
         // rellenar: Formato, Notas»). Lo que se edita se abre al tocar su nombre (su campo ya está, escondido, en el form).
-        var lleno = function (c) { return ed.indexOf(c) >= 0 ? !vacio(crudoEd[c]) : verTexto(campo(a, c), f, VAL, PROHIB) !== ''; };
+        // T0746: un Sí | No que se edita sale aunque esté vacío (sus dos botones, sin elegir), no en «Sin rellenar».
+        var lleno = function (c) { return ed.indexOf(c) >= 0 ? !vacio(crudoEd[c]) || (tocar && !!dosOpciones(campo(a, c), crudoEd[c])) : verTexto(campo(a, c), f, VAL, PROHIB) !== ''; };
         var apartadoFicha = function (titulo, cs) {
           if (!cs.length) return '';
           cs.forEach(function (c) { puestos.push(c); });
           var rp = nueva ? { ver: cs, vacios: [] } : repartir(cs, lleno, a.obligatorias);
           var cuerpo = rp.ver.map(function (c) {
-            if (ed.indexOf(c) >= 0) return tocar && !campo(a, c).colores ? datoTocar(a, c, f, cli) : entrada(a, c, crudoEd);
+            if (ed.indexOf(c) >= 0) return tocar && !campo(a, c).colores && !dosOpciones(campo(a, c), crudoEd[c]) ? datoTocar(a, c, f, cli) : entrada(a, c, crudoEd); // T0746: Sí | No, siempre a la vista
             var cp = campo(a, c);
             // T0651: lo que no se edita en una ficha que sí: una palabra pequeña junto a su etiqueta («· calculado») y, si es de
             // otra fila que tiene su sección (el próximo paso, de su tarea), el dato entero lleva a ella, con una flecha suave.
@@ -3347,6 +3372,7 @@
           if (!i) { if (datoDe(c)) pintarDato(c); return; } // T0651: leído como texto, se vuelve a pintar con lo de ahora
           i.value = vacio(v) ? '' : String(v); ponerInicial(i, i.value);
           if (i.hasAttribute('data-pil')) i.dispatchEvent(new Event('change')); // su color
+          if (i.hasAttribute('data-dos')) pintarDos(i); // T0746: sus dos botones
         }
         /** T0651 · Lo de ahora de c, como se ve (el nombre de lo que apunta a otra tabla), para pintarlo leído. */
         function filaAhora(c) {
@@ -3500,8 +3526,9 @@
           var g = document.createElement('span'); g.className = 'li-guardado'; g.setAttribute('aria-live', 'polite'); u.appendChild(g);
           el.parentNode.replaceChild(u, el);
           var i = u.querySelector('input,select,textarea'); if (!i) return;
-          i.focus();
-          if (i.tagName === 'SELECT') { try { if (i.showPicker) i.showPicker(); } catch (e) {} } else if (i.select && i.type !== 'date') i.select();
+          var b2 = u.querySelector('[data-dos-v][aria-pressed=true]') || u.querySelector('[data-dos-v]'); // T0746: Sí | No, al primero
+          if (b2) b2.focus(); else i.focus();
+          if (b2) { /* sus botones */ } else if (i.tagName === 'SELECT') { try { if (i.showPicker) i.showPicker(); } catch (e) {} } else if (i.select && i.type !== 'date') i.select();
           var hecho = false;
           function cerrar(sin) {
             if (hecho) return;
@@ -4036,6 +4063,15 @@
       }
 
       /* ---------- eventos ---------- */
+      // T0746: Sí | No en la ficha (y en lo de dentro): el botón pone su valor en el desplegable escondido, que guarda como
+      // siempre; tocar el que ya está elegido lo deja vacío.
+      vent.addEventListener('click', function (ev) {
+        var b = ev.target.closest('[data-dos-v]'), sel = b && b.parentNode.parentNode.querySelector('select[data-dos]');
+        if (!sel) return;
+        sel.value = b.getAttribute('aria-pressed') === 'true' ? '' : b.getAttribute('data-dos-v');
+        pintarDos(sel);
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+      });
       cont.addEventListener('click', function (ev) {
         // T0724 (R44): un enlace de la tabla (la web, el correo) se abre él, sin abrir la ficha de su fila.
         if (ev.target.closest('a.li-enl')) return;

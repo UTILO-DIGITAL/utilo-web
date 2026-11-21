@@ -34,6 +34,7 @@
           if (!i) { if (datoDe(c)) pintarDato(c); return; } // T0651: leído como texto, se vuelve a pintar con lo de ahora
           i.value = vacio(v) ? '' : String(v); ponerInicial(i, i.value);
           if (i.hasAttribute('data-pil')) i.dispatchEvent(new Event('change')); // su color
+          if (i.hasAttribute('data-dos')) pintarDos(i); // T0746: sus dos botones
         }
         /** T0651 · Lo de ahora de c, como se ve (el nombre de lo que apunta a otra tabla), para pintarlo leído. */
         function filaAhora(c) {

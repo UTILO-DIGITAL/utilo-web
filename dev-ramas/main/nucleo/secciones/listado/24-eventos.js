@@ -1,4 +1,13 @@
       /* ---------- eventos ---------- */
+      // T0746: Sí | No en la ficha (y en lo de dentro): el botón pone su valor en el desplegable escondido, que guarda como
+      // siempre; tocar el que ya está elegido lo deja vacío.
+      vent.addEventListener('click', function (ev) {
+        var b = ev.target.closest('[data-dos-v]'), sel = b && b.parentNode.parentNode.querySelector('select[data-dos]');
+        if (!sel) return;
+        sel.value = b.getAttribute('aria-pressed') === 'true' ? '' : b.getAttribute('data-dos-v');
+        pintarDos(sel);
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+      });
       cont.addEventListener('click', function (ev) {
         // T0724 (R44): un enlace de la tabla (la web, el correo) se abre él, sin abrir la ficha de su fila.
         if (ev.target.closest('a.li-enl')) return;

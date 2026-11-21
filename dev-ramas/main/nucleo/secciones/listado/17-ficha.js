@@ -42,13 +42,14 @@
         var puestos = [];
         // T0630: lo que tiene algo, cada uno en su sitio; lo vacío, junto en una línea al final de su apartado («Sin
         // rellenar: Formato, Notas»). Lo que se edita se abre al tocar su nombre (su campo ya está, escondido, en el form).
-        var lleno = function (c) { return ed.indexOf(c) >= 0 ? !vacio(crudoEd[c]) : verTexto(campo(a, c), f, VAL, PROHIB) !== ''; };
+        // T0746: un Sí | No que se edita sale aunque esté vacío (sus dos botones, sin elegir), no en «Sin rellenar».
+        var lleno = function (c) { return ed.indexOf(c) >= 0 ? !vacio(crudoEd[c]) || (tocar && !!dosOpciones(campo(a, c), crudoEd[c])) : verTexto(campo(a, c), f, VAL, PROHIB) !== ''; };
         var apartadoFicha = function (titulo, cs) {
           if (!cs.length) return '';
           cs.forEach(function (c) { puestos.push(c); });
           var rp = nueva ? { ver: cs, vacios: [] } : repartir(cs, lleno, a.obligatorias);
           var cuerpo = rp.ver.map(function (c) {
-            if (ed.indexOf(c) >= 0) return tocar && !campo(a, c).colores ? datoTocar(a, c, f, cli) : entrada(a, c, crudoEd);
+            if (ed.indexOf(c) >= 0) return tocar && !campo(a, c).colores && !dosOpciones(campo(a, c), crudoEd[c]) ? datoTocar(a, c, f, cli) : entrada(a, c, crudoEd); // T0746: Sí | No, siempre a la vista
             var cp = campo(a, c);
             // T0651: lo que no se edita en una ficha que sí: una palabra pequeña junto a su etiqueta («· calculado») y, si es de
             // otra fila que tiene su sección (el próximo paso, de su tarea), el dato entero lleva a ella, con una flecha suave.

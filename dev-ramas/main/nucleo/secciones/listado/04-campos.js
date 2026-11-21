@@ -222,3 +222,13 @@
     });
   }
 
+  /** T0746 · Las dos opciones de un campo que se elige con dos botones juntos (Sí | No): [{ valor, nombre, color }], o null
+   *  si no son dos (o lo que tiene no es ninguna de las dos: entonces, su desplegable, que lo enseña). */
+  function dosOpciones(cp, v) {
+    if (cp.varios) return null;
+    var ops = cp.ids ? Object.keys(cp.ids).map(function (n) { return { valor: String(cp.ids[n]), nombre: n }; })
+      : (cp.opciones || []).map(function (o) { return { valor: String(o), nombre: String(o) }; });
+    if (ops.length !== 2 || (!vacio(v) && !ops.some(function (o) { return o.valor === String(v); }))) return null;
+    ops.forEach(function (o) { o.color = cp.colores && cp.colores[o.nombre] || ''; });
+    return ops;
+  }

@@ -2498,6 +2498,16 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
   padding: 0 var(--e3); font: 400 14px/1 var(--fuente-texto); cursor: pointer; }
 .u .li-dia[aria-pressed="true"] { background: var(--color-principal-oscuro); border-color: var(--color-principal-oscuro); color: var(--color-sobre-principal, #fff); }
 .u .li-dia[aria-pressed="true"] small { color: inherit; }
+/* T0746 · Un campo de dos opciones (Sí | No) en la ficha: dos botones juntos; el elegido, con el fondo de su color (o el
+ * verde suave, como en la maqueta de T0702) y en negrita. */
+.u .li-dos { display: inline-flex; align-self: flex-start; width: max-content; margin-top: var(--e1); border: 1px solid var(--color-borde-campo, var(--color-linea)); border-radius: 8px; overflow: hidden; background: var(--color-superficie); }
+.u .li-dos-b { min-height: 36px; min-width: 64px; padding: 0 var(--e3); border: 0; background: none; color: var(--color-texto); font: 500 14px/1 var(--fuente-texto); cursor: pointer; }
+.u .li-dos-b + .li-dos-b { border-left: 1px solid var(--color-borde-campo, var(--color-linea)); }
+.u .li-dos-b[aria-pressed="true"] { background: var(--est-verde-f); font-weight: 600; }
+.u .li-dos-b[class*=" li-"][aria-pressed="true"] { background: var(--li-fondo); color: var(--li-c); }
+.u .li-dos-b:focus-visible { outline: 2px solid var(--color-principal); outline-offset: -2px; }
+@media (hover: hover) { .u .li-dos-b:not([aria-pressed="true"]):hover { background: color-mix(in srgb, var(--color-texto) 5%, var(--color-superficie)); } }
+@media (max-width: 639px) { .u .li-dos-b { min-height: 44px; min-width: 76px; font-size: 15px; } }
 /* El alta: lo de más, plegado. */
 .u .li-mas { border-top: 1px dashed var(--color-linea); padding-top: var(--e3); }
 .u .li-mas summary { cursor: pointer; color: var(--color-principal-oscuro); font-weight: 600; }
@@ -2885,6 +2895,7 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
 .u .li-ventana .li-f-pil { background: none; border: 0; padding: 0; }
 .u .li-ventana .li-f-pil .u-campos { display: block; }
 .u .li-ventana .li-f-pil .u-campo { flex-direction: row; align-items: center; gap: var(--e2); }
+.u .li-ventana .li-f-pil .li-dos { margin-top: 0; } /* T0746: el Sí | No solo arriba, a la altura de su etiqueta */
 /* Guardar y lo que se hace con la ficha: al final, fijos abajo mientras se baja por ella. */
 .u .li-pie { position: sticky; bottom: 0; z-index: 2; margin: 0 calc(var(--e5) * -1) calc(var(--e5) * -1); padding: var(--e3) var(--e5);
   background: color-mix(in srgb, var(--fondo-cab) 92%, transparent); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border-top: 1px solid var(--linea-caja); }
