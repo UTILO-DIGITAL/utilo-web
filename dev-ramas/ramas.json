@@ -682,10 +682,10 @@
    "tarea": "T0637",
    "titulo": "Lecciones de cada iniciativa: diario de Telas y de Casa Abuela, catálogo con lista corta y lecciones.js",
    "pr": null,
-   "commit": "11d9a654",
-   "ultimo": "T0637: «Aprobando sin probar» (TEL-44, regla 8.31) y la revisión en producción antes de enseñar la entrega; chats cuenta «¿puedo iniciar alguna más?»",
+   "commit": "263b88a2",
+   "ultimo": "T0637: lo de después de publicar Telas 1.7.0: «Añadir» roto en producción (TEL-45, regla 9.13) y mirar lo publicado en el momento (TEL-46); chats cuenta «¿qué hago ahora?»",
    "quien": "Javi Canela",
-   "fecha": "2026-11-21T08:57:37.993Z",
+   "fecha": "2026-11-21T11:37:41.089Z",
    "toca": [],
    "comun": false,
    "paginas": [
