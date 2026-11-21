@@ -642,7 +642,10 @@
       return true;
     });
   }
-  function normArt(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  /** T0736 · Sin tildes ni mayúsculas: la del núcleo (UN.plano; en Node, las pruebas, la de nucleo.js). */
+  var UNT = null;
+  function plano(s) { return (UNT || (UNT = typeof module !== 'undefined' && module.exports ? require('../nucleo.js') : window.UN)).plano(s); }
+  function normArt(s) { return plano(s); }
   /** Lo que se puede vender, por código: [{ codigo, nombre, detalle, unidad, precio (sin IVA; NaN si falta algo para calcularlo) }]. */
   function articulos(art, D) {
     if (!art || !art.tabla) return [];
@@ -1179,7 +1182,7 @@
     return opciones(lista, s) + (esta ? '' : '<option value="' + texto(s) + '" selected>' + texto(s) + '</option>');
   }
   function guardado(k, v) { try { if (v === undefined) return localStorage.getItem(k) || ''; localStorage.setItem(k, v); } catch (e) {} return ''; }
-  function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  function norm(s) { return plano(s); }
   function cifra(c, bien) { return '<span class="u-cifra' + (c < 0 && bien ? ' u-mal' : '') + '">' + eur(c) + '</span>'; }
   /** La barra de lo gastado o cobrado: en teja si se ha pasado; T0726 (R56): en gris si no tiene previsto (no hay con qué compararla). */
   function barra(p, mal, gris) { p = Math.max(0, Math.min(1, p || 0)) * 100; return '<div class="eco-barra-p"><i' + (mal ? ' class="eco-pasado"' : gris ? ' class="eco-sinprev"' : '') + ' style="width:' + p.toFixed(1) + '%"></i></div>'; }

@@ -75,12 +75,15 @@
    * { id, tela, precio, ancho, de, su (su precio por tu metro), porM2 }. Por m² cuando están los dos anchos (su precio
    * pasado a tu ancho), como la ficha de la marca; si falta uno, por metro.
    */
+  /** T0736 · Sin tildes ni mayúsculas: la del núcleo (UN.plano; en Node, las pruebas, la de nucleo.js). */
+  var UNT = null;
+  function plano(s) { return (UNT || (UNT = typeof module !== 'undefined' && module.exports ? require('../../nucleo/nucleo.js') : window.UN)).plano(s); }
   /**
    * T0731 (R19) · Qué es el precio de una fila de la Comparativa, como en la ficha de la marca: su objetivo, el de catálogo o
    * lo que paga hoy (su tipo, de TIPOS_PRECIO; sin tipo o con otro, «Hoy paga»). → «Su objetivo: », «En catálogo: » o «Hoy paga ».
    */
   function quePrecio(tipo) {
-    var t = String(tipo || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+    var t = plano(tipo).trim();
     return t === 'objetivo' ? 'Su objetivo: ' : t === 'catalogo' ? 'En catálogo: ' : 'Hoy paga ';
   }
   function comparativa(D, marca, diseno, anchoTela) {

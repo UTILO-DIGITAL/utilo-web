@@ -29,7 +29,10 @@
 
   var DIA = 86400000;
   function vacio(v) { return v === '' || v === null || v === undefined; }
-  function norm(s) { return String(s == null ? '' : s).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  /** T0736 · Sin tildes ni mayúsculas: la del núcleo (UN.plano; en Node, las pruebas, la de nucleo.js). */
+  var UNT = null;
+  function plano(s) { return (UNT || (UNT = typeof module !== 'undefined' && module.exports ? require('../nucleo.js') : window.UN)).plano(s); }
+  function norm(s) { return plano(s).trim(); }
   function lista(v) { return v === undefined || v === null ? [] : (Array.isArray(v) ? v : [v]); }
   function dos(n) { return (n < 10 ? '0' : '') + n; }
 
@@ -1739,6 +1742,70 @@
       return usado;
     } };
   }
+  /**
+   * T0736 (R99) · El guardado de una ficha que guarda sola (T0689), sin pantalla, para probarlo de verdad. Cada campo: lo que
+   * no vale se dice y no se guarda; el mismo valor, nada; un cambio, «Guardando…» y, al acabar, «Guardado» y el aviso con
+   * «Deshacer» (si falla, vuelve a como estaba y lo dice). Dos cambios del mismo campo, en orden: el segundo espera al
+   * primero (lo de antes se coge al cambiar, no al ejecutarse: si no, se esperaba a sí mismo). Un texto, tras «espera» ms sin
+   * escribir; al cerrar, lo que quede pendiente.
+   * o: { apartado, prohib (los de cambioCampo), actual (la fila como está; se cambia aquí),
+   *      escritor(c) → function (cambios) → promesa (el motor) o un texto si no se puede, reloj: { poner(fn, ms), quitar(t) },
+   *      espera (1500) y lo de la pantalla, con «que» (lo que dio quien llama: el campo): invalido(que, sí/no),
+   *      igual(que), empieza(que, c, cambios) → info, estado(que, texto, mal), hecho(que, info, deshacer),
+   *      volver(que, columna, valor), fallo(que, c, error) }.
+   * → { guardar(c, valor, que) → 'mal' | 'igual' | 'guarda', esperar(c, valorDe, que) (valorDe() → el valor, o undefined si el
+   *     campo ya no está), olvidar(c), cerrar(queDe, valorDe) (lo pendiente: queDe(c) → que, o null si ya no está;
+   *     valorDe(que) → su valor), pendientes() }.
+   */
+  function guardadoSolo(o) {
+    var esperas = {}, enCurso = {}, reloj = o.reloj, nada = function () {};
+    var avisa = function (n) { return o[n] || nada; };
+    function olvidar(c) { if (esperas[c]) { reloj.quitar(esperas[c].t); delete esperas[c]; } }
+    function guardar(c, valor, que) {
+      olvidar(c);
+      var actual = o.actual, r = cambioCampo(o.apartado, c, valor, actual, o.prohib);
+      if (r.error) { avisa('invalido')(que, true); avisa('estado')(que, r.error, true); return 'mal'; }
+      avisa('invalido')(que, false);
+      var ks = Object.keys(r.cambios);
+      if (!ks.length) { avisa('igual')(que); return 'igual'; }
+      var escribir = o.escritor(c);
+      if (typeof escribir !== 'function') { avisa('estado')(que, escribir, true); return 'mal'; }
+      var antes = {}; ks.forEach(function (k) { antes[k] = vacio(actual[k]) ? '' : actual[k]; actual[k] = r.cambios[k]; });
+      var info = avisa('empieza')(que, c, r.cambios);
+      avisa('estado')(que, 'Guardando…');
+      function aAntes() { ks.forEach(function (k) { actual[k] = antes[k]; avisa('volver')(que, k, antes[k]); }); }
+      var previo = (enCurso[c] || Promise.resolve()).then(null, nada);
+      var ch = deshacerEnOrden(function () { return previo.then(function () { return escribir(r.cambios); }); },
+        function () { return escribir(antes); });
+      enCurso[c] = ch.hecho;
+      ch.hecho.then(function () {
+        avisa('estado')(que, 'Guardado');
+        avisa('hecho')(que, info, function () {
+          return Promise.resolve(ch.deshacer()).then(function () { aAntes(); avisa('estado')(que, ''); });
+        });
+      }, function (e) {
+        aAntes();
+        avisa('estado')(que, 'No se ha guardado', true);
+        avisa('fallo')(que, c, e);
+      });
+      return 'guarda';
+    }
+    return {
+      guardar: guardar,
+      olvidar: olvidar,
+      esperar: function (c, valorDe, que) {
+        olvidar(c);
+        esperas[c] = { que: que, t: reloj.poner(function () {
+          delete esperas[c];
+          var v = valorDe(); if (v !== undefined) guardar(c, v, que);
+        }, o.espera || 1500) };
+      },
+      cerrar: function (queDe, valorDe) {
+        Object.keys(esperas).forEach(function (c) { var q = queDe(c); if (q) guardar(c, valorDe(q), q); else olvidar(c); });
+      },
+      pendientes: function () { return Object.keys(esperas); }
+    };
+  }
   /** T0677 · La lista de «con quién» al añadir (un campo con «primero»): un grupo por columna, con el título de «grupos»
    *  («Marcas», «Proveedores», «Otros») o el del campo, en orden alfabético y, con q, solo lo que lo lleva (sin tildes ni
    *  mayúsculas). ed: las columnas que se pueden poner. [{ col, titulo, opciones: [{ nombre, valor }] }], sin grupos vacíos. */
@@ -2152,7 +2219,7 @@
   function sufijoFijo(cp) { return cp.calculo ? 'calculado' : (cp.de && cp.ir && cp.ir.texto ? String(cp.ir.texto) : ''); }
 
   var CALC = { pctVer: pctVer, pctEscrito: pctEscrito, deEscrito: deEscrito, nuevoId: nuevoId, altaNuevoDe: altaNuevoDe, codigoAltaNuevo: codigoAltaNuevo, plantillaPrefijo: plantillaPrefijo, codigoNuevo: codigoNuevo, esRuta: esRuta, destinoDe: destinoDe, avisoRuta: avisoRuta, borrarDe: borrarDe, queBorra: queBorra, borrarCon: borrarCon, seccionDeFila: seccionDeFila, seccionesRel: seccionesRel, plantillaPara: plantillaPara, sinMarcas: sinMarcas, sinComunes: sinComunes, palabraTodos: palabraTodos, yaEsta: yaEsta, yaPuestos: yaPuestos, esSoporte: esSoporte, htmlErrores: htmlErrores, cuantas: cuantas, yJuntos: yJuntos, relEdicion: relEdicion, altaRelacionada: altaRelacionada, paraElegir: paraElegir, sufijoFijo: sufijoFijo,
-    fechaDia: fechaDia, webCorta: webCorta, webSitio: webSitio, textoCorto: textoCorto, gruposConQuien: gruposConQuien, nombreCorto: nombreCorto, deshacerEnOrden: deshacerEnOrden, loDiceUnAviso: loDiceUnAviso, contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, queHacerAtras: queHacerAtras, dirFicha: dirFicha, cambiosHecha: cambiosHecha, conHablado: conHablado, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
+    fechaDia: fechaDia, webCorta: webCorta, webSitio: webSitio, textoCorto: textoCorto, gruposConQuien: gruposConQuien, nombreCorto: nombreCorto, deshacerEnOrden: deshacerEnOrden, guardadoSolo: guardadoSolo, loDiceUnAviso: loDiceUnAviso, contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, queHacerAtras: queHacerAtras, dirFicha: dirFicha, cambiosHecha: cambiosHecha, conHablado: conHablado, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
     textoVuelta: textoVuelta, QUITAR_DE_VUELTA: QUITAR_DE_VUELTA, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, franja: franja, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, resumenCifras: resumenCifras, arribaDe: arribaDe, filasArriba: filasArriba, rangoFechas: rangoFechas, lineaArriba: lineaArriba, cifrasResumen: cifrasResumen, seguirCrudo: seguirCrudo, tablasDeRuta: tablasDeRuta, conCamposPropios: conCamposPropios, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, vistaDeFila: vistaDeFila, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, recomendacionDe: recomendacionDe, camposCond: camposCond, irA: irA, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir, valorCon: valorCon, columnasCon: columnasCon, cambioCampo: cambioCampo, textoCambio: textoCambio, miasDe: miasDe, equipoLimpio: equipoLimpio, hayMias: hayMias, esMia: esMia, nombrePara: nombrePara, conEquipo: conEquipo,
@@ -3214,7 +3281,7 @@
         /* T0689 · La ficha guarda sola: cada campo, al cambiarlo (un desplegable o una fecha, al momento; un texto, al salir de él
          * o tras 1,5 s sin escribir), con «Guardando…» y «Guardado» a su lado y el aviso con «Deshacer». Lo que no vale (algo
          * que aquí no se guarda, una obligatoria vacía) se dice al lado y no se guarda; si falla al guardar, vuelve a como estaba. */
-        var actual = solo ? mezclar(crudoEd, {}) : null, esperas = {}, enCurso = {};
+        var actual = solo ? mezclar(crudoEd, {}) : null;
         /** T0651 · El dato leído de c (si no está abierto) o el campo abierto. */
         function datoDe(c) { return [].filter.call(vent.querySelectorAll('[data-tocar]'), function (x) { return x.getAttribute('data-tocar') === c; })[0] || null; }
         function entradaDe(c) { return [].filter.call(vent.querySelectorAll('[data-c]'), function (x) { return x.getAttribute('data-c') === c; })[0] || null; }
@@ -3273,53 +3340,41 @@
         function cerrarDato(c, sin) {
           var i = entradaDe(c), u = i && i.closest('[data-abierto]'); if (!u) return;
           if (!sin) { var r = guardarCampo(i); if (r === 'mal') return; }
-          else { clearTimeout(esperas[c]); delete esperas[c]; }
+          else G.olvidar(c);
           var g = u.querySelector('.li-guardado'), t = document.createElement('div');
           t.innerHTML = datoTocar(a, c, filaAhora(c), cli);
           var n = t.firstChild;
           if (g && g.textContent && !sin) { var g2 = n.querySelector('.li-guardado'); g2.textContent = g.textContent; g2.className = g.className; }
           u.parentNode.replaceChild(n, u);
         }
-        function guardarCampo(i) {
-          var c = i.getAttribute('data-c'); clearTimeout(esperas[c]); delete esperas[c];
-          var r = cambioCampo(a, c, i.value, actual, PROHIB);
-          if (r.error) { i.setAttribute('aria-invalid', 'true'); marcaCampo(i, r.error, true); return 'mal'; }
-          i.removeAttribute('aria-invalid');
-          var ks = Object.keys(r.cambios);
-          if (!ks.length) { var sp = (i.closest('.u-campo') || i.parentNode).querySelector('.li-guardado'); if (sp && sp.classList.contains('li-guardado-mal')) sp.textContent = ''; return 'igual'; }
+        /* T0736 (R99): lo que decide (la cola por campo, la espera, los estados y el deshacer) es guardadoSolo, probado sin
+         * pantalla; aquí, solo cómo se ve. «que» es el campo (input, select o textarea). */
+        var G = guardadoSolo({
+          apartado: a, prohib: PROHIB, actual: actual, espera: 1500,
+          reloj: { poner: function (fn, ms) { return setTimeout(fn, ms); }, quitar: function (t) { clearTimeout(t); } },
           // T0651: una ruta («ID_DISENO.ANCHO») se guarda en la fila a la que llega (su diseño), con su columna.
-          var dest = esRuta(c) ? destinoDe(a, D, c, crudo) : null;
-          if (esRuta(c) && !dest) { marcaCampo(i, 'No se puede: le falta ' + campo(a, c.split('.')[0]).titulo.toLowerCase() + '.', true); return 'mal'; }
-          var escribir = function (cs) {
-            if (!dest) return T.actualizar(a.tabla, id, cs);
-            var o = {}; Object.keys(cs).forEach(function (k) { o[k === c ? dest.columna : k] = cs[k]; });
-            return T.actualizar(dest.tabla, dest.id, o);
-          };
-          var antes = {}; ks.forEach(function (k) { antes[k] = vacio(actual[k]) ? '' : actual[k]; actual[k] = r.cambios[k]; });
-          ponerInicial(i, i.value);
-          ks.forEach(function (k) { if (k !== c) ponerValor(k, r.cambios[k]); }); // lo que se pone solo (el área), también en pantalla
-          marcaCampo(i, 'Guardando…');
-          var txt = textoCambio(a, c, i.tagName === 'SELECT' && i.selectedIndex >= 0 ? i.options[i.selectedIndex].text : i.value, VAL, PROHIB);
-          // En orden: si el mismo campo aún se está guardando, después de él (lo de antes se coge ahora, no al ejecutarse).
-          var previo = (enCurso[c] || Promise.resolve()).then(null, function () {});
-          var ch = deshacerEnOrden(function () { return previo.then(function () { return escribir(r.cambios); }); },
-            function () { return escribir(antes); });
-          enCurso[c] = ch.hecho;
-          ch.hecho.then(function () {
-            marcaCampo(i, 'Guardado');
-            deshacible(txt, function () {
-              return Promise.resolve(ch.deshacer()).then(function () {
-                ks.forEach(function (k) { actual[k] = antes[k]; if (vent.contains(i) || datoDe(k)) ponerValor(k, antes[k]); });
-                marcaCampo(i, '');
-              });
-            });
-          }, function (e) {
-            ks.forEach(function (k) { actual[k] = antes[k]; if (vent.contains(i) || datoDe(k)) ponerValor(k, antes[k]); });
-            marcaCampo(i, 'No se ha guardado', true);
-            ctx.aviso('No se ha guardado ' + campo(a, c).titulo.toLowerCase() + ': ' + ((e && e.message) || e));
-          });
-          return 'guarda';
-        }
+          escritor: function (c) {
+            var dest = esRuta(c) ? destinoDe(a, D, c, crudo) : null;
+            if (esRuta(c) && !dest) return 'No se puede: le falta ' + campo(a, c.split('.')[0]).titulo.toLowerCase() + '.';
+            return function (cs) {
+              if (!dest) return T.actualizar(a.tabla, id, cs);
+              var o = {}; Object.keys(cs).forEach(function (k) { o[k === c ? dest.columna : k] = cs[k]; });
+              return T.actualizar(dest.tabla, dest.id, o);
+            };
+          },
+          invalido: function (i, si) { if (si) i.setAttribute('aria-invalid', 'true'); else i.removeAttribute('aria-invalid'); },
+          igual: function (i) { var sp = (i.closest('.u-campo') || i.parentNode).querySelector('.li-guardado'); if (sp && sp.classList.contains('li-guardado-mal')) sp.textContent = ''; },
+          empieza: function (i, c, cambios) {
+            ponerInicial(i, i.value);
+            Object.keys(cambios).forEach(function (k) { if (k !== c) ponerValor(k, cambios[k]); }); // lo que se pone solo (el área), también en pantalla
+            return textoCambio(a, c, i.tagName === 'SELECT' && i.selectedIndex >= 0 ? i.options[i.selectedIndex].text : i.value, VAL, PROHIB);
+          },
+          estado: function (i, txt, mal) { marcaCampo(i, txt, mal); },
+          hecho: function (i, txt, deshacer) { deshacible(txt, deshacer); },
+          volver: function (i, k, v) { if (vent.contains(i) || datoDe(k)) ponerValor(k, v); },
+          fallo: function (i, c, e) { ctx.aviso('No se ha guardado ' + campo(a, c).titulo.toLowerCase() + ': ' + ((e && e.message) || e)); }
+        });
+        function guardarCampo(i) { return G.guardar(i.getAttribute('data-c'), i.value, i); }
         if (solo) {
           en('change', function (ev) {
             var i = ev.target, c = i.getAttribute && i.getAttribute('data-c'); if (!c) return;
@@ -3330,10 +3385,10 @@
           en('input', function (ev) {
             var i = ev.target, c = i.getAttribute && i.getAttribute('data-c');
             if (!c || i.tagName === 'SELECT' || /^(date|checkbox|radio)$/.test(i.type)) return;
-            clearTimeout(esperas[c]); esperas[c] = setTimeout(function () { if (vent.contains(i)) guardarCampo(i); }, 1500);
+            G.esperar(c, function () { return vent.contains(i) ? i.value : undefined; }, i);
           });
           // Al cerrar la ficha con algo escrito y sin guardar aún, se guarda.
-          alCerrar = function () { Object.keys(esperas).forEach(function (c) { var i = entradaDe(c); if (i) guardarCampo(i); }); };
+          alCerrar = function () { G.cerrar(entradaDe, function (i) { return i.value; }); };
         }
         if (tocar) {
           // T0651: tocar un dato (no un enlace de dentro: la web, el correo) lo abre; Intro o espacio, también.

@@ -37,6 +37,15 @@
  */
 (function () {
   'use strict';
+  /** T0736 · Sin tildes ni mayúsculas, para buscar y comparar: «Ébano» → «ebano». La misma para todas las secciones (UN.plano),
+   *  buscar.js y elegir.js; catalogo.js, la página pública, lleva la suya. Mantiene la longitud (para resaltar lo que casa:
+   *  los saltos de línea y tabuladores, espacios) y no recorta: quien compara valores, con .trim(). null o undefined son '';
+   *  el 0, «0». En Node (las pruebas), solo esto y cumpleCifra. */
+  function plano(s) {
+    var t = s == null ? '' : String(s);
+    return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\S ]/g, ' ').slice(0, t.length);
+  }
+  if (typeof window === 'undefined') { if (typeof module !== 'undefined') module.exports = { plano: plano, cumpleCifra: cumpleCifra }; return; }
   var C = window.KANBAN || {};
   var CLAVE = 'nucleo_' + (C.clave || 'negocio');
   // Raíz de utilo-web (…/utilo-web/): de aquí cuelgan nucleo/, kanban4/, estilos/ y la carpeta de cada negocio.
@@ -357,6 +366,8 @@
   var T = null;             // tablas al momento (kanban4/tablas.js), una copia para todas las secciones
 
   window.UN = {
+    /** T0736 · Sin tildes ni mayúsculas, con la misma longitud (ver plano, arriba): la forma de buscar de todas las secciones. */
+    plano: plano,
     /** Cada sección se registra al cargar su JS: UN.registrar('EJEMPLO', { abrir: function (el, ctx) {}, cerrar: function () {} }). */
     registrar: function (id, def) { DEF[String(id).toUpperCase()] = def; },
     /**
@@ -519,7 +530,7 @@
   /** T0710 · Las condiciones de una cifra («si»), como las de Listado: es, no, vacio y, en una fecha, desde y hasta en días
    * desde hoy (incluidos; «dias» es el «dias» de la cifra). Sin condiciones, todas. */
   function cumpleCifra(f, si, dias) {
-    function norm(v) { return String(v == null ? '' : v).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+    function norm(v) { return plano(v).trim(); }
     function lista(x) { return Array.isArray(x) ? x : [x]; }
     function dia(v) {
       if (v instanceof Date) return isNaN(v) ? null : new Date(v.getFullYear(), v.getMonth(), v.getDate());

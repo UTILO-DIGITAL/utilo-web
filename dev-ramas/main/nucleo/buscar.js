@@ -20,8 +20,9 @@
   'use strict';
   var POR_GRUPO = 4, MAX_GRUPO = 50, ESPERA = 120; // T0722: ms tras la última tecla
 
-  /** Sin tildes ni mayúsculas, con la misma longitud (para resaltar donde toca): «Ébano» → «ebano». */
-  function plano(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^\S ]/g, ' ').slice(0, String(s == null ? '' : s).length); }
+  /** Sin tildes ni mayúsculas, con la misma longitud (para resaltar donde toca): «Ébano» → «ebano». La del núcleo (T0736: UN.plano). */
+  var UNT = null;
+  function plano(s) { return (UNT || (UNT = typeof module !== 'undefined' && module.exports ? require('./nucleo.js') : window.UN)).plano(s); }
   function palabras(q) { return plano(q).split(/\s+/).filter(Boolean); }
   function vacio(v) { return v === null || v === undefined || String(v).trim() === ''; }
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }

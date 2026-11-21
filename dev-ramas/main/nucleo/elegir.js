@@ -27,8 +27,10 @@
   var descIdx = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'selectedIndex');
 
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  /** Sin tildes ni mayúsculas, para comparar («Ébano» → «ebano»). Mantiene la longitud (para resaltar lo que casa). */
-  function plano(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+  /** Sin tildes ni mayúsculas, para comparar («Ébano» → «ebano»). Mantiene la longitud (para resaltar lo que casa). La del
+   *  núcleo (T0736: UN.plano). */
+  var UNT = null;
+  function plano(s) { return (UNT || (UNT = typeof module !== 'undefined' && module.exports ? require('./nucleo.js') : window.UN)).plano(s); }
   function clave(sel) { return 'u-elegir:' + (sel.getAttribute('data-elegir') || sel.id || 'x'); }
   function recientes(sel) { try { var r = JSON.parse(localStorage.getItem(clave(sel)) || '[]'); return Array.isArray(r) ? r.map(String) : []; } catch (e) { return []; } }
   function apuntar(sel, v) {

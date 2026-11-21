@@ -39,7 +39,10 @@
     if (v === '' || v == null || isNaN(Number(v))) return '';
     return campo === 'ENVIO_ARANCEL' ? Number(v).toFixed(2).replace('.', ',') : String(v).replace('.', ',');
   }
-  function norm(s) { return String(s == null ? '' : s).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  /** T0736 · Sin tildes ni mayúsculas: la del núcleo (UN.plano; en Node, las pruebas, la de nucleo.js). */
+  var UNT = null;
+  function plano(s) { return (UNT || (UNT = typeof module !== 'undefined' && module.exports ? require('../../nucleo/nucleo.js') : window.UN)).plano(s); }
+  function norm(s) { return plano(s).trim(); }
   /** Las opciones de una lista, en su orden (ORDEN; si no tiene, por nombre). */
   function ordenadas(fs) {
     return (fs || []).filter(function (f) { return f && String(f.NOMBRE == null ? '' : f.NOMBRE).trim(); }).slice().sort(function (a, b) {
