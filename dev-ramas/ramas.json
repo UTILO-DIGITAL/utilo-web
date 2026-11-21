@@ -1251,14 +1251,16 @@
   },
   "T0752-telas-antes-del-video": {
    "tarea": "T0752",
-   "titulo": "Merge pull request #434 from UTILO-DIGITAL/T0751-rematar-telas-publicada",
+   "titulo": "Telas sin nada raro antes del vídeo: la misma cabecera en cada lista y el número de Hoy que cuadra",
    "pr": null,
-   "commit": "bb722eb5",
-   "ultimo": "Merge pull request #434 from UTILO-DIGITAL/T0751-rematar-telas-publicada",
+   "commit": "8f4da837",
+   "ultimo": "T0752: Telas sin nada raro antes del vídeo: la misma cabecera en cada lista y el número de Hoy que cuadra",
    "quien": "Javi Canela",
-   "fecha": "2026-11-21T19:25:25.071Z",
-   "toca": [],
-   "comun": false,
+   "fecha": "2026-11-21T19:25:58.463Z",
+   "toca": [
+    "telas"
+   ],
+   "comun": true,
    "paginas": [
     {
      "ruta": "dev/konamigas/",
@@ -1293,7 +1295,7 @@
       "google",
       "codigo"
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/plataforma/",
@@ -1332,7 +1334,7 @@
      "entrar": [
       "google"
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/area/",
@@ -1367,7 +1369,7 @@
       "codigo",
       "google"
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/konamigas/competiciones/",
@@ -1424,7 +1426,7 @@
        "nombre": "Admin"
       }
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/",
@@ -1442,7 +1444,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/catalogo/",
@@ -1457,7 +1459,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     }
    ],
    "migraciones": {
