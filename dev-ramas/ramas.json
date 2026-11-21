@@ -1060,6 +1060,15 @@
    "quien": "Javi Canela",
    "rama": "T0733-economia-gestoria",
    "carpeta": "T0733-economia-gestoria"
+  },
+  "DEV-2": {
+   "cliente": "telas",
+   "modo": "ejemplo",
+   "commit": "402a0373+cambios",
+   "subido": "21/11/26, 9:26",
+   "quien": "Javi Canela",
+   "rama": "T0747-anticipos-rectificativas",
+   "carpeta": "T0747-anticipos-rectificativas"
   }
  }
 }
