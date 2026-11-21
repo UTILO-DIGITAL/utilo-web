@@ -1247,12 +1247,12 @@
   },
   "T0733-economia-gestoria": {
    "tarea": "T0733",
-   "titulo": "Para tu gestoría: IVA del trimestre de las facturas, descarga CSV, retención de IRPF e IVA de aduana",
-   "pr": null,
+   "titulo": "Para tu gestoría: el IVA de cada trimestre y sus facturas en CSV, con retención e IVA de aduana",
+   "pr": 418,
    "commit": "bf00abe3",
    "ultimo": "T0733: Para tu gestoría: IVA del trimestre de las facturas, descarga CSV, retención de IRPF e IVA de aduana",
    "quien": "Javi Canela",
-   "fecha": "2026-11-21T00:28:35.235Z",
+   "fecha": "2026-11-21T00:28:58.134Z",
    "toca": [
     "telas"
    ],
