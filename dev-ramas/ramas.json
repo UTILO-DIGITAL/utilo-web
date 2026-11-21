@@ -1346,6 +1346,15 @@
    "quien": "Javi Canela",
    "rama": "T0725-facturas-sin-fallos",
    "carpeta": "T0725-facturas-sin-fallos"
+  },
+  "DEV-2": {
+   "cliente": "telas",
+   "modo": "ejemplo",
+   "commit": "557f5305",
+   "subido": "21/11/26, 1:07",
+   "quien": "Javi Canela",
+   "rama": "T0727-limpiar-hoy",
+   "carpeta": "T0727-limpiar-hoy"
   }
  }
 }
