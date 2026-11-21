@@ -961,12 +961,12 @@
   },
   "T0732-listas-como-app": {
    "tarea": "T0732",
-   "titulo": "Atrás cierra la ficha, «Pasar», lo hablado al cerrar y la ficha de tú",
-   "pr": null,
+   "titulo": "Atrás cierra la ficha, el botón dice «Pasar» y al cerrar una tarea se apunta lo hablado",
+   "pr": 421,
    "commit": "76879ebf",
    "ultimo": "T0732: Atrás cierra la ficha, «Pasar», lo hablado al cerrar y la ficha de tú",
    "quien": "Javi Canela",
-   "fecha": "2026-11-21T00:55:42.323Z",
+   "fecha": "2026-11-21T00:56:52.520Z",
    "toca": [
     "telas"
    ],
