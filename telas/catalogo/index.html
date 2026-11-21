@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Marta Canela · Catálogo</title>
+<!-- T0686: el catálogo que Marta enseña a una marca, aparte de su app: sin menú y sin nada
+     confidencial (el motor, catalogoTelas de clientes/telas/modulos/catalogo, solo manda lo que puede ver una marca).
+     Entra con su Google como en la app (la misma sesión: misma clave «telas»). Maqueta con el visto bueno de Javi (T0686). -->
+<link rel="manifest" href="manifest.webmanifest?v=1">
+<link rel="apple-touch-icon" href="../icono-180.png?v=1">
+<link rel="icon" href="../icono-192.png?v=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Catálogo">
+<meta name="theme-color" content="#FAFAF7">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="../marca.css?v=887f38c9ea">
+<link rel="stylesheet" href="catalogo.css?v=f85b6403bc">
+<script>
+  window.KANBAN = {
+    clave: 'telas',
+    marca: 'telas',
+    nombreApp: 'Telas',
+    google: '405319382307-oido241fdeknsvv2mub9u9e6qh9tao6h.apps.googleusercontent.com',
+    proyecto: '405319382307',
+    clavePicker: 'AIzaSyAZXmBAdcHLu2mdYeljY_WMe5w6iVn6hLg',
+    api: 'https://script.google.com/macros/s/AKfycbyL6KgjQSOr91MCtefpzTCc8YZYKunYZPdxpFVvozDYAqiVrFATjaBJDm1cjIj3y-j0Kw/exec'
+  };
+</script>
+</head>
+<body class="ca">
+<div class="ca-env">
+  <header class="ca-cab"><h1 class="ca-marca">Marta Canela</h1></header>
+</div>
+<div class="ca-barra" id="ca-barra" hidden><div class="ca-env">
+  <div class="ca-filtros" id="ca-filtros" role="group" aria-label="Técnica"></div>
+  <input id="ca-buscar" type="search" placeholder="Buscar color, lino, ikat…" aria-label="Buscar en el catálogo" autocomplete="off">
+</div></div>
+<main class="ca-env ca-principal" id="ca-principal"><p class="ca-nota">Cargando el catálogo…</p></main>
+<div class="ca-velo" id="ca-velo" hidden></div>
+<aside class="ca-ficha" id="ca-ficha" hidden role="dialog" aria-modal="true" aria-labelledby="ca-ficha-titulo"></aside>
+<script src="../../kanban4/google.js?v=b58efb95a7"></script>
+<script src="catalogo.js?v=94e3ede666"></script>
+</body>
+</html>

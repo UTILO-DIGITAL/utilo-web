@@ -56,18 +56,53 @@
     var n = typeof v === 'number' ? v : Number(String(v == null ? '' : v).replace(/\s|€/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'));
     return isFinite(n) ? Math.round(n * 100) : 0;
   }
-  /** «21%» → 21. */
-  function pct(t) { var n = parseFloat(String(t == null ? '' : t).replace(',', '.')); return isFinite(n) ? n : 0; }
+  /** «21%» → 21. T0725 (R03): también el número que guarda el Excel (0,21 o 21) y «0». */
+  function pct(t) { var n = parseFloat(tipoIva(t)); return isFinite(n) ? n : 0; }
+  /**
+   * T0725 (R03) · El tipo de IVA como lo enseña la web («21%», «0%»), venga como venga del Excel: un número con formato de
+   * porcentaje (0,21 → «21%»; 0 → «0%»), un número suelto (21 → «21%») o un texto («21 %», «0»). Vacío, vacío. Sin esto,
+   * un 0 guardado como número no estaba en la lista y, al editar el gasto, se elegía el 21 %.
+   */
+  function tipoIva(t) {
+    if (t === '' || t == null) return '';
+    var s = String(t).trim(), conPct = /%$/.test(s), n = parseFloat(s.replace('%', '').replace(',', '.'));
+    if (!isFinite(n)) return s;
+    if (!conPct && n > 0 && n < 1) n = Math.round(n * 10000) / 100;
+    return String(n).replace('.', ',') + '%';
+  }
   /** Base, cuota de IVA y total de una fila (BASE, TIPO_IVA), en céntimos. La cuota se redondea al céntimo. */
-  function importe(f) { var b = cts(f.BASE), i = Math.round(b * pct(f.TIPO_IVA) / 100); return { base: b, iva: i, total: b + i }; }
+  /** T0689 · Un importe en céntimos sin redondear (82,6446 € → 8264,46): la base de un total con IVA que no sale justa. */
+  function ctsExactos(v) {
+    var n = typeof v === 'number' ? v : Number(String(v == null ? '' : v).replace(/\s|€/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'));
+    return isFinite(n) ? Math.round(n * 1000000) / 10000 : 0;
+  }
+  /** Base, cuota de IVA y total de una fila (BASE, TIPO_IVA), en céntimos. La cuota se redondea al céntimo; T0689: sobre la base
+   *  tal cual (con 4 decimales si los lleva), para que «100 € con IVA» dé 82,64 + 17,36 = 100,00. Con 2 decimales, como siempre. */
+  /*  T0733 (R101) · Con la retención de IRPF (RETENCION: «15%», en la factura de un profesional) y el IVA de importación del
+   *  DUA (IVA_IMPORTACION: un importe aparte de la base, que se recupera), si la fila los tiene: { base, cuota (la del
+   *  TIPO_IVA), dua, iva (cuota + dua: todo el IVA), ret, total (lo que se paga: base + iva − ret) }. Sin ellas, como siempre. */
+  function importe(f) {
+    var x = ctsExactos(f.BASE), b = Math.round(x), i = Math.round(x * pct(f.TIPO_IVA) / 100);
+    var dua = cts(f.IVA_IMPORTACION), r = Math.round(x * pct(f.RETENCION) / 100);
+    return { base: b, iva: i + dua, cuota: i, dua: dua, ret: r, total: b + i + dua - r };
+  }
   /**
    * T0272 · La base (céntimos) de un total con IVA: la que, con su cuota redondeada al céntimo, da justo ese total
-   * (si el redondeo no lo permite, la más cercana). Para apuntar un importe tal cual lo dicen, con el IVA incluido.
+   * (si el redondeo no lo permite, T0689: con dos decimales más). Para apuntar un importe tal cual lo dicen, con el IVA incluido.
+   * T0733: con una retención (ret, «15%»), el total es lo que se paga: base + IVA − retención.
    */
-  function baseDeTotal(total, tipo) {
-    var p = pct(tipo), b = Math.round(total * 100 / (100 + p)), c = [b, b - 1, b + 1];
-    for (var k = 0; k < c.length; k++) if (c[k] + Math.round(c[k] * p / 100) === total) return c[k];
-    return b;
+  function baseDeTotal(total, tipo, ret) {
+    var p = pct(tipo), q = pct(ret), div = 100 + p - q;
+    function da(x) { return Math.round(x) + Math.round(x * p / 100) - Math.round(x * q / 100); }
+    if (div <= 0) return 0;
+    var b = Math.round(total * 100 / div), c = [b, b - 1, b + 1];
+    for (var k = 0; k < c.length; k++) if (da(c[k]) === total) return c[k];
+    // T0689 · Si ninguna base en céntimos da justo ese total (100 € al 21 %), la base con dos decimales más de céntimo:
+    // importe() calcula la cuota sobre ella y el total sale el escrito.
+    // Si cae justo en medio céntimo (0,49 €: 40,50), la de al lado (40,49).
+    var r = Math.round(total * 100 / div * 100) / 100, d = [0, -0.01, 0.01, -0.02, 0.02];
+    for (var j = 0; j < d.length; j++) { var x = Math.round((r + d[j]) * 100) / 100; if (da(x) === total) return x; }
+    return r;
   }
   /** T0627 · Una cantidad escrita («12,5», «30», vacía = 1) → número. */
   function cantidad(v) {
@@ -248,11 +283,19 @@
    * Facturas Pendientes (de cualquier periodo), con lo que falta: [{ f, total, pagado, falta, cobrar }].
    * cobrar: es una emitida (falta cobrarla); si no, falta pagarla. La que tiene ESTADO vacío no cuenta.
    */
+  /* T0747 (R13) · Una emitida pendiente con rectificativas: lo que falta es su total más el de ellas (en negativo, lo que
+   * se descuenta), y ellas no salen aparte. Una rectificativa de una ya cobrada sí sale, si está Pendiente: lo que hay
+   * que devolver (en negativo). */
   function pendientes(d) {
-    var pg = pagadoPorFactura(d);
-    return d.fac.filter(function (f) { return f.ESTADO === 'Pendiente'; }).map(function (f) {
-      var t = importe(f).total, p = pg[f.ID] || 0;
-      return { f: f, total: t, pagado: p, falta: t - p, cobrar: f.TIPO === 'Emitida' };
+    var pg = pagadoPorFactura(d), ix = indice(d.fac), rect = {};
+    d.fac.forEach(function (r) { if (esRectificativa(r) && r.ESTADO !== 'Anulada' && r.RECTIFICA) rect[r.RECTIFICA] = (rect[r.RECTIFICA] || 0) + importe(r).total; });
+    return d.fac.filter(function (f) {
+      if (f.ESTADO !== 'Pendiente') return false;
+      var o = esRectificativa(f) ? ix[f.RECTIFICA] : null;
+      return !(o && o.ESTADO === 'Pendiente');
+    }).map(function (f) {
+      var t = importe(f).total + (rect[f.ID] || 0), p = pg[f.ID] || 0;
+      return { f: f, total: t, pagado: p, falta: t - p, cobrar: f.TIPO === 'Emitida', rectificado: rect[f.ID] || 0 };
     }).sort(function (a, b) { return String(a.f.FECHA) < String(b.f.FECHA) ? -1 : 1; });
   }
   /** Ingresos y gastos del periodo con una categoría del otro tipo (para corregirlos en el Excel). */
@@ -308,7 +351,8 @@
     var p = previsto || 0, r = real || 0;
     if (!p && !r) return { t: '', mal: false, bien: false };
     if (tipo === 'Gasto') {
-      if (!p) return { t: 'Sin presupuesto', mal: true, bien: false };
+      // T0726 (R56): sin previsto no es «mal» (ni barra en teja): falta ponerlo.
+      if (!p) return { t: 'Pon tu presupuesto', mal: false, bien: false, sinPrevisto: true };
       if (r > p + 50) return { t: 'Te has pasado ' + eur0(r - p), mal: true, bien: false };
       return { t: 'Quedan ' + eur0(p - r), mal: false, bien: true };
     }
@@ -393,7 +437,9 @@
     var mal = [];
     if (!v.FECHA) mal.push('Falta la fecha.');
     if (!String(v.CONCEPTO || '').trim()) mal.push('Falta el concepto.');
-    if (!(cts(v.BASE) > 0)) mal.push('El importe tiene que ser mayor que 0 (el signo lo da si entra o sale dinero).');
+    // T0726 (R61): un importe que no se entiende («4.000 rupias») se dice; nunca se guarda como 0.
+    if (typeof v.BASE !== 'number' && String(v.BASE == null ? '' : v.BASE).trim() && isNaN(numeroEscrito(v.BASE))) mal.push('No entiendo el importe «' + String(v.BASE).trim() + '»: escribe solo el número (por ejemplo, 36,36) y elige la moneda al lado.');
+    else if (!(cts(numeroEscrito(v.BASE) || 0) > 0)) mal.push('El importe tiene que ser mayor que 0 (el signo lo da si entra o sale dinero).');
     if (!v.ID_CUENTA) mal.push('Falta la cuenta.');
     if (v.TIPO === 'Interno') {
       if (!v.ID_CUENTA_DESTINO) mal.push('Falta a qué cuenta va el dinero.');
@@ -404,6 +450,135 @@
     }
     if (cfg.PERIODO && v[cfg.PERIODO] === '') mal.push('Falta ' + String(cfg.NOMBRE_PERIODO || 'el periodo').toLowerCase() + '.');
     return mal;
+  }
+
+  /* ---------- T0726 · cómo se dice: la palabra de la sección, las listas y el periodo ---------- */
+
+  /**
+   * T0726 (R26) · Cómo llama la sección a una venta: NOMBRE_VENTA («pedido» en Telas; vacío, «venta»), o { uno, varios,
+   * genero: 'f' | 'm' }. Sin género, femenina si acaba en «a». → { uno, varios, f }.
+   */
+  function palabraVenta(x) {
+    var o = x && typeof x === 'object' ? x : { uno: x };
+    var uno = String(o.uno || '').trim().toLowerCase() || 'venta';
+    var varios = String(o.varios || '').trim().toLowerCase() || (/[aeiouáéó]$/.test(uno) ? uno + 's' : uno + 'es');
+    return { uno: uno, varios: varios, f: o.genero ? /^f/i.test(String(o.genero)) : /a$/.test(uno) };
+  }
+  /**
+   * Un texto con la palabra de la sección: {venta}, {ventas}, {Venta}, {Ventas}; y lo que concuerda con ella: {la}, {los},
+   * {del}, {lo} (créa{lo}), {una}, {esta}, {esa}, {ninguna} (ninguna/ningún), {alguna} y {a} (la letra final: cobrad{a},
+   * Nuev{a}, Ningun{a}). Con mayúscula, la primera letra ({La}, {Los}).
+   */
+  function decir(p, s) {
+    var f = p.f, may = function (t) { return t.charAt(0).toUpperCase() + t.slice(1); };
+    var w = { venta: p.uno, ventas: p.varios, la: f ? 'la' : 'el', los: f ? 'las' : 'los', del: f ? 'de la' : 'del', lo: f ? 'la' : 'lo', una: f ? 'una' : 'un', esta: f ? 'esta' : 'este',
+      esa: f ? 'esa' : 'ese', ninguna: f ? 'ninguna' : 'ningún', alguna: f ? 'alguna' : 'algún', a: f ? 'a' : 'o' };
+    return String(s).replace(/\{(\w+)\}/g, function (m, k) {
+      var b = k.toLowerCase();
+      if (!(b in w)) return m;
+      return k === b ? w[b] : may(w[b]);
+    });
+  }
+  /** T0726 (R26) · El paso de una venta (Pedida, Cobrada…) concordando con la palabra: «Pedido», «Cobrado por adelantado». */
+  function pasoDicho(paso, p) {
+    return p && !p.f ? String(paso || '').replace(/^(Pedid|Cobrad|Entregad|Pagad|Facturad)a\b/, '$1o') : String(paso || '');
+  }
+  /** T0726 (R27) · ['a', 'b', 'c'] → «a, b y c». */
+  function listaY(xs) { xs = (xs || []).filter(Boolean); return xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' y ' + xs[xs.length - 1]; }
+  /**
+   * T0726 (R27) · «en 2026» con un año (o un periodo que empieza por número, 2025-26), nunca «en la 2026»; «en la Temporada
+   * …» si no; sin periodo, «en este periodo». pre: 'en' (de entrada), 'de' o 'para'.
+   */
+  function enPeriodo(nombre, pre) {
+    var n = String(nombre || '').trim(); pre = pre || 'en';
+    if (!n) return pre + ' este periodo';
+    return /^\d/.test(n) ? pre + ' ' + n : pre + ' la ' + n;
+  }
+
+  /* ---------- T0726 (R61) · los gastos en otra moneda ---------- */
+
+  /** Un importe escrito → número, o NaN si no se entiende: «4.000», «4.000 ₹», «1.234,56 €», «$12», «12 USD». Vacío, NaN. */
+  function numeroEscrito(v) {
+    if (typeof v === 'number') return isFinite(v) ? v : NaN;
+    var s = String(v == null ? '' : v).replace(/\s|€|₹|\$|\b(EUR|USD|INR|Rs)\b\.?/gi, '');
+    if (!s || !/^-?[\d.,]+$/.test(s)) return NaN;
+    var n = Number(s.replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.'));
+    return isFinite(n) ? n : NaN;
+  }
+  /** Un número como se escribe: 4000 → «4.000», 36.364 → «36,36», 110.5 → «110,5». */
+  function numTxt(n) {
+    var r = Math.round(Math.abs(n) * 100) / 100, p = String(r).split('.');
+    return (n < 0 ? '−' : '') + miles(p[0]) + (p[1] ? ',' + p[1] : '');
+  }
+  /**
+   * Las monedas en que se apunta un gasto: el euro y las de MONEDAS ({ "₹": { "nombre": "rupias", "tabla": "AJUSTES",
+   * "fila": "AJUSTES", "columna": "RUPIAS_POR_EURO" }, "$": { "nombre": "dólares" } }), cada una con su cambio (cuántas
+   * hay en un euro: de su fila de la tabla, o «cambio»: 110), o null si no se sabe (se pide al apuntar). filasDe(t): las
+   * filas de una tabla. → [{ sim, nombre, cambio }], el euro primero.
+   */
+  function monedas(cfgM, filasDe) {
+    var out = [{ sim: '€', nombre: 'euros', cambio: 1 }];
+    if (!cfgM || typeof cfgM !== 'object' || Array.isArray(cfgM)) return out;
+    Object.keys(cfgM).forEach(function (s) {
+      var m = cfgM[s], c = null;
+      if (s === '€' || !String(s).trim()) return;
+      if (typeof m === 'number' || typeof m === 'string') m = { cambio: m };
+      m = m || {};
+      if (m.tabla && m.columna) {
+        var fs = (filasDe && filasDe(m.tabla)) || [];
+        var f = fs.filter(function (x) { return String(x.ID) === String(m.fila); })[0] || (m.fila ? null : fs[0]);
+        c = f ? numeroEscrito(f[m.columna]) : NaN;
+      } else if (m.cambio !== undefined && m.cambio !== '') c = numeroEscrito(m.cambio);
+      out.push({ sim: String(s), nombre: String(m.nombre || s), cambio: c > 0 ? c : null });
+    });
+    return out;
+  }
+  /**
+   * Un importe (n, en la moneda m) → { cts: en euros, cuenta: «4.000 ₹ ÷ 110 = 36,36 €» } (en euros, sin cuenta), o null si
+   * no se entiende el importe o no se sabe el cambio.
+   */
+  function aEuros(n, m) {
+    if (typeof n !== 'number') n = numeroEscrito(n);
+    if (isNaN(n)) return null;
+    if (!m || m.sim === '€') return { cts: Math.round(n * 100), cuenta: '' };
+    if (!(m.cambio > 0)) return null;
+    var c = Math.round(n / m.cambio * 100);
+    return { cts: c, cuenta: numTxt(n) + ' ' + m.sim + ' ÷ ' + numTxt(m.cambio) + ' = ' + eur(c) };
+  }
+  /** Las notas de un gasto con la cuenta del cambio en una línea «Cambio: …»: la de antes (al editarlo) se cambia por la nueva. */
+  function notasConCambio(notas, cuenta) {
+    var s = String(notas || '').split('\n').filter(function (l) { return !/^Cambio: /.test(l.trim()); }).join('\n').trim();
+    return cuenta ? (s ? s + '\n' : '') + 'Cambio: ' + cuenta : s;
+  }
+
+  /**
+   * T0726 (R63) · Lo que le falta a una factura emitida antes de hacerla (como economiaFacturaFaltan_ del motor, sin el
+   * número, que lo pone el motor): la empresa, el cliente y lo que se vende. doc: { empresa, cliente, lineas, base, factura }.
+   * → { empresa: [lo que falta de la empresa], resto: [lo demás] }. Así se avisa sin ir al motor; el motor lo vuelve a mirar.
+   */
+  function faltanFactura(doc) {
+    var e = (doc && doc.empresa) || {}, c = (doc && doc.cliente) || {}, f = (doc && doc.factura) || {}, emp = [], resto = [];
+    var vacio = function (x) { return !String(x == null ? '' : x).trim(); };
+    if (vacio(e.NOMBRE)) emp.push('el nombre');
+    if (vacio(e.NIF)) emp.push('el CIF');
+    if (vacio(e.DIRECCION)) emp.push('la dirección');
+    if (vacio(c.NOMBRE)) resto.push('el nombre del cliente');
+    if (vacio(c.NIF)) resto.push('el CIF o NIF del cliente');
+    if (vacio(c.DIRECCION)) resto.push('la dirección del cliente');
+    if (!f.FECHA) resto.push('la fecha');
+    var hay = ((doc && doc.lineas) || []).some(function (l) { return l && (String(l.CONCEPTO || '').trim() || Number(l.PRECIO)); }) || Number(doc && doc.base) > 0;
+    if (!hay) resto.push('lo que se vende');
+    if (f.CLASE === 'Rectificativa') { // T0747 (R13): a cuál corrige y por qué
+      if (vacio(f.RECTIFICA_NUMERO)) resto.push('la factura que corrige');
+      if (vacio(f.CAUSA)) resto.push('por qué la corriges');
+    }
+    return { empresa: emp, resto: resto };
+  }
+  /** Lo que falta de una factura, dicho entero: «faltan el nombre y el CIF de tu empresa y el CIF o NIF del cliente» ('' si nada). */
+  function faltanTexto(x) {
+    var partes = (x.empresa.length ? [listaY(x.empresa) + ' de tu empresa'] : []).concat(x.resto);
+    if (!partes.length) return '';
+    return (x.empresa.length + x.resto.length > 1 ? 'faltan ' : 'falta ') + listaY(partes);
   }
 
   /* ---------- T0635 · lo que se vende (ARTICULOS, p. ej. Mis telas) ----------
@@ -479,7 +654,10 @@
       return true;
     });
   }
-  function normArt(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  /** T0736 · Sin tildes ni mayúsculas: la del núcleo (UN.plano; en Node, las pruebas, la de nucleo.js). */
+  var UNT = null;
+  function plano(s) { return (UNT || (UNT = typeof module !== 'undefined' && module.exports ? require('../nucleo.js') : window.UN)).plano(s); }
+  function normArt(s) { return plano(s); }
   /** Lo que se puede vender, por código: [{ codigo, nombre, detalle, unidad, precio (sin IVA; NaN si falta algo para calcularlo) }]. */
   function articulos(art, D) {
     if (!art || !art.tabla) return [];
@@ -504,7 +682,9 @@
       if (faltaEnvio) co = NaN;
       if (!isNaN(pr)) pr = Math.round(pr * 100) / 100;
       return { codigo: cod, nombre: nom, detalle: det, unidad: String(art.unidad || ''), precio: isNaN(pr) || pr < 0 ? NaN : pr,
-        coste: isNaN(co) || co < 0 ? NaN : co, faltaEnvio: !!faltaEnvio, _b: normArt(nom + ' ' + cod + ' ' + det) };
+        coste: isNaN(co) || co < 0 ? NaN : co, faltaEnvio: !!faltaEnvio, _b: normArt(nom + ' ' + cod + ' ' + det),
+        // T0739: quién lo hace (el ID de su taller), para proponerlo en una línea de venta.
+        taller: art.taller ? String(seguirRuta(art, D, art.tabla, f, art.taller, true) || '') : '' };
     }).filter(function (a) { return a.codigo; }).sort(function (a, b) { return a.codigo.localeCompare(b.codigo, 'es'); });
   }
   /** T0673 · Lo que dice cada tela al elegirla en una factura: el recomendado si lo hay; si no, lo que te cuesta; si no, nada (nunca «sin precio»). */
@@ -547,7 +727,7 @@
     if (!idCtr || !codigo) return null;
     var fs = {};
     (facturas || []).forEach(function (f) {
-      if (f.TIPO === 'Emitida' && f.ESTADO !== 'Anulada' && String(f.ID_CONTRAPARTE) === String(idCtr) && String(f.ID) !== String(sinFac == null ? '' : sinFac)) fs[f.ID] = f;
+      if (f.TIPO === 'Emitida' && f.ESTADO !== 'Anulada' && !f.CLASE && String(f.ID_CONTRAPARTE) === String(idCtr) && String(f.ID) !== String(sinFac == null ? '' : sinFac)) fs[f.ID] = f;
     });
     // La más reciente: por fecha y, el mismo día, por su número (FE.10 después de FE.9); dentro de una factura, la última línea.
     var orden = function (f, l) { var n = /(\d+)\s*$/.exec(String(f.NUMERO || '')); return String(f.FECHA || '') + '|' + ('0000000000' + (n ? n[1] : '')).slice(-10) + '|' + String(l.ID || ''); };
@@ -657,6 +837,33 @@
     var f = (filas || []).filter(function (x) { return String(x.ID) === String(cfgMin.fila); })[0] || (cfgMin.fila ? null : (filas || [])[0]);
     return f ? fraccion(f[cfgMin.columna]) : 0;
   }
+  /**
+   * T0692 · Las ventas de cada uno con quien se trata (las de una marca, para su ficha de Clientes): su contraparte lleva en
+   * «campo» la clave de su ficha (CONTRAPARTES.ID_MARCA). { clave: { ventas, ultima, anio, enAnio, debe, sinPrecio } }:
+   *   ventas     cada venta (la de venta()), de la más reciente a la más antigua por FECHA
+   *   ultima     la FECHA de la más reciente
+   *   anio       lo que suman las de este año (IMPORTE, sin IVA; las sin precio cerrado no suman) y enAnio, cuántas son
+   *   debe       lo que le falta por pagar de las que no ha pagado enteras; sinPrecio, cuántas de esas no tienen IMPORTE
+   * Una venta sin contraparte, o con una que no tiene «campo», no es de nadie. hoy: 'AAAA-MM-DD' (para el año).
+   */
+  function ventasPorQuien(d, filas, DS, minimo, ctr, campo, hoy) {
+    var de = {}, o = {}, anio = String(hoy || '').slice(0, 4);
+    (ctr || []).forEach(function (c) { var k = c[campo]; if (k !== '' && k != null) de[String(c.ID)] = String(k); });
+    (filas || []).forEach(function (v) {
+      var k = de[String(v.ID_CONTRAPARTE || '')];
+      if (!k) return;
+      var x = venta(d, v, DS, minimo), q = o[k] || (o[k] = { ventas: [], ultima: '', anio: 0, enAnio: 0, debe: 0, sinPrecio: 0 });
+      q.ventas.push(x);
+      var f = String(v.FECHA || '').slice(0, 10);
+      if (f > q.ultima) q.ultima = f;
+      if (anio && f.slice(0, 4) === anio) { q.enAnio++; if (x.importe !== null) q.anio += x.importe; }
+      if (!x.cobrada && !x.adelantado) { if (x.debe === null) q.sinPrecio++; else q.debe += x.debe; }
+    });
+    Object.keys(o).forEach(function (k) {
+      o[k].ventas.sort(function (a, b) { var x = String(a.v.FECHA || ''), y = String(b.v.FECHA || ''); return x < y ? 1 : x > y ? -1 : String(a.v.ID) < String(b.v.ID) ? 1 : -1; });
+    });
+    return o;
+  }
 
 
   /* ---------- T0646 · caja y clientes de una factura ---------- */
@@ -714,21 +921,327 @@
     return r;
   }
 
-  var CALC = { filtrosMovPuestos: filtrosMovPuestos, cajaPartes: cajaPartes, clientesFactura: clientesFactura, direccionCliente: direccionCliente, categoriaUnica: categoriaUnica, cts: cts, pct: pct, importe: importe, baseDeTotal: baseDeTotal, eur: eur, eur0: eur0, fecha: fecha, periodos: periodos, periodoActual: periodoActual,
+  /* ---------- T0689 · la factura de un pedido y el ticket de un gasto ---------- */
+
+  /** La factura emitida de una venta (FACTURAS con la columna del desglose, DS, en esa venta), sin las anuladas; la más reciente, o null.
+   *  T0747: la final (ni la del anticipo ni una rectificativa); con clase, la de esa clase (anticipoDeVenta). */
+  function facturaDeVenta(fac, DS, idVenta, clase) {
+    if (!DS || !idVenta) return null;
+    return (fac || []).filter(function (f) { return f.TIPO === 'Emitida' && f.ESTADO !== 'Anulada' && String(f.CLASE || '') === String(clase || '') && String(f[DS] || '') === String(idVenta); })
+      .sort(function (a, b) { return String(a.FECHA || '') < String(b.FECHA || '') ? 1 : String(a.FECHA || '') > String(b.FECHA || '') ? -1 : 0; })[0] || null;
+  }
+  /* ---------- T0747 · anticipos (R102) y rectificativas (R13) ---------- */
+
+  function esRectificativa(f) { return !!(f && f.TIPO === 'Emitida' && String(f.CLASE || '') === 'Rectificativa'); }
+  /** La factura del anticipo de una venta (CLASE = Anticipo), sin las anuladas, o null. */
+  function anticipoDeVenta(fac, DS, idVenta) { return facturaDeVenta(fac, DS, idVenta, 'Anticipo'); }
+  /** Lo que se factura de anticipo (céntimos): el IMPORTE por el ANTICIPO pactado; sin uno de los dos, 0. */
+  function importeAnticipo(v) {
+    var imp = v && v.IMPORTE !== '' && v.IMPORTE != null ? cts(v.IMPORTE) : 0, a = fraccion(v && v.ANTICIPO);
+    return imp > 0 && a > 0 ? Math.round(imp * Math.min(a, 1)) : 0;
+  }
+  /**
+   * La línea de la factura del anticipo: «Anticipo del 50 % · <lo que es la venta>» por lo que toca, con el porqué en el
+   * detalle («50 % de 3.300,00 € sin IVA»). → { concepto, detalle, cantidad, unidad, precio } (precio NaN: sin precio cerrado).
+   */
+  function lineaAnticipo(v) {
+    var a = fraccion(v && v.ANTICIPO), imp = v && v.IMPORTE !== '' && v.IMPORTE != null ? cts(v.IMPORTE) : 0, c = importeAnticipo(v);
+    var pc = String(Math.round(Math.min(a, 1) * 1000) / 10).replace('.', ',') + ' %';
+    return { concepto: 'Anticipo' + (a ? ' del ' + pc : '') + ' · ' + String((v && v.NOMBRE) || 'pedido'), detalle: imp > 0 && a ? pc + ' de ' + eur(imp) + ' sin IVA' : '',
+      cantidad: 1, unidad: '', precio: c ? c / 100 : NaN };
+  }
+  /** La línea con la que la factura final descuenta su anticipo: «Anticipo FE.9 · 12/11/2026», por su base en negativo. */
+  function lineaDescuentoAnticipo(fa) {
+    return { concepto: 'Anticipo ' + String(fa.NUMERO || '').trim() + ' · ' + fecha(String(fa.FECHA || '').slice(0, 10)), detalle: 'Ya facturado: se descuenta',
+      cantidad: 1, unidad: '', precio: -Math.round(ctsExactos(fa.BASE) * 100) / 10000 };
+  }
+  /** Las rectificativas de una emitida (sin las anuladas), por número. */
+  function rectificativasDe(fac, idFac) {
+    return (fac || []).filter(function (r) { return esRectificativa(r) && r.ESTADO !== 'Anulada' && String(r.RECTIFICA || '') === String(idFac); })
+      .sort(function (a, b) { return String(a.FECHA) < String(b.FECHA) ? -1 : String(a.FECHA) > String(b.FECHA) ? 1 : String(a.NUMERO) < String(b.NUMERO) ? -1 : 1; });
+  }
+  /**
+   * Las líneas con que empieza la rectificativa de una emitida: las suyas con la cantidad en negativo (−40 m × 27,50 €/m),
+   * que la anulan entera; se dejan solo las que cambian. Sin líneas, una con su base en negativo.
+   */
+  function lineasRectificar(f, lineas) {
+    var ls = lineasDe(lineas, f && f.ID);
+    if (!ls.length) return [{ concepto: 'Factura ' + String((f && f.NUMERO) || '').trim(), cantidad: -1, unidad: '', precio: Math.round(ctsExactos(f && f.BASE) * 100) / 10000 }];
+    return ls.map(function (l) { return { concepto: String(l.CONCEPTO || ''), detalle: String(l.DETALLE || ''), cantidad: -cantidad(l.CANTIDAD), unidad: String(l.UNIDAD || ''), precio: precio(l.PRECIO) }; });
+  }
+  /**
+   * Lo que falla en la base de una emitida: en negativo, solo en una rectificativa; a 0, solo si descuenta algo (la final de
+   * un pedido pagado entero por adelantado). rect: es rectificativa; ls: sus líneas. → texto o ''.
+   */
+  function baseEmitidaMal(base, rect, ls) {
+    if (rect) return base === 0 && !(ls || []).some(function (l) { return String(l.CONCEPTO || '').trim(); }) ? 'Pon lo que cambia, con su importe.' : '';
+    if (base < 0) return 'La base no puede ser negativa. Para devolver o descontar algo de una factura ya hecha, haz una rectificativa.';
+    if (base === 0 && !(ls || []).some(function (l) { return precio(l.PRECIO) < 0; })) return 'Añade lo que se vende, con su precio.';
+    return '';
+  }
+  /** Cómo se dice una emitida en una lista: «FR.1 · rectifica FE.6», «FE.9 · anticipo», o su número. */
+  function claseDicha(f, ix) {
+    if (esRectificativa(f)) { var o = ix && ix[f.RECTIFICA]; return 'Rectificativa' + (o ? ' de ' + String(o.NUMERO || '').trim() : ''); }
+    return f && f.TIPO === 'Emitida' && f.CLASE === 'Anticipo' ? 'Anticipo' : '';
+  }
+
+  /** Las ventas de una contraparte que aún no tienen factura, de la más reciente a la más antigua. */
+  function ventasSinFactura(vts, fac, DS, idCtr) {
+    if (!idCtr) return [];
+    return (vts || []).filter(function (v) { return String(v.ID_CONTRAPARTE || '') === String(idCtr) && !facturaDeVenta(fac, DS, v.ID); })
+      .sort(function (a, b) { return String(a.FECHA || '') < String(b.FECHA || '') ? 1 : String(a.FECHA || '') > String(b.FECHA || '') ? -1 : 0; });
+  }
+  /**
+   * La primera línea de la factura de una venta, sacada de lo que dice: el artículo cuyo código aparece en su nombre
+   * («Azul noche JAC-107 · 17 m»: el más largo, para no tomar BOR-004 por BOR-004-01), los metros («17 m») y el precio por
+   * metro (lo que paga, sin IVA, entre los metros; con 4 decimales, para que la línea dé justo lo que paga). Sin metros, una
+   * línea de 1 con todo el importe; sin importe, sin precio. → { articulo, concepto, cantidad, unidad, precio (NaN: sin) }
+   */
+  function lineaDeVenta(v, arts) {
+    var nom = String((v && v.NOMBRE) || ''), up = nom.toUpperCase(), art = null;
+    (arts || []).forEach(function (a) { var c = String(a.codigo || '').toUpperCase(); if (c && up.indexOf(c) >= 0 && (!art || c.length > String(art.codigo).length)) art = a; });
+    var mm = nom.match(/(\d+(?:[.,]\d+)?)\s*(m|metros)\b/i), metros = mm ? cantidad(mm[1]) : 0;
+    var imp = v && v.IMPORTE !== '' && v.IMPORTE != null ? cts(v.IMPORTE) : 0;
+    var r = { articulo: art ? art.codigo : '', concepto: art ? '' : nom, cantidad: metros > 0 ? metros : 1, unidad: metros > 0 ? 'm' : '', precio: NaN };
+    if (imp > 0) r.precio = Math.round(imp / r.cantidad * 100) / 10000;
+    return r;
+  }
+  /** T0739 · Las líneas de una venta (VENTA_LINEAS), en el orden en que se apuntaron. */
+  function lineasVenta(lineas, idVenta) {
+    return (lineas || []).filter(function (l) { return idVenta !== '' && idVenta != null && String(l.ID_VENTA) === String(idVenta); })
+      .sort(function (a, b) { return String(a.ID) < String(b.ID) ? -1 : String(a.ID) > String(b.ID) ? 1 : 0; });
+  }
+  /** T0739 · Cómo va el envío de una línea: «DHL · 1Z999AA1» o, sin transportista ni seguimiento, «Por salir». */
+  function envioLinea(l) {
+    var t = String((l && l.TRANSPORTISTA) || '').trim(), s = String((l && l.SEGUIMIENTO) || '').trim();
+    return t || s ? [t, s].filter(Boolean).join(' · ') : 'Por salir';
+  }
+  /**
+   * T0739 · Las líneas de la factura de una venta: con sus líneas (VENTA_LINEAS), una por tela con sus metros (el precio,
+   * el recomendado de cada tela; con una sola línea con metros y lo que paga la marca, lo que sale por metro, como
+   * lineaDeVenta). Sin líneas, la que sale de su nombre (lineaDeVenta). → [{ articulo, concepto, cantidad, unidad, precio }]
+   */
+  function lineasFacturaVenta(v, lineas, arts) {
+    var ls = lineasVenta(lineas, v && v.ID);
+    if (!ls.length) return [lineaDeVenta(v, arts)];
+    var imp = v && v.IMPORTE !== '' && v.IMPORTE != null ? cts(v.IMPORTE) : 0;
+    return ls.map(function (l) {
+      var cod = String(l.ARTICULO || '').trim(), a = (arts || []).filter(function (x) { return x.codigo === cod; })[0] || null;
+      var n = l.CANTIDAD === '' || l.CANTIDAD == null ? 0 : cantidad(l.CANTIDAD), r = { articulo: a ? cod : '', concepto: a ? '' : cod, cantidad: n > 0 ? n : '', unidad: a ? a.unidad : 'm', precio: NaN };
+      if (ls.length === 1 && imp > 0 && n > 0) r.precio = Math.round(imp / n * 100) / 10000;
+      return r;
+    });
+  }
+  /**
+   * T0739 · El anticipo que propone la ficha de una marca (ANTICIPO_MARCA), como fracción (0,5 = 50 %), o 0. fila: su fila
+   * de ant.tabla; nombreSi(tabla, id): el nombre de esa fila, cuando «si» apunta a otra tabla (SI_NO).
+   */
+  function anticipoMarca(ant, fila, nombreSi) {
+    if (!ant || !fila) return 0;
+    var v = fila[ant.columna], si = ant.si === undefined ? 'Sí' : ant.si;
+    if (v === '' || v == null) return 0;
+    var ok = si && typeof si === 'object' ? String(nombreSi(si.tabla, v) || '') === String(si.nombre) : String(v) === String(si);
+    var p = Number(ant.porcentaje);
+    return ok && p > 0 && p <= 100 ? p / 100 : 0;
+  }
+  /** La factura que lleva un cobro de una venta, si no lleva ninguna: la emitida de esa venta (o ''). */
+  function facturaDelCobro(m, fac, DS) {
+    if (!m || m.TIPO !== 'Ingreso' || m.ID_FACTURA || !DS || !m[DS]) return '';
+    var f = facturaDeVenta(fac, DS, m[DS]) || anticipoDeVenta(fac, DS, m[DS]); // T0747: antes de la final, la del anticipo
+    return f ? String(f.ID) : '';
+  }
+  /**
+   * T0725 (R12) · Una emitida que ya no se cambia: tiene su PDF (ya se ha podido mandar) o no está Pendiente (cobrada o
+   * anulada). Solo se cambian su estado y sus notas; corregirla es cosa de una rectificativa, no de reescribirla.
+   */
+  function facturaCerrada(f) {
+    return !!(f && f.TIPO === 'Emitida' && (String(f.ARCHIVO_URL || '').trim() || String(f.ESTADO || '') !== 'Pendiente'));
+  }
+  /** T0741 · ¿Puede sacar ya su PDF? Una emitida guardada sin PDF que no está anulada: también cobrada (sacarlo no la
+   * cambia, solo la guarda en Drive con lo que ya tiene). Con PDF, anulada, recibida o sin guardar, no. */
+  function puedeSacarPdf(f) {
+    return !!(f && f.TIPO === 'Emitida' && !String(f.ARCHIVO_URL || '').trim() && String(f.ESTADO || '') !== 'Anulada');
+  }
+  /** T0725 (R62) · Lo que le falta a una línea con unidad y sin cantidad («Faltan los metros.»), o ''. Sin unidad (el envío), nada. */
+  function faltaCantidad(l) {
+    if (!l || !String(l.CONCEPTO || '').trim() || !String(l.UNIDAD || '').trim()) return '';
+    if (String(l.CANTIDAD == null ? '' : l.CANTIDAD).trim() !== '') return '';
+    return /^m(etros?)?$/i.test(String(l.UNIDAD).trim()) ? 'Faltan los metros.' : 'Falta la cantidad.';
+  }
+  /** T0725 (R14) · La emitida de la serie con el número más alto (o null), como la mira el motor (economiaUltima_). */
+  function ultimaEmitida(fac, serie) {
+    var max = 0, n = String(serie || '').length, u = null;
+    (fac || []).forEach(function (f) {
+      if (!f || f.TIPO !== 'Emitida') return;
+      var s = String(f.NUMERO || '').trim();
+      if (s.slice(0, n) !== String(serie || '') || !/^\d+$/.test(s.slice(n))) return;
+      if (Number(s.slice(n)) > max) { max = Number(s.slice(n)); u = f; }
+    });
+    return u;
+  }
+  /** T0725 (R14) · Lo que falla en la fecha de una emitida nueva: no puede ser anterior a la de la última de su serie. */
+  function fechaEmitidaMal(fac, serie, fe) {
+    var u = ultimaEmitida(fac, serie);
+    if (!u || !fe || String(fe).slice(0, 10) >= String(u.FECHA || '').slice(0, 10)) return '';
+    return 'La fecha no puede ser anterior a la de la ' + String(u.NUMERO).trim() + ' (' + fecha(String(u.FECHA).slice(0, 10)) + '): las facturas van numeradas por orden de fecha.';
+  }
+  /** El número de un ticket que se apunta con su foto: «Ticket · el concepto» (o su fecha), corto. */
+  function numeroTicket(concepto, fechaIso) {
+    var c = String(concepto || '').replace(/\s+/g, ' ').trim();
+    return ('Ticket · ' + (c || fecha(fechaIso))).slice(0, 40).trim();
+  }
+
+  /* ----- T0733 · Para tu gestoría: el IVA y las facturas de cada trimestre (modelos 303 y 111) ----- */
+
+  /** El trimestre de una fecha: '2026-11-21' → { ano: '2026', t: 4 } (o null). */
+  function trimestreDe(iso) {
+    var m = /^(\d{4})-(\d{2})/.exec(String(iso || ''));
+    return m ? { ano: m[1], t: Math.ceil(Number(m[2]) / 3) } : null;
+  }
+  /** { ano, t } → '4T 2026'. */
+  function trimestreNombre(q) { return q ? q.t + 'T ' + q.ano : ''; }
+  /** Las fechas de un trimestre: { desde: '2026-10-01', hasta: '2026-12-31' }. */
+  function trimestreFechas(q) {
+    var m0 = (q.t - 1) * 3 + 1, m1 = m0 + 2, p = function (n) { return (n < 10 ? '0' : '') + n; };
+    var ult = new Date(Date.UTC(Number(q.ano), m1, 0)).getUTCDate();
+    return { desde: q.ano + '-' + p(m0) + '-01', hasta: q.ano + '-' + p(m1) + '-' + p(ult) };
+  }
+  /**
+   * El trimestre que se mira de entrada: el de hoy; en los primeros 20 días de un trimestre (30 en enero), el anterior, que
+   * es el que se presenta entonces (modelo 303: del 1 al 20 de abril, julio y octubre, y hasta el 30 de enero).
+   */
+  function trimestrePorDefecto(hoyIso) {
+    var q = trimestreDe(hoyIso); if (!q) return null;
+    var mes = Number(String(hoyIso).slice(5, 7)), dia = Number(String(hoyIso).slice(8, 10));
+    if ((mes - 1) % 3 === 0 && dia <= (mes === 1 ? 30 : 20)) return q.t === 1 ? { ano: String(Number(q.ano) - 1), t: 4 } : { ano: q.ano, t: q.t - 1 };
+    return q;
+  }
+  /** Los cuatro trimestres de un año, para elegir: [{ ano, t }]. */
+  function trimestresDe(ano) { return [1, 2, 3, 4].map(function (t) { return { ano: String(ano), t: t }; }); }
+  /**
+   * El libro de facturas de un trimestre, por la fecha de la factura: { q, desde, hasta, filas: [{ f, imp, nif, nombre, anulada }]
+   * (las emitidas primero, por número; después las recibidas y los tickets, por fecha), baseE, repercutido (IVA de las
+   * emitidas), baseR, soportado (el de las recibidas y los tickets), dua (el IVA de importación, que también se descuenta),
+   * ret (las retenciones de IRPF, que se pagan con el modelo 111), resultado (repercutido − soportado − dua: > 0, a pagar),
+   * sinNif (emitidas sin el NIF del cliente), sinFacGasto y sinFacCobro (movimientos del trimestre sin factura: su IVA no
+   * cuenta) }. Las anuladas salen en la lista (la serie no tiene huecos) pero no suman.
+   */
+  function libroTrimestre(d, q) {
+    var r = { q: q, filas: [], baseE: 0, repercutido: 0, baseR: 0, soportado: 0, dua: 0, ret: 0, resultado: 0, sinNif: [], sinFacGasto: [], sinFacCobro: [], rect: [], anticipos: [] };
+    if (!q) return r;
+    var fs = trimestreFechas(q), ctr = indice(d.ctr), cat = indice(d.cat), ixf = indice(d.fac);
+    r.desde = fs.desde; r.hasta = fs.hasta;
+    function dentro(x) { var s = String(x.FECHA || '').slice(0, 10); return s >= fs.desde && s <= fs.hasta; }
+    function numero(x) { var m = /(\d+)\s*$/.exec(String(x.NUMERO || '')); return m ? Number(m[1]) : 0; }
+    function serie(x) { return String(x.NUMERO || '').replace(/\d+\s*$/, ''); } // T0747: FE. y después FR., cada una por número
+    d.fac.filter(dentro).sort(function (a, b) {
+      var ea = a.TIPO === 'Emitida' ? 0 : 1, eb = b.TIPO === 'Emitida' ? 0 : 1;
+      if (ea !== eb) return ea - eb;
+      if (!ea) return (serie(a) < serie(b) ? -1 : serie(a) > serie(b) ? 1 : 0) || numero(a) - numero(b) || (String(a.NUMERO) < String(b.NUMERO) ? -1 : 1);
+      return String(a.FECHA) < String(b.FECHA) ? -1 : String(a.FECHA) > String(b.FECHA) ? 1 : 0;
+    }).forEach(function (x) {
+      var i = importe(x), c = ctr[x.ID_CONTRAPARTE] || {}, anul = x.ESTADO === 'Anulada';
+      var o = esRectificativa(x) ? ixf[x.RECTIFICA] : null;
+      r.filas.push({ f: x, imp: i, nif: String(c.NIF || '').trim(), nombre: String(c.NOMBRE || ''), anulada: anul, rectifica: o ? String(o.NUMERO || '').trim() : '' });
+      if (anul) return;
+      if (esRectificativa(x)) r.rect.push(x); else if (x.TIPO === 'Emitida' && x.CLASE === 'Anticipo') r.anticipos.push(x); // T0747
+      if (x.TIPO === 'Emitida') { r.baseE += i.base; r.repercutido += i.cuota; if (!String(c.NIF || '').trim()) r.sinNif.push(x); }
+      else { r.baseR += i.base; r.soportado += i.cuota; r.dua += i.dua; r.ret += i.ret; }
+    });
+    r.resultado = r.repercutido - r.soportado - r.dua;
+    d.mov.filter(dentro).forEach(function (m) {
+      if (m.ID_FACTURA || esReparto(d, cat[m.ID_CATEGORIA])) return;
+      if (m.TIPO === 'Gasto') r.sinFacGasto.push(m);
+      else if (m.TIPO === 'Ingreso' && importe(m).iva) r.sinFacCobro.push(m);
+    });
+    return r;
+  }
+  /**
+   * El libro de un trimestre como texto para la gestoría: CSV (sep «;», el que abre bien Excel en español) o, con sep «\t»,
+   * para pegar en una hoja. Una fila por factura (también las anuladas), con importes «1234,56» sin separador de miles.
+   * Un texto que empieza por = + - @ va con un apóstrofo delante: no es una fórmula al abrirlo.
+   */
+  function csvLibro(lib, sep) {
+    sep = sep || ';';
+    // T0747: al final, qué emitida es (Anticipo o Rectificativa), a cuál rectifica y por qué.
+    var cab = ['Tipo', 'Fecha', 'Número', 'NIF', 'Nombre', 'Base', '% IVA', 'Cuota IVA', 'IVA importación (DUA)', '% retención', 'Retención', 'Total', 'Estado', 'PDF', 'Clase', 'Rectifica a', 'Causa'];
+    function num(c) { return (c < 0 ? '-' : '') + (Math.abs(c) / 100).toFixed(2).replace('.', ','); }
+    function txt(v) {
+      v = String(v == null ? '' : v).replace(/\r?\n/g, ' ');
+      if (/^[=+\-@]/.test(v)) v = "'" + v;
+      return v.indexOf(sep) >= 0 || /["\t]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+    }
+    var filas = (lib.filas || []).map(function (x) {
+      var f = x.f, i = x.imp, ret = pct(f.RETENCION);
+      return [txt(f.TIPO), fecha(String(f.FECHA || '').slice(0, 10)), txt(f.NUMERO), txt(x.nif), txt(x.nombre), num(i.base), txt(tipoIva(f.TIPO_IVA) || '0%'), num(i.cuota),
+        i.dua ? num(i.dua) : '', ret ? txt(tipoIva(f.RETENCION)) : '', i.ret ? num(i.ret) : '', num(i.total), txt(f.ESTADO), txt(f.ARCHIVO_URL),
+        txt(f.TIPO === 'Emitida' ? f.CLASE : ''), txt(x.rectifica), txt(esRectificativa(f) ? f.CAUSA : '')].join(sep);
+    });
+    return [cab.join(sep)].concat(filas).join('\r\n') + '\r\n';
+  }
+  /**
+   * T0733 (R94) · Las fechas que la factura de un pedido lleva además de la suya (Reglamento de facturación, art. 6.1.f):
+   * FECHA_OPERACION, la de la entrega del pedido si es otra; VENCIMIENTO, si la forma de pago dice «a 30 días», la fecha
+   * de la factura más esos días. → { FECHA_OPERACION?, VENCIMIENTO? }
+   */
+  function fechasFactura(fechaFac, venta, formaPago) {
+    var o = {}, fe = String(fechaFac || '').slice(0, 10), en = String((venta && venta.FECHA_ENTREGA) || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(en) && en !== fe) o.FECHA_OPERACION = en;
+    var m = /(\d{1,3})\s*d[ií]as/i.exec(String(formaPago || ''));
+    if (m && Number(m[1]) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(fe)) {
+      var t = new Date(fe + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + Number(m[1]));
+      o.VENCIMIENTO = t.toISOString().slice(0, 10);
+    }
+    return o;
+  }
+
+  var CALC = { esRectificativa: esRectificativa, anticipoDeVenta: anticipoDeVenta, importeAnticipo: importeAnticipo, lineaAnticipo: lineaAnticipo, lineaDescuentoAnticipo: lineaDescuentoAnticipo,
+    rectificativasDe: rectificativasDe, lineasRectificar: lineasRectificar, baseEmitidaMal: baseEmitidaMal, claseDicha: claseDicha, facturaDeVenta: facturaDeVenta, ventasSinFactura: ventasSinFactura, lineaDeVenta: lineaDeVenta, lineasVenta: lineasVenta, envioLinea: envioLinea, lineasFacturaVenta: lineasFacturaVenta, anticipoMarca: anticipoMarca, facturaDelCobro: facturaDelCobro, numeroTicket: numeroTicket, facturaCerrada: facturaCerrada, puedeSacarPdf: puedeSacarPdf, faltaCantidad: faltaCantidad, ultimaEmitida: ultimaEmitida, fechaEmitidaMal: fechaEmitidaMal,
+    filtrosMovPuestos: filtrosMovPuestos, cajaPartes: cajaPartes, clientesFactura: clientesFactura, direccionCliente: direccionCliente, categoriaUnica: categoriaUnica, cts: cts, pct: pct, tipoIva: tipoIva, opciones: opciones, opcionesConValor: opcionesConValor, importe: importe, baseDeTotal: baseDeTotal, eur: eur, eur0: eur0, fecha: fecha, periodos: periodos, periodoActual: periodoActual,
     anteriores: anteriores, movDe: movDe, facDe: facDe, preDe: preDe, resumen: resumen, saldos: saldos, cuenta: cuenta, pendientes: pendientes,
     sinFactura: sinFactura, presupuesto: presupuesto, grupos: grupos, estadoLinea: estadoLinea, avisos: avisos, cruzados: cruzados,
     desglose: desglose, recomendar: recomendar, esReparto: esReparto, problemasMov: problemasMov,
     cantidad: cantidad, precio: precio, iban: iban, sinIva: sinIva, conIvaPrecio: conIvaPrecio, importeLinea: importeLinea, baseLineas: baseLineas, lineasDe: lineasDe,
     articulos: articulos, buscarArt: buscarArt, artDe: artDe, ultimoPrecio: ultimoPrecio, precioOpcion: precioOpcion, conQuien: conQuien,
-    fraccion: fraccion, diasEntre: diasEntre, venta: venta, ventas: ventas, minimoDe: minimoDe };
+    fraccion: fraccion, diasEntre: diasEntre, venta: venta, ventas: ventas, minimoDe: minimoDe, ventasPorQuien: ventasPorQuien,
+    palabraVenta: palabraVenta, decir: decir, pasoDicho: pasoDicho, listaY: listaY, enPeriodo: enPeriodo, numeroEscrito: numeroEscrito, numTxt: numTxt, monedas: monedas,
+    aEuros: aEuros, notasConCambio: notasConCambio, faltanFactura: faltanFactura, faltanTexto: faltanTexto,
+    trimestreDe: trimestreDe, trimestreNombre: trimestreNombre, trimestreFechas: trimestreFechas, trimestrePorDefecto: trimestrePorDefecto, trimestresDe: trimestresDe,
+    libroTrimestre: libroTrimestre, csvLibro: csvLibro, fechasFactura: fechasFactura };
   if (typeof window === 'undefined' || !window.UN) { if (typeof module !== 'undefined') module.exports = CALC; return; }
 
   /* ======================= pantalla ======================= */
 
   var TABLAS = ['MOVIMIENTOS', 'CATEGORIAS', 'CUENTAS', 'CONTRAPARTES', 'FACTURAS', 'PRESUPUESTOS'];
+  // T0726 (R56): el del PDF de una factura (una hoja con la esquina doblada), como los enlaces del Listado.
+  var ICONO_PDF = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 15.5h5"/></svg>';
   var ICONO_FILTRO = '<svg class="u-icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8L4 5z"/></svg>';
-  var PESTANAS = { RESUMEN: 'Resumen', VENTAS: 'Ventas', MOVIMIENTOS: 'Movimientos', CAJA: 'Caja', PENDIENTE: 'Pendiente', FACTURAS: 'Facturas', PRESUPUESTO: 'Presupuesto' };
+  var PESTANAS = { RESUMEN: 'Resumen', VENTAS: 'Ventas', MOVIMIENTOS: 'Movimientos', CAJA: 'Caja', PENDIENTE: 'Pendiente', FACTURAS: 'Facturas', PRESUPUESTO: 'Presupuesto', GESTORIA: 'Para tu gestoría' }; // T0733: GESTORIA
   var VER = 150; // filas de una lista larga antes de «Ver más»
+  // T0689 · La foto de un ticket: como mucho 20 MB al elegirla; se manda reducida (1.600 px, JPEG), que basta para leerla.
+  var MAX_FOTO = 20 * 1024 * 1024, LADO_FOTO = 1600;
+  var ICONO_FOTO = '<svg class="eco-foto-ic" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+  /** T0689 · Un archivo elegido → promesa con { tipo, datos (base64) }: una foto, reducida a LADO_FOTO en JPEG (si el navegador
+   *  no puede abrirla, como HEIC en Chrome, tal cual); un PDF, tal cual. */
+  function prepararArchivo(fl) {
+    return new Promise(function (ok, mal) {
+      var r = new FileReader();
+      r.onerror = function () { mal(new Error('No se ha podido leer el archivo.')); };
+      r.onload = function () {
+        var url = String(r.result), tipo = fl.type || 'application/octet-stream', tal = { tipo: tipo, datos: url.split(',')[1] || '' };
+        if (!/^image\/(jpeg|png|webp)$/.test(tipo)) { ok(tal); return; }
+        var img = new Image();
+        img.onerror = function () { ok(tal); };
+        img.onload = function () {
+          var k = Math.min(1, LADO_FOTO / Math.max(img.width || 1, img.height || 1)), c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+          try { c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); ok({ tipo: 'image/jpeg', datos: c.toDataURL('image/jpeg', 0.82).split(',')[1] }); } catch (e) { ok(tal); }
+        };
+        img.src = url;
+      };
+      r.readAsDataURL(fl);
+    });
+  }
 
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function opciones(lista, sel, vacio) {
@@ -736,10 +1249,17 @@
       return '<option value="' + texto(o[0]) + '"' + (String(o[0]) === String(sel == null ? '' : sel) ? ' selected' : '') + '>' + texto(o[1]) + '</option>';
     }).join('');
   }
+  /** T0725 (R03) · Las <option> de un desplegable entero (el IVA): un valor guardado que no está en la lista sale también,
+   *  elegido (al guardar sin tocarlo, se queda como estaba en vez de cambiar a la primera opción). */
+  function opcionesConValor(lista, sel) {
+    var s = String(sel == null ? '' : sel), esta = !s || lista.some(function (o) { return String(o[0]) === s; });
+    return opciones(lista, s) + (esta ? '' : '<option value="' + texto(s) + '" selected>' + texto(s) + '</option>');
+  }
   function guardado(k, v) { try { if (v === undefined) return localStorage.getItem(k) || ''; localStorage.setItem(k, v); } catch (e) {} return ''; }
-  function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  function norm(s) { return plano(s); }
   function cifra(c, bien) { return '<span class="u-cifra' + (c < 0 && bien ? ' u-mal' : '') + '">' + eur(c) + '</span>'; }
-  function barra(p, mal) { p = Math.max(0, Math.min(1, p || 0)) * 100; return '<div class="eco-barra-p"><i' + (mal ? ' class="eco-pasado"' : '') + ' style="width:' + p.toFixed(1) + '%"></i></div>'; }
+  /** La barra de lo gastado o cobrado: en teja si se ha pasado; T0726 (R56): en gris si no tiene previsto (no hay con qué compararla). */
+  function barra(p, mal, gris) { p = Math.max(0, Math.min(1, p || 0)) * 100; return '<div class="eco-barra-p"><i' + (mal ? ' class="eco-pasado"' : gris ? ' class="eco-sinprev"' : '') + ' style="width:' + p.toFixed(1) + '%"></i></div>'; }
   function clase(e) { return e.mal ? 'u-mal' : e.bien ? 'eco-bien' : ''; }
 
   window.UN.registrar('ECONOMIA', {
@@ -747,6 +1267,10 @@
       var T = ctx.tablas, cfg = ctx.config || {}, R = cfg._refs || {};
       var P = String(cfg.PERIODO || ''), DS = String(cfg.DESGLOSE || '');
       var nomPer = String(cfg.NOMBRE_PERIODO || 'Año'), nomDes = String(cfg.NOMBRE_DESGLOSE || DS);
+      // T0726 (R26): cómo se llama aquí una venta (NOMBRE_VENTA: «pedido» en Telas), siempre la misma palabra.
+      var PV = palabraVenta(cfg.NOMBRE_VENTA);
+      function V(t) { return decir(PV, t); }
+      function paso(t) { return pasoDicho(t, PV); }
       // T0627: con FACTURA_LINEAS, una factura emitida se hace por líneas (tabla FACTURA_LINEAS) y se ve como documento.
       var LINEAS = cfg.FACTURA_LINEAS === 'Sí';
       // y los datos de la empresa para el documento salen de la tabla EMPRESA, que se cambia desde aquí (Datos de tu empresa).
@@ -758,32 +1282,72 @@
       // T0646 · Con CLIENTES (p. ej. las MARCAS de GESTION), la factura emitida solo ofrece clientes: las contrapartes de tipo
       // Cliente y las marcas que aún no lo son (se dan de alta al guardar), con la dirección de su ficha.
       var CLI = LINEAS && cfg.CLIENTES && cfg.CLIENTES.tabla ? cfg.CLIENTES : null;
+      // T0725 (R04): las ventas (Pedidos) eligen la marca igual que una factura emitida, también sin FACTURA_LINEAS.
+      var CLIV = cfg.CLIENTES && cfg.CLIENTES.tabla ? cfg.CLIENTES : null;
       if (CLI && tablas.indexOf(CLI.tabla) < 0) tablas.push(CLI.tabla);
       // T0628: la pestaña Ventas, con la tabla VENTAS, que es la del desglose (sus movimientos la eligen); el mínimo, de
       // MARGEN_MINIMO (un número o una fila de otra tabla, como AJUSTES).
       var VEN = cfg.VENTAS && DS && R.DESGLOSE === cfg.VENTAS ? String(cfg.VENTAS) : '';
       var MIN = cfg.MARGEN_MINIMO && typeof cfg.MARGEN_MINIMO === 'object' && cfg.MARGEN_MINIMO.tabla ? cfg.MARGEN_MINIMO : null;
       if (VEN && MIN && tablas.indexOf(MIN.tabla) < 0) tablas.push(MIN.tabla);
+      // T0739 · Con LINEAS_VENTA, cada venta lleva sus líneas (VENTA_LINEAS): qué se vende (de ARTICULOS), cuánto, quién lo
+      // hace (el «taller» del artículo) y cómo va su envío. Con ANTICIPO_MARCA, el anticipo de una venta nueva sale de la ficha.
+      var LV = !!VEN && cfg.LINEAS_VENTA === 'Sí';
+      var ARTV = LV && cfg.ARTICULOS && cfg.ARTICULOS.tabla ? cfg.ARTICULOS : null;
+      var ANT = VEN && CLIV && cfg.ANTICIPO_MARCA && cfg.ANTICIPO_MARCA.tabla ? cfg.ANTICIPO_MARCA : null;
+      [LV ? 'VENTA_LINEAS' : '', VEN && CLIV ? CLIV.tabla : '', ANT ? ANT.tabla : '', ANT && ANT.si && ANT.si.tabla ? ANT.si.tabla : '']
+        .concat(ARTV ? [ARTV.tabla].concat(Object.keys(ARTV._refs || {})) : [])
+        .forEach(function (t) { if (t && tablas.indexOf(t) < 0) tablas.push(t); });
       function hayPest(s) { return PESTANAS[s] && (s !== 'VENTAS' || VEN); }
       var pest = String(cfg.PESTANAS || 'RESUMEN, MOVIMIENTOS, CAJA, PENDIENTE, FACTURAS, PRESUPUESTO').split(',').map(function (s) { return s.trim().toUpperCase(); })
         .filter(hayPest);
       if (!pest.length) pest = Object.keys(PESTANAS).filter(hayPest);
       var prepara = ctx.admin || String(cfg.PREPARA_PRESUPUESTO || '').split(',').map(function (s) { return s.trim(); }).indexOf(ctx.perfil) >= 0;
       var CLAVE = 'eco_' + ctx.id + '_';
+      // T0689 · Una venta lleva su factura si FACTURAS tiene la columna del desglose (ID_VENTA). Se hace aquí si esta sección
+      // hace facturas por líneas; si no (Pedidos), en la sección FACTURAR (Economía), con ?factura=nueva&pedido=<venta>.
+      var FACTURAR = String(cfg.FACTURAR || '').trim().toLowerCase();
+      function facPorVenta() { return !!(VEN && DS && d && d.colsFac.indexOf(DS) >= 0); }
+      function hrefFacturaVenta(v, anticipo) { return '?s=' + encodeURIComponent(FACTURAR) + '&factura=nueva&pedido=' + encodeURIComponent(v.ID) + (anticipo ? '&anticipo=1' : ''); }
+      // T0689 · Los tickets (la foto de un gasto) van a Drive si el negocio tiene dónde: TICKETS_CARPETA o, si no, una carpeta
+      // «Tickets» junto a la de las facturas (FACTURA_CARPETA), que el motor crea la primera vez.
+      var TICKETS = !!String(cfg.TICKETS_CARPETA || cfg.FACTURA_CARPETA || '').trim();
+      var volverTras = null; // T0689 · la sección de la que se viene con un enlace para hacer una factura ({ id, titulo })
       function movVacio() { return { tipo: '', cat: '', cue: '', q: '', sinFac: false, cruz: false, ver: VER, desde: '' }; }
       var S = { tab: pest.indexOf(guardado(CLAVE + 'tab')) >= 0 ? guardado(CLAVE + 'tab') : pest[0], per: guardado(CLAVE + 'per'), des: '',
-        mov: movVacio(), fac: { tipo: '', estado: '' }, caja: { cue: '', ceros: false }, ven: { id: '', des: '' }, ab: {}, ceros: false, medidas: null, leido: false };
+        mov: movVacio(), fac: { tipo: '', estado: '' }, gest: { q: null }, caja: { cue: '', ceros: false }, ven: { id: '', des: '', volver: null }, ab: {}, ceros: false, medidas: null, leido: false };
+      // T0692 · ?venta=VEN0001 (desde la ficha de una marca en Clientes): abre esa venta, con «‹ Volver a …» a la ficha de la que
+      // se viene. Se quita de la dirección: el atrás del navegador ya vuelve a la ficha.
+      (function () {
+        var u; try { u = new URL(location.href); } catch (e) { return; }
+        var id = u.searchParams.get('venta');
+        if (id === null) return;
+        u.searchParams.delete('venta');
+        try { history.replaceState(history.state, '', u.pathname + u.search + u.hash); } catch (e) {}
+        if (!id || pest.indexOf('VENTAS') < 0) return;
+        S.tab = 'VENTAS'; S.ven.id = String(id); S.ven.volver = ctx.desde || null;
+      })();
 
       el.innerHTML = (cfg.AYUDA ? '<p class="u-nota n-ayuda">' + texto(cfg.AYUDA) + '</p>' : '') +
         '<div class="eco-barra"><label class="u-campo eco-per"><span class="u-etiqueta">' + texto(nomPer) + '</span><select id="eco-per"></select></label>' +
-        '<div class="u-pestanas" role="tablist">' + pest.map(function (p) {
-          return '<button type="button" role="tab" data-tab="' + p + '">' + PESTANAS[p] + (p === 'PENDIENTE' ? ' <span class="u-chip" id="eco-npend" hidden></span>' : '') + '</button>';
+        '<div class="u-pestanas" role="tablist"' + (pest.length < 2 ? ' hidden' : '') + '>' + pest.map(function (p) {
+          return '<button type="button" role="tab" data-tab="' + p + '">' + (p === 'VENTAS' ? V('{Ventas}') : PESTANAS[p]) + (p === 'PENDIENTE' ? ' <span class="u-chip" id="eco-npend" hidden></span>' : '') + '</button>';
         }).join('') + '</div></div>' +
         '<div id="eco-cont" class="eco-cont"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div>' +
-        '<button type="button" class="eco-fab" data-accion="apuntar">Añadir movimiento</button>' +
+        '<button type="button" class="eco-fab" data-accion="apuntar" hidden>Añadir movimiento</button>' + // T0726 (R28): hasta que carga, no
         '<div class="u-velo" id="eco-velo"><div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="eco-vt"><div class="n-ventana" id="eco-vent"></div></div></div>';
       var cont = el.querySelector('#eco-cont'), velo = el.querySelector('#eco-velo'), vent = el.querySelector('#eco-vent'), selPer = el.querySelector('#eco-per');
 
+      /**
+       * T0726 (R63) · Lo que devuelve una función de la sección con las filas que ha escrito ({ otras: { TABLA: [filas] } }) → a
+       * la copia, sin volver a leer el Excel. Si la capa de tablas no sabe (Supabase), se vuelven a leer esas tablas.
+       */
+      function anotar(ts) {
+        return function (r) {
+          if (r && r.otras && typeof T.anotar === 'function') { T.anotar(r); return r; }
+          return Promise.resolve(T.refrescar ? T.refrescar(ts, true) : null).then(function () { return r; });
+        };
+      }
       function filaDe(t, id) {
         if (id === '' || id == null) return null;
         if (T.fila) return T.fila(t, id);
@@ -792,12 +1356,22 @@
 
       /* ---------- datos ---------- */
 
+      /** T0725 (R03): TIPO_IVA, como lo enseña la web («0%»), aunque el Excel lo guarde como número. */
+      function ivaLeido(xs) {
+        (xs || []).forEach(function (x) {
+          if (x && 'TIPO_IVA' in x) { var t = tipoIva(x.TIPO_IVA); if (t !== x.TIPO_IVA) x.TIPO_IVA = t; }
+          if (x && x.RETENCION !== '' && x.RETENCION != null) { var r = tipoIva(x.RETENCION); if (r !== x.RETENCION) x.RETENCION = r; } // T0733: 0,15 → «15%»
+        });
+        return xs;
+      }
       function datos() {
         return {
-          cfg: cfg, mov: T.filas('MOVIMIENTOS'), cat: T.filas('CATEGORIAS'), cue: T.filas('CUENTAS'), ctr: T.filas('CONTRAPARTES'),
-          fac: T.filas('FACTURAS'), pre: T.filas('PRESUPUESTOS'), per: R.PERIODO ? T.filas(R.PERIODO) : [], des: R.DESGLOSE ? T.filas(R.DESGLOSE) : [],
+          cfg: cfg, mov: ivaLeido(T.filas('MOVIMIENTOS')), cat: T.filas('CATEGORIAS'), cue: T.filas('CUENTAS'), ctr: T.filas('CONTRAPARTES'),
+          fac: ivaLeido(T.filas('FACTURAS')), pre: T.filas('PRESUPUESTOS'), per: R.PERIODO ? T.filas(R.PERIODO) : [], des: R.DESGLOSE ? T.filas(R.DESGLOSE) : [],
           colsPre: T.columnas ? T.columnas('PRESUPUESTOS') : [], colsMov: T.columnas ? T.columnas('MOVIMIENTOS') : [],
-          lin: LINEAS ? T.filas('FACTURA_LINEAS') : [], emp: LINEAS ? T.filas('EMPRESA')[0] || null : null, colsEmp: LINEAS && T.columnas ? T.columnas('EMPRESA') || [] : [], colsCtr: T.columnas ? T.columnas('CONTRAPARTES') : []
+          lin: LINEAS ? T.filas('FACTURA_LINEAS') : [], emp: LINEAS ? T.filas('EMPRESA')[0] || null : null, colsEmp: LINEAS && T.columnas ? T.columnas('EMPRESA') || [] : [], colsCtr: T.columnas ? T.columnas('CONTRAPARTES') : [],
+          colsFac: T.columnas ? T.columnas('FACTURAS') || [] : [],
+          lv: LV ? T.filas('VENTA_LINEAS') || [] : [] // T0739
         };
       }
       var d, lista, per, ix;
@@ -838,7 +1412,7 @@
           if (si && b.parentNode.scrollWidth > b.parentNode.clientWidth) b.parentNode.scrollLeft = Math.max(0, b.offsetLeft - b.parentNode.offsetLeft - 16); // en el móvil, que se vea
         });
         el.querySelector('.eco-fab').hidden = S.tab !== 'MOVIMIENTOS'; // T0272: añadir un movimiento, solo desde Movimientos
-        el.querySelector('.eco-per').style.display = S.tab === 'VENTAS' || S.tab === 'CAJA' ? 'none' : ''; // T0628: las ventas, desde el principio (no por periodo). T0679: Caja tampoco (sus saldos son de siempre): el año sale solo donde cuenta
+        el.querySelector('.eco-per').style.display = S.tab === 'VENTAS' || S.tab === 'CAJA' || S.tab === 'GESTORIA' ? 'none' : ''; // T0733: la gestoría elige su trimestre; // T0628: las ventas, desde el principio (no por periodo). T0679: Caja tampoco (sus saldos son de siempre): el año sale solo donde cuenta
         cont.classList.toggle('eco-con-fab', S.tab === 'MOVIMIENTOS'); // T0644: con sitio abajo para el botón
         var np = pendientes(d).filter(function (x) { return x.falta > 0; }).length + sinFactura(d, per).length, nb = el.querySelector('#eco-npend');
         if (nb) { nb.textContent = np; nb.hidden = !np; }
@@ -847,7 +1421,7 @@
           return;
         }
         // Cada tabla en su caja: si no cabe en el móvil, se desplaza ella y no la página.
-        cont.innerHTML = ({ RESUMEN: htmlResumen, VENTAS: htmlVentas, MOVIMIENTOS: htmlMovimientos, CAJA: htmlCaja, PENDIENTE: htmlPendiente, FACTURAS: htmlFacturas, PRESUPUESTO: htmlPresupuesto })[S.tab]()
+        cont.innerHTML = ({ RESUMEN: htmlResumen, VENTAS: htmlVentas, MOVIMIENTOS: htmlMovimientos, CAJA: htmlCaja, PENDIENTE: htmlPendiente, FACTURAS: htmlFacturas, PRESUPUESTO: htmlPresupuesto, GESTORIA: htmlGestoria })[S.tab]()
           .replace(/<table class="u-tabla eco-tabla">/g, '<div class="u-tabla-caja"><table class="u-tabla eco-tabla">').replace(/<\/table>/g, '</table></div>');
         var q = cont.querySelector('#eco-q');
         if (q && S.foco) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
@@ -866,13 +1440,13 @@
           var cats = g.cats.filter(function (x) { return x.previsto || x.real; });
           return '<div class="eco-grupo"><button type="button" class="eco-gb" data-grupo="' + texto(id) + '" aria-expanded="' + ab + '">' +
             '<div class="eco-gl"><b><span class="eco-flecha" aria-hidden="true">›</span>' + texto(g.grupo) + '</b><span class="eco-num">' + eur0(g.real) + '</span></div>' +
-            barra(g.previsto ? g.real / g.previsto : g.real ? 1 : 0, tipo === 'Gasto' && e.mal) +
+            barra(g.previsto ? g.real / g.previsto : g.real ? 1 : 0, tipo === 'Gasto' && e.mal, e.sinPrevisto) +
             '<div class="eco-gs"><span>' + (g.previsto ? 'Previsto ' + eur0(g.previsto) : 'Sin previsto') + '</span><span class="' + clase(e) + '"><b>' + texto(e.t) + '</b></span></div></button>' +
             '<div class="eco-lineas"' + (ab ? '' : ' hidden') + '>' + cats.map(function (x) {
               var ec = estadoLinea(tipo, x.previsto, x.real);
               return '<button type="button" class="eco-linea" data-vercat="' + texto(x.cat.ID) + '" title="Ver sus movimientos">' +
                 '<div class="eco-gl"><b>' + texto(x.cat.NOMBRE) + '</b><span class="eco-num">' + eur0(x.real) + ' <span class="eco-ir" aria-hidden="true">›</span></span></div>' +
-                barra(x.previsto ? x.real / x.previsto : x.real ? 1 : 0, tipo === 'Gasto' && ec.mal) +
+                barra(x.previsto ? x.real / x.previsto : x.real ? 1 : 0, tipo === 'Gasto' && ec.mal, ec.sinPrevisto) +
                 '<div class="eco-gs"><span>' + (x.previsto ? 'de ' + eur0(x.previsto) : 'Sin previsto') + '</span><span class="' + clase(ec) + '"><b>' + texto(ec.t) + '</b></span></div></button>';
             }).join('') + '</div></div>';
         }).join('') + '</div></section>';
@@ -890,7 +1464,7 @@
         });
         return '<details class="eco-card eco-desp" id="eco-rep"' + (S.ab.rep ? ' open' : '') + '><summary><b><span class="eco-flecha" aria-hidden="true">›</span> Beneficio y reparto</b>' +
           '<span class="u-nota">' + (r.reparto ? 'repartido ' + eur0(r.reparto) : 'sin reparto') + '</span></summary>' +
-          '<div class="eco-rf"><span>Beneficio<small>Ingresos menos gastos de la ' + texto(nomPeriodo()) + ', sin IVA</small></span><span>' + eur0(r.resultado) + '</span></div>' +
+          '<div class="eco-rf"><span>Beneficio<small>Ingresos menos gastos ' + texto(enPeriodo(nomPeriodo(), 'de')) + ', sin IVA</small></span><span>' + eur0(r.resultado) + '</span></div>' +
           '<div class="eco-rf"><span>Reparto</span><span>' + (r.reparto ? '− ' + eur0(r.reparto) : '0 €') + '</span></div>' +
           orden.map(function (k) { return '<div class="eco-rf eco-rf-sub"><span>' + texto(k) + '</span><span>' + eur0(quien[k]) + '</span></div>'; }).join('') +
           '<div class="eco-rf eco-rf-tot"><span>Resultado<small>Lo que queda tras el reparto</small></span><span class="' + (r.tras < 0 ? 'u-mal' : '') + '">' + eur0(r.tras) + '</span></div></details>';
@@ -902,7 +1476,8 @@
         var pb = pi - pg, desv = r.resultado - pb, ds = desglose(d, per), h = '';
         // T0628: cada venta, con su marca, como en Ventas.
         if (VEN && ds) ds.forEach(function (x) { var f = x.id ? ix.des[String(x.id)] : null; if (f) x.nombre = nombreVenta(f); });
-        if (ds && ds.length) {
+        // T0726 (R56): el filtro, solo si hay alguna parte de verdad (sin ventas, solo saldría «General»).
+        if (ds && ds.some(function (x) { return x.id; })) {
           h += '<div class="u-filtros eco-filtro-des"><label class="u-campo"><span class="u-etiqueta">' + texto(nomDes) + '</span><select id="eco-des">' +
             opciones(ds.map(function (x) { return [x.id || '-', x.nombre]; }), S.des, 'Todas') + '</select></label></div>';
         }
@@ -913,7 +1488,10 @@
           '<div class="eco-kpi"><b>Ingresos</b><span class="eco-val">' + eur0(r.ingresos.base) + '</span><span class="eco-sub">' + (pi ? 'de ' + eur0(pi) + ' previstos' : 'sin IVA') + '</span></div>' +
           '<div class="eco-kpi"><b>Gastos</b><span class="eco-val">' + eur0(r.gastos.base) + '</span><span class="eco-sub">' + (pg ? 'de ' + eur0(pg) + ' previstos' : 'sin IVA') + '</span></div></div>';
         var pend = pendientes(d).filter(function (x) { return x.falta > 0; }), sf = sinFactura(d, per, S.des);
-        h += '<div class="eco-mini"><button type="button" data-abrir="iva"><strong>' + eur0(Math.abs(r.iva)) + '</strong><small>IVA ' + (r.iva >= 0 ? 'a pagar' : 'a devolver') + '</small></button>' +
+        // T0733 (R57): con «Para tu gestoría», el IVA es el del trimestre, de las facturas (el que se declara), y lleva allí.
+        var qR = pest.indexOf('GESTORIA') >= 0 ? trimestreResumen() : null, LR = qR ? libroTrimestre(d, qR) : null;
+        h += '<div class="eco-mini">' + (LR ? '<button type="button" data-ir="GESTORIA" data-trim-ir="' + qR.ano + '-' + qR.t + '"><strong>' + eur0(Math.abs(LR.resultado)) + '</strong><small>IVA del ' + texto(trimestreNombre(qR)) + (LR.resultado >= 0 ? '' : ' a tu favor') + ' ›</small></button>'
+          : '<button type="button" data-abrir="iva"><strong>' + eur0(Math.abs(r.iva)) + '</strong><small>IVA ' + (r.iva >= 0 ? 'a pagar' : 'a devolver') + '</small></button>') +
           '<button type="button" data-ir="PENDIENTE"><strong' + (sf.length ? ' class="u-mal"' : '') + '>' + sf.length + '</strong><small>Gastos sin factura ›</small></button>' +
           '<button type="button" data-ir="PENDIENTE"><strong>' + pend.length + '</strong><small>Facturas pendientes ›</small></button></div></div>';
         h += '<details class="eco-card eco-desp" id="eco-iva"' + (S.ab.iva ? ' open' : '') + '><summary><b><span class="eco-flecha" aria-hidden="true">›</span> Ingresos, gastos e IVA</b>' +
@@ -922,8 +1500,9 @@
           '<tr><td class="u-tabla-t">Ingresos</td><td class="num">' + eur(r.ingresos.base) + '</td><td class="num">' + eur(r.ingresos.iva) + '</td><td class="num u-solo-ancho">' + eur(r.ingresos.total) + '</td></tr>' +
           '<tr><td class="u-tabla-t">Gastos</td><td class="num">' + eur(r.gastos.base) + '</td><td class="num">' + eur(r.gastos.iva) + '</td><td class="num u-solo-ancho">' + eur(r.gastos.total) + '</td></tr>' +
           '<tr class="eco-total"><td class="u-tabla-t">Beneficio</td><td class="num">' + cifra(r.resultado, true) + '</td><td class="num">' + eur(r.iva) + '</td><td class="num u-solo-ancho"></td></tr>' +
-          '</tbody></table><p class="u-nota">' + (r.iva >= 0 ? 'IVA a pagar: ' + eur(r.iva) : 'IVA a devolver: ' + eur(-r.iva)) +
-          ' (el de los ingresos menos el de los gastos' + (r.reparto ? ', también el del reparto' : '') + '). Los movimientos entre cuentas no cuentan.</p></details>';
+          '</tbody></table><p class="u-nota">' + (LR ? 'IVA cobrado menos pagado: ' + eur(r.iva) : r.iva >= 0 ? 'IVA a pagar: ' + eur(r.iva) : 'IVA a devolver: ' + eur(-r.iva)) +
+          ' (el de los ingresos menos el de los gastos' + (r.reparto ? ', también el del reparto' : '') + '). Los movimientos entre cuentas no cuentan.' +
+          (LR ? ' El que declaras sale de las facturas, por trimestre: <button type="button" class="u-btn u-btn-texto" data-ir="GESTORIA">Para tu gestoría</button>.' : '') + '</p></details>';
         h += htmlReparto(r);
         h += '<div class="eco-bloques">' + htmlGrupos(gs, 'Ingreso') + htmlGrupos(gs, 'Gasto') + '</div>';
         if (ds && ds.length > 1 && !S.des) {
@@ -934,7 +1513,7 @@
         var cz = cruzados(d, per, S.des);
         if (cz.length) h += '<p class="u-nota">' + cz.length + (cz.length === 1 ? ' movimiento tiene' : ' movimientos tienen') + ' una categoría del otro tipo: restan de su categoría, como una devolución. ' +
           (pest.indexOf('MOVIMIENTOS') >= 0 ? '<button type="button" class="u-btn u-btn-texto" data-accion="cruzados">Ver esos movimientos</button>' : '') + '</p>';
-        if (!r.n && !ps.some(function (x) { return x.previsto; })) h += '<p class="u-vacio">Todavía no hay movimientos en la ' + texto(nomPeriodo()) + '. Los que apuntes en Movimientos salen aquí al momento.</p>';
+        if (!r.n && !ps.some(function (x) { return x.previsto; })) h += '<p class="u-vacio">Todavía no hay movimientos ' + texto(enPeriodo(nomPeriodo())) + '. Los que apuntes en Movimientos salen aquí al momento.</p>';
         return h;
       }
 
@@ -979,7 +1558,7 @@
           (nf ? '<p class="u-nota">Solo ' + texto(puestos.join(', ')) + ' · <button type="button" class="u-btn u-btn-texto" data-accion="quitarfmov">Quitar filtros</button></p>' : '') +
           (S.des ? '<p class="u-nota">Solo ' + texto(S.des === '-' ? 'General' : nombre('des', S.des)) + ' · <button type="button" class="u-btn u-btn-texto" data-accion="todasdes">ver ' + texto(nomDes.toLowerCase()) + ': todas</button></p>' : '');
         if (!ms.length) return h + '<p class="u-vacio">' + (movDe(d, per, S.des).length ? 'Ningún movimiento cumple el filtro. Quita algún filtro para ver más.' :
-          'Todavía no hay movimientos en la ' + texto(nomPeriodo() || 'este periodo') + '. Los que apuntes con «Añadir movimiento» salen aquí al momento.') + '</p>';
+          'Todavía no hay movimientos ' + texto(enPeriodo(nomPeriodo())) + '. Los que apuntes con «Añadir movimiento» salen aquí al momento.') + '</p>';
         h += '<p class="u-nota">' + ms.length + (ms.length === 1 ? ' movimiento' : ' movimientos') + ' · suman <b class="' + (neto < 0 ? 'u-mal' : 'eco-bien') + '">' + eur(neto) + '</b> (entra menos sale, con IVA)</p>' +
           '<table class="u-tabla eco-tabla"><thead><tr><th>Movimiento</th><th class="num u-solo-ancho">Cuenta</th><th class="num">Importe</th></tr></thead><tbody>' + ms.slice(0, f.ver).map(function (m) { return filaMov(m); }).join('') + '</tbody></table>';
         if (ms.length > f.ver) h += '<button type="button" class="u-btn" data-accion="vermas">Ver ' + Math.min(VER, ms.length - f.ver) + ' movimientos más</button>';
@@ -990,6 +1569,8 @@
 
       // T0646 · Con CUENTAS_PERSONALES (tipos de CUENTAS que son lo que pone una persona, p. ej. «Personal»), la caja no las
       // suma al dinero de la empresa: van aparte, en positivo, como lo que la empresa le debe a esa persona.
+      // T0707 · Un gasto pagado desde una de ellas es gasto de la empresa (Resumen, resultado y lo invertido) y, a la vez, lo que se
+      // le debe: no se cuenta dos veces (Javi, 20/11/2026). El capital no es ni lo uno ni lo otro.
       var PERSONALES = String(cfg.CUENTAS_PERSONALES || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
       function esPersonal(c) { return PERSONALES.indexOf(String(c.TIPO || '')) >= 0; }
       // T0673 · Con CUENTAS_CAPITAL (p. ej. «Capital»), el capital no sale en Caja: ni dinero de la empresa ni lo que te debe.
@@ -1010,7 +1591,7 @@
             (cs.length > 1 ? '<tr class="eco-total"><td class="u-tabla-t">Total de la empresa</td><td class="num">' + cifra(tot, true) + '</td></tr>' : '') + '</tbody></table>'
             : '<p class="u-vacio">La empresa no tiene dinero en ninguna cuenta.</p>');
           if (pers.length) {
-            h += '<h2 class="n-grupo">Lo que te debe la empresa</h2><p class="u-nota">Lo que has pagado tú por la empresa (o le has prestado) y todavía no te ha devuelto.</p>' +
+            h += '<h2 class="n-grupo">Lo que te debe la empresa</h2><p class="u-nota">Lo que has pagado tú por la empresa (o le has prestado) y todavía no te ha devuelto. Lo que pagaste por ella ya cuenta como gasto de la empresa en el Resumen.</p>' +
               '<table class="u-tabla eco-tabla"><tbody>' + pers.map(function (y) {
                 return fila(y.c, y.v, y.v < 0 ? 'Te ha devuelto más de lo que pusiste' : '');
               }).join('') + (pers.length > 1 ? '<tr class="eco-total"><td class="u-tabla-t">Total</td><td class="num">' + cifra(debe, true) + '</td></tr>' : '') + '</tbody></table>';
@@ -1054,14 +1635,15 @@
           h += '<h2 class="n-grupo">' + g[1] + ' <span class="u-cifra">' + eur(tot) + '</span></h2>' +
             '<table class="u-tabla eco-tabla"><thead><tr><th>Factura</th><th class="num">Falta</th></tr></thead><tbody>' + xs.map(function (x) {
               return '<tr tabindex="0" data-fac="' + texto(x.f.ID) + '"><td class="u-tabla-t">' + texto(numFac(x.f)) + ' · ' + texto(nombre('ctr', x.f.ID_CONTRAPARTE)) + chip(x.f) +
-                '<div class="u-nota">' + fecha(x.f.FECHA) + ' · total ' + eur(x.total) + (x.pagado ? ' · ' + (g[0] ? 'cobrado ' : 'pagado ') + eur(x.pagado) : '') + '</div></td>' +
-                '<td class="num">' + (x.falta > 0 ? cifra(x.falta) : '<span class="u-nota">' + (g[0] ? 'Cobrada: márcala' : 'Pagada: márcala') + '</span>') + '</td></tr>';
+                '<div class="u-nota">' + fecha(x.f.FECHA) + ' · total ' + eur(x.total) + (x.rectificado ? ' (con ' + eur(x.rectificado) + ' de su rectificativa)' : '') + (x.pagado ? ' · ' + (g[0] ? 'cobrado ' : 'pagado ') + eur(x.pagado) : '') + '</div></td>' +
+                // T0747: una rectificativa de una ya cobrada, lo que hay que devolver (en negativo).
+                '<td class="num">' + (x.falta > 0 ? cifra(x.falta) : x.falta < 0 && esRectificativa(x.f) ? cifra(x.falta) + '<div class="u-nota">a devolver</div>' : '<span class="u-nota">' + (g[0] ? 'Cobrada: márcala' : 'Pagada: márcala') + '</span>') + '</td></tr>';
             }).join('') + '</tbody></table>';
         });
-        if (!hay) h += '<h2 class="n-grupo">Facturas por cobrar y por pagar</h2><p class="u-vacio">No hay ninguna factura Pendiente. Una factura emitida o recibida que marques como Pendiente sale aquí hasta que se cobre o se pague.</p>';
+        if (!hay) h += '<h2 class="n-grupo">Facturas por cobrar y por pagar</h2><p class="u-vacio">No hay ninguna factura pendiente. Una factura emitida o recibida que marques como pendiente sale aquí hasta que se cobre o se pague.</p>';
         var tsf = 0; sf.forEach(function (m) { tsf += importe(m).total; });
         h += '<h2 class="n-grupo">Gastos sin factura · ' + texto(nomPeriodo()) + (sf.length ? ' <span class="u-cifra">' + eur(tsf) + '</span>' : '') + '</h2>';
-        if (!sf.length) return h + '<p class="u-vacio">Todos los gastos de la ' + texto(nomPeriodo()) + ' tienen su factura o ticket.</p>';
+        if (!sf.length) return h + '<p class="u-vacio">Todos los gastos ' + texto(enPeriodo(nomPeriodo(), 'de')) + ' tienen su factura o ticket.</p>';
         h += '<p class="u-nota">Abre cada uno y toca «Añadir su factura» para apuntarla.</p><table class="u-tabla eco-tabla"><thead><tr><th>Gasto</th><th class="num u-solo-ancho">Cuenta</th><th class="num">Importe</th></tr></thead><tbody>' +
           sf.sort(function (a, b) { return String(a.FECHA) < String(b.FECHA) ? 1 : -1; }).slice(0, 30).map(function (m) { return filaMov(m); }).join('') + '</tbody></table>';
         if (sf.length > 30 && pest.indexOf('MOVIMIENTOS') >= 0) h += '<button type="button" class="u-btn" data-accion="sinfac">Ver los ' + sf.length + ' en Movimientos</button>';
@@ -1074,29 +1656,123 @@
         var f = S.fac;
         var fs = facDe(d, per).filter(function (x) { return (!f.tipo || x.TIPO === f.tipo) && (!f.estado || (f.estado === '-' ? !x.ESTADO : x.ESTADO === f.estado)); })
           .sort(function (a, b) { return String(a.FECHA) < String(b.FECHA) ? 1 : -1; });
-        var tot = 0; fs.forEach(function (x) { if (x.ESTADO !== 'Anulada') tot += importe(x).total; });
+        // T0726 (R59): lo que suman, por tipo: lo que facturas tú y lo que te facturan no se suma en una sola cifra.
+        var totE = 0, totR = 0, hayE = false, hayR = false;
+        fs.forEach(function (x) { if (x.TIPO === 'Emitida') hayE = true; else hayR = true; if (x.ESTADO === 'Anulada') return; if (x.TIPO === 'Emitida') totE += importe(x).total; else totR += importe(x).total; });
         // T0646 · Como las demás secciones: «Filtrar» (abre sus filtros, con cuántos hay puestos) y «Añadir».
         var nf = (f.tipo ? 1 : 0) + (f.estado ? 1 : 0);
         // T0673 · En el móvil, Filtrar y Añadir en una línea (como Movimientos); lo que suman, debajo, y «Datos de tu empresa», al final.
         var h = '<div class="li-barra eco-fbarra eco-fmov"><button type="button" class="u-btn li-filtrar" data-accion="filtrarfac" aria-haspopup="dialog"' + (nf ? ' aria-pressed="true"' : '') + '>' + ICONO_FILTRO + 'Filtrar' +
           (nf ? ' <span class="li-nf" aria-label="' + nf + (nf === 1 ? ' puesto' : ' puestos') + '">' + nf + '</span>' : '') + '</button>' +
           '<button type="button" class="u-btn u-btn-accion li-nueva" data-accion="factura">Añadir</button></div>' +
-          '<p class="u-nota">' + fs.length + (fs.length === 1 ? ' factura' : ' facturas') + ' · ' + eur(tot) + ' con IVA (sin las anuladas)</p>' +
+          (fs.length ? '<p class="eco-fac-tot">' + (hayE ? '<span>Emitidas: <b class="u-cifra">' + eur(totE) + '</b></span>' : '') + (hayR ? '<span>Recibidas y tickets: <b class="u-cifra">' + eur(totR) + '</b></span>' : '') +
+            '<span class="u-nota">' + fs.length + (fs.length === 1 ? ' factura' : ' facturas') + ', con IVA y sin las anuladas</span></p>' : '') +
           (nf ? '<p class="u-nota">Solo ' + [f.tipo ? { Emitida: 'emitidas', Recibida: 'recibidas', Ticket: 'tickets' }[f.tipo] : '', f.estado ? (f.estado === '-' ? 'sin estado' : f.estado.toLowerCase()) : ''].filter(Boolean).join(', ') +
             ' · <button type="button" class="u-btn u-btn-texto" data-accion="quitarffac">Quitar filtros</button></p>' : '') +
-          (LINEAS && empresaFaltan().length ? '<p class="u-nota eco-falta">Para que tus facturas estén completas falta ' + texto(empresaFaltan().join(', ')) + ': ponlo en <button type="button" class="u-btn u-btn-texto" data-accion="empresa">Datos de tu empresa</button>.</p>' : '');
+          (LINEAS && empresaFaltan().length ? '<p class="u-nota eco-falta">' + avisoEmpresa('Para que tus facturas estén completas') + '</p>' : '');
         var emp = LINEAS ? '<p><button type="button" class="u-btn u-btn-texto" data-accion="empresa">Datos de tu empresa</button> <span class="u-nota">(lo que sale en cada factura: nombre, CIF, dirección y forma de pago)</span></p>' : '';
-        if (!fs.length) return h + '<p class="u-vacio">No hay facturas ' + (f.tipo || f.estado ? 'con este filtro' : 'en la ' + texto(nomPeriodo() || 'este periodo')) + '. Las que añadas salen aquí al momento.</p>' + emp;
+        if (!fs.length) return h + '<p class="u-vacio">No hay facturas ' + (f.tipo || f.estado ? 'con este filtro' : texto(enPeriodo(nomPeriodo()))) + '. Las que añadas salen aquí al momento.</p>' + emp;
         var sinPdf = fs.filter(function (x) { return !x.ARCHIVO_URL; }).length;
-        // T0673 · En el móvil, una tarjeta como Movimientos: sin la columna Archivo (el enlace, si lo hay, va debajo; «Sin archivo» lo cuenta la nota del final).
-        return h + '<table class="u-tabla eco-tabla"><thead><tr><th>Factura</th><th class="u-solo-ancho">Archivo</th><th class="num">Total</th></tr></thead><tbody>' + fs.map(function (x) {
-          return '<tr tabindex="0" data-fac="' + texto(x.ID) + '"><td class="u-tabla-t">' + texto(numFac(x)) + ' · ' + texto(nombre('ctr', x.ID_CONTRAPARTE)) + chip(x) +
-            '<div class="u-nota">' + [texto(fecha(x.FECHA)), x.TIPO === 'Emitida' ? 'Emitida<span class="u-solo-ancho"> (a un cliente)</span>' : x.TIPO === 'Ticket' ? 'Ticket' : 'Recibida<span class="u-solo-ancho"> (de un proveedor)</span>', texto(x.TIPO === 'Emitida' && x.ESTADO === 'Pagada' ? 'Cobrada' : (x.ESTADO || ''))].filter(Boolean).join(' · ') /* T0679: una emitida pagada se dice «Cobrada» (se guarda Pagada) */ + '</div>' +
+        // T0673 · En el móvil, una tarjeta como Movimientos: sin la columna del PDF (el enlace, si lo hay, va debajo; los que no tienen, los cuenta la nota del final).
+        // T0726 (R56): el estado, en su píldora, y el PDF, como un enlace del Listado («Ver el PDF»); sin archivo, la celda vacía.
+        // T0733 (R58): en el ordenador, también la base y el IVA de cada una (lo que mira la gestoría).
+        return h + '<table class="u-tabla eco-tabla"><thead><tr><th>Factura</th><th class="u-solo-ancho">PDF</th><th class="num u-solo-ancho">Base</th><th class="num u-solo-ancho">IVA</th><th class="num">Total</th></tr></thead><tbody>' + fs.map(function (x) {
+          var im = importe(x), an = x.ESTADO === 'Anulada' ? ' eco-anulada' : '';
+          return '<tr tabindex="0" data-fac="' + texto(x.ID) + '"><td class="u-tabla-t">' + texto(numFac(x)) + (x.ID_CONTRAPARTE ? ' · ' + texto(nombre('ctr', x.ID_CONTRAPARTE)) : '') + chip(x) + // T0689: un ticket sin a quién, sin «·» de más
+            '<div class="u-nota eco-fac-l">' + [texto(fecha(x.FECHA)), x.TIPO === 'Emitida' ? 'Emitida<span class="u-solo-ancho"> (a un cliente)</span>' : x.TIPO === 'Ticket' ? 'Ticket' : 'Recibida<span class="u-solo-ancho"> (de un proveedor)</span>'].join(' · ') + pildoraFac(x) + '</div>' +
             (x.ARCHIVO_URL ? '<div class="u-nota u-solo-movil">' + enlaceDrive(x) + '</div>' : '') + '</td>' +
             '<td class="u-solo-ancho">' + enlaceDrive(x) + '</td>' +
-            '<td class="num"><span class="u-cifra' + (x.ESTADO === 'Anulada' ? ' eco-anulada' : '') + '">' + eur(importe(x).total) + '</span></td></tr>';
+            '<td class="num u-solo-ancho"><span class="u-cifra' + an + '">' + eur(im.base) + '</span></td>' +
+            '<td class="num u-solo-ancho"><span class="u-cifra' + an + '">' + eur(im.iva) + '</span></td>' +
+            '<td class="num"><span class="u-cifra' + an + '">' + eur(im.total) + '</span></td></tr>';
         }).join('') + '</tbody></table>' +
           (sinPdf ? '<p class="u-nota">' + sinPdf + (sinPdf === 1 ? ' factura no tiene' : ' facturas no tienen') + ' su archivo enlazado: ábrela y pega en «Enlace en Drive» el enlace del PDF (en Drive, Compartir › Copiar enlace).</p>' : '') + emp;
+      }
+
+      /* ----- T0733 · Para tu gestoría: el IVA del trimestre de las facturas (modelo 303), las retenciones (111) y la descarga ----- */
+
+      function trimestreVisto() { return S.gest.q || trimestrePorDefecto(hoy()); }
+      /** El trimestre del Resumen: el de entrada si el año mirado es el de hoy (o no es un año); si es otro año, su 4T. */
+      function trimestreResumen() {
+        var q = trimestrePorDefecto(hoy()), y = per && /^\d{4}$/.test(per.id) ? per.id : '';
+        return y && y !== q.ano ? { ano: y, t: 4 } : q;
+      }
+      function libroAhora() { return libroTrimestre(d, trimestreVisto()); }
+      /** Los años que se pueden mirar: el de hoy y los que tienen facturas, el más reciente primero. */
+      function anosGestoria() {
+        var o = {}; o[hoy().slice(0, 4)] = 1; o[trimestreVisto().ano] = 1;
+        d.fac.forEach(function (f) { var y = String(f.FECHA || '').slice(0, 4); if (/^\d{4}$/.test(y)) o[y] = 1; });
+        return Object.keys(o).sort().reverse();
+      }
+      function htmlGestoria() {
+        var q = trimestreVisto(), L = libroAhora(), nq = trimestreNombre(q), aPagar = L.resultado >= 0;
+        var h = '<div class="eco-trim-barra"><div class="eco-sw eco-trim" role="group" aria-label="Trimestre">' + trimestresDe(q.ano).map(function (x) {
+          return '<button type="button" data-trim="' + x.t + '" aria-pressed="' + (x.t === q.t ? 'true' : 'false') + '">' + x.t + 'T</button>';
+        }).join('') + '</div><label class="u-campo eco-trim-ano"><span class="u-etiqueta">Año</span><select id="eco-gano">' +
+          opciones(anosGestoria().map(function (y) { return [y, y]; }), q.ano) + '</select></label></div>';
+        h += '<div class="eco-kpis eco-gest-kpis"><div class="eco-kpi eco-grande"><b>IVA del ' + texto(nq) + '</b><span class="eco-val">' + eur(Math.abs(L.resultado)) + '</span>' +
+          '<span class="eco-sub">' + (L.resultado === 0 ? 'Ni a pagar ni a devolver' : aPagar ? 'A pagar' : 'A tu favor: se compensa o se devuelve') + '. Sale de las facturas, no de los cobros.</span></div>' +
+          '<div class="eco-kpi"><b>De tus facturas</b><span class="eco-val">' + eur(L.repercutido) + '</span><span class="eco-sub">IVA de ' + eur(L.baseE) + ' facturados</span></div>' +
+          '<div class="eco-kpi"><b>De lo que te facturan</b><span class="eco-val">' + eur(L.soportado + L.dua) + '</span><span class="eco-sub">' +
+          (L.dua ? 'Con ' + eur(L.dua) + ' de IVA de aduana (DUA)' : 'Recibidas y tickets') + '</span></div></div>';
+        if (L.ret) h += '<p class="eco-gest-ret">Retenciones de IRPF que pagas tú a Hacienda (modelo 111): <b class="u-cifra">' + eur(L.ret) + '</b></p>';
+        h += '<div class="n-botones eco-gest-bot"><button type="button" class="u-btn u-btn-accion" data-accion="gestcsv"' + (L.filas.length ? '' : ' disabled') + '>Descargar (CSV)</button>' +
+          '<button type="button" class="u-btn" data-accion="gestcopiar"' + (L.filas.length ? '' : ' disabled') + '>Copiar</button></div>' +
+          '<p class="u-nota">Para mandárselo a tu gestoría: fecha, número, NIF, nombre, base, % de IVA, cuota, retención, total, estado y PDF de cada factura del ' + texto(nq) + '. «Copiar» es para pegarlo en una hoja de cálculo.</p>';
+        // Lo que hay que arreglar antes de mandarlo, en palabras.
+        var av = [];
+        if (L.sinNif.length) av.push(L.sinNif.length === 1 ? 'La ' + texto(numFac(L.sinNif[0])) + ' no tiene el CIF o NIF del cliente: ábrela y ponlo.' :
+          L.sinNif.length + ' facturas tuyas no tienen el CIF o NIF del cliente (' + texto(listaY(L.sinNif.map(numFac))) + '): ábrelas y ponlo.');
+        if (L.sinFacGasto.length) {
+          var ig = 0; L.sinFacGasto.forEach(function (m) { ig += importe(m).iva; });
+          av.push(deMas(L.sinFacGasto.length, 'gasto', 'gastos') + ' del trimestre sin factura' + (ig ? ': su IVA (' + eur(ig) + ') no se puede descontar hasta que la tengas.' : '.') +
+            (pest.indexOf('PENDIENTE') >= 0 ? ' <button type="button" class="u-btn u-btn-texto" data-ir="PENDIENTE">Verlos en Pendiente</button>' : ''));
+        }
+        if (L.sinFacCobro.length) {
+          var ic = 0; L.sinFacCobro.forEach(function (m) { ic += importe(m).iva; });
+          av.push(deMas(L.sinFacCobro.length, 'cobro', 'cobros') + ' del trimestre sin factura, con ' + eur(ic) + ' de IVA: lo cobrado también se declara aunque aún no hayas hecho la factura.');
+        }
+        // T0747 · Lo que la gestoría tiene que saber de este trimestre: las rectificativas (restan) y los anticipos.
+        var sab = [];
+        if (L.rect.length) sab.push('Lleva ' + deMas(L.rect.length, 'rectificativa', 'rectificativas') + ' (' + texto(listaY(L.rect.map(numFac))) + '): restan de lo facturado y salen en el CSV con la factura que corrigen y por qué.');
+        if (L.anticipos.length) sab.push('Lleva ' + deMas(L.anticipos.length, 'factura de anticipo', 'facturas de anticipo') + ' (' + texto(listaY(L.anticipos.map(numFac))) + '): su IVA se declara al cobrarlo, y la factura final lo descuenta.');
+        if (sab.length) h += sab.map(function (x) { return '<p class="u-nota">' + x + '</p>'; }).join('');
+        if (av.length) h += '<div class="eco-aviso eco-amb"><b>Antes de mandarlo</b>' + av.map(function (x) { return '<p>' + x + '</p>'; }).join('') + '</div>';
+        if (!L.filas.length) return h + '<p class="u-vacio">No hay facturas del ' + texto(nq) + '. Las que hagas o apuntes con fecha de este trimestre salen aquí.</p>';
+        h += '<h2 class="n-grupo">Las facturas del ' + texto(nq) + ' <span class="u-nota">' + deMas(L.filas.length, 'factura', 'facturas') + '</span></h2>' +
+          '<table class="u-tabla eco-tabla"><thead><tr><th>Factura</th><th class="u-solo-ancho">CIF o NIF</th><th class="num u-solo-ancho">Base</th><th class="num">IVA</th><th class="num u-solo-ancho">Total</th></tr></thead><tbody>' +
+          L.filas.map(function (x) {
+            var f = x.f, i = x.imp, an = x.anulada ? ' eco-anulada' : '', extra = [];
+            if (i.dua) extra.push('IVA de aduana ' + eur(i.dua));
+            if (i.ret) extra.push('retención ' + tipoIva(f.RETENCION) + ' ' + eur(i.ret));
+            return '<tr tabindex="0" data-fac="' + texto(f.ID) + '"><td class="u-tabla-t">' + texto(numFac(f)) + (x.nombre ? ' · ' + texto(x.nombre) : '') +
+              '<div class="u-nota">' + [texto(fecha(f.FECHA)), f.TIPO === 'Emitida' ? 'Emitida' : f.TIPO === 'Ticket' ? 'Ticket' : 'Recibida'].concat(extra.map(texto)).join(' · ') + pildoraFac(f) + '</div>' +
+              '<div class="u-nota u-solo-movil">' + (x.nif ? 'CIF/NIF ' + texto(x.nif) + ' · ' : '') + 'base ' + eur(i.base) + ' · total ' + eur(i.total) + '</div></td>' +
+              '<td class="u-solo-ancho">' + (x.nif ? texto(x.nif) : f.TIPO === 'Emitida' && !x.anulada ? '<span class="u-mal">Falta</span>' : '') + '</td>' +
+              '<td class="num u-solo-ancho"><span class="u-cifra' + an + '">' + eur(i.base) + '</span></td>' +
+              '<td class="num"><span class="u-cifra' + an + '">' + eur(i.iva) + '</span><div class="u-nota">' + texto(tipoIva(f.TIPO_IVA) || '0%') + '</div></td>' +
+              '<td class="num u-solo-ancho"><span class="u-cifra' + an + '">' + eur(i.total) + '</span></td></tr>';
+          }).join('') + '</tbody></table><p class="u-nota">Por la fecha de cada factura. Las anuladas salen tachadas y no suman.</p>';
+        return h;
+      }
+      /** El nombre del archivo: «Facturas 4T 2026 · Telas Ejemplo S.L.csv». */
+      function archivoGestoria() {
+        var e = LINEAS ? empresaAhora() : null, n = String((e && e.NOMBRE) || '').replace(/[\\/:*?"<>|\r\n]+/g, ' ').trim();
+        return 'Facturas ' + trimestreNombre(trimestreVisto()) + (n ? ' · ' + n : '') + '.csv';
+      }
+      function descargarGestoria() {
+        var csv = '﻿' + csvLibro(libroAhora(), ';'); // con BOM: Excel lo abre con sus tildes
+        try {
+          var a = document.createElement('a'), url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+          a.href = url; a.download = archivoGestoria(); document.body.appendChild(a); a.click();
+          setTimeout(function () { a.remove(); URL.revokeObjectURL(url); }, 1000);
+        } catch (e) { ctx.aviso('No se ha podido descargar: prueba con «Copiar».'); }
+      }
+      function copiarGestoria() {
+        var tsv = csvLibro(libroAhora(), '\t'), n = libroAhora().filas.length;
+        var ok = function () { if (ctx.abierta()) ctx.aviso('Copiadas las ' + n + ' facturas del ' + trimestreNombre(trimestreVisto()) + ': pégalas en una hoja de cálculo.'); };
+        try { navigator.clipboard.writeText(tsv).then(ok, function () { ctx.aviso('No se ha podido copiar: usa «Descargar (CSV)».'); }); }
+        catch (e) { ctx.aviso('No se ha podido copiar: usa «Descargar (CSV)».'); }
       }
       /** T0646 · Los filtros de Facturas, en su ventana (como «Filtrar» del Listado): nada cambia hasta «Ver». */
       /** T0644 · Filtrar · Movimientos: tipo, categoría (las de ese tipo), cuenta y gastos sin factura, con cuántos se verían. */
@@ -1139,16 +1815,40 @@
           vent.querySelector('#ff-quitar').onclick = function () { S.fac = { tipo: '', estado: '' }; cerrar(); pintar(); };
         });
       }
-      /** El enlace al PDF de una factura en Drive, para abrirlo en otra pestaña (sin abrir la ficha). */
+      /**
+       * El enlace al archivo de una factura en Drive, para abrirlo en otra pestaña (sin abrir la ficha). T0726 (R56): como un
+       * enlace del Listado (li-enl, con su icono): «Ver el PDF» (la emitida), «Ver la factura» (la recibida) o «Ver el ticket».
+       * Sin archivo, nada (la nota de debajo de la lista cuenta las que no tienen).
+       */
       function enlaceDrive(f) {
-        return f && f.ARCHIVO_URL ? '<a class="eco-drive" href="' + texto(f.ARCHIVO_URL) + '" target="_blank" rel="noopener" data-fuera>Abrir en Drive ↗</a>' : '<span class="u-nota">Sin archivo</span>';
+        if (!f || !f.ARCHIVO_URL) return '';
+        var q = f.TIPO === 'Ticket' ? 'Ver el ticket' : f.TIPO === 'Recibida' ? 'Ver la factura' : 'Ver el PDF';
+        return '<a class="li-enl eco-drive" href="' + texto(f.ARCHIVO_URL) + '" target="_blank" rel="noopener" data-fuera>' + ICONO_PDF + '<span>' + q + '</span></a>';
+      }
+      /**
+       * T0726 (R56) · El estado de una factura en la píldora común: pendiente en ocre, cobrada (una emitida pagada: se guarda
+       * Pagada, T0679) en verde, y pagada y anulada (tachada) en gris. Sin estado, nada.
+       */
+      function pildoraFac(x) {
+        var e = String(x.ESTADO || ''), cl = pildoraClase(x); if (!e) return cl;
+        // T0747: una rectificativa no se cobra: pendiente es lo que hay que devolver; pagada, ya resuelta (devuelta o descontada).
+        var r = esRectificativa(x), t = r ? { Pendiente: 'Por devolver', Pagada: 'Resuelta' }[e] || e : x.TIPO === 'Emitida' && e === 'Pagada' ? 'Cobrada' : e;
+        var c = e === 'Pendiente' ? 'li-medio' : t === 'Cobrada' ? 'li-bien' : 'li-apagado';
+        return ' <span class="u-chip li-estado ' + c + (e === 'Anulada' ? ' eco-anulada' : '') + '">' + texto(t) + '</span>' + cl;
+      }
+      /** T0747 · Qué emitida es, en su píldora: «Anticipo», «Rectifica la FE.6» o, la corregida, «Rectificada con FR.1». */
+      function pildoraClase(x) {
+        if (!x || x.TIPO !== 'Emitida') return '';
+        var t = esRectificativa(x) ? 'Rectifica ' + (ix.fac[x.RECTIFICA] ? 'la ' + String(ix.fac[x.RECTIFICA].NUMERO || '').trim() : 'otra') : x.CLASE === 'Anticipo' ? 'Anticipo' : '';
+        if (!t) { var rs = rectificativasDe(d.fac, x.ID); if (rs.length) t = 'Rectificada con ' + listaY(rs.map(function (r) { return String(r.NUMERO || '').trim(); })); }
+        return t ? ' <span class="u-chip li-apagado eco-clase">' + texto(t) + '</span>' : '';
       }
 
       /* ----- Presupuesto (se mira; se prepara aparte) ----- */
 
       function htmlPresupuesto() {
         var ps = presupuesto(d, per, S.des), av = avisos(d, ps);
-        var h = '<p class="u-nota">Lo previsto' + (presPorPeriodo(d) ? ' para la ' + texto(nomPeriodo()) : '') + ' frente a lo real, sin IVA. ' +
+        var h = '<p class="u-nota">Lo previsto' + (presPorPeriodo(d) ? ' ' + texto(enPeriodo(nomPeriodo(), 'para')) : '') + ' frente a lo real, sin IVA. ' +
           (prepara ? 'Toca una categoría para definir lo previsto: te recomienda una cifra a partir de lo real de ' + (presPorPeriodo(d) ? 'la ' + texto(nomPer.toLowerCase()) + ' anterior' : 'antes') + '.' :
             'Toca una categoría para ver sus movimientos. Lo prepara ' + texto(cfg.PREPARA_PRESUPUESTO ? 'el perfil ' + cfg.PREPARA_PRESUPUESTO : 'quien administra') + '.') + '</p>';
         if (av.length) {
@@ -1181,7 +1881,10 @@
         var p = vent.querySelector('[data-foco]') || vent.querySelector('input:not([type=hidden]), select, textarea');
         if (p) p.focus();
       }
-      function cerrar() { velo.classList.remove('abierto'); vent.innerHTML = ''; if (alCerrar) { var f = alCerrar; alCerrar = null; f(); } }
+      function cerrar() {
+        if (debajo) { volverDebajo(); return; } // T0726 (R64): cerrar la de encima vuelve a la de debajo
+        velo.classList.remove('abierto'); vent.innerHTML = ''; if (alCerrar) { var f = alCerrar; alCerrar = null; f(); }
+      }
       function campo(et, html, extra) { return '<label class="u-campo' + (extra ? ' ' + extra : '') + '"><span class="u-etiqueta">' + et + '</span>' + html + '</label>'; }
       function val(id) { var e = vent.querySelector('#' + id); return e ? String(e.value).trim() : ''; }
       function verError(mal) { var e = vent.querySelector('.u-error'); e.textContent = mal.join(' '); e.hidden = !mal.length; }
@@ -1192,28 +1895,148 @@
        * T0272: el importe de un movimiento o una factura se puede escribir con el IVA incluido, como lo dicen muchas veces:
        * se guarda la base que le toca (baseDeTotal). La casilla se recuerda en este navegador.
        */
-      function conIva() { return guardado(CLAVE + 'coniva') === '1'; }
+      // T0689: de entrada, con el IVA incluido (como viene en el ticket); «Lo tengo sin IVA» lo cambia y se recuerda ('0').
+      function conIva() { return guardado(CLAVE + 'coniva') !== '0'; }
       function verImporte(v) {
         if (v.BASE === '' || v.BASE == null) return '';
         var x = conIva() ? importe(v).total : cts(v.BASE);
         return (x / 100).toFixed(2).replace('.', ',').replace(/,00$/, '');
       }
+      /** T0689 · Cómo se lee el importe: con el IVA incluido (de entrada) o sin él, con un botón de texto que lo cambia. La casilla
+       *  sigue (escondida): es lo que leen baseEn y pintaImporte. */
       function casillaIva(pre) {
-        return '<label class="u-check u-ancho"><input type="checkbox" id="' + pre + '-coniva"' + (conIva() ? ' checked' : '') + '> El importe lleva el IVA incluido</label>';
+        return '<div class="u-ancho eco-iva-sw" id="' + pre + '-iva-sw"><input type="checkbox" id="' + pre + '-coniva" hidden' + (conIva() ? ' checked' : '') + '>' +
+          '<button type="button" class="u-btn u-btn-texto" id="' + pre + '-iva-cambio"></button></div>';
       }
       /** La base escrita (en céntimos), o la que sale del total si la casilla del IVA incluido está marcada. */
       function baseEn(pre) {
-        var x = cts(val(pre + '-BASE')), c = vent.querySelector('#' + pre + '-coniva');
-        return c && c.checked ? baseDeTotal(x, val(pre + '-TIPO_IVA')) : x;
+        var mx = enOtraMoneda(pre), x = mx ? (mx.euros ? mx.euros.cts : 0) : cts(val(pre + '-BASE')), c = vent.querySelector('#' + pre + '-coniva');
+        // T0733: con el IVA incluido, lo escrito es lo que se paga: sin el IVA de aduana y con la retención ya descontada.
+        return c && c.checked ? baseDeTotal(x - duaEn(pre), val(pre + '-TIPO_IVA'), retEn(pre)) : x;
+      }
+      /* ----- T0733 (R101) · la retención de IRPF y el IVA de aduana (DUA) de una factura recibida o un gasto ----- */
+
+      /** ¿Tiene la tabla las columnas? (Konamigas no: no se enseñan.) */
+      function conRetDua(cols) { return { ret: cols.indexOf('RETENCION') >= 0, dua: cols.indexOf('IVA_IMPORTACION') >= 0 }; }
+      /** La caja plegada «+ Retención de IRPF o IVA de aduana (DUA)», abierta si ya lleva alguno. */
+      function cajaRetDua(pre, v, cols) {
+        var c = conRetDua(cols); if (!c.ret && !c.dua) return '';
+        var abierta = pct(v.RETENCION) > 0 || cts(v.IVA_IMPORTACION) > 0;
+        var que = c.ret && c.dua ? 'Retención de IRPF o IVA de aduana (DUA)' : c.ret ? 'Retención de IRPF' : 'IVA de aduana (DUA)';
+        return '<div class="u-ancho eco-retdua" id="' + pre + '-retdua"><button type="button" class="u-btn u-btn-texto" id="' + pre + '-retdua-b"' + (abierta ? ' hidden' : '') + '>+ ' + que + '</button>' +
+          '<div class="u-campos" id="' + pre + '-retdua-c"' + (abierta ? '' : ' hidden') + '>' +
+          (c.ret ? campo('Retención de IRPF', '<select id="' + pre + '-RETENCION">' + opcionesConValor([['0%', 'Sin retención'], ['7%', '7 %'], ['15%', '15 %']], tipoIva(v.RETENCION) || '0%') + '</select>') : '') +
+          (c.dua ? campo('IVA de aduana (DUA)', '<input type="text" inputmode="decimal" id="' + pre + '-IVA_IMPORTACION" value="' + texto(cts(v.IVA_IMPORTACION) ? (cts(v.IVA_IMPORTACION) / 100).toFixed(2).replace('.', ',') : '') + '" placeholder="0,00">') : '') +
+          '<p class="u-nota u-ancho">' + [c.ret ? 'Retención: la de las facturas de profesionales (gestoría, abogados). Pagas menos a quien te factura y ese dinero lo ingresas tú a Hacienda cada trimestre.' : '',
+            c.dua ? 'IVA de aduana: el que pagas al traer las telas, que viene en el DUA. Se recupera: no es un gasto del pedido.' : ''].filter(Boolean).join(' ') + '</p></div></div>';
+      }
+      function retDuaVisible(pre) { var x = vent.querySelector('#' + pre + '-retdua'); return !!x && !x.hidden; }
+      function retEn(pre) { var e = vent.querySelector('#' + pre + '-RETENCION'); return e && retDuaVisible(pre) ? e.value : ''; }
+      function duaEn(pre) { var e = vent.querySelector('#' + pre + '-IVA_IMPORTACION'); return e && retDuaVisible(pre) ? Math.max(0, cts(e.value)) : 0; }
+      /** Lo que se guarda de las dos (solo las columnas que hay): { RETENCION, IVA_IMPORTACION }; sin enseñar, vacías. */
+      function valoresRetDua(pre, cols) {
+        var c = conRetDua(cols), o = {};
+        if (c.ret) o.RETENCION = retEn(pre) && retEn(pre) !== '0%' ? retEn(pre) : '';
+        if (c.dua) o.IVA_IMPORTACION = duaEn(pre) ? duaEn(pre) / 100 : '';
+        return o;
+      }
+      function oirRetDua(pre, refrescar) {
+        var b = vent.querySelector('#' + pre + '-retdua-b'); if (!b) return;
+        b.onclick = function () { b.hidden = true; vent.querySelector('#' + pre + '-retdua-c').hidden = false; var s = vent.querySelector('#' + pre + '-RETENCION, #' + pre + '-IVA_IMPORTACION'); if (s) s.focus(); };
+        var r = vent.querySelector('#' + pre + '-RETENCION'); if (r) r.addEventListener('change', refrescar);
+        var dd = vent.querySelector('#' + pre + '-IVA_IMPORTACION'); if (dd) dd.addEventListener('input', refrescar);
+      }
+      /* ----- T0726 (R61) · un gasto en rupias o dólares, pasado a euros con su cambio ----- */
+
+      /** Las monedas de este negocio (MONEDAS, con el cambio de AJUSTES), o solo el euro. */
+      function monedasAhora() { return monedas(cfg.MONEDAS, function (t) { return T.filas(t) || []; }); }
+      /** El desplegable de la moneda junto al importe (solo si hay más que el euro) y, para una sin cambio guardado, «1 € = … $». */
+      function cajaMoneda(pre) {
+        var ms = monedasAhora(); if (ms.length < 2) return '';
+        return '<select id="' + pre + '-moneda" class="eco-moneda" aria-label="Moneda">' + ms.map(function (m) { return '<option value="' + texto(m.sim) + '">' + texto(m.sim) + '</option>'; }).join('') + '</select>';
+      }
+      function cajaCambio(pre) {
+        return monedasAhora().length < 2 ? '' : '<label class="u-campo eco-cambio" id="' + pre + '-cambio-c" hidden><span class="u-etiqueta">Cambio</span><span class="eco-cambio-f">1 € = ' +
+          '<input type="text" inputmode="decimal" id="' + pre + '-cambio" placeholder="0"> <span id="' + pre + '-cambio-s"></span></span></label>';
+      }
+      /** La moneda elegida si no es el euro: { m, n (lo escrito), euros: aEuros(…) o null }; en euros, null. */
+      function enOtraMoneda(pre) {
+        var sel = vent.querySelector('#' + pre + '-moneda'); if (!sel || sel.value === '€') return null;
+        var m = monedasAhora().filter(function (x) { return x.sim === sel.value; })[0]; if (!m) return null;
+        if (!m.cambio) { var c = numeroEscrito(val(pre + '-cambio')); m = Object.assign({}, m, { cambio: c > 0 ? c : null }); }
+        return { m: m, n: numeroEscrito(val(pre + '-BASE')), euros: aEuros(val(pre + '-BASE'), m) };
+      }
+      /** Al cambiar de moneda: el cambio, a la vista si no se sabe (con el último que se puso en este navegador). */
+      function oirMoneda(pre, refrescar) {
+        var sel = vent.querySelector('#' + pre + '-moneda'); if (!sel) return;
+        var ci = vent.querySelector('#' + pre + '-cambio');
+        sel.addEventListener('change', function () {
+          var m = monedasAhora().filter(function (x) { return x.sim === sel.value; })[0], pide = !!m && m.sim !== '€' && !m.cambio;
+          vent.querySelector('#' + pre + '-cambio-c').hidden = !pide;
+          vent.querySelector('#' + pre + '-cambio-s').textContent = m ? m.sim : '';
+          if (pide && !ci.value) ci.value = guardado(CLAVE + 'cambio' + m.sim);
+          refrescar();
+        });
+        ci.addEventListener('input', function () { var m = enOtraMoneda(pre); if (m) guardado(CLAVE + 'cambio' + m.m.sim, ci.value); refrescar(); });
       }
       /** Etiqueta del importe y la línea de debajo con lo que se va a guardar. */
-      function pintaImporte(pre, etBase) {
-        var ci = vent.querySelector('#' + pre + '-coniva').checked, b = baseEn(pre), t = importe({ BASE: b / 100, TIPO_IVA: val(pre + '-TIPO_IVA') });
-        vent.querySelector('#' + pre + '-imp-et').textContent = ci ? 'Importe con IVA' : etBase;
-        vent.querySelector('#' + pre + '-total').textContent = ci ? 'Sin IVA ' + eur(t.base) + ' · IVA ' + eur(t.iva) + ' · total ' + eur(t.total) : 'IVA ' + eur(t.iva) + ' · total con IVA ' + eur(t.total);
+      /* ----- T0689 · la foto del ticket (o de una factura recibida) ----- */
+
+      /** La caja de la foto (pre: m o f): un botón grande que en el móvil abre la cámara o la galería; elegida, su miniatura, «Cambiar» y «Quitar». */
+      function cajaFoto(pre, titulo) {
+        return '<div class="u-ancho eco-foto" id="' + pre + '-foto-caja"><input type="file" id="' + pre + '-foto" accept="image/*,application/pdf" hidden>' +
+          '<button type="button" class="eco-foto-b" id="' + pre + '-foto-b">' + ICONO_FOTO + '<b>' + texto(titulo) + '</b><span class="u-nota">Hazle una foto o elige una que ya tengas</span></button>' +
+          '<div class="eco-foto-ok" id="' + pre + '-foto-ok" hidden><img alt="" id="' + pre + '-foto-img"><span class="eco-foto-n"><b id="' + pre + '-foto-n"></b>' +
+          '<span class="u-nota">Se guarda en Drive al guardar.</span></span><button type="button" class="u-btn u-btn-texto" id="' + pre + '-foto-cambiar">Cambiar</button>' +
+          '<button type="button" class="u-btn u-btn-texto" id="' + pre + '-foto-quitar">Quitar</button></div></div>';
+      }
+      function fotoDe(pre) { var i = vent.querySelector('#' + pre + '-foto'); return (i && i.files && i.files[0]) || null; }
+      function quitarFoto(pre) {
+        var i = vent.querySelector('#' + pre + '-foto'); if (!i) return;
+        i.value = ''; vent.querySelector('#' + pre + '-foto-b').hidden = false; vent.querySelector('#' + pre + '-foto-ok').hidden = true;
+      }
+      function oirFoto(pre) {
+        var inp = vent.querySelector('#' + pre + '-foto'); if (!inp) return;
+        var abrir = function () { inp.click(); };
+        vent.querySelector('#' + pre + '-foto-b').onclick = abrir;
+        vent.querySelector('#' + pre + '-foto-cambiar').onclick = abrir;
+        vent.querySelector('#' + pre + '-foto-quitar').onclick = function () { quitarFoto(pre); };
+        inp.onchange = function () {
+          var fl = fotoDe(pre); if (!fl) return;
+          if (!/^image\//.test(fl.type || '') && fl.type !== 'application/pdf') { verError(['Elige una foto o un PDF.']); quitarFoto(pre); return; }
+          if (fl.size > MAX_FOTO) { verError(['Es muy grande (más de 20 MB): elige otra o hazle una foto.']); quitarFoto(pre); return; }
+          verError([]);
+          var img = vent.querySelector('#' + pre + '-foto-img');
+          img.hidden = !/^image\//.test(fl.type || '');
+          if (!img.hidden) { try { img.src = URL.createObjectURL(fl); } catch (e) { img.hidden = true; } }
+          vent.querySelector('#' + pre + '-foto-n').textContent = fl.type === 'application/pdf' ? fl.name || 'El PDF' : 'La foto del ticket';
+          vent.querySelector('#' + pre + '-foto-b').hidden = true; vent.querySelector('#' + pre + '-foto-ok').hidden = false;
+        };
+      }
+      /** Sube un archivo (la foto, ya reducida, o el PDF) a la carpeta de los tickets → promesa con su enlace. */
+      function subirArchivo(fl, nombreA, fechaIso) {
+        if (!fl) return Promise.reject(new Error('No hay ninguna foto.'));
+        return prepararArchivo(fl).then(function (a) { return ctx.llamar('economiaTicket', [{ nombre: nombreA, fecha: fechaIso, tipo: a.tipo, datos: a.datos }]); })
+          .then(function (r) { return r.url; });
+      }
+      function subirFoto(pre, nombreA, fechaIso) { return subirArchivo(fotoDe(pre), nombreA, fechaIso); }
+
+      /** Etiqueta del importe y, debajo, la cuenta: «82,64 € + IVA 17,36 € = 100,00 €». etCon: cómo se llama con IVA. */
+      function pintaImporte(pre, etBase, etCon) {
+        var ci = vent.querySelector('#' + pre + '-coniva').checked, b = baseEn(pre), t = importe({ BASE: b / 100, TIPO_IVA: val(pre + '-TIPO_IVA'), RETENCION: retEn(pre), IVA_IMPORTACION: duaEn(pre) / 100 });
+        // T0733: con retención, lo escrito con el IVA incluido es lo que se paga (base + IVA − retención).
+        vent.querySelector('#' + pre + '-imp-et').textContent = ci ? (t.ret ? 'Lo que pagas' : etCon || 'Importe con IVA') : etBase;
+        var bc = vent.querySelector('#' + pre + '-iva-cambio'); if (bc) bc.textContent = ci ? 'Lo tengo sin IVA' : 'Lo tengo con el IVA incluido';
+        var mx = enOtraMoneda(pre), cambio = !mx ? '' : mx.euros ? mx.euros.cuenta + ' · ' : isNaN(mx.n) ? '' : 'Falta el cambio: cuántos ' + mx.m.sim + ' hay en un euro. ';
+        // T0733: «100,00 € + IVA 21,00 € − retención 15,00 € = 106,00 €» (y el IVA de aduana, aparte).
+        vent.querySelector('#' + pre + '-total').textContent = cambio + eur(t.base) + ' + IVA ' + eur(t.cuota) + (t.dua ? ' + IVA de aduana ' + eur(t.dua) : '') +
+          (t.ret ? ' − retención ' + eur(t.ret) : '') + ' = ' + eur(t.total) + (ci ? '' : t.ret ? ' a pagar' : ' con IVA');
       }
       function oirImporte(pre, refrescar) {
-        vent.querySelector('#' + pre + '-coniva').addEventListener('change', function (e) { guardado(CLAVE + 'coniva', e.target.checked ? '1' : ''); refrescar(); });
+        var ci = vent.querySelector('#' + pre + '-coniva');
+        ci.addEventListener('change', function (e) { guardado(CLAVE + 'coniva', e.target.checked ? '1' : '0'); refrescar(); });
+        // Cambiar cómo se lee no cambia el número escrito: lo que se guarda es su base, con o sin IVA.
+        vent.querySelector('#' + pre + '-iva-cambio').addEventListener('click', function () { ci.checked = !ci.checked; ci.dispatchEvent(new Event('change')); });
       }
       function dato(et, v) { return v === '' || v == null ? '' : '<div class="eco-df"><span>' + texto(et) + '</span><span>' + v + '</span></div>'; }
 
@@ -1231,12 +2054,15 @@
             dato(m.TIPO === 'Ingreso' ? 'Entra en' : 'Sale de', texto(nombre('cue', m.ID_CUENTA))) +
             dato(m.TIPO === 'Ingreso' ? 'Quién paga' : 'Quién cobra', texto(nombre('ctr', m.ID_CONTRAPARTE)))) +
           (P && m[P] ? dato(nomPer, texto(nombre('per', m[P]))) : '') + (DS && m[DS] ? dato(nomDes, texto(nombre('des', m[DS]))) : '') +
-          dato('Sin IVA', eur(x.base)) + dato('IVA', texto(m.TIPO_IVA || '0%') + ' · ' + eur(x.iva)) + dato('Total', eur(x.total)) +
+          dato('Sin IVA', eur(x.base)) + dato('IVA', texto(m.TIPO_IVA || '0%') + ' · ' + eur(x.cuota)) +
+          (x.dua ? dato('IVA de aduana (DUA)', eur(x.dua)) : '') + (x.ret ? dato('Retención de IRPF', texto(tipoIva(m.RETENCION)) + ' · −' + eur(x.ret)) : '') + // T0733
+          dato('Total', eur(x.total)) +
           (interno ? '' : dato('Factura o ticket', f ? '<button type="button" class="u-btn u-btn-texto" data-verfac="' + texto(f.ID) + '">' + texto(numFac(f)) + ' ›</button>' + (f.ARCHIVO_URL ? ' · ' + enlaceDrive(f) : '') : sinFac(m) ? '<span class="u-mal">Falta</span>' : 'No lleva')) +
           dato('Notas', texto(m.NOTAS)) + '</div>' +
           (m.LOG ? '<details class="eco-hist"><summary>Historial de cambios</summary><pre>' + texto(m.LOG) + '</pre></details>' : '') +
           '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="d-editar" data-foco>Editar movimiento</button>' +
-          (!interno && !m.ID_FACTURA && !(c && esReparto(d, c)) ? '<button type="button" class="u-btn" id="d-factura">' + (m.TIPO === 'Ingreso' ? 'Hacer la factura' : 'Añadir su factura') + '</button>' : '') +
+          // T0689: donde la factura se hace desde su pedido (FACTURAS con ID_VENTA), un cobro no la hace: la lleva al unirse.
+          (!interno && !m.ID_FACTURA && !(c && esReparto(d, c)) && !(m.TIPO === 'Ingreso' && facPorVenta()) ? '<button type="button" class="u-btn" id="d-factura">' + (m.TIPO === 'Ingreso' ? 'Hacer la factura' : 'Añadir su factura') + '</button>' : '') +
           '<button type="button" class="u-btn" data-cerrar>Cerrar</button>' +
           '<button type="button" class="u-btn u-btn-texto" id="d-borrar">Borrar movimiento</button></div>';
         ventana(html, function () {
@@ -1244,7 +2070,8 @@
           var bf = vent.querySelector('#d-factura');
           if (bf) bf.onclick = function () {
             var emit = m.TIPO === 'Ingreso';
-            formFac(null, { TIPO: emit ? 'Emitida' : 'Recibida', FECHA: emit ? hoy() : m.FECHA, ID_CONTRAPARTE: m.ID_CONTRAPARTE, BASE: x.base / 100, TIPO_IVA: m.TIPO_IVA || '21%',
+            formFac(null, { TIPO: emit ? 'Emitida' : 'Recibida', FECHA: emit ? hoy() : m.FECHA, ID_CONTRAPARTE: m.ID_CONTRAPARTE, BASE: emit ? x.base / 100 : m.BASE, TIPO_IVA: m.TIPO_IVA || '21%',
+              RETENCION: emit ? '' : m.RETENCION || '', IVA_IMPORTACION: emit ? '' : m.IVA_IMPORTACION || '', // T0733
               ESTADO: 'Pagada', NOTAS: (emit ? 'Del cobro ' : 'Del pago ') + m.ID + ' · ' + String(m.CONCEPTO || '') }, m.ID);
           };
           var vf = vent.querySelector('[data-verfac]');
@@ -1287,10 +2114,14 @@
           '<div class="eco-sw" role="group" aria-label="Qué es">' +
           '<button type="button" data-tipo="Ingreso">↓ Entra dinero</button><button type="button" data-tipo="Gasto">↑ Sale dinero</button><button type="button" data-tipo="Interno">⇄ Entre cuentas</button></div>' +
           '<div class="u-campos">' +
-          campo('<span id="m-imp-et">Importe sin IVA</span>', '<input type="text" inputmode="decimal" class="eco-imp" id="m-BASE" value="' + texto(verImporte(v)) + '" placeholder="0,00" data-foco>') +
-          campo('IVA', '<select id="m-TIPO_IVA">' + opciones(ivas().map(function (x) { return [x, x]; }), v.TIPO_IVA) + '</select>') +
+          // T0689 · La foto del ticket, lo primero de un gasto (en el móvil abre la cámara o la galería); al guardar, a Drive.
+          (TICKETS && !(m && m.ID_FACTURA) ? cajaFoto('m', 'Foto del ticket') : '') +
+          campo('<span id="m-imp-et">Importe sin IVA</span>', '<span class="eco-imp-m"><input type="text" inputmode="decimal" class="eco-imp" id="m-BASE" value="' + texto(verImporte(v)) + '" placeholder="0,00" data-foco>' + cajaMoneda('m') + '</span>') +
+          cajaCambio('m') +
+          campo('IVA', '<select id="m-TIPO_IVA">' + opcionesConValor(ivas().map(function (x) { return [x, x]; }), v.TIPO_IVA) + '</select>') +
           casillaIva('m') +
           '<p class="u-nota u-ancho" id="m-total"></p>' +
+          cajaRetDua('m', v, d.colsMov) + // T0733 (R101): solo en un gasto
           campo('Concepto', '<input type="text" id="m-CONCEPTO" value="' + texto(v.CONCEPTO) + '" maxlength="200" placeholder="Por ejemplo: el dominio de la web">', 'u-ancho') +
           campo('Fecha', '<input type="date" id="m-FECHA" value="' + texto(v.FECHA) + '">') +
           (tienePer ? campo(texto(nomPer), '<select id="m-PER">' + opciones(lista.map(function (p) { return [p.id, p.nombre]; }), v[P], 'Elige') + '</select>') : '') +
@@ -1325,19 +2156,24 @@
               var filas = d.des.filter(function (r) { return !pv || !(P in r) || String(r[P]) === pv || String(r.ID) === String(des); });
               // T0628: las ventas, con su marca; sin venta, es un gasto de la empresa (lo invertido).
               if (VEN) filas = filas.slice().sort(function (a, b) { return String(a.FECHA || '') < String(b.FECHA || '') ? 1 : -1; });
-              sd.innerHTML = opciones((R.DESGLOSE ? filas.map(function (r) { return [r.ID, VEN ? nombreVenta(r) : r.NOMBRE || r.ID]; }) : []), des, VEN ? 'Ninguna: es de la empresa' : 'General');
+              sd.innerHTML = opciones((R.DESGLOSE ? filas.map(function (r) { return [r.ID, VEN ? nombreVenta(r) : r.NOMBRE || r.ID]; }) : []), des, VEN ? V('Ningun{a}: es de la empresa') : 'General');
             }
             var sf = vent.querySelector('#m-ID_FACTURA'), fa = sf.value || v.ID_FACTURA, ctr = val('m-ID_CONTRAPARTE');
             var fs = d.fac.filter(function (f) { return String(f.ID) === String(fa) || (f.ESTADO !== 'Anulada' && (!ctr || String(f.ID_CONTRAPARTE) === ctr) && (tipo === 'Ingreso' ? f.TIPO === 'Emitida' : f.TIPO !== 'Emitida')); })
               .sort(function (a, b) { return String(a.FECHA) < String(b.FECHA) ? 1 : -1; }).slice(0, 60);
             sf.innerHTML = opciones(fs.map(function (f) { return [f.ID, numFac(f) + ' · ' + fecha(f.FECHA) + ' · ' + eur(importe(f).total)]; }), fa, 'Sin factura');
-            pintaImporte('m', 'Importe sin IVA');
+            pintaImporte('m', 'Importe sin IVA', tipo === 'Gasto' ? 'Lo que pagaste, con IVA' : tipo === 'Ingreso' ? 'Lo que cobraste, con IVA' : 'Importe con IVA');
+            var cf = vent.querySelector('#m-foto-caja'); if (cf) cf.hidden = tipo !== 'Gasto';
+            var rd = vent.querySelector('#m-retdua'); if (rd && rd.hidden !== (tipo !== 'Gasto')) { rd.hidden = tipo !== 'Gasto'; pintaImporte('m', 'Importe sin IVA', tipo === 'Gasto' ? 'Lo que pagaste, con IVA' : tipo === 'Ingreso' ? 'Lo que cobraste, con IVA' : 'Importe con IVA'); }
           }
           refrescar();
           vent.querySelector('.eco-sw').onclick = function (e) { var b = e.target.closest('[data-tipo]'); if (b) { st.tipo = b.getAttribute('data-tipo'); refrescar(); } };
           ['m-TIPO_IVA', 'm-ID_CONTRAPARTE', 'm-PER'].forEach(function (id) { var e = vent.querySelector('#' + id); if (e) e.addEventListener('change', refrescar); });
           vent.querySelector('#m-BASE').addEventListener('input', refrescar);
           oirImporte('m', refrescar);
+          oirRetDua('m', refrescar);
+          oirMoneda('m', refrescar);
+          oirFoto('m');
           // T0293 · Alta rápida de quién paga o cobra (ALTA_CONTRAPARTE): se crea al momento y queda elegida.
           var bn = vent.querySelector('#m-ctr-nueva');
           if (bn) {
@@ -1365,15 +2201,50 @@
             var nv = { FECHA: val('m-FECHA'), TIPO: tipo, CONCEPTO: val('m-CONCEPTO'), BASE: baseEn('m') / 100, TIPO_IVA: val('m-TIPO_IVA'),
               ID_CATEGORIA: interno ? '' : val('m-ID_CATEGORIA'), ID_CUENTA: val('m-ID_CUENTA'), ID_CUENTA_DESTINO: interno ? val('m-ID_CUENTA_DESTINO') : '',
               ID_CONTRAPARTE: interno ? '' : val('m-ID_CONTRAPARTE'), ID_FACTURA: interno ? '' : val('m-ID_FACTURA'), NOTAS: val('m-NOTAS') };
+            Object.assign(nv, valoresRetDua('m', d.colsMov)); // T0733: vacías si no es un gasto (la caja no se ve)
             if (tienePer) nv[P] = val('m-PER');
             if (tieneDes) nv[DS] = interno ? '' : val('m-DES');
+            // T0689: un cobro de un pedido con factura la lleva aunque no se elija.
+            if (tieneDes && facPorVenta() && !nv.ID_FACTURA) nv.ID_FACTURA = facturaDelCobro(nv, d.fac, DS);
             var mal = problemasMov(Object.assign({}, nv, { BASE: val('m-BASE') }), Object.assign({}, cfg, { PERIODO: tienePer ? P : '' }));
+            // T0726 (R61): en otra moneda se guarda en euros, con la cuenta en las notas («Cambio: 4.000 ₹ ÷ 110 = 36,36 €»).
+            var mx = enOtraMoneda('m');
+            if (mx && !isNaN(mx.n)) {
+              if (!mx.euros) mal.push('Falta el cambio: cuántos ' + mx.m.sim + ' hay en un euro.');
+              else nv.NOTAS = notasConCambio(nv.NOTAS, mx.euros.cuenta);
+            }
             if (mal.length) { verError(mal); return; }
+            var foto = tipo === 'Gasto' ? fotoDe('m') : null; // T0689: se lee antes de cerrar la ventana
             cerrar();
             var p = m ? T.actualizar('MOVIMIENTOS', m.ID, cambios(m, nv)) : T.crear('MOVIMIENTOS', nv);
-            p.then(function () { if (ctx.abierta()) ctx.aviso('Movimiento guardado en el Excel.'); revisarFactura(nv.ID_FACTURA); }, function () {});
+            p.then(function (r) {
+              if (!foto) { if (ctx.abierta()) ctx.aviso('Movimiento guardado en el Excel.'); revisarFactura(nv.ID_FACTURA); return; }
+              ticketDelGasto(m ? m.ID : (r && (r.id || (r.fila && r.fila.ID))), nv, foto);
+            }, function () {});
           };
         });
+      }
+
+      /**
+       * T0689 · Tras apuntar un gasto con su foto: la sube a Drive y la guarda como su ticket (una fila de FACTURAS de tipo
+       * Ticket, Pagada, con el mismo importe), unido al gasto. Si el gasto ya llevaba una factura sin archivo, la foto va a
+       * esa. El gasto ya está apuntado: si la foto falla, lo dice y queda como gasto sin factura (sale en Pendiente).
+       */
+      /** T0733 · La retención y el IVA de aduana del gasto, para su ticket (solo las columnas que tiene FACTURAS). */
+      function ticketRetDua(nv) { var o = {}; ['RETENCION', 'IVA_IMPORTACION'].forEach(function (k) { if (d.colsFac.indexOf(k) >= 0 && nv[k]) o[k] = nv[k]; }); return o; }
+      function ticketDelGasto(idMov, nv, foto) {
+        if (!idMov) return;
+        if (ctx.abierta()) ctx.aviso('Gasto apuntado. Subiendo la foto del ticket…');
+        subirArchivo(foto, nv.CONCEPTO || 'Ticket', nv.FECHA).then(function (url) {
+          var ya = nv.ID_FACTURA ? ix.fac[nv.ID_FACTURA] : null;
+          if (ya) return ya.ARCHIVO_URL ? null : T.actualizar('FACTURAS', ya.ID, { ARCHIVO_URL: url });
+          return T.crear('FACTURAS', Object.assign({ TIPO: 'Ticket', NUMERO: numeroTicket(nv.CONCEPTO, nv.FECHA), FECHA: nv.FECHA, ID_CONTRAPARTE: nv.ID_CONTRAPARTE || '',
+            BASE: nv.BASE, TIPO_IVA: nv.TIPO_IVA, ESTADO: 'Pagada', ARCHIVO_URL: url }, ticketRetDua(nv))).then(function (rf) {
+            var idf = rf && (rf.id || (rf.fila && rf.fila.ID));
+            if (idf) return T.actualizar('MOVIMIENTOS', idMov, { ID_FACTURA: idf });
+          });
+        }).then(function () { if (ctx.abierta()) ctx.aviso('Ticket guardado en Drive y unido al gasto.'); },
+          function (e) { if (ctx.abierta()) ctx.aviso('El gasto está apuntado, pero la foto no se ha subido: ' + String((e && e.message) || e).replace(/^[A-Z]+: /, '') + '. Añádela desde el gasto.'); });
       }
 
       /** Si una factura Pendiente ya está cobrada o pagada del todo con sus movimientos, se marca Pagada. */
@@ -1386,17 +2257,45 @@
         }, function () {});
       }
 
+      /** T0726 (R64) · La fila de EMPRESA tal como está ahora en la copia (también lo recién cambiado en «Datos de tu empresa»). */
+      function empresaAhora() { return LINEAS ? (T.filas('EMPRESA') || [])[0] || d.emp || null : null; }
       /** T0627 · Lo que le falta a la empresa para que sus facturas estén completas. */
       function empresaFaltan() {
-        var e = d.emp || {}, f = [];
+        var e = empresaAhora() || {}, f = [];
         if (!String(e.NOMBRE || '').trim()) f.push('el nombre');
         if (!String(e.NIF || '').trim()) f.push('el CIF');
         if (!String(e.DIRECCION || '').trim()) f.push('la dirección');
         return f;
       }
-      /** T0627 · Los datos de la empresa para sus facturas (la fila de EMPRESA; si no hay, se crea al guardar). */
-      function formEmpresa() {
-        var e = d.emp || {};
+      /**
+       * T0726 (R27 y R64) · «Para … faltan el nombre, el CIF y la dirección de tu empresa: ponlos en «Datos de tu empresa»», con
+       * el botón que los abre. encima: desde una factura a medias, que no se pierde (los datos se abren encima).
+       */
+      function avisoEmpresa(para, encima) {
+        var xs = empresaFaltan(), n = xs.length;
+        return texto(para) + ' ' + (n > 1 ? 'faltan ' : 'falta ') + texto(listaY(xs)) + ' de tu empresa: <button type="button" class="u-btn u-btn-texto" data-accion="empresa"' +
+          (encima ? ' id="f-empresa"' : '') + '>' + (n > 1 ? 'ponlos' : 'ponlo') + ' en «Datos de tu empresa»</button>.' + (encima ? ' Se abren encima y no pierdes la factura.' : '');
+      }
+      /**
+       * T0726 (R64) · Una ventana encima de otra (los datos de la empresa sobre una factura a medias): la de debajo se aparta tal
+       * cual (con lo escrito y sus botones) y vuelve al cerrar la de encima. alVolver: lo que se hace al volver.
+       */
+      var debajo = null;
+      function apartar(alVolver) {
+        var fr = document.createDocumentFragment(), uv = vent.closest('.u-ventana');
+        while (vent.firstChild) fr.appendChild(vent.firstChild);
+        debajo = { fr: fr, arriba: uv ? uv.scrollTop : 0, alVolver: alVolver || null };
+      }
+      function volverDebajo() {
+        var x = debajo; debajo = null;
+        vent.innerHTML = ''; vent.appendChild(x.fr);
+        var uv = vent.closest('.u-ventana'); if (uv) uv.scrollTop = x.arriba;
+        if (x.alVolver) x.alVolver();
+      }
+      /** T0627 · Los datos de la empresa para sus facturas (la fila de EMPRESA; si no hay, se crea al guardar). T0726: alVolver, encima de una factura. */
+      function formEmpresa(alVolver) {
+        if (alVolver) apartar(alVolver);
+        var e = empresaAhora() || {};
         var c = function (et, col, html, extra) { return campo(et, html.replace('%v', texto(e[col])), extra); };
         ventana('<h2 id="eco-vt">Datos de tu empresa</h2><p class="u-nota">Salen en todas tus facturas. El nombre, el CIF y la dirección son obligatorios en una factura.</p><div class="u-campos">' +
           c('Nombre o razón social', 'NOMBRE', '<input type="text" id="e-NOMBRE" value="%v" maxlength="120">', 'u-ancho') +
@@ -1409,7 +2308,7 @@
           // T0681: la cuenta en la que te pagan: sale en la factura, bajo la forma de pago (Javi, 19/11/2026).
           (d.colsEmp.indexOf('IBAN') >= 0 ? c('IBAN de la cuenta en la que te pagan', 'IBAN', '<input type="text" id="e-IBAN" value="%v" maxlength="42" autocomplete="off" placeholder="ES00 0000 0000 0000 0000 0000">', 'u-ancho') : '') +
           c('Pie de la factura (opcional)', 'PIE', '<textarea id="e-PIE" rows="2">%v</textarea>', 'u-ancho') + '</div>' +
-          '<p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="e-guardar">Guardar</button><button type="button" class="u-btn" data-cerrar>Cancelar</button></div>',
+          '<p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="e-guardar">Guardar</button><button type="button" class="u-btn" data-cerrar>' + (alVolver ? 'Volver a la factura' : 'Cancelar') + '</button></div>',
         function () {
           vent.querySelector('#e-guardar').onclick = function () {
             var nv = {};
@@ -1417,8 +2316,9 @@
             nv.NIF = nv.NIF.toUpperCase().replace(/\s+/g, '');
             if (nv.EMAIL && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(nv.EMAIL)) { verError(['El email no parece bien escrito.']); return; }
             if ('IBAN' in nv) { var ib = iban(nv.IBAN); if (!ib.ok) { verError(['El IBAN no cuadra: revisa que esté entero y sin cambiar ningún número.']); return; } nv.IBAN = ib.texto; }
+            // T0726: primero a la copia (al momento) y después se cierra: si vuelve a una factura, ya los tiene.
+            var e0 = empresaAhora(), p = e0 && e0.ID ? T.actualizar('EMPRESA', e0.ID, cambios(e0, nv)) : T.crear('EMPRESA', nv);
             cerrar();
-            var p = d.emp ? T.actualizar('EMPRESA', d.emp.ID, cambios(d.emp, nv)) : T.crear('EMPRESA', nv);
             p.then(function () { if (ctx.abierta()) ctx.aviso('Datos de tu empresa guardados en el Excel.'); }, function () {});
           };
         });
@@ -1443,6 +2343,12 @@
        *  aún no tienen contraparte, con «marca:» delante); si no, todas las contrapartes. */
       function opcContraparte(tipo, sel) {
         function orden(a, b) { return String(a[1]).localeCompare(String(b[1]), 'es'); }
+        // T0726 (R60): en una recibida o un ticket, primero quien te factura (proveedores, gestoría, herramientas…) y los clientes, aparte.
+        if (tipo !== 'Emitida' && d.ctr.some(function (c) { return c.TIPO === 'Cliente'; })) {
+          var no = d.ctr.filter(function (c) { return c.TIPO !== 'Cliente'; }), si = d.ctr.filter(function (c) { return c.TIPO === 'Cliente'; });
+          var de = function (xs) { return xs.map(function (c) { return [c.ID, c.NOMBRE]; }).sort(orden); };
+          return '<option value="">Elige</option>' + opciones(de(no), sel) + '<optgroup label="Clientes">' + opciones(de(si), sel) + '</optgroup>';
+        }
         if (!(CLI && tipo === 'Emitida')) return opciones(d.ctr.map(function (c) { return [c.ID, c.NOMBRE]; }).sort(orden), sel, 'Elige');
         var x = clientesFactura(d.ctr, fichasCli(), CLI, sel), xs = x.clientes, otros = x.otros;
         var h = '<option value="">Elige</option>' + opciones(xs, sel);
@@ -1456,14 +2362,41 @@
         var lin0 = f && LINEAS ? lineasDe(d.lin, f.ID) : [];
         var ARTS = ART ? articulos(ART, { filas: function (t) { return T.filas(t) || []; }, fila: filaDe }) : [];
         var datosCli = LINEAS && d.colsCtr.indexOf('NIF') >= 0 && d.colsCtr.indexOf('DIRECCION') >= 0;
+        // T0726 (R60): el CIF o NIF del proveedor, también en una recibida (se guarda en su contraparte, como el del cliente).
+        var nifProv = d.colsCtr.indexOf('NIF') >= 0;
         var pdf = LINEAS && !!String(cfg.FACTURA_CARPETA || '').trim();
-        var html = '<h2 id="eco-vt">' + (f ? 'Factura ' + texto(numFac(f)) : movId ? (v.TIPO === 'Emitida' ? 'Hacer la factura' : 'Añadir su factura') : 'Añadir factura') + '</h2>' +
+        // T0725 (R12): una emitida con PDF, cobrada o anulada no se cambia; solo su estado y sus notas.
+        var cerrada = LINEAS && facturaCerrada(f);
+        // T0689 · Desde un pedido: a su marca y con lo que pidió; al guardarla queda unida a él (FACTURAS · ID_VENTA).
+        var deVenta = !f && DS && v[DS] && d.colsFac.indexOf(DS) >= 0 ? ix.des[String(v[DS])] || null : null;
+        // T0747 · Qué emitida es: la del anticipo de un pedido (R102) o una rectificativa (R13), con la que corrige.
+        var conClase = d.colsFac.indexOf('CLASE') >= 0, clase = conClase ? String(v.CLASE || '') : '';
+        var rect = clase === 'Rectificativa', rectDe = rect ? ix.fac[String(v.RECTIFICA || '')] || null : null;
+        var serieNueva = String(rect ? cfg.SERIE_RECTIFICATIVAS || 'FR.' : cfg.SERIE_EMITIDAS || '');
+        var rectsDe = f && conClase && f.TIPO === 'Emitida' ? rectificativasDe(d.fac, f.ID) : [];
+        // Se rectifica una emitida guardada que no está anulada (cerrada o no: una pendiente sin PDF también se puede corregir así).
+        var puedeRect = conClase && f && f.TIPO === 'Emitida' && f.ESTADO !== 'Anulada' && !f._nueva && LINEAS;
+        var descuenta = (linea0 && [].concat(linea0).filter(function (l) { return l && l.anticipo; })[0]) || null;
+        var html = '<h2 id="eco-vt">' + (f ? (rect ? 'Rectificativa ' : 'Factura ') + texto(numFac(f)) : rect ? 'Rectificativa de la ' + texto(rectDe ? numFac(rectDe) : 'factura') :
+            deVenta ? (clase === 'Anticipo' ? 'Factura del anticipo a ' : 'Factura a ') + texto(nombre('ctr', v.ID_CONTRAPARTE) || 'la marca') : movId ? (v.TIPO === 'Emitida' ? 'Hacer la factura' : 'Añadir su factura') : 'Añadir factura') + '</h2>' +
+          (deVenta ? '<p class="u-nota">' + V('{Del} {venta}') + ' «' + texto(deVenta.NOMBRE || deVenta.ID) + '»: ' +
+            (clase === 'Anticipo' ? 'el anticipo pactado. Su IVA se declara al cobrarlo; la factura final lo descontará.' :
+              'revisa lo que se vende y el precio.' + (descuenta ? ' Lleva en negativo el anticipo que ya le facturaste (' + texto(descuenta.numero) + '): así no paga dos veces.' : '')) +
+            ' Será la siguiente de la serie «' + texto(serieNueva) + '», con fecha de hoy.</p>' : '') +
+          // T0747 (R13) · La rectificativa: a cuál corrige y cómo empieza (sus líneas en negativo).
+          (rect && !f ? '<p class="u-nota">Corrige la ' + texto(rectDe ? numFac(rectDe) : 'factura') + ' sin tocarla: una factura ya hecha no se cambia. Empieza con sus líneas en negativo, que la anulan entera; si solo cambia una parte (un descuento, metros de menos), deja solo esa línea con lo que cambia. Será la siguiente de la serie «' + texto(serieNueva) + '».</p>' : '') +
+          (rect && f ? '<p class="u-nota">Rectifica la ' + texto(rectDe ? numFac(rectDe) + ' (' + fecha(rectDe.FECHA) + ')' : 'factura ' + String(v.RECTIFICA || '')) + '.</p>' : '') +
+          (rectsDe.length ? '<p class="u-nota">Corregida con ' + texto(listaY(rectsDe.map(numFac))) + ': lo que cuenta es esta más ' + (rectsDe.length === 1 ? 'su rectificativa' : 'sus rectificativas') + '.</p>' : '') +
           // T0627: en una emitida por líneas, arriba, su PDF guardado (el que se manda al cliente) o que aún no tiene.
-          (f && LINEAS && f.TIPO === 'Emitida' ? '<p>' + (f.ARCHIVO_URL ? '<a class="eco-drive" href="' + texto(f.ARCHIVO_URL) + '" target="_blank" rel="noopener" data-fuera>Abrir el PDF ↗</a>' : '<span class="u-nota">Todavía sin PDF' + (pdf ? ': «Guardar y sacar el PDF» lo hace.' : '.') + '</span>') + '</p>'
-            : f ? '<p>' + enlaceDrive(f) + '</p>' : '') +
+          (f && LINEAS && f.TIPO === 'Emitida' ? '<p>' + (f.ARCHIVO_URL ? enlaceDrive(f) : '<span class="u-nota">Todavía sin PDF' + (pdf && puedeSacarPdf(f) ? ': «Guardar y sacar el PDF» lo hace.' : '.') + '</span>') + '</p>'
+            : f && f.ARCHIVO_URL ? '<p>' + enlaceDrive(f) + '</p>' : '') +
+          (cerrada ? '<p class="u-nota" id="f-cerrada">' + (String(f.ARCHIVO_URL || '').trim() ? 'Ya tiene su PDF' : f.ESTADO === 'Anulada' ? 'Está anulada' : 'Ya está cobrada') +
+            ': solo se cambian el estado y las notas. La fecha, el cliente, lo que se vende y el IVA se quedan como están.' + (puedeRect ? ' Si hay que corregirla, «Rectificar».' : '') + '</p>' : '') +
+          // T0726 (R64): sin los datos de la empresa, dónde se ponen, sin perder la factura.
+          (LINEAS && !cerrada ? '<p class="u-nota eco-falta" id="f-emp" hidden></p>' : '') +
           (movId ? '<p class="u-nota">Con los datos del movimiento. ' + (v.TIPO === 'Emitida' ? 'La fecha es la de hoy, que es cuando se emite; el número lo pone el Excel al guardarla.' : 'Pon el número que trae la factura.') + ' Al guardarla queda enlazada al movimiento.</p>' : '') +
           // T0673 · El tipo, arriba y a la vista (como «Entra / Sale / Entre cuentas» en Movimientos), no en un desplegable.
-          (f ? '' : '<div class="eco-sw" role="group" aria-label="Qué factura es">' + TIPOS_FAC.map(function (t) {
+          (f ? '' : clase ? '<input type="hidden" id="f-TIPO" value="Emitida">' : '<div class="eco-sw" role="group" aria-label="Qué factura es">' + TIPOS_FAC.map(function (t) {
             return '<button type="button" data-tipo="' + t[0] + '" aria-pressed="' + (t[0] === (v.TIPO || 'Emitida') ? 'true' : 'false') + '">' + t[1] + '</button>';
           }).join('') + '</div><input type="hidden" id="f-TIPO" value="' + texto(v.TIPO || 'Emitida') + '"><p class="u-nota" id="f-tipo-nota">' + texto(notaTipoFac(v.TIPO || 'Emitida')) + '</p>') +
           '<div class="u-campos">' +
@@ -1471,26 +2404,37 @@
           '<p class="u-nota u-ancho" id="f-num-nota" hidden></p>' +
           campo('Fecha', '<input type="date" id="f-FECHA" value="' + texto(v.FECHA) + '">') +
           campo('<span id="f-ctr-et">' + (v.TIPO === 'Emitida' ? 'Cliente (a quién se la hacemos)' : 'Proveedor (quién nos la hace)') + '</span>', '<select id="f-ID_CONTRAPARTE">' + opcContraparte(v.TIPO, v.ID_CONTRAPARTE) + '</select>') +
-          (datosCli ? '<div class="u-campos u-ancho" id="f-cli">' + campo('CIF o NIF del cliente', '<input type="text" id="f-NIF" maxlength="20" autocomplete="off">') +
-            campo('Dirección del cliente', '<textarea id="f-DIRECCION" rows="2" placeholder="Calle y número&#10;Código postal y ciudad"></textarea>', 'u-ancho') +
-            '<p class="u-nota u-ancho">Salen en su factura. Se guardan en el cliente: la próxima vez ya están.</p></div>' : '') +
-          (LINEAS ? '<div class="u-ancho" id="f-lin"><span class="u-etiqueta">Qué se vende</span><div id="f-lineas"></div>' +
+          (datosCli || nifProv ? '<div class="u-campos u-ancho" id="f-cli">' + campo('<span id="f-nif-et">CIF o NIF del cliente</span>', '<input type="text" id="f-NIF" maxlength="20" autocomplete="off">') +
+            (datosCli ? campo('Dirección del cliente', '<textarea id="f-DIRECCION" rows="2" placeholder="Calle y número&#10;Código postal y ciudad"></textarea>', 'u-ancho eco-dir-cli') : '') +
+            '<p class="u-nota u-ancho" id="f-cli-nota">Salen en su factura. Se guardan en el cliente: la próxima vez ya están.</p></div>' : '') +
+          (rect ? campo('Por qué la corriges', '<input type="text" id="f-CAUSA" list="f-causas" maxlength="200" value="' + texto(v.CAUSA) + '" placeholder="Un descuento, tela devuelta, un precio mal puesto…" autocomplete="off">' +
+            '<datalist id="f-causas">' + ['Descuento por tela con defecto', 'Devolución de tela', 'Precio mal puesto', 'Metros de más en la factura', 'Datos del cliente mal puestos', 'Pedido anulado'].map(function (c) { return '<option value="' + c + '"></option>'; }).join('') + '</datalist>' +
+            '<span class="u-nota">Sale en la rectificativa, como pide la ley.</span>', 'u-ancho') : '') +
+          (LINEAS ? '<div class="u-ancho" id="f-lin"><span class="u-etiqueta">' + (rect ? 'Lo que cambia' : 'Qué se vende') + '</span><div id="f-lineas"></div>' +
             '<button type="button" class="u-btn u-btn-texto" id="f-mas">+ Añadir línea</button>' +
             '<p class="u-nota" id="f-lin-nota"></p></div>' : '') +
           campo('<span id="f-imp-et">Base imponible</span>', '<input type="text" inputmode="decimal" id="f-BASE" value="' + texto(verImporte(v)) + '" placeholder="0,00">', 'eco-base') +
-          campo('IVA', '<select id="f-TIPO_IVA">' + opciones(ivas().map(function (x) { return [x, x]; }), v.TIPO_IVA) + '</select>') +
+          campo('IVA', '<select id="f-TIPO_IVA">' + opcionesConValor(ivas().map(function (x) { return [x, x]; }), v.TIPO_IVA) + '</select>') +
           casillaIva('f') +
           '<div class="u-nota u-ancho" id="f-total"></div>' +
-          campo('Estado', '<select id="f-ESTADO">' + opciones([['Pendiente', 'Pendiente'], ['Pagada', 'Pagada'], ['Anulada', 'Anulada']], v.ESTADO, 'Sin estado') + '</select>') +
+          (cerrada ? '' : cajaRetDua('f', v, d.colsFac)) + // T0733 (R101): solo en una recibida o un ticket
+          // T0747 (R13): una emitida con su PDF ya se ha podido mandar: no se anula, se rectifica (salvo que ya lo esté).
+          campo('Estado', '<select id="f-ESTADO">' + opciones([['Pendiente', rect ? 'Pendiente (por devolver)' : 'Pendiente'], ['Pagada', rect ? 'Resuelta (devuelta o descontada)' : 'Pagada']]
+            .concat(f && f.TIPO === 'Emitida' && String(f.ARCHIVO_URL || '').trim() && f.ESTADO !== 'Anulada' && conClase ? [] : [['Anulada', 'Anulada']]), v.ESTADO, 'Sin estado') + '</select>') +
+          // T0689 · La foto o el PDF de una recibida o un ticket, desde el móvil (la sube el motor a Drive al guardar).
+          (TICKETS && !(f && f.ARCHIVO_URL) ? cajaFoto('f', 'Foto o PDF de la factura') : '') +
           campo('Enlace en Drive', '<input type="url" id="f-ARCHIVO_URL" value="' + texto(v.ARCHIVO_URL) + '" placeholder="https://drive.google.com/…">', 'u-ancho eco-url') +
-          '<p class="u-nota u-ancho" id="f-url-nota">El del PDF o la foto de la factura: en Drive, Compartir › Copiar enlace.</p>' +
+          '<p class="u-nota u-ancho" id="f-url-nota">' + (TICKETS && !(f && f.ARCHIVO_URL) ? 'O, si ya está en Drive, su enlace: Compartir › Copiar enlace.' : 'El del PDF o la foto de la factura: en Drive, Compartir › Copiar enlace.') + '</p>' +
           campo('Notas', '<textarea id="f-NOTAS" rows="2">' + texto(v.NOTAS) + '</textarea>', 'u-ancho') + '</div>' +
           (f ? '<p class="u-nota">' + (movs.length ? movs.length + (movs.length === 1 ? ' movimiento' : ' movimientos') + ' con esta factura: ' + eur(pagado) + ' de ' + eur(importe(f).total) + '.' : 'Ningún movimiento lleva todavía esta factura.') + '</p>' : '') +
           // T0646 · Lo que se hace, primero (guardar, sacar el PDF, apuntar el cobro); «Vista previa» y «Cancelar», como texto, al final.
           '<p class="u-error" role="alert" hidden></p><div class="n-botones eco-fbotones">' +
+          // T0689 · Una emitida nueva con carpeta para el PDF: un solo botón, que la guarda, la numera y saca su PDF.
+          (pdf && !f ? '<button type="button" class="u-btn u-btn-accion" id="f-hacer" hidden>' + (rect ? 'Hacer la rectificativa y el PDF' : 'Hacer la factura y el PDF') + '</button>' : '') +
           '<button type="button" class="u-btn u-btn-accion" id="f-guardar">Guardar factura</button>' +
-          (pdf && f ? '<button type="button" class="u-btn" id="f-pdf" hidden>Guardar y sacar el PDF</button>' : '') +
-          (f && f.ESTADO === 'Pendiente' ? '<button type="button" class="u-btn" id="f-apuntar">' + (f.TIPO === 'Emitida' ? 'Apuntar el cobro' : 'Apuntar el pago') + '</button>' : '') +
+          (pdf && puedeSacarPdf(f) ? '<button type="button" class="u-btn" id="f-pdf" hidden>Guardar y sacar el PDF</button>' : '') +
+          (f && f.ESTADO === 'Pendiente' && !esRectificativa(f) ? '<button type="button" class="u-btn" id="f-apuntar">' + (f.TIPO === 'Emitida' ? 'Apuntar el cobro' : 'Apuntar el pago') + '</button>' : '') +
+          (puedeRect ? '<button type="button" class="u-btn" id="f-rectificar">Rectificar</button>' : '') + // T0747 (R13)
           (LINEAS ? '<button type="button" class="u-btn u-btn-texto" id="f-ver" hidden title="Cómo queda con lo que hay ahora en pantalla, sin guardar">Vista previa</button>' : '') +
           '<button type="button" class="u-btn u-btn-texto" data-cerrar>Cancelar</button></div>';
         ventana(html, function () {
@@ -1508,7 +2452,7 @@
             div.className = 'eco-lin';
             if (l.ID) div.setAttribute('data-id', l.ID);
             div.innerHTML = (ARTS.length
-              ? '<div class="eco-lin-cw"><textarea rows="1" class="eco-lin-c" aria-label="Concepto" autocomplete="off" role="combobox" aria-expanded="false" placeholder="Busca en ' + texto(ART.titulo || 'la lista') + ' por nombre o código, o escribe (el envío)">' + texto(l.CONCEPTO) + '</textarea>' +
+              ? '<div class="eco-lin-cw"><textarea rows="1" class="eco-lin-c" aria-label="Concepto" autocomplete="off" role="combobox" aria-expanded="false" placeholder="Busca en ' + texto(ART.titulo || 'la lista') + ' por nombre o código, o escríbelo a mano">' + texto(l.CONCEPTO) + '</textarea>' +
                 '<div class="eco-lin-op" role="listbox" hidden></div></div>'
               : '<textarea rows="1" class="eco-lin-c" aria-label="Concepto" placeholder="Qué (p. ej. Lino Celosía BOR-004-01)">' + texto(l.CONCEPTO) + '</textarea>') +
               '<textarea rows="1" class="eco-lin-d" aria-label="Detalle" placeholder="Detalle (opcional)">' + texto(l.DETALLE) + '</textarea>' +
@@ -1517,7 +2461,7 @@
               '<input type="text" inputmode="decimal" class="eco-lin-p" aria-label="Precio" placeholder="Precio" value="' + texto(n(pv)) + '" data-precio="' + texto(l.PRECIO == null ? '' : l.PRECIO) + '">' +
               '<label class="eco-lin-iva" title="El precio que has puesto ya lleva el IVA"><input type="checkbox" class="eco-lin-ci"' + (ci ? ' checked' : '') + '> IVA incl.</label>' +
               '<span class="eco-lin-t u-cifra"></span><button type="button" class="u-btn u-btn-texto eco-lin-x" aria-label="Quitar la línea">Quitar</button>' +
-              (ARTS.length ? '<p class="eco-lin-rec" hidden></p>' : '');
+              (ARTS.length ? '<p class="eco-lin-rec" hidden></p>' : '') + '<p class="u-error eco-lin-falta" hidden></p>';
             cajaLin.appendChild(div);
             crecer(div);
             if (ARTS.length) {
@@ -1557,7 +2501,7 @@
             // Sin recomendado (en Mis telas le falta el coste): en rojo solo mientras la línea no tiene precio.
             else if (ART.precio) partes.push(sinPrecio ? '<span class="u-mal">Sin precio recomendado: en ' + texto(ART.titulo || 'la lista') + ' le falta el coste. Ponlo tú.</span>' : 'Sin precio recomendado: en ' + texto(ART.titulo || 'la lista') + ' le falta el coste.');
             if (ART.coste) {
-              if (a.faltaEnvio) partes.push('<span class="u-mal">Sin coste: falta el envío en tus ajustes.</span>');
+              if (a.faltaEnvio) partes.push('<span class="u-mal">Sin coste: falta el envío en Ajustes.</span>');
               else if (isNaN(a.coste)) partes.push('Sin coste: en ' + texto(ART.titulo || 'la lista') + ' le falta.');
               else if (!isNaN(puesto) && puesto < a.coste - 0.004) partes.push('<span class="u-mal">Por debajo de lo que te cuesta (' + eurPrecio(a.coste) + texto(u) + ')</span>');
               else partes.push('Te cuesta ' + eurPrecio(a.coste) + texto(u));
@@ -1617,6 +2561,10 @@
               var ci = linIva(r);
               r.querySelector('.eco-lin-t').textContent = vacia ? '' : eur(importeLinea({ CANTIDAD: q('.eco-lin-n'), PRECIO: q('.eco-lin-p') })) + (ci ? ' con IVA' : '');
               pintaRec(r);
+              // T0725 (R62): una tela sin metros no se toma por 1 m sin avisar.
+              var fc = faltaCantidad({ CONCEPTO: q('.eco-lin-c'), UNIDAD: q('.eco-lin-u'), CANTIDAD: q('.eco-lin-n') }), pf = r.querySelector('.eco-lin-falta');
+              if (pf) { pf.textContent = fc; pf.hidden = !fc || cerrada; }
+              r.querySelector('.eco-lin-n').setAttribute('aria-invalid', fc && !cerrada ? 'true' : 'false');
             });
             vent.querySelector('#f-lin-nota').textContent = 'Precio por unidad (metro, pieza…), sin IVA. Si el que sabes ya lleva el IVA, ponlo tal cual y marca «IVA incl.» en esa línea: la factura lo pone sin IVA y el total cuadra.';
             var b = vent.querySelector('#f-BASE');
@@ -1627,7 +2575,7 @@
            * de la factura en grande (la casilla de la base no sale: ya está aquí).
            */
           function pintaTot() {
-            pintaImporte('f', 'Base imponible');
+            pintaImporte('f', 'Base imponible', 'Total con IVA');
             var lin = porLineas(), b = vent.querySelector('.eco-base');
             if (b) b.hidden = lin;
             if (!lin) return;
@@ -1645,30 +2593,38 @@
           }
           /** La dirección para la factura: la que ya tiene el cliente o, si no, la de su ficha (CLIENTES · direccion). */
           function direccionDe(c) { return direccionCliente(c, c._ficha, CLI && CLI.direccion); }
+          /** T0726 (R60) · ¿Pide el CIF o NIF de quien la hace? En una recibida (no en un ticket), si CONTRAPARTES lo tiene. */
+          function pideNifProv() { return nifProv && tipoAhora() === 'Recibida'; }
           function pintaCliente() {
-            if (!datosCli) return;
-            var c = clienteElegido(), caja = vent.querySelector('#f-cli');
-            caja.hidden = !porLineas() || !c;
+            var caja = vent.querySelector('#f-cli'); if (!caja) return;
+            var c = clienteElegido(), lin = porLineas() && datosCli, prov = pideNifProv();
+            caja.hidden = !c || !(lin || prov);
+            vent.querySelector('#f-nif-et').textContent = prov ? 'CIF o NIF del proveedor' : 'CIF o NIF del cliente';
+            vent.querySelector('#f-cli-nota').textContent = prov ? 'Se guarda en el proveedor: la próxima vez ya está.' : 'Salen en su factura. Se guardan en el cliente: la próxima vez ya están.';
+            var dir = vent.querySelector('.eco-dir-cli'); if (dir) dir.hidden = !lin;
             vent.querySelector('#f-NIF').value = c ? String(c.NIF || '') : '';
-            vent.querySelector('#f-DIRECCION').value = c ? direccionDe(c) : '';
+            var td = vent.querySelector('#f-DIRECCION'); if (td) td.value = c && lin ? direccionDe(c) : '';
           }
           function refrescar() {
             var tipo = tipoAhora(), em = tipo === 'Emitida' && !f, lin = porLineas();
             // T0627: el número de una emitida lo pone el motor al guardarla y ya no se cambia (correlativo y sin huecos).
             vent.querySelector('#f-ctr-et').textContent = tipo === 'Emitida' ? 'Cliente (a quién se la hacemos)' : 'Proveedor (quién nos la hace)';
             var sc = vent.querySelector('#f-ID_CONTRAPARTE');
-            if (CLI && !f && sc.getAttribute('data-tipo') !== tipo) { var sv = sc.value; sc.innerHTML = opcContraparte(tipo, sv); sc.setAttribute('data-tipo', tipo); }
+            if (!f && sc.getAttribute('data-tipo') !== tipo) { var sv = sc.value; sc.innerHTML = opcContraparte(tipo, sv); sc.setAttribute('data-tipo', tipo); } // T0726: también sin CLIENTES (las recibidas, proveedores primero)
             var n = vent.querySelector('#f-NUMERO');
             // Bloqueado se ve como texto, sin caja (no parece que se pueda escribir), con su porqué debajo.
             n.disabled = tipo === 'Emitida'; if (em) n.value = ''; n.placeholder = em ? 'Se pone sola al guardar' : '';
             var nn = vent.querySelector('#f-num-nota');
             nn.hidden = tipo !== 'Emitida';
-            nn.textContent = em ? 'La siguiente de la serie ' + String(cfg.SERIE_EMITIDAS || '') + ', seguida y sin huecos.' : 'No se cambia: si hay un error, ponla en Anulada y haz otra.';
+            nn.textContent = em ? 'La siguiente de la serie «' + serieNueva + '», seguida y sin huecos.' : puedeRect ? 'No se cambia. Si ya la has mandado y hay que corregirla, «Rectificar».' : 'No se cambia. Si ya la has mandado, no la cambies: Utilo te ayuda a corregirla.';
             if (LINEAS) {
               vent.querySelector('#f-lin').hidden = !lin;
               var ci = vent.querySelector('#f-coniva');
               if (lin && ci.checked) ci.checked = false; // por líneas, los precios van sin IVA
-              ci.parentNode.hidden = lin;
+              else if (!lin && !f && ci.getAttribute('data-lin')) ci.checked = conIva(); // T0689: al volver a recibida, como venía
+              if (lin) ci.setAttribute('data-lin', '1'); else ci.removeAttribute('data-lin');
+              vent.querySelector('#f-iva-sw').hidden = lin;
+              var bh = vent.querySelector('#f-hacer'); if (bh) { bh.hidden = !lin; vent.querySelector('#f-guardar').hidden = lin; }
               vent.querySelector('#f-BASE').readOnly = lin;
               vent.querySelector('.eco-base').classList.toggle('eco-calculada', lin);
               if (lin) { if (!cajaLin.children.length) filaLin({ CANTIDAD: '', UNIDAD: '' }); pintaLineas(); }
@@ -1678,7 +2634,19 @@
               vent.querySelector('.eco-url').hidden = lin && pdf;
               vent.querySelector('#f-url-nota').hidden = lin && pdf;
             }
+            var cf = vent.querySelector('#f-foto-caja'); if (cf) cf.hidden = tipo === 'Emitida';
+            var rd = vent.querySelector('#f-retdua'); if (rd) rd.hidden = tipo === 'Emitida';
+            pintaEmpresa();
             pintaTot();
+          }
+          /** T0726 (R64) · El aviso de lo que le falta a la empresa (solo en una emitida por líneas), con «ponlos en Datos de tu empresa». */
+          function pintaEmpresa() {
+            var pe = vent.querySelector('#f-emp'); if (!pe) return;
+            var falta = porLineas() && empresaFaltan().length;
+            pe.hidden = !falta;
+            pe.innerHTML = falta ? avisoEmpresa('Para sacar el PDF de una factura', true) : '';
+            var be = pe.querySelector('#f-empresa');
+            if (be) be.onclick = function () { formEmpresa(function () { verError([]); pintaEmpresa(); }); };
           }
           if (cajaLin) {
             lin0.forEach(filaLin);
@@ -1743,12 +2711,36 @@
           }
           refrescar();
           pintaCliente();
+          if (rect) vent.querySelector('#f-ID_CONTRAPARTE').disabled = true; // T0747: al mismo cliente que la que corrige
+          // T0725 (R12): cerrada, todo se ve pero solo se tocan el estado y las notas (ni líneas nuevas ni quitar).
+          if (cerrada) {
+            Array.prototype.forEach.call(vent.querySelectorAll('.u-campos input, .u-campos select, .u-campos textarea'), function (x) {
+              if (x.id !== 'f-ESTADO' && x.id !== 'f-NOTAS') x.disabled = true;
+            });
+            Array.prototype.forEach.call(vent.querySelectorAll('#f-mas, .eco-lin-x, .eco-lin-pon, .eco-lin-rec'), function (x) { x.hidden = true; });
+          }
           // T0653 · Desde «Calcular precio» («Llevar a una factura»): la primera línea, con la tela y el precio calculado.
-          if (linea0 && cajaLin && ARTS.length && porLineas()) {
-            var a0 = artPorCodigo(String(linea0.articulo || '')), r0 = cajaLin.querySelector('.eco-lin');
-            if (a0 && r0) {
-              elegir(r0, a0);
-              if (!isNaN(linea0.precio)) { var pi0 = r0.querySelector('.eco-lin-p'); pi0.value = String(linea0.precio).replace('.', ','); leerPrecio(pi0); pintaLineas(); pintaTot(); }
+          // T0689 · Desde un pedido: además, los metros; y si su nombre no trae ninguna tela de la lista, la línea con lo que dice.
+          // T0739 · Desde un pedido con sus líneas: una por tela (linea0 es una lista).
+          var lins0 = [].concat(linea0 || []).filter(function (x) { return x && (x.articulo || x.concepto); });
+          if (lins0.length && cajaLin && porLineas()) {
+            var r0 = cajaLin.querySelector('.eco-lin');
+            lins0.forEach(function (l0, i) {
+              if (i) filaLin({ CANTIDAD: '', UNIDAD: '' });
+              var rr = i ? cajaLin.lastChild : r0, a0 = ARTS.length ? artPorCodigo(String(l0.articulo || '')) : null;
+              if (!rr || !(a0 || l0.concepto)) return;
+              if (a0) elegir(rr, a0);
+              else { rr.querySelector('.eco-lin-c').value = String(l0.concepto); if (l0.unidad) rr.querySelector('.eco-lin-u').value = l0.unidad; crecer(rr); }
+              if (l0.detalle) { rr.querySelector('.eco-lin-d').value = String(l0.detalle); crecer(rr); } // T0747
+              if (l0.cantidad != null && l0.cantidad !== '') rr.querySelector('.eco-lin-n').value = String(l0.cantidad).replace('.', ',');
+              if (l0.precio != null && !isNaN(l0.precio)) { var pi0 = rr.querySelector('.eco-lin-p'); pi0.value = String(l0.precio).replace('.', ','); leerPrecio(pi0); }
+            });
+            if (r0) {
+              pintaLineas(); pintaTot();
+              // Desde un pedido, la ventana se abre desde arriba (a quién y de qué pedido), no en los metros.
+              if (deVenta) setTimeout(function () { var uv = vent.closest('.u-ventana'); if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); if (uv) uv.scrollTop = 0; }, 0);
+              // T0725 (R62): desde Calcular precio llega sin metros: el cursor, en «Cant.».
+              else if (r0.querySelector('.eco-lin-n').value === '') setTimeout(function () { r0.querySelector('.eco-lin-n').focus(); }, 0);
             }
           }
           ['f-TIPO', 'f-TIPO_IVA'].forEach(function (id) { var e = vent.querySelector('#' + id); if (e) e.addEventListener('change', function () { refrescar(); pintaCliente(); }); });
@@ -1770,32 +2762,50 @@
           vent.querySelector('#f-ID_CONTRAPARTE').addEventListener('change', function () { pintaCliente(); if (porLineas()) pintaLineas(); });
           vent.querySelector('#f-BASE').addEventListener('input', refrescar);
           oirImporte('f', refrescar);
+          oirRetDua('f', refrescar);
+          oirFoto('f');
           /** Lo que hay en pantalla, para el documento (el número, el que tiene; una nueva aún no lo tiene). */
           function documento(numero) {
             var c = clienteElegido() || {};
+            // T0733 (R94): la de un pedido lleva la fecha de su entrega (si es otra) y, si la forma de pago dice «a 30 días», el vencimiento.
+            var vta = deVenta || (f && DS && f[DS] ? ix.des[String(f[DS])] || null : null), emp = empresaAhora() || {};
             return {
-              factura: { NUMERO: numero || (f && f.NUMERO) || '', FECHA: val('f-FECHA'), TIPO_IVA: val('f-TIPO_IVA'), NOTAS: val('f-NOTAS'), ESTADO: val('f-ESTADO'), ARCHIVO_URL: val('f-ARCHIVO_URL') },
+              factura: Object.assign({ ID: (f && f.ID) || '', NUMERO: numero || (f && f.NUMERO) || '', FECHA: val('f-FECHA'), TIPO_IVA: val('f-TIPO_IVA'), NOTAS: val('f-NOTAS'), ESTADO: val('f-ESTADO'), ARCHIVO_URL: val('f-ARCHIVO_URL') },
+                rect ? {} : fechasFactura(val('f-FECHA'), vta, emp.FORMA_PAGO || cfg.FACTURA_PAGO || ''), // T0747: una rectificativa no vence
+                // T0747: la clase y, en una rectificativa, a cuál corrige (número y fecha) y por qué, para su PDF.
+                clase ? { CLASE: clase } : {}, rect ? { RECTIFICA_NUMERO: rectDe ? String(rectDe.NUMERO || '').trim() : '', RECTIFICA_FECHA: rectDe ? String(rectDe.FECHA || '').slice(0, 10) : '', CAUSA: val('f-CAUSA') } : {}),
               cliente: { NOMBRE: c.NOMBRE || '', NIF: datosCli ? val('f-NIF') : c.NIF || '', DIRECCION: datosCli ? val('f-DIRECCION') : c.DIRECCION || '' },
-              lineas: lineasAhora(), base: baseEn('f') / 100, empresa: d.emp || null
+              lineas: lineasAhora(), base: baseEn('f') / 100, empresa: empresaAhora()
             };
           }
           /** Guarda la factura (y sus líneas y los datos del cliente) → promesa con { id, numero }. */
           function guardar() {
+            if (cerrada) { // T0725 (R12): solo el estado y las notas
+              return T.actualizar('FACTURAS', f.ID, cambios(f, { ESTADO: val('f-ESTADO'), NOTAS: val('f-NOTAS') })).then(function () { return { id: f.ID, numero: f.NUMERO, nueva: false }; });
+            }
             var tipo = tipoAhora(), em = tipo === 'Emitida' && !f, lin = porLineas(), conNumero = tipo !== 'Emitida';
             var nv = { FECHA: val('f-FECHA'), ID_CONTRAPARTE: val('f-ID_CONTRAPARTE'), BASE: baseEn('f') / 100, TIPO_IVA: val('f-TIPO_IVA'),
               ESTADO: val('f-ESTADO'), ARCHIVO_URL: val('f-ARCHIVO_URL'), NOTAS: val('f-NOTAS') };
+            Object.assign(nv, valoresRetDua('f', d.colsFac)); // T0733: vacías en una emitida (la caja no se ve)
             if (conNumero) nv.NUMERO = val('f-NUMERO');
+            if (deVenta && tipo === 'Emitida') nv[DS] = deVenta.ID; // T0689: unida a su pedido
+            if (em && clase) { nv.CLASE = clase; if (rect) { nv.RECTIFICA = String(v.RECTIFICA || ''); nv.CAUSA = val('f-CAUSA'); } } // T0747
             var mal = [], ls = lin ? lineasAhora() : [];
             if (conNumero && !nv.NUMERO) mal.push('Falta el número.');
             if (!nv.FECHA) mal.push('Falta la fecha.');
+            var fm = em ? fechaEmitidaMal(d.fac, cfg.SERIE_EMITIDAS || 'FE.', nv.FECHA) : ''; if (fm) mal.push(fm); // T0725 (R14)
             if (!nv.ID_CONTRAPARTE) mal.push('Falta ' + (tipo === 'Emitida' ? 'el cliente.' : 'el proveedor.'));
             if (lin && ls.some(function (l) { return !l.CONCEPTO; })) mal.push('Cada línea necesita qué se vende.');
             if (lin && ls.some(function (l) { return l.PRECIO === ''; })) mal.push('Cada línea necesita su precio.');
-            if (!(cts(val('f-BASE')) > 0)) mal.push(lin ? 'Añade lo que se vende, con su precio.' : 'La base tiene que ser mayor que 0.');
+            var fcs = lin ? ls.map(faltaCantidad).filter(Boolean) : []; if (fcs.length) mal.push(fcs[0]); // T0725 (R62)
+            // T0747: en negativo, solo una rectificativa; a 0, la final que descuenta todo su anticipo.
+            var bm = lin && tipo === 'Emitida' ? baseEmitidaMal(cts(val('f-BASE')), rect, ls) : !(cts(val('f-BASE')) > 0) ? (lin ? 'Añade lo que se vende, con su precio.' : 'La base tiene que ser mayor que 0.') : '';
+            if (bm) mal.push(bm);
+            if (rect && em && !val('f-CAUSA')) mal.push('Falta por qué la corriges: sale en la rectificativa.');
             if (conNumero && nv.NUMERO && d.fac.some(function (x) { return x !== f && x.TIPO === tipo && String(x.NUMERO).trim() === nv.NUMERO; })) mal.push('Ya hay una ' + tipo.toLowerCase() + ' con el número ' + nv.NUMERO + '.');
             if (mal.length) { verError(mal); return null; }
-            var cli = clienteElegido(), cliNuevo = datosCli && lin && cli ? { NIF: val('f-NIF'), DIRECCION: val('f-DIRECCION') } : null;
-            if (cliNuevo && !cli._nuevo && String(cli.NIF || '') === cliNuevo.NIF && String(cli.DIRECCION || '') === cliNuevo.DIRECCION) cliNuevo = null;
+            var cli = clienteElegido(), cliNuevo = datosCli && lin && cli ? { NIF: val('f-NIF'), DIRECCION: val('f-DIRECCION') } : pideNifProv() && cli ? { NIF: val('f-NIF').toUpperCase().replace(/\s+/g, '') } : null;
+            if (cliNuevo && !cli._nuevo && Object.keys(cliNuevo).every(function (k) { return String(cli[k] || '') === cliNuevo[k]; })) cliNuevo = null;
             // T0646 · Una marca que aún no es contraparte se da de alta como Cliente, con su ficha, antes de la factura.
             var alta = cli && cli._nuevo ? T.crear('CONTRAPARTES', Object.assign({ NOMBRE: cli.NOMBRE, TIPO: 'Cliente' }, cliNuevo || {},
               (function () { var o = {}; o[String(CLI.campo || 'ID_MARCA')] = cli._ficha.ID; return o; })())).then(function (r) {
@@ -1809,8 +2819,15 @@
             }).then(function (r) {
               var x = r && r.fila ? r.fila : null, id = (f && f.ID) || (r && r.id) || (x && x.ID), numero = (x && x.NUMERO) || nv.NUMERO || (f && f.NUMERO) || '';
               if (movId && id) T.actualizar('MOVIMIENTOS', movId, { ID_FACTURA: id }).then(function () {}, function () {});
-              if (cliNuevo && cli.ID) ctx.llamar('economiaClienteDatos', [cli.ID, cliNuevo]).then(function () { T.refrescar(['CONTRAPARTES'], true); }, function (e) { ctx.aviso(String((e && e.message) || e)); });
+              // T0689: los cobros de su pedido que aún no llevaban factura, ahora la llevan (y, si ya está cobrada, queda Pagada).
+              if (id && nv[DS] && !rect) {
+                var cobros = d.mov.filter(function (m) { return m.TIPO === 'Ingreso' && !m.ID_FACTURA && String(m[DS] || '') === String(nv[DS]); });
+                Promise.all(cobros.map(function (m) { return T.actualizar('MOVIMIENTOS', m.ID, { ID_FACTURA: id }); })).then(function () { if (cobros.length) revisarFactura(id); }, function () {});
+              }
+              // T0726 (R63): lo que devuelve el motor va a la copia (sin volver a leer CONTRAPARTES).
+              if (cliNuevo && cli.ID) ctx.llamar('economiaClienteDatos', [cli.ID, cliNuevo]).then(anotar(['CONTRAPARTES']), function (e) { ctx.aviso(String((e && e.message) || e)); });
               var res = { id: id, numero: numero, nueva: !f && em };
+              if (rect && rectDe && em) revisarFactura(rectDe.ID); // T0747: con su rectificativa, la corregida puede quedar ya cobrada
               // T0681: la factura no está guardada hasta que lo están sus líneas (reabierta antes, salía a medias).
               return lin && id ? guardarLineas(id, ls).then(function () { return res; }) : res;
             });
@@ -1829,10 +2846,21 @@
               else nuevas.push(fila);
             });
             antes.forEach(function (a) { if (!vistas[a.ID]) va.push(T.borrar('FACTURA_LINEAS', a.ID)); });
-            if (nuevas.length) va.push(ctx.llamar('economiaLineasCrear', [id, nuevas]).then(function () { return T.refrescar(['FACTURA_LINEAS'], true); }));
+            // T0726 (R63): las filas que devuelve van a la copia, sin volver a leer FACTURA_LINEAS del Excel.
+            if (nuevas.length) va.push(ctx.llamar('economiaLineasCrear', [id, nuevas]).then(anotar(['FACTURA_LINEAS'])));
             return Promise.all(va.map(function (p) { return Promise.resolve(p).then(null, function (e) { ctx.aviso('Alguna línea no se ha guardado: ' + String((e && e.message) || e)); }); }));
           }
           vent.querySelector('#f-guardar').onclick = function () {
+            // T0689 · Con foto (una recibida o un ticket): primero se sube y su enlace queda en «Enlace en Drive».
+            var bf0 = this;
+            if (tipoAhora() !== 'Emitida' && fotoDe('f')) {
+              bf0.disabled = true; bf0.textContent = 'Subiendo la foto…';
+              subirFoto('f', val('f-NUMERO') || tipoAhora(), val('f-FECHA')).then(function (url) {
+                vent.querySelector('#f-ARCHIVO_URL').value = url; quitarFoto('f');
+                bf0.disabled = false; bf0.textContent = 'Guardar factura'; bf0.click();
+              }, function (e) { bf0.disabled = false; bf0.textContent = 'Guardar factura'; verError(['La foto no se ha subido: ' + String((e && e.message) || e).replace(/^[A-Z]+: /, '') + '. Prueba otra vez.']); });
+              return;
+            }
             var lin = porLineas(), p = guardar(); if (!p) return;
             // T0681: con líneas, la ventana espera a que estén guardadas (si se cerrara antes, se podría reabrir a medias).
             var bg = vent.querySelector('#f-guardar');
@@ -1842,6 +2870,53 @@
               if (ctx.abierta()) ctx.aviso(r.nueva ? 'Factura ' + r.numero + ' guardada en el Excel.' : 'Factura guardada en el Excel.');
             }, function () { if (lin) { bg.disabled = false; bg.textContent = 'Guardar factura'; } });
           };
+          /**
+           * T0689 · «Hacer la factura y el PDF»: comprueba que no le falta nada, la guarda (el motor le pone el número), saca su
+           * PDF y lo enlaza. Al acabar, la ventana dice que está hecha, con «Abrir el PDF» y «Copiar el enlace». Si el PDF falla,
+           * la factura ya está guardada: lo dice y cómo sacarlo después.
+           */
+          var bh = vent.querySelector('#f-hacer');
+          if (bh) bh.onclick = function () {
+            function vuelta(msg) { bh.disabled = false; bh.textContent = rect ? 'Hacer la rectificativa y el PDF' : 'Hacer la factura y el PDF'; if (msg) verError([msg]); }
+            verError([]);
+            // T0726 (R63): lo que falta se mira aquí (sin ir al motor); el motor lo vuelve a mirar al sacar el PDF. Así son tres
+            // viajes: la factura (con su número), sus líneas y el PDF, que el motor deja enlazado en la misma llamada.
+            var ft = faltanTexto(faltanFactura(documento('(se numera al guardar)')));
+            if (ft) { vuelta('Antes de hacerla ' + ft + '.'); return; }
+            var p = guardar(); if (!p) { vuelta(); return; }
+            bh.disabled = true; bh.textContent = 'Haciendo la factura…';
+            p.then(function (g) {
+              var doc = documento(g.numero); doc.factura.ID = g.id; // T0725 (R06): el motor coge su PDF de la fila guardada
+              bh.textContent = 'Sacando el PDF…';
+              return ctx.llamar('economiaFacturaPdf', [doc]).then(function (x) { anotar(['FACTURAS'])(x); hecha(g, doc, x.url, ''); },
+                function (e) { hecha(g, doc, '', String((e && e.message) || e).replace(/^[A-Z]+: /, '')); });
+            }, function (e) { vuelta(String((e && e.message) || e).replace(/^[A-Z]+: /, '')); });
+          };
+          /** La factura ya hecha: su número, a quién y cuánto, y su PDF (o por qué no ha salido). */
+          function hecha(g, doc, url, err) {
+            var t = importe({ BASE: doc.base, TIPO_IVA: doc.factura.TIPO_IVA }).total, va = volverTras; volverTras = null;
+            if (!velo.classList.contains('abierto')) { if (ctx.abierta()) ctx.aviso(url ? 'Factura ' + g.numero + ' hecha, con su PDF.' : 'Factura ' + g.numero + ' guardada, sin PDF: ' + err); return; }
+            vent.innerHTML = '<div class="eco-hecha"><div class="eco-hecha-ic" aria-hidden="true">✓</div><h2 id="eco-vt">Factura ' + texto(g.numero) + ' hecha</h2>' +
+              '<p>' + texto(doc.cliente.NOMBRE) + ' · ' + eur(t) + ' con IVA.</p>' +
+              (url ? '<p class="u-nota">El PDF está guardado en tu carpeta de facturas de Drive.</p>'
+                : '<p class="u-error">El PDF no ha salido: ' + texto(err) + '. La factura sí está guardada: ábrela en Facturas y toca «Guardar y sacar el PDF».</p>') +
+              '<div class="n-botones eco-hecha-b">' + (url ? '<a class="u-btn u-btn-accion" href="' + texto(url) + '" target="_blank" rel="noopener" data-fuera>Abrir el PDF</a>' +
+                '<button type="button" class="u-btn" id="h-copiar">Copiar el enlace</button>' : '') +
+              (va ? '<button type="button" class="u-btn u-btn-texto" id="h-volver">Volver a ' + texto(va.titulo) + '</button>' : '<button type="button" class="u-btn u-btn-texto" data-cerrar>Cerrar</button>') + '</div></div>';
+            var bc = vent.querySelector('#h-copiar');
+            if (bc) bc.onclick = function () {
+              var ok = function () { bc.textContent = 'Enlace copiado'; };
+              try { navigator.clipboard.writeText(url).then(ok, function () { ctx.aviso(url); }); } catch (e) { ctx.aviso(url); }
+            };
+            var bv = vent.querySelector('#h-volver');
+            if (bv) bv.onclick = function () { cerrar(); ctx.volver(); };
+            var a = vent.querySelector('.eco-hecha-b a, .eco-hecha-b button'); if (a) a.focus();
+            if (ctx.abierta()) ctx.aviso(url ? 'Factura ' + g.numero + ' hecha, con su PDF.' : 'Factura ' + g.numero + ' guardada, sin PDF.');
+          }
+          // T0747 (R13) · «Rectificar»: una rectificativa nueva de esta, al mismo cliente y con sus líneas en negativo. Si esta
+          // aún está por cobrar, la rectificativa se descuenta de ella (sale ya resuelta); si estaba cobrada, queda por devolver.
+          var brect = vent.querySelector('#f-rectificar');
+          if (brect) brect.onclick = function () { rectificar(f); };
           var bver = vent.querySelector('#f-ver');
           if (bver) bver.onclick = function () {
             // T0627: flotante, encima de la factura, y con la marca BORRADOR (la pone el motor): nunca se confunde con el PDF.
@@ -1864,36 +2939,89 @@
               ifr.onload = function () {
                 var k = Math.min(1, (hoja.clientWidth - 16) / 794);
                 ifr.style.width = Math.round(794 * k) + 'px';
-                ifr.style.height = Math.round(1123 * k) + 'px';
+                // T0725 (R05): una factura larga lleva más de una hoja: se ven todas, una debajo de otra.
+                var nh = 1; try { nh = Math.max(1, ifr.contentDocument.querySelectorAll('.hoja').length); } catch (e) {}
+                ifr.style.height = Math.round(1119 * nh * k) + 'px';
                 try { ifr.contentDocument.documentElement.style.zoom = k; } catch (e) {}
               };
               ifr.srcdoc = r.html;
-              verError(r.faltan && r.faltan.length ? ['Le falta ' + r.faltan.join(', ') + ': sale en rojo en el borrador.'] : []);
+              verError(r.faltan && r.faltan.length ? ['Le ' + (r.faltan.length > 1 ? 'faltan ' : 'falta ') + listaY(r.faltan) + ': sale en rojo en el borrador.'] : []);
             }, function (e) { quitar(); verError([String((e && e.message) || e)]); });
           };
           var bpdf = vent.querySelector('#f-pdf');
           if (bpdf) bpdf.onclick = function () {
             var doc = documento();
+            // T0726 (R63): lo que falta, aquí; el PDF lo enlaza el motor en la misma llamada.
+            var ft = faltanTexto(faltanFactura(doc));
+            if (ft) { verError(['Antes de sacar el PDF ' + ft + '.']); return; }
+            var p = guardar(); if (!p) return;
             bpdf.disabled = true; bpdf.textContent = 'Sacando el PDF…';
-            ctx.llamar('economiaFacturaVer', [doc]).then(function (r) {
-              if (r.faltan && r.faltan.length) { bpdf.disabled = false; bpdf.textContent = 'Guardar y sacar el PDF'; verError(['Antes de sacar el PDF falta ' + r.faltan.join(', ') + '.']); return; }
-              var p = guardar(); if (!p) { bpdf.disabled = false; bpdf.textContent = 'Guardar y sacar el PDF'; return; }
-              // T0681: la ventana se cierra cuando la factura y sus líneas están guardadas (antes, se podía reabrir a medias).
-              p.then(function () {
-                cerrar();
-                ctx.aviso('Sacando el PDF de la factura ' + numFac(f) + '…');
-                return ctx.llamar('economiaFacturaPdf', [doc]);
-              }).then(function (x) {
-                return T.actualizar('FACTURAS', f.ID, { ARCHIVO_URL: x.url }).then(function () { if (ctx.abierta()) ctx.aviso('PDF de la factura ' + numFac(f) + ' guardado en Drive y enlazado.'); });
-              }, function (e) { bpdf.disabled = false; bpdf.textContent = 'Guardar y sacar el PDF'; if (ctx.abierta()) ctx.aviso(String((e && e.message) || e).replace(/^[A-Z]+: /, '')); });
-            }, function (e) { bpdf.disabled = false; bpdf.textContent = 'Guardar y sacar el PDF'; verError([String((e && e.message) || e)]); });
+            // T0681: la ventana se cierra cuando la factura y sus líneas están guardadas (antes, se podía reabrir a medias).
+            p.then(function () {
+              cerrar();
+              ctx.aviso('Sacando el PDF de la factura ' + numFac(f) + '…');
+              return ctx.llamar('economiaFacturaPdf', [doc]);
+            }).then(function (x) {
+              anotar(['FACTURAS'])(x);
+              if (ctx.abierta()) ctx.aviso('PDF de la factura ' + numFac(f) + ' guardado en Drive y enlazado.');
+            }, function (e) { bpdf.disabled = false; bpdf.textContent = 'Guardar y sacar el PDF'; if (ctx.abierta()) ctx.aviso(String((e && e.message) || e).replace(/^[A-Z]+: /, '')); });
           };
           var ba = vent.querySelector('#f-apuntar');
           if (ba) ba.onclick = function () {
-            var t = importe(f), falta = t.total - pagado, base = Math.round(falta * 100 / (100 + pct(f.TIPO_IVA)));
+            // T0733: con la retención y el IVA de aduana de la factura; si ya se ha pagado una parte, en proporción a lo que falta.
+            var t = importe(f), falta = t.total - pagado, k = t.total ? falta / t.total : 1, base = pagado ? Math.round(cts(f.BASE) * k) : null;
             var pre = { TIPO: f.TIPO === 'Emitida' ? 'Ingreso' : 'Gasto', CONCEPTO: (f.TIPO === 'Emitida' ? 'Cobro ' : 'Pago ') + numFac(f), ID_CONTRAPARTE: f.ID_CONTRAPARTE,
-              ID_FACTURA: f.ID, TIPO_IVA: f.TIPO_IVA, BASE: base / 100 };
+              ID_FACTURA: f.ID, TIPO_IVA: f.TIPO_IVA, BASE: base === null ? f.BASE : base / 100, RETENCION: f.RETENCION || '',
+              IVA_IMPORTACION: t.dua ? Math.round(t.dua * (pagado ? k : 1)) / 100 : '' };
             formMov(null, pre);
+          };
+        });
+      }
+
+      /** T0747 (R13) · Abre la rectificativa de una emitida: su cliente, su IVA, sus líneas en negativo y la causa por poner. */
+      function rectificar(f) {
+        if (!f) return;
+        var pre = { TIPO: 'Emitida', CLASE: 'Rectificativa', RECTIFICA: f.ID, FECHA: hoy(), ID_CONTRAPARTE: f.ID_CONTRAPARTE, TIPO_IVA: tipoIva(f.TIPO_IVA) || '21%',
+          ESTADO: f.ESTADO === 'Pendiente' ? 'Pagada' : 'Pendiente' };
+        formFac(null, pre, null, lineasRectificar(f, d.lin));
+      }
+
+      /* ---------- T0689 · la factura de un pedido, en un sitio ---------- */
+
+      /** La factura de una venta: emitida, de hoy, a su marca, con la línea que sale de lo que dice la venta. Si ya tiene, esa. */
+      /* T0747 (R102) · anticipo: la factura del anticipo (CLASE = Anticipo, con lo pactado); sin él, la final, que lleva en
+       * negativo el anticipo ya facturado. */
+      function facturarVenta(v, anticipo) {
+        if (!v) return;
+        var conClase = d.colsFac.indexOf('CLASE') >= 0, fa = conClase ? anticipoDeVenta(d.fac, DS, v.ID) : null;
+        var ya = anticipo ? fa : facturaDeVenta(d.fac, DS, v.ID);
+        if (ya) { formFac(ya); return; }
+        var pre = { TIPO: 'Emitida', FECHA: hoy(), ID_CONTRAPARTE: v.ID_CONTRAPARTE || '' };
+        pre[DS] = v.ID;
+        if (anticipo && conClase) { pre.CLASE = 'Anticipo'; formFac(null, pre, null, [lineaAnticipo(v)]); return; }
+        var arts = ART ? articulos(ART, { filas: function (t) { return T.filas(t) || []; }, fila: filaDe }) : [];
+        var ls = [].concat(LV ? lineasFacturaVenta(v, d.lv, arts) : lineaDeVenta(v, arts)); // T0739: con sus líneas, una por tela
+        // T0747: con un anticipo facturado, la final lo descuenta; si su precio salía de lo que paga la marca, sigue siendo el entero.
+        if (fa) ls.push(Object.assign(lineaDescuentoAnticipo(fa), { anticipo: true, numero: String(fa.NUMERO || '').trim() }));
+        formFac(null, pre, null, ls);
+      }
+      /** Desde la ficha de una marca (idCtr: su contraparte, o «marca:M-214» si aún no lo es): si tiene pedidos sin factura,
+       *  primero de cuál (sale ya con lo que pidió); si no, una factura a su nombre. */
+      function facturarA(idCtr) {
+        var vs = facPorVenta() && !/^marca:/.test(idCtr) ? ventasSinFactura(d.des, d.fac, DS, idCtr) : [];
+        var pre = { TIPO: 'Emitida', FECHA: hoy(), ID_CONTRAPARTE: idCtr };
+        if (!vs.length) { formFac(null, pre); return; }
+        var html = '<h2 id="eco-vt">¿De qué pedido es la factura?</h2><p class="u-nota">Factura a ' + texto(nombre('ctr', idCtr)) + '. Con su pedido, sale ya con lo que pidió.</p>' +
+          '<div class="eco-elige" role="radiogroup" aria-label="Pedido">' + vs.map(function (v, i) {
+            var imp = v.IMPORTE === '' || v.IMPORTE == null ? 'sin precio cerrado' : eur0(cts(v.IMPORTE)) + ' sin IVA';
+            return '<label class="eco-elige-o"><input type="radio" name="eco-ped" value="' + texto(v.ID) + '"' + (i ? '' : ' checked') + '><span><b>' + texto(v.NOMBRE || v.ID) + '</b>' +
+              '<span class="u-nota">Pedido el ' + texto(fecha(v.FECHA)) + ' · ' + texto(imp) + '</span></span></label>';
+          }).join('') + '<label class="eco-elige-o eco-elige-sin"><input type="radio" name="eco-ped" value=""><span>Una factura sin pedido</span></label></div>' +
+          '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="p-seguir">Seguir</button><button type="button" class="u-btn u-btn-texto" data-cerrar>Cancelar</button></div>';
+        ventana(html, function () {
+          vent.querySelector('#p-seguir').onclick = function () {
+            var r = vent.querySelector('input[name="eco-ped"]:checked'), id = r ? r.value : '';
+            if (id && ix.des[id]) facturarVenta(ix.des[id]); else formFac(null, pre);
           };
         });
       }
@@ -1983,7 +3111,7 @@
               presupuesto(d, per).forEach(function (r) { if (esReparto(d, r.cat)) return; if (r.tipo === 'Ingreso') pi += r.previsto; else if (r.tipo === 'Gasto') pg += r.previsto; });
               var b0 = pi - pg, b1 = b0 + (c.TIPO === 'Ingreso' ? dif : -dif);
               verError([]);
-              vent.querySelector('#p-tot').innerHTML = '<b>' + texto(c.NOMBRE) + ': ' + eur0(antes) + ' → ' + eur0(n) + '.</b> Beneficio previsto' + (presPorPeriodo(d) ? ' de la ' + texto(nomPeriodo()) : '') + ': ' + eur0(b0) + ' → ' + eur0(b1) + '. Queda apuntado en el Excel con tu nombre.';
+              vent.querySelector('#p-tot').innerHTML = '<b>' + texto(c.NOMBRE) + ': ' + eur0(antes) + ' → ' + eur0(n) + '.</b> Beneficio previsto' + (presPorPeriodo(d) ? ' ' + texto(enPeriodo(nomPeriodo(), 'de')) : '') + ': ' + eur0(b0) + ' → ' + eur0(b1) + '. Queda apuntado en el Excel con tu nombre.';
               bg.setAttribute('data-ok', '1'); bg.textContent = 'Sí, guardar lo previsto';
               return;
             }
@@ -2003,6 +3131,8 @@
 
       /* ---------- T0628 · Ventas ---------- */
 
+      /** T0726 (R26) · Dónde se apuntan los pagos y cobros: aquí, en Movimientos, o (en Pedidos, sin esa pestaña) en Economía. */
+      function dondeMov() { return pest.indexOf('MOVIMIENTOS') >= 0 ? 'Movimientos' : 'Economía › Movimientos'; }
       function minimo() { return MIN ? minimoDe(MIN, T.filas(MIN.tabla)) : minimoDe(cfg.MARGEN_MINIMO); }
       function pc(x) { return Math.round(x * 100) + ' %'; }
       function deMas(n, uno, varios) { return n + ' ' + (n === 1 ? uno : varios); }
@@ -2010,7 +3140,7 @@
       function costesTxt(x) { return x.costes.map(function (c) { return texto(c.nombre) + ' ' + eur0(c.base); }).join(' + '); }
       /** El paso de una venta en palabras: «En camino desde el 04/11/2026 · te debe 2.700 € de 5.400 €». */
       function pasoTxt(x) {
-        var h = '<b>' + texto(x.paso) + '</b>' + (x.fechaPaso ? (x.paso === 'En camino' ? ' desde el ' : ' el ') + texto(fecha(x.fechaPaso)) : '');
+        var h = '<b>' + texto(paso(x.paso)) + '</b>' + (x.fechaPaso ? (x.paso === 'En camino' ? ' desde el ' : ' el ') + texto(fecha(x.fechaPaso)) : '');
         if (x.cobrada) return h;
         if (x.adelantado) return h + ' · aún sin pagar al taller';
         if (x.debe === null) return h + ' · sin precio cerrado';
@@ -2025,81 +3155,82 @@
 
       function htmlVentas() {
         if (S.ven.id) { var una = ix.des[S.ven.id]; if (una) return htmlVenta(una); S.ven.id = ''; }
-        var V = ventas(d, d.des, DS, minimo()), m = V.minimo;
-        var h = '<p class="u-nota">Cada venta, desde que la marca te la pide hasta que te paga: cuánto te juegas, cuánto ganas y cuánto te falta para recuperar lo invertido. Sin IVA.</p>';
-        var nueva = '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" data-accion="nuevaventa">Nueva venta</button></div>';
-        if (!V.todas.length) {
-          return h + '<p class="u-vacio">Todavía no hay ventas. Cuando una marca te haga un pedido, créalo con «Nueva venta»; al apuntar sus pagos y cobros en Movimientos, elige esa venta.</p>' + nueva;
+        var V0 = ventas(d, d.des, DS, minimo()), m = V0.minimo;
+        // T0726 (R26): un solo texto de entrada (con AYUDA, el suyo; si no, este).
+        var h = cfg.AYUDA ? '' : '<p class="u-nota">' + V('Cad{a} {venta}, desde que la marca te {lo} pide hasta que te {lo} paga: cuánto te juegas, cuánto ganas y cuánto te falta para recuperar lo invertido. Sin IVA.') + '</p>';
+        var nueva = '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" data-accion="nuevaventa">' + V('Nuev{a} {venta}') + '</button></div>';
+        if (!V0.todas.length) {
+          return h + '<p class="u-vacio">' + V('Aún no hay {ventas}. Cuando una marca te haga un pedido, créa{lo} con «Nuev{a} {venta}»; al apuntar sus pagos y cobros en ' + dondeMov() + ', elige {esa} {venta}.') + '</p>' + nueva;
         }
-        var k3 = V.falta > 0 ? kpi('recuperar', 'Te falta por recuperar', eur0(V.falta), 'De ' + eur0(V.invertido) + ' invertidos · llevas el ' + pc(V.recuperado) + barra(V.recuperado)) :
-          V.invertido > 0 ? kpi('recuperar', 'Lo invertido', 'Recuperado', 'Has recuperado los ' + eur0(V.invertido) + ' invertidos' + (V.ganado > V.invertido ? ' y llevas ' + eur0(V.ganado - V.invertido) + ' de más' : '')) :
+        var k3 = V0.falta > 0 ? kpi('recuperar', 'Te falta por recuperar', eur0(V0.falta), 'De ' + eur0(V0.invertido) + ' invertidos · llevas el ' + pc(V0.recuperado) + barra(V0.recuperado)) :
+          V0.invertido > 0 ? kpi('recuperar', 'Lo invertido', 'Recuperado', 'Has recuperado los ' + eur0(V0.invertido) + ' invertidos' + (V0.ganado > V0.invertido ? ' y llevas ' + eur0(V0.ganado - V0.invertido) + ' de más' : '')) :
           kpi('recuperar', 'Lo invertido', '0 €', 'Aún no hay gastos de la empresa');
-        h += '<div class="eco-kpis">' +
-          kpi('juego', 'Tu dinero en juego', eur0(V.enJuego), V.enJuego ? 'Lo que has pagado en ventas que la marca aún no te ha pagado' + (V.conJuego > 1 ? ', en ' + V.conJuego + ' ventas' : '') + '. Si una no pagara, es lo que perderías.' :
+        h += '<div class="eco-kpis eco-kpis-ven">' + // T0726 (R26): las cifras, a 24 px
+          kpi('juego', 'Tu dinero en juego', eur0(V0.enJuego), V0.enJuego ? V('Lo que has pagado en {ventas} que la marca aún no te ha pagado') + (V0.conJuego > 1 ? ', en ' + V0.conJuego + ' ' + V('{ventas}') : '') + '. Si una no pagara, es lo que perderías.' :
             'Ahora no tienes dinero tuyo pendiente de cobrar.', true) +
-          kpi('ganado', 'Has ganado con las ventas', eur0(V.ganado), V.cobradas.length ? 'En ' + deMas(V.cobradas.length, 'venta cobrada', 'ventas cobradas') +
-            (V.bajos ? ' · <span class="u-mal">' + V.bajos + ' por debajo de tu mínimo del ' + pc(m) + '</span>' : '') : 'Aún no has cobrado ninguna venta entera') +
+          kpi('ganado', V('Has ganado con {los} {ventas}'), eur0(V0.ganado), V0.cobradas.length ? 'En ' + deMas(V0.cobradas.length, V('{venta} cobrad{a}'), V('{ventas} cobrad{a}s')) +
+            (V0.bajos ? ' · <span class="u-mal">' + V0.bajos + ' por debajo de tu mínimo del ' + pc(m) + '</span>' : '') : V('Aún no has cobrado {ninguna} {venta} enter{a}')) +
           k3 + '</div>';
-        if (S.ven.des) h += htmlDesVentas(V, S.ven.des);
-        if (V.abiertas.length) {
-          h += '<h2 class="n-grupo">Sin cobrar todavía</h2><p class="u-nota">Te deben ' + eur0(V.deben) + (V.abiertas.length > 1 ? ' entre las ' + V.abiertas.length : '') +
-            (V.sinImporte ? ' (' + deMas(V.sinImporte, 'sin precio cerrado', 'sin precio cerrado') + ')' : '') + '. «En juego» es lo que has pagado tú y aún no has recuperado.</p>' +
-            '<table class="u-tabla eco-tabla"><thead><tr><th>Venta</th><th class="num">En juego</th></tr></thead><tbody>' + V.abiertas.map(function (x) {
+        if (S.ven.des) h += htmlDesVentas(V0, S.ven.des);
+        if (V0.abiertas.length) {
+          h += '<h2 class="n-grupo">Sin cobrar todavía</h2><p class="u-nota">Te deben ' + eur0(V0.deben) + (V0.abiertas.length > 1 ? ' entre las ' + V0.abiertas.length : '') +
+            (V0.sinImporte ? ' (' + deMas(V0.sinImporte, 'sin precio cerrado', 'sin precio cerrado') + ')' : '') + '. «En juego» es lo que has pagado tú y aún no has recuperado.</p>' +
+            '<table class="u-tabla eco-tabla"><thead><tr><th>' + V('{Venta}') + '</th><th class="num">En juego</th></tr></thead><tbody>' + V0.abiertas.map(function (x) {
               return '<tr tabindex="0" data-venta="' + texto(x.v.ID) + '"><td class="u-tabla-t">' + texto(nombreVenta(x.v)) + chip(x.v) + '<span class="eco-paso">' + pasoTxt(x) + '</span></td>' +
                 '<td class="num"><span class="u-cifra">' + eur0(x.enJuego) + '</span>' + (!x.enJuego ? '<div class="u-nota">' + (x.pagado ? 'Cubierto con lo que te han pagado' : 'Aún no has pagado nada') + '</div>' : '') + '</td></tr>';
             }).join('') + '</tbody></table>';
         }
         h += nueva;
-        if (V.cobradas.length) {
-          h += '<h2 class="n-grupo">Cobradas</h2>' + (V.dias !== null ? '<p class="u-nota">Tardas ' + (V.dias === 1 ? '1 día' : 'unos ' + V.dias + ' días') + ' en cobrar desde que pagas al taller.</p>' : '') +
-            '<table class="u-tabla eco-tabla"><thead><tr><th>Venta</th><th class="num">Has ganado</th></tr></thead><tbody>' + V.cobradas.map(function (x) {
+        if (V0.cobradas.length) {
+          h += '<h2 class="n-grupo">' + V('Cobrad{a}s') + '</h2>' + (V0.dias !== null ? '<p class="u-nota">Tardas ' + (V0.dias === 1 ? '1 día' : 'unos ' + V0.dias + ' días') + ' en cobrar desde que pagas al taller.</p>' : '') +
+            '<table class="u-tabla eco-tabla"><thead><tr><th>' + V('{Venta}') + '</th><th class="num">Has ganado</th></tr></thead><tbody>' + V0.cobradas.map(function (x) {
               return '<tr tabindex="0" data-venta="' + texto(x.v.ID) + '"><td class="u-tabla-t">' + texto(nombreVenta(x.v)) + '<span class="eco-paso">' + pasoTxt(x) + '</span></td>' +
                 '<td class="num"><span class="u-cifra' + (x.ganado < 0 ? ' u-mal' : x.bajo ? '' : ' eco-bien') + '">' + eur0(x.ganado) + '</span>' +
                 (m && x.margen !== null ? '<div class="u-nota' + (x.bajo ? ' u-mal' : '') + '">' + pc(x.margen) + (x.bajo ? ': por debajo del ' + pc(m) : '') + '</div>' : '') + '</td></tr>';
             }).join('') + '</tbody></table>';
         }
-        return h + '<p class="u-nota">Toca una venta para ver sus cuentas y sus movimientos.</p>';
+        return h + '<p class="u-nota">' + V('Toca {una} {venta} para ver sus cuentas y sus movimientos.') + '</p>';
       }
 
       /** De dónde sale cada cifra de arriba: un resumen corto, con la cuenta. */
-      function htmlDesVentas(V, k) {
-        var m = V.minimo, h = '<div class="eco-card eco-des" id="eco-des"><div class="eco-des-cab"><h2 class="n-grupo">';
+      function htmlDesVentas(V0, k) {
+        var m = V0.minimo, h = '<div class="eco-card eco-des" id="eco-des"><div class="eco-des-cab"><h2 class="n-grupo">';
         var cerrarB = '</h2><button type="button" class="u-btn u-btn-texto" data-accion="cerrardes">Cerrar</button></div>';
         if (k === 'juego') {
-          var xs = V.abiertas.filter(function (x) { return x.pagado || x.cobrado; });
-          h += 'Tu dinero en juego: ' + eur0(V.enJuego) + cerrarB + '<p class="u-nota">Venta a venta: lo que has pagado tú (taller, envío, aduanas…) menos lo que te ha pagado ya la marca.</p>';
-          if (!xs.length) return h + '<p class="u-vacio">En las ventas sin cobrar aún no has pagado nada ni te han pagado nada.</p></div>';
-          return h + '<table class="u-tabla eco-tabla"><thead><tr><th>Venta</th><th class="num u-solo-ancho">Has pagado</th><th class="num u-solo-ancho">Te han pagado</th><th class="num">En juego</th></tr></thead><tbody>' +
+          var xs = V0.abiertas.filter(function (x) { return x.pagado || x.cobrado; });
+          h += 'Tu dinero en juego: ' + eur0(V0.enJuego) + cerrarB + '<p class="u-nota">' + V('{Venta} a {venta}') + ': lo que has pagado tú (taller, envío, aduanas…) menos lo que te ha pagado ya la marca.</p>';
+          if (!xs.length) return h + '<p class="u-vacio">' + V('En {los} {ventas} sin cobrar aún no has pagado nada ni te han pagado nada.') + '</p></div>';
+          return h + '<table class="u-tabla eco-tabla"><thead><tr><th>' + V('{Venta}') + '</th><th class="num u-solo-ancho">Has pagado</th><th class="num u-solo-ancho">Te han pagado</th><th class="num">En juego</th></tr></thead><tbody>' +
             xs.map(function (x) {
               var det = x.pagado ? costesTxt(x) : 'Aún no has pagado nada';
               return '<tr><td class="u-tabla-t">' + texto(nombreVenta(x.v)) + '<div class="u-nota">' + det + '<span class="u-solo-movil"> · te han pagado ' + eur0(x.cobrado) + '</span></div></td>' +
                 '<td class="num u-solo-ancho">' + eur0(x.pagado) + '</td><td class="num u-solo-ancho">' + eur0(x.cobrado) + '</td><td class="num">' + eur0(x.enJuego) + '</td></tr>';
-            }).join('') + '<tr class="eco-total"><td class="u-tabla-t">Total</td><td class="num u-solo-ancho"></td><td class="num u-solo-ancho"></td><td class="num">' + eur0(V.enJuego) + '</td></tr></tbody></table>' +
-            '<p class="u-nota">Una venta en la que la marca te ha pagado tanto o más de lo que has gastado cuenta 0: ahí no arriesgas nada. Las ventas ya cobradas no cuentan.</p></div>';
+            }).join('') + '<tr class="eco-total"><td class="u-tabla-t">Total</td><td class="num u-solo-ancho"></td><td class="num u-solo-ancho"></td><td class="num">' + eur0(V0.enJuego) + '</td></tr></tbody></table>' +
+            '<p class="u-nota">' + V('{Una} {venta} en {la} que la marca te ha pagado tanto o más de lo que has gastado cuenta 0: ahí no arriesgas nada. {Los} {ventas} ya cobrad{a}s no cuentan.') + '</p></div>';
         }
         if (k === 'ganado') {
-          h += 'Has ganado con las ventas: ' + eur0(V.ganado) + cerrarB + '<p class="u-nota">Solo las ventas cobradas: lo que te ha pagado la marca menos lo que te ha costado.</p>';
-          if (!V.cobradas.length) return h + '<p class="u-vacio">Cuando una marca te pague una venta entera, sale aquí lo que te ha dejado.</p></div>';
-          var bajo = V.cobradas.filter(function (x) { return x.bajo; })[0];
-          return h + '<table class="u-tabla eco-tabla"><thead><tr><th>Venta</th><th class="num u-solo-ancho">Te pagó</th><th class="num u-solo-ancho">Te costó</th><th class="num">Ganaste</th></tr></thead><tbody>' +
-            V.cobradas.map(function (x) {
+          h += V('Has ganado con {los} {ventas}') + ': ' + eur0(V0.ganado) + cerrarB + '<p class="u-nota">' + V('Solo {los} {ventas} cobrad{a}s') + ': lo que te ha pagado la marca menos lo que te ha costado.</p>';
+          if (!V0.cobradas.length) return h + '<p class="u-vacio">' + V('Cuando una marca te pague {una} {venta} enter{a}, sale aquí lo que te ha dejado.') + '</p></div>';
+          var bajo = V0.cobradas.filter(function (x) { return x.bajo; })[0];
+          return h + '<table class="u-tabla eco-tabla"><thead><tr><th>' + V('{Venta}') + '</th><th class="num u-solo-ancho">Te pagó</th><th class="num u-solo-ancho">Te costó</th><th class="num">Ganaste</th></tr></thead><tbody>' +
+            V0.cobradas.map(function (x) {
               return '<tr><td class="u-tabla-t">' + texto(nombreVenta(x.v)) + '<div class="u-nota">' + (x.pagado ? 'Costó ' + costesTxt(x) : 'Sin gastos apuntados') +
                 '<span class="u-solo-movil"> · te pagó ' + eur0(x.cobrado) + '</span></div></td><td class="num u-solo-ancho">' + eur0(x.cobrado) + '</td><td class="num u-solo-ancho">' + eur0(x.pagado) + '</td>' +
                 '<td class="num">' + eur0(x.ganado) + (m && x.margen !== null ? '<div class="u-nota' + (x.bajo ? ' u-mal' : '') + '">' + pc(x.margen) + '</div>' : '') + '</td></tr>';
-            }).join('') + '<tr class="eco-total"><td class="u-tabla-t">Total</td><td class="num u-solo-ancho">' + eur0(V.cobradas.reduce(function (s, x) { return s + x.cobrado; }, 0)) + '</td>' +
-            '<td class="num u-solo-ancho">' + eur0(V.cobradas.reduce(function (s, x) { return s + x.pagado; }, 0)) + '</td><td class="num">' + eur0(V.ganado) + '</td></tr></tbody></table>' +
+            }).join('') + '<tr class="eco-total"><td class="u-tabla-t">Total</td><td class="num u-solo-ancho">' + eur0(V0.cobradas.reduce(function (s, x) { return s + x.cobrado; }, 0)) + '</td>' +
+            '<td class="num u-solo-ancho">' + eur0(V0.cobradas.reduce(function (s, x) { return s + x.pagado; }, 0)) + '</td><td class="num">' + eur0(V0.ganado) + '</td></tr></tbody></table>' +
             (m ? '<p class="u-nota"><b>El %</b> es lo que ganas sobre lo que te cuesta' + (bajo ? ': en ' + texto(nombreVenta(bajo.v)) + ', ' + eur0(bajo.ganado) + ' sobre ' + eur0(bajo.pagado) + ' es un ' + pc(bajo.margen) + '.' : '.') +
-              ' <b>Tu mínimo es el ' + pc(m) + '</b>' + (bajo ? '; para llegar, esa venta tendría que haber sido de ' + eur(bajo.paraMinimo) + ' en lugar de ' + eur(bajo.cobrado) + '.' : ', y todas llegan.') + '</p>' :
-              '<p class="u-nota">Lo que ganas en cada venta es lo que te paga la marca menos lo que te cuesta (taller, envío, aduanas…).</p>') + '</div>';
+              ' <b>Tu mínimo es el ' + pc(m) + '</b>' + (bajo ? '; para llegar, ' + V('{esa} {venta}') + ' tendría que haber sido de ' + eur(bajo.paraMinimo) + ' en lugar de ' + eur(bajo.cobrado) + '.' : ', y todas llegan.') + '</p>' :
+              '<p class="u-nota">' + V('Lo que ganas en cada {venta}') + ' es lo que te paga la marca menos lo que te cuesta (taller, envío, aduanas…).</p>') + '</div>';
         }
-        h += (V.falta > 0 ? 'Te falta por recuperar: ' + eur0(V.falta) : 'Lo invertido: ' + eur0(V.invertido)) + cerrarB +
-          '<p class="u-nota"><b>Lo invertido</b> son los gastos que no son de ninguna venta: lo que cuesta montar y mover el negocio. Se recupera con lo que ganas en las ventas.</p>';
-        if (!V.porCategoria.length) return h + '<p class="u-vacio">Aún no hay gastos de la empresa: todos los gastos apuntados son de alguna venta.</p></div>';
-        return h + '<table class="u-tabla eco-tabla"><tbody>' + V.porCategoria.map(function (c) {
+        h += (V0.falta > 0 ? 'Te falta por recuperar: ' + eur0(V0.falta) : 'Lo invertido: ' + eur0(V0.invertido)) + cerrarB +
+          '<p class="u-nota"><b>Lo invertido</b> son los gastos que no son de ' + V('{ninguna} {venta}: lo que cuesta montar y mover el negocio. Se recupera con lo que ganas en {los} {ventas}.') + '</p>';
+        if (!V0.porCategoria.length) return h + '<p class="u-vacio">' + V('Aún no hay gastos de la empresa: todos los gastos apuntados son de {alguna} {venta}.') + '</p></div>';
+        return h + '<table class="u-tabla eco-tabla"><tbody>' + V0.porCategoria.map(function (c) {
           return '<tr><td class="u-tabla-t">' + texto(c.nombre) + '</td><td class="num">' + eur0(c.base) + '</td></tr>';
-        }).join('') + '<tr class="eco-total"><td class="u-tabla-t">Has invertido</td><td class="num">' + eur0(V.invertido) + '</td></tr>' +
-          '<tr><td class="u-tabla-t">Has ganado con las ventas</td><td class="num">− ' + eur0(V.ganado) + '</td></tr>' +
-          '<tr class="eco-total"><td class="u-tabla-t">Te falta por recuperar</td><td class="num">' + eur0(V.falta) + '</td></tr></tbody></table>' +
+        }).join('') + '<tr class="eco-total"><td class="u-tabla-t">Has invertido</td><td class="num">' + eur0(V0.invertido) + '</td></tr>' +
+          '<tr><td class="u-tabla-t">' + V('Has ganado con {los} {ventas}') + '</td><td class="num">− ' + eur0(V0.ganado) + '</td></tr>' +
+          '<tr class="eco-total"><td class="u-tabla-t">Te falta por recuperar</td><td class="num">' + eur0(V0.falta) + '</td></tr></tbody></table>' +
           '<p class="u-nota">El dinero que pones en la empresa (el capital) no cuenta aquí: no es un gasto, es con lo que pagas todo esto. Desde el principio, no solo este año.</p></div>';
       }
 
@@ -2109,15 +3240,35 @@
         var sub = x.cobrada ? 'Te pagó ' + eur0(x.cobrado) + ' y te costó ' + eur0(x.pagado) + (m && x.margen !== null ? ': un ' + pc(x.margen) + ' sobre lo que te costó.' : '.') +
             (x.bajo ? ' <b>Por debajo de tu mínimo del ' + pc(m) + '</b>: para llegar, ' + eur(x.paraMinimo) + '.' : '') :
           x.adelantado ? texto(c) + ' te ha pagado los ' + eur0(x.cobrado) + ' por adelantado y aún no has pagado al taller: lo que ganas sale cuando lo pagues.' :
+          // T0726 (R66): antes del primer pago al taller no se dice lo que ganará (sería el precio entero, sin la tela).
+          !x.pagado ? (x.debe === null ? 'Aún sin precio cerrado: apunta lo que paga la marca en «' + V('Editar {la} {venta}') + '». ' : 'Te debe ' + (x.cobrado ? 'otros ' : '') + eur0(x.debe) + '; ') + 'aún no has pagado el taller.' :
           'Has pagado ' + eur0(x.pagado) + ' y ' + texto(c) + ' te ha pagado ' + eur0(x.cobrado) + '. ' +
-            (x.debe === null ? 'Aún sin precio cerrado: apunta lo que paga la marca en «Editar la venta».' :
+            (x.debe === null ? 'Aún sin precio cerrado: apunta lo que paga la marca en «' + V('Editar {la} {venta}') + '».' :
               'Te debe ' + (x.cobrado ? 'otros ' : '') + eur0(x.debe) + ': cuando pague, habrás ganado ' + eur0(x.previsto) + ', si no hay más gastos.');
-        var h = '<button type="button" class="u-btn u-btn-texto eco-volver" data-accion="todasventas">‹ Todas las ventas</button>' +
-          '<div class="eco-kpis"><div class="eco-kpi eco-grande"><b>' + texto(nombreVenta(v)) + '</b><span class="eco-val">' +
-          (x.cobrada ? eur0(x.ganado) + ' ganados' : x.adelantado ? 'Cobrada por adelantado' : eur0(x.enJuego) + ' en juego') + '</span><span class="eco-sub">' + sub + '</span></div></div>';
-        var pasos = [['Pedida', v.FECHA]];
+        var h = (S.ven.volver ? '<button type="button" class="u-btn u-btn-texto eco-volver" data-accion="volverficha">‹ Volver a ' + texto(S.ven.volver.titulo) + '</button>' : '<button type="button" class="u-btn u-btn-texto eco-volver" data-accion="todasventas">‹ ' + V('Tod{a}s {los} {ventas}') + '</button>') +
+          '<div class="eco-kpis eco-kpis-ven"><div class="eco-kpi eco-grande"><b>' + texto(nombreVenta(v)) + '</b><span class="eco-val">' +
+          (x.cobrada ? eur0(x.ganado) + ' ganados' : x.adelantado ? paso('Cobrada por adelantado') : eur0(x.enJuego) + ' en juego') + '</span><span class="eco-sub">' + sub + '</span></div></div>@@FACTURA@@';
+        // T0739 · Lo que lleva: cada tela con sus metros, su taller y cómo va su envío (como su pestaña Pedidos).
+        if (LV && !v._nueva) {
+          var lvs = lineasVenta(d.lv, v.ID);
+          h += '<h2 class="n-grupo">' + V('Qué lleva {la} {venta}') + '</h2>' + (lvs.length ? '<ul class="eco-lvs">' + lvs.map(function (l) {
+            var env = envioLinea(l), quien = l.ID_PROVEEDOR ? nombreTaller(l.ID_PROVEEDOR) : '';
+            return '<li><button type="button" class="eco-lv" data-linea="' + texto(l.ID) + '"><span class="eco-lv-t"><b>' + texto(nombreTela(l.ARTICULO)) + '</b>' +
+              '<span class="u-nota">' + texto([metrosDe(l), quien ? 'taller ' + quien : 'sin taller'].join(' · ')) + '</span></span>' +
+              '<span class="eco-lv-e' + (env === 'Por salir' ? ' eco-lv-por' : '') + '">' + texto(env) + '</span></button></li>';
+          }).join('') + '</ul>' : '<p class="u-vacio">' + V('Aún no has apuntado las telas de {este} {venta}.') + '</p>') +
+            '<p><button type="button" class="u-btn u-btn-texto" data-accion="nuevalinea">+ Añadir línea</button></p>';
+        }
+        // T0689 · Su factura (la emitida que la elige), como un paso más y, abajo, para abrirla o hacerla.
+        var fv = facPorVenta() ? facturaDeVenta(d.fac, DS, v.ID) : null;
+        // T0747 (R102) · Con anticipo pactado (y la columna CLASE), su factura: se hace antes que la final, al cobrarlo.
+        var conAnt = facPorVenta() && d.colsFac.indexOf('CLASE') >= 0 && x.anticipo > 0 && x.anticipo < 1 + 1e-9;
+        var fa = conAnt ? anticipoDeVenta(d.fac, DS, v.ID) : null;
+        var pasos = [[paso('Pedida'), v.FECHA]];
+        if (conAnt) pasos.push([fa ? 'Anticipo facturado · ' + numFac(fa) : 'Anticipo facturado', fa ? fa.FECHA : '']);
         if (x.anticipo) pasos.push(['Anticipo cobrado · ' + pc(x.anticipo), x.primerCobro]);
-        pasos.push(['Pagada al taller', x.primerPago], ['En camino', v.FECHA_ENVIO], ['Entregada', v.FECHA_ENTREGA], ['Cobrada', x.cobro]);
+        if (facPorVenta()) pasos.push([fv ? paso('Facturada') + ' · ' + numFac(fv) : paso('Facturada'), fv ? fv.FECHA : '']);
+        pasos.push([paso('Pagada al taller'), x.primerPago], ['En camino', v.FECHA_ENVIO], [paso('Entregada'), v.FECHA_ENTREGA], [paso('Cobrada'), x.cobro]);
         h += '<h2 class="n-grupo">Dónde está</h2><ol class="eco-pasos">' + pasos.map(function (p) {
           return '<li' + (p[1] ? ' class="eco-ya"' : '') + '><span>' + texto(p[0]) + '</span><span>' + texto(fecha(p[1])) + '</span></li>';
         }).join('') + '</ol>';
@@ -2125,39 +3276,162 @@
         h += '<h2 class="n-grupo">Las cuentas</h2><table class="u-tabla eco-tabla"><tbody>' +
           '<tr><td class="u-tabla-t">Lo que paga la marca<div class="u-nota">' + (x.importe === null ? 'Sin precio cerrado' : 'Te ha pagado ' + eur0(x.cobrado)) + '</div></td><td class="num">' + (x.importe === null ? '—' : eur0(x.importe)) + '</td></tr>' +
           x.costes.map(function (k) { return '<tr><td class="u-tabla-t">' + texto(k.nombre) + '</td><td class="num">− ' + eur0(k.base) + '</td></tr>'; }).join('') +
-          (x.adelantado ? '<tr class="eco-total"><td class="u-tabla-t">Lo que ganas<div class="u-nota">Sale cuando pagues al taller: lo que te pagó menos lo que te cueste</div></td><td class="num">—</td></tr>' :
+          // T0726 (R66): sin nada pagado al taller, lo que ganas aún no se sabe (no es el precio entero).
+          (x.adelantado || (!x.cobrada && !x.pagado) ? '<tr class="eco-total"><td class="u-tabla-t">Lo que ganas<div class="u-nota">Sale cuando pagues al taller: lo que ' + (x.adelantado ? 'te pagó' : 'te pague') + ' menos lo que te cueste</div></td><td class="num">—</td></tr>' :
            x.importe === null ? '' : '<tr class="eco-total"><td class="u-tabla-t">' + (x.cobrada ? 'Has ganado' : 'Ganarás, si no hay más gastos') +
             (m && x.pagado ? '<div class="u-nota">' + pc(gan / x.pagado) + ' sobre lo que te cuesta</div>' : '') + '</td><td class="num"><span class="u-cifra' +
             (gan < 0 ? ' u-mal' : ' eco-bien') + '">' + eur0(gan) + '</span></td></tr>') +
           '</tbody></table><p class="u-nota">Sin IVA.' + (x.anticipo ? ' Anticipo pactado: ' + pc(x.anticipo) + (x.importe !== null ? ' (' + eur0(Math.round(x.importe * x.anticipo)) + ')' : '') + '.' : '') + '</p>';
         h += '<h2 class="n-grupo">Sus movimientos</h2>' + (x.movs.length ? '<table class="u-tabla eco-tabla"><thead><tr><th>Movimiento</th><th class="num u-solo-ancho">Cuenta</th><th class="num">Importe</th></tr></thead><tbody>' +
           x.movs.slice().reverse().map(function (mv) { return filaMov(mv); }).join('') + '</tbody></table>' :
-          '<p class="u-vacio">Todavía no hay pagos ni cobros de esta venta. Al apuntarlos, elige esta venta.</p>');
+          '<p class="u-vacio">' + V('Todavía no hay pagos ni cobros de {esta} {venta}. Al apuntarlos, elige {esta} {venta}.') + '</p>');
         if (v.NOTAS) h += '<div class="eco-dl">' + dato('Notas', texto(v.NOTAS)) + '</div>';
-        return h + '<div class="n-botones"><button type="button" class="u-btn u-btn-accion" data-accion="movventa">Apuntar un pago o un cobro</button>' +
-          '<button type="button" class="u-btn" data-accion="editarventa">Editar la venta</button></div>';
+        // T0689 · Sin factura, «Hacer la factura» es lo primero (aquí, o en la sección que las hace: FACTURAR); con ella, su PDF.
+        var hacer = facPorVenta() && !fv && (LINEAS || FACTURAR) && !v._nueva;
+        // T0747: sin la del anticipo (y con precio cerrado), «Factura del anticipo» es lo primero; «Hacer la factura» (la final), al lado.
+        var hacerAnt = hacer && conAnt && !fa && importeAnticipo(v) > 0;
+        function botonFac(ant, prin) {
+          var t = ant ? 'Factura del anticipo' : 'Hacer la factura' + (fa ? ' final' : ''), c = 'u-btn' + (prin ? ' u-btn-accion' : '');
+          return LINEAS ? '<button type="button" class="' + c + '" data-accion="' + (ant ? 'anticipoventa' : 'facturaventa') + '">' + t + '</button>'
+            : '<a class="' + c + '" href="' + texto(hrefFacturaVenta(v, ant)) + '" data-sx="' + texto(FACTURAR.toUpperCase()) + '">' + t + '</a>';
+        }
+        var abrirAnt = fa && fa.ARCHIVO_URL ? '<a class="u-btn" href="' + texto(fa.ARCHIVO_URL) + '" target="_blank" rel="noopener" data-fuera>Abrir el anticipo ' + texto(numFac(fa)) + ' ↗</a>' : '';
+        var bFac = !facPorVenta() ? '' : fv ? (fv.ARCHIVO_URL ? '<a class="u-btn" href="' + texto(fv.ARCHIVO_URL) + '" target="_blank" rel="noopener" data-fuera>Abrir la factura ' + texto(numFac(fv)) + ' ↗</a>' : '') + abrirAnt
+          : hacer ? (hacerAnt ? botonFac(true, true) + botonFac(false, false) : botonFac(false, true) + abrirAnt) : '';
+        // Arriba, junto a la cifra (lo primero que se hace con un pedido sin factura); abajo, lo de siempre.
+        h = h.replace('@@FACTURA@@', bFac ? '<div class="n-botones eco-ven-fac">' + bFac + '</div>' : fv && !fv.ARCHIVO_URL ? '<p class="u-nota">Su factura, ' + texto(numFac(fv)) + ', aún no tiene PDF: sácalo desde Economía › Facturas.</p>' : '');
+        return h + '<div class="n-botones"><button type="button" class="u-btn' + (hacer ? '' : ' u-btn-accion') + '" data-accion="movventa">Apuntar un pago o un cobro</button>' +
+          '<button type="button" class="u-btn" data-accion="editarventa">' + V('Editar {la} {venta}') + '</button></div>';
       }
 
+      /* ---------- T0739 · las líneas de una venta ---------- */
+      function artsVenta() { return ARTV ? articulos(ARTV, { filas: function (t) { return T.filas(t) || []; }, fila: filaDe }) : []; }
+      /** Una tela como se dice: «BOR-004-01 · Bordado · Arena» (su código, si ya no está en la lista). */
+      function nombreTela(cod) {
+        cod = String(cod || '').trim();
+        var a = artsVenta().filter(function (x) { return x.codigo === cod; })[0];
+        if (a) return a.nombre && a.nombre !== cod ? cod + ' · ' + a.nombre : cod;
+        return cod || 'Sin tela';
+      }
+      function nombreTaller(id) { var t = ARTV ? (ARTV._refs || {}) : {}, f = null; Object.keys(t).forEach(function (k) { if (!f && /PROVEEDOR/.test(k)) f = filaDe(k, id); }); return f ? String(f.NOMBRE || id) : String(id); }
+      function metrosDe(l) { return l.CANTIDAD === '' || l.CANTIDAD == null ? 'sin metros' : String(cantidad(l.CANTIDAD)).replace('.', ',') + ' m'; }
+      /** Los talleres que se pueden elegir: los de las telas de la lista, por nombre (y el que ya tenga la línea). */
+      function talleres(arts, sel) {
+        var vistos = {}, xs = [];
+        arts.map(function (a) { return a.taller; }).concat(sel ? [sel] : []).forEach(function (id) {
+          if (!id || vistos[id]) return; vistos[id] = 1; xs.push([id, nombreTaller(id)]);
+        });
+        return xs.sort(function (a, b) { return String(a[1]).localeCompare(String(b[1]), 'es'); });
+      }
+      /** Añadir (l null) o cambiar una línea: la tela, los metros, el taller y su envío. */
+      function formLinea(v, l) {
+        var arts = artsVenta(), x = l || {}, cod = String(x.ARTICULO || '');
+        var trs = {}; d.lv.forEach(function (y) { var t = String(y.TRANSPORTISTA || '').trim(); if (t) trs[t] = 1; });
+        var html = '<h2 id="eco-vt">' + (l ? 'Cambiar la línea' : 'Añadir una línea') + '</h2><p class="u-nota">' + texto(nombreVenta(v)) + '</p><div class="u-campos">' +
+          campo('Tela', '<input type="text" id="l-ART" list="l-arts" value="' + texto(cod) + '" placeholder="Busca por código o nombre" autocomplete="off" data-foco>' +
+            '<datalist id="l-arts">' + arts.map(function (a) { return '<option value="' + texto(a.codigo) + '">' + texto(a.nombre) + '</option>'; }).join('') + '</datalist>', 'u-ancho') +
+          campo('Metros', '<input type="text" inputmode="decimal" id="l-CANTIDAD" value="' + texto(x.CANTIDAD === '' || x.CANTIDAD == null ? '' : String(x.CANTIDAD).replace('.', ',')) + '" placeholder="Si aún no se sabe, vacío">') +
+          campo('Taller', '<select id="l-ID_PROVEEDOR">' + opciones(talleres(arts, x.ID_PROVEEDOR), x.ID_PROVEEDOR, 'Sin taller') + '</select>') +
+          campo('Transportista <span class="eco-opc">(al salir)</span>', '<input type="text" id="l-TRANSPORTISTA" list="l-trs" value="' + texto(x.TRANSPORTISTA) + '" maxlength="60" placeholder="DHL, FedEx, tu transitario…" autocomplete="off">' +
+            '<datalist id="l-trs">' + Object.keys(trs).sort().map(function (t) { return '<option value="' + texto(t) + '"></option>'; }).join('') + '</datalist>') +
+          campo('Nº de seguimiento <span class="eco-opc">(al salir)</span>', '<input type="text" id="l-SEGUIMIENTO" value="' + texto(x.SEGUIMIENTO) + '" maxlength="80" autocomplete="off">') +
+          '</div><p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="l-guardar">' + (l ? 'Guardar' : 'Añadir') + '</button>' +
+          (l ? '<button type="button" class="u-btn" id="l-quitar">Quitar la línea</button>' : '') +
+          '<button type="button" class="u-btn" data-cerrar>Cancelar</button></div>';
+        ventana(html, function () {
+          var inA = vent.querySelector('#l-ART'), selT = vent.querySelector('#l-ID_PROVEEDOR');
+          function artEscrito() { var c = val('l-ART').split('·')[0].trim().toUpperCase(); return arts.filter(function (a) { return a.codigo.toUpperCase() === c; })[0] || null; }
+          // Al elegir la tela, su taller (si es otra tela que la de antes; el que se haya puesto a mano en esta, no se toca).
+          inA.addEventListener('change', function () {
+            var a = artEscrito(); if (!a) return;
+            inA.value = a.codigo;
+            if (a.taller && (!l || a.codigo !== cod)) {
+              if (!selT.querySelector('option[value="' + a.taller.replace(/"/g, '') + '"]')) selT.insertAdjacentHTML('beforeend', opciones([[a.taller, nombreTaller(a.taller)]], ''));
+              selT.value = a.taller;
+            }
+          });
+          vent.querySelector('#l-guardar').onclick = function () {
+            var a = artEscrito(), tm = val('l-CANTIDAD'), mal = [];
+            var nl = { ARTICULO: a ? a.codigo : '', CANTIDAD: tm === '' ? '' : cantidad(tm), ID_PROVEEDOR: val('l-ID_PROVEEDOR'), TRANSPORTISTA: val('l-TRANSPORTISTA'), SEGUIMIENTO: val('l-SEGUIMIENTO') };
+            if (!a) mal.push(val('l-ART') ? 'Esa tela no está en ' + (ARTV && ARTV.titulo ? ARTV.titulo : 'la lista') + ': elígela de la lista.' : 'Falta la tela.');
+            if (tm !== '' && !(cantidad(tm) > 0)) mal.push('Los metros tienen que ser un número mayor que 0 (o vacío).');
+            if (mal.length) { verError(mal); return; }
+            cerrar();
+            if (l) T.actualizar('VENTA_LINEAS', l.ID, cambios(l, nl)).then(function () { if (ctx.abierta()) ctx.aviso('Línea guardada en el Excel.'); }, function () {});
+            else T.crear('VENTA_LINEAS', Object.assign({ ID_VENTA: v.ID }, nl)).then(function () { if (ctx.abierta()) ctx.aviso('Línea añadida.'); }, function () {});
+          };
+          var bq = vent.querySelector('#l-quitar');
+          if (bq) bq.onclick = function () {
+            if (bq.getAttribute('data-seguro') !== '1') { bq.setAttribute('data-seguro', '1'); bq.textContent = '¿Seguro? Quitarla'; return; }
+            cerrar();
+            T.borrar('VENTA_LINEAS', l.ID).then(function () { if (ctx.abierta()) ctx.aviso('Línea quitada.'); }, function () {});
+          };
+        });
+      }
+
+      /**
+       * T0725 (R04) · Las marcas de una venta. Con CLIENTES, como en una factura emitida (clientesFactura): las contrapartes
+       * Cliente y las marcas que aún no lo son (las de su lista arriba y las de prospección aparte), que se dan de alta al
+       * guardar. Sin CLIENTES, las contrapartes Cliente; nunca un proveedor o una herramienta (antes, sin ningún Cliente,
+       * salían todas: Canva y Google Workspace).
+       */
+      function opcVenta(sel) {
+        function orden(a, b) { return String(a[1]).localeCompare(String(b[1]), 'es'); }
+        if (!CLIV) return opciones(d.ctr.filter(function (c) { return c.TIPO === 'Cliente' || String(c.ID) === String(sel); }).map(function (c) { return [c.ID, c.NOMBRE]; }).sort(orden), sel, 'Elige la marca');
+        var x = clientesFactura(d.ctr, T.filas(CLIV.tabla) || [], CLIV, sel);
+        return '<option value="">Elige la marca</option>' + opciones(x.clientes, sel) +
+          (x.otros.length ? '<optgroup label="' + texto(CLIV.otros || 'En prospección') + '">' + opciones(x.otros, sel) + '</optgroup>' : '');
+      }
+      /** T0725 · La contraparte de la marca elegida: si es una ficha que aún no es contraparte («marca:M-…»), la da de alta
+       *  como Cliente con su ficha → promesa con su ID. */
+      function contraparteDe(v0) {
+        if (!(CLIV && /^marca:/.test(String(v0 || '')))) return Promise.resolve(v0);
+        var m = filaDe(CLIV.tabla, String(v0).slice(6));
+        if (!m) return Promise.reject(new Error('No encuentro esa marca: actualiza y vuelve a probar.'));
+        var ya = d.ctr.filter(function (c) { return String(c[String(CLIV.campo || 'ID_MARCA')] || '') === String(m.ID); })[0];
+        if (ya) return Promise.resolve(ya.ID);
+        var o = { NOMBRE: m.NOMBRE, TIPO: 'Cliente' }; o[String(CLIV.campo || 'ID_MARCA')] = m.ID;
+        return T.crear('CONTRAPARTES', o).then(function (r) {
+          var idc = (r && r.id) || (r && r.fila && r.fila.ID); if (!idc) throw new Error('No se ha podido dar de alta la marca.');
+          return idc;
+        });
+      }
+      /** T0739 · La fila de ANTICIPO_MARCA (NECESIDADES) de la marca elegida: una contraparte con su ficha o «marca:M-…». */
+      function fichaAnticipo(v0) {
+        v0 = String(v0 || '');
+        var campoM = String(CLIV.campo || 'ID_MARCA'), c = /^marca:/.test(v0) ? null : ix.ctr[v0];
+        var idm = /^marca:/.test(v0) ? v0.slice(6) : c ? String(c[campoM] || '') : '';
+        if (!idm) return null;
+        var col = String(ANT.marca || campoM);
+        return (T.filas(ANT.tabla) || []).filter(function (r) { return String(r[col] || '') === idm; })[0] || null;
+      }
       /** Nueva venta (v null) o cambiar una: la marca, qué es, lo que paga, el anticipo y las fechas. */
       function formVenta(v) {
         var cols = T.columnas ? T.columnas(VEN) : [], hay = function (c) { return !cols.length || cols.indexOf(c) >= 0; };
         var x = v || { FECHA: hoy() };
-        var clientes = d.ctr.filter(function (c) { return c.TIPO === 'Cliente' || String(c.ID) === String(x.ID_CONTRAPARTE); });
-        if (!clientes.length) clientes = d.ctr;
         var ant = fraccion(x.ANTICIPO);
-        var html = '<h2 id="eco-vt">' + (v ? 'Editar la venta' : 'Nueva venta') + '</h2><div class="u-campos">' +
-          (hay('ID_CONTRAPARTE') ? campo('Marca', '<select id="v-ID_CONTRAPARTE">' + opciones(clientes.map(function (c) { return [c.ID, c.NOMBRE]; }).sort(function (a, b) { return String(a[1]).localeCompare(String(b[1]), 'es'); }), x.ID_CONTRAPARTE, 'Elige la marca') + '</select>') : '') +
+        var html = '<h2 id="eco-vt">' + V(v ? 'Editar {la} {venta}' : 'Nuev{a} {venta}') + '</h2><div class="u-campos">' +
+          (hay('ID_CONTRAPARTE') ? campo('Marca', '<select id="v-ID_CONTRAPARTE">' + opcVenta(x.ID_CONTRAPARTE) + '</select>') : '') +
           campo('Qué es', '<input type="text" id="v-NOMBRE" value="' + texto(x.NOMBRE) + '" maxlength="120" placeholder="Por ejemplo: Celosía arena · 300 m" data-foco>', 'u-ancho') +
           campo('Fecha del pedido', '<input type="date" id="v-FECHA" value="' + texto(x.FECHA) + '">') +
           (hay('IMPORTE') ? campo('Lo que paga la marca, sin IVA', '<input type="text" inputmode="decimal" id="v-IMPORTE" value="' + texto(x.IMPORTE === '' || x.IMPORTE == null ? '' : String(x.IMPORTE).replace('.', ',')) + '" placeholder="Si aún no está cerrado, vacío">') : '') +
-          (hay('ANTICIPO') ? campo('Anticipo (%)', '<input type="text" inputmode="decimal" id="v-ANTICIPO" value="' + (ant ? String(Math.round(ant * 1000) / 10).replace('.', ',') : '') + '" placeholder="Sin anticipo, vacío">') : '') +
+          (hay('ANTICIPO') ? campo('Anticipo (%)', '<input type="text" inputmode="decimal" id="v-ANTICIPO" value="' + (ant ? String(Math.round(ant * 1000) / 10).replace('.', ',') : '') + '" placeholder="Sin anticipo, vacío"><span class="u-nota" id="v-ant-nota" hidden>Lo pone su ficha: acepta anticipo. Puedes cambiarlo.</span>') : '') +
           (hay('FECHA_ENVIO') ? campo('Salieron las telas <span class="eco-opc">(en camino)</span>', '<input type="date" id="v-FECHA_ENVIO" value="' + texto(x.FECHA_ENVIO) + '">') : '') +
           (hay('FECHA_ENTREGA') ? campo('Las recibió la marca', '<input type="date" id="v-FECHA_ENTREGA" value="' + texto(x.FECHA_ENTREGA) + '">') : '') +
           (hay('NOTAS') ? campo('Notas <span class="eco-opc">(opcional)</span>', '<textarea id="v-NOTAS" rows="2" placeholder="Condiciones, plazos, lo que hayáis acordado…">' + texto(x.NOTAS) + '</textarea>', 'u-ancho') : '') +
-          '</div><p class="u-nota">Los pagos (taller, envío, aduanas) y los cobros (anticipo, el resto) se apuntan en Movimientos, eligiendo esta venta.</p>' +
-          '<p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="v-guardar">' + (v ? 'Guardar' : 'Crear la venta') + '</button>' +
+          '</div><p class="u-nota">' + V('Los pagos (taller, envío, aduanas) y los cobros (anticipo, el resto) se apuntan en ' + dondeMov() + ', eligiendo {esta} {venta}.') + '</p>' +
+          '<p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="v-guardar">' + (v ? 'Guardar' : V('Crear {la} {venta}')) + '</button>' +
           '<button type="button" class="u-btn" data-cerrar>Cancelar</button></div>';
         ventana(html, function () {
+          // T0739 · En un pedido nuevo, al elegir la marca, el anticipo que dice su ficha (si no se ha escrito otro).
+          var selM = vent.querySelector('#v-ID_CONTRAPARTE'), inAnt = vent.querySelector('#v-ANTICIPO'), notaAnt = vent.querySelector('#v-ant-nota'), puesto = '';
+          if (ANT && !v && selM && inAnt) selM.addEventListener('change', function () {
+            var p = anticipoMarca(ANT, fichaAnticipo(selM.value), function (t, id) { var f = filaDe(t, id); return f ? f.NOMBRE : ''; });
+            if (inAnt.value.trim() !== '' && inAnt.value !== puesto) return; // lo ha escrito ella: no se toca
+            puesto = p ? String(Math.round(p * 1000) / 10).replace('.', ',') : '';
+            inAnt.value = puesto; notaAnt.hidden = !p;
+          });
+          if (inAnt && notaAnt) inAnt.addEventListener('input', function () { notaAnt.hidden = true; });
           vent.querySelector('#v-guardar').onclick = function () {
             var nv = { NOMBRE: val('v-NOMBRE'), FECHA: val('v-FECHA') }, mal = [];
             if (hay('ID_CONTRAPARTE')) nv.ID_CONTRAPARTE = val('v-ID_CONTRAPARTE');
@@ -2176,12 +3450,16 @@
             if (!nv.FECHA) mal.push('Falta la fecha del pedido.');
             if (nv.FECHA_ENTREGA && nv.FECHA_ENVIO && nv.FECHA_ENTREGA < nv.FECHA_ENVIO) mal.push('La entrega no puede ser antes de que salieran las telas.');
             if (mal.length) { verError(mal); return; }
-            cerrar();
-            if (v) {
-              T.actualizar(VEN, v.ID, cambios(v, nv)).then(function () { if (ctx.abierta()) ctx.aviso('Venta guardada en el Excel.'); }, function () {});
-            } else {
-              T.crear(VEN, nv).then(function (r) { if (r && r.id) { S.ven.id = String(r.id); pintar(); arriba(); } if (ctx.abierta()) ctx.aviso('Venta creada. Apunta sus pagos y cobros eligiéndola.'); }, function () {});
-            }
+            var bg = vent.querySelector('#v-guardar'); bg.disabled = true;
+            contraparteDe(nv.ID_CONTRAPARTE).then(function (idc) {
+              if (hay('ID_CONTRAPARTE')) nv.ID_CONTRAPARTE = idc;
+              cerrar();
+              if (v) {
+                T.actualizar(VEN, v.ID, cambios(v, nv)).then(function () { if (ctx.abierta()) ctx.aviso(V('{Venta} guardad{a} en el Excel.')); }, function () {});
+              } else {
+                T.crear(VEN, nv).then(function (r) { if (r && r.id) { S.ven.id = String(r.id); pintar(); arriba(); } if (ctx.abierta()) ctx.aviso(V('{Venta} cread{a}. Apunta sus pagos y cobros eligiéndo{lo}.')); }, function () {});
+              }
+            }, function (e) { bg.disabled = false; verError([String((e && e.message) || e).replace(/^[A-Z]+: /, '')]); });
           };
         });
       }
@@ -2194,7 +3472,7 @@
       function verMovs(f, desde) { S.mov = Object.assign(movVacio(), f, { desde: desde || '' }); irA('MOVIMIENTOS'); }
       el.addEventListener('click', function (e) {
         var t = e.target;
-        var b = t.closest('[data-tab]'); if (b) { if (b.getAttribute('data-tab') === 'MOVIMIENTOS') S.mov.desde = ''; if (b.getAttribute('data-tab') === 'CAJA') S.caja.cue = ''; if (b.getAttribute('data-tab') === 'VENTAS') S.ven.id = ''; irA(b.getAttribute('data-tab')); return; }
+        var b = t.closest('[data-tab]'); if (b) { if (b.getAttribute('data-tab') === 'MOVIMIENTOS') S.mov.desde = ''; if (b.getAttribute('data-tab') === 'CAJA') S.caja.cue = ''; if (b.getAttribute('data-tab') === 'VENTAS') { S.ven.id = ''; S.ven.volver = null; } irA(b.getAttribute('data-tab')); return; }
         if (t.closest('[data-fuera]')) return; // un enlace a Drive se abre en otra pestaña, sin abrir la fila
         if (t.closest('[data-cerrar]')) { cerrar(); return; }
         if (velo.contains(t)) return; // lo de dentro de una ventana lo lleva su ventana
@@ -2206,8 +3484,15 @@
         if (ab) { var dt = el.querySelector('#eco-' + ab.getAttribute('data-abrir')); if (dt) { dt.open = true; S.ab[ab.getAttribute('data-abrir')] = true; dt.scrollIntoView({ block: 'start' }); } return; }
         var dv = t.closest('[data-desv]'); // T0628: de dónde sale una cifra de Ventas
         if (dv) { var kd = dv.getAttribute('data-desv'); S.ven.des = S.ven.des === kd ? '' : kd; pintar(); return; }
+        var tb = t.closest('[data-trim]'); // T0733: el trimestre de «Para tu gestoría»
+        if (tb) { S.gest.q = { ano: trimestreVisto().ano, t: Number(tb.getAttribute('data-trim')) }; pintar(); return; }
         var ir = t.closest('button[data-ir]');
-        if (ir) { if (pest.indexOf(ir.getAttribute('data-ir')) >= 0) irA(ir.getAttribute('data-ir')); return; }
+        if (ir) {
+          var ti = /^(\d{4})-(\d)$/.exec(ir.getAttribute('data-trim-ir') || ''); if (ti) S.gest.q = { ano: ti[1], t: Number(ti[2]) }; // T0733: el del Resumen
+          if (pest.indexOf(ir.getAttribute('data-ir')) >= 0) irA(ir.getAttribute('data-ir')); return;
+        }
+        var bl = t.closest('[data-linea]'); // T0739: una línea de la venta abierta
+        if (bl) { var vb = ix.des[S.ven.id], lb = d.lv.filter(function (y) { return String(y.ID) === bl.getAttribute('data-linea'); })[0]; if (vb && lb && !lb._nueva) formLinea(vb, lb); return; }
         var a = t.closest('[data-accion]');
         if (a) {
           var ac = a.getAttribute('data-accion');
@@ -2228,10 +3513,16 @@
           else if (ac === 'cruzados') verMovs({ cruz: true }, S.tab);
           else if (ac === 'sinfac') verMovs({ tipo: 'Gasto', sinFac: true }, S.tab);
           else if (ac === 'nuevaventa') formVenta(null);
+          else if (ac === 'nuevalinea') { var vl = ix.des[S.ven.id]; if (vl && LV) formLinea(vl, null); } // T0739
           else if (ac === 'editarventa') { var ve = ix.des[S.ven.id]; if (ve && !ve._nueva) formVenta(ve); }
           else if (ac === 'movventa') { var pv = {}; pv[DS] = S.ven.id; formMov(null, pv); }
+          else if (ac === 'facturaventa') { volverTras = null; facturarVenta(ix.des[S.ven.id]); } // T0689
+          else if (ac === 'anticipoventa') { volverTras = null; facturarVenta(ix.des[S.ven.id], true); } // T0747
           else if (ac === 'todasventas') { S.ven.id = ''; pintar(); arriba(); }
+          else if (ac === 'volverficha') { S.ven.volver = null; ctx.volver(); }
           else if (ac === 'cerrardes') { S.ven.des = ''; pintar(); }
+          else if (ac === 'gestcsv') descargarGestoria(); // T0733
+          else if (ac === 'gestcopiar') copiarGestoria();
           return;
         }
         var tr = t.closest('tr[tabindex]');
@@ -2256,6 +3547,7 @@
         if (velo.contains(t)) return;
         if (t === selPer) { S.per = t.value; S.des = ''; guardado(CLAVE + 'per', t.value); S.mov.ver = VER; pintar(); return; }
         if (t.id === 'eco-des') { S.des = t.value; pintar(); return; }
+        if (t.id === 'eco-gano') { S.gest.q = { ano: t.value, t: trimestreVisto().t }; pintar(); return; }
         if (t.hasAttribute('data-filtro')) { var k = t.getAttribute('data-filtro'); S.mov[k] = t.type === 'checkbox' ? t.checked : t.value; if (k === 'tipo') S.mov.cat = ''; S.mov.ver = VER; pintar(); return; }
       });
       var tq = 0;
@@ -2275,12 +3567,21 @@
         var u; try { u = new URL(location.href); } catch (e) { return; }
         if (u.searchParams.get('factura') !== 'nueva') return;
         var art = u.searchParams.get('articulo') || '', pr = aNum(u.searchParams.get('precio')), cli = String(u.searchParams.get('cliente') || ''), i = cli.indexOf(':');
-        ['factura', 'articulo', 'precio', 'cliente'].forEach(function (k) { u.searchParams.delete(k); });
+        var ped = String(u.searchParams.get('pedido') || ''), ant = u.searchParams.get('anticipo') === '1';
+        ['factura', 'articulo', 'precio', 'cliente', 'pedido', 'anticipo'].forEach(function (k) { u.searchParams.delete(k); });
         try { history.replaceState(history.state, '', u.pathname + u.search + u.hash); } catch (e) {}
         if (!LINEAS) return;
+        // T0689 · Al acabar la factura, «Volver a …» lleva a donde se estaba (el pedido, la ficha de la marca).
+        volverTras = ctx.desde || null;
+        // T0689 · ?pedido=VEN0001 (desde Pedidos): la factura de esa venta, ya rellena.
+        if (ped) { var v = ix.des[ped]; if (v) facturarVenta(v, ant); else ctx.aviso('Ese pedido ya no está.'); return; } // T0747: &anticipo=1, la del anticipo
         var col = i > 0 ? cli.slice(0, i) : '', valor = cli.slice(i + 1);
         var ctr = col ? (T.filas('CONTRAPARTES') || []).filter(function (c) { return c[col] != null && String(c[col]) === valor; })[0] : null;
-        formFac(null, { TIPO: 'Emitida', FECHA: hoy(), ID_CONTRAPARTE: ctr ? ctr.ID : '' }, null, { articulo: art, precio: pr });
+        // T0689 · Desde la ficha de una marca (?cliente=ID_MARCA:M-214, sin artículo): primero de qué pedido, si tiene sin factura.
+        // Una marca que aún no es contraparte se elige como tal y se da de alta al guardar (T0646).
+        var id = ctr ? ctr.ID : CLI && col === String(CLI.campo || 'ID_MARCA') && valor && filaDe(CLI.tabla, valor) ? 'marca:' + valor : '';
+        if (!art && id) { facturarA(id); return; }
+        formFac(null, { TIPO: 'Emitida', FECHA: hoy(), ID_CONTRAPARTE: id }, null, { articulo: art, precio: pr });
       }
 
       ctx.tablas.leer(tablas).then(function () { S.leido = true; pintar(); desdeEnlace(); }, function (e) {
@@ -2288,6 +3589,21 @@
       });
       this._cerrar = cerrar;
     },
-    cerrar: function () { if (this._cerrar) this._cerrar(); }
+    cerrar: function () { if (this._cerrar) this._cerrar(); },
+    /**
+     * T0692 · Las ventas de cada uno con quien se trata, para otra sección (la ficha de una marca en Clientes) sin abrir esta:
+     * lee lo que hace falta con las tablas de quien ha entrado (el permiso es el de esta sección) y da ventasPorQuien() por
+     * «campo» de CONTRAPARTES (ID_MARCA). null si esta sección no tiene ventas (sin VENTAS o sin su DESGLOSE).
+     */
+    ventasDe: function (T, cfg, campo) {
+      cfg = cfg || {};
+      var R = cfg._refs || {}, DS = String(cfg.DESGLOSE || ''), VEN = cfg.VENTAS && DS && R.DESGLOSE === cfg.VENTAS ? String(cfg.VENTAS) : '';
+      if (!VEN || !campo) return Promise.resolve(null);
+      var MIN = cfg.MARGEN_MINIMO && typeof cfg.MARGEN_MINIMO === 'object' && cfg.MARGEN_MINIMO.tabla ? cfg.MARGEN_MINIMO : null;
+      return T.leer(['MOVIMIENTOS', 'CATEGORIAS', 'CONTRAPARTES', VEN].concat(MIN ? [MIN.tabla] : [])).then(function () {
+        var m = MIN ? minimoDe(MIN, T.filas(MIN.tabla)) : minimoDe(cfg.MARGEN_MINIMO);
+        return ventasPorQuien({ cfg: cfg, mov: T.filas('MOVIMIENTOS') || [], cat: T.filas('CATEGORIAS') || [] }, T.filas(VEN) || [], DS, m, T.filas('CONTRAPARTES') || [], campo, hoy());
+      });
+    }
   });
 })();

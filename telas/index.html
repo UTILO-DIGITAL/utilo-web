@@ -14,9 +14,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Telas">
-<meta name="theme-color" content="#F5F1E9">
-<link rel="stylesheet" href="marca.css?v=b611b1e70b">
-<link rel="stylesheet" href="../estilos/base.css?v=43f0b8fcfa">
+<meta name="theme-color" content="#FAFAF7">
+<meta name="color-scheme" content="light">
+<link rel="stylesheet" href="marca.css?v=887f38c9ea">
+<link rel="stylesheet" href="../estilos/nucleo.css?v=b6697aeff2">
+<link rel="stylesheet" href="../estilos/nucleo-2.css?v=bae9e3782e">
 <script>
   window.KANBAN = {
     clave: 'telas',
@@ -27,12 +29,17 @@
     clavePicker: 'AIzaSyAZXmBAdcHLu2mdYeljY_WMe5w6iVn6hLg',
     api: 'https://script.google.com/macros/s/AKfycbyL6KgjQSOr91MCtefpzTCc8YZYKunYZPdxpFVvozDYAqiVrFATjaBJDm1cjIj3y-j0Kw/exec'
   };
+  // T0740: la letra sigue el tamaño de texto del iPhone (Ajustes › Pantalla y brillo › Tamaño del texto) y el modo oscuro
+  // se puede elegir en Perfil › Aspecto. Aparte del KANBAN de arriba, que es igual que el del catálogo (probar-catalogo.js).
+  window.KANBAN.letraDelSistema = true;
+  window.KANBAN.modoOscuro = true;
 </script>
 </head>
 <body class="u">
 <div class="kz"><div class="kz-caja kz-centro" role="status"><div class="u-carga"></div><p>Cargando…</p></div></div>
 <script src="../kanban4/google.js?v=b58efb95a7"></script>
 <script src="../kanban4/tablas.js?v=6d45123156"></script>
-<script src="../nucleo/nucleo.js?v=95087b552b"></script>
+<script src="../nucleo/nucleo.js?v=f62dc3f2f1"></script>
+<script src="../nucleo/elegir.js?v=fc3217e615"></script>
 </body>
 </html>

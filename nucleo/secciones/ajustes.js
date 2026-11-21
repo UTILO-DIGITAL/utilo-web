@@ -17,7 +17,7 @@
  *   Acción   el JS del cliente (ACCIONES), que se registra con UN.ajustes('ID', { abrir(el, ctx), cerrar() }) y
  *            recibe el ctx de la sección más volver() y raiz (la carpeta de la web). Con una acción «inicio» (T0294),
  *            el inicio tiene dos pestañas: esa acción, que se abre al entrar (el camino para preparar la temporada),
- *            y «Todas las tablas».
+ *            y «Todas las tablas» (sin ella, con TODAS: false; T0729).
  * Quien está en SOLO_LEER lo ve todo sin botones de cambiar (el motor tampoco le deja: soloLeer en los permisos).
  * Personalización y claves de cada tabla: docs/SECCION_AJUSTES.md.
  */
@@ -41,7 +41,10 @@
   function etiqueta(spec, c) { return (spec && spec.titulos && spec.titulos[c]) || titulo(c); }
   function colDe(e, n) { for (var i = 0; i < e.columnas.length; i++) if (e.columnas[i].n === n) return e.columnas[i]; return null; }
   function vacio(v) { return v === '' || v === null || v === undefined; }
-  function norm(s) { return String(s == null ? '' : s).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  /** T0736 · Sin tildes ni mayúsculas: la del núcleo (UN.plano; en Node, las pruebas, la de nucleo.js). */
+  var UNT = null;
+  function plano(s) { return (UNT || (UNT = typeof module !== 'undefined' && module.exports ? require('../nucleo.js') : window.UN)).plano(s); }
+  function norm(s) { return plano(s).trim(); }
   function dos(n) { return (n < 10 ? '0' : '') + n; }
 
   /** ¿Está dada de baja? (la fila tiene lo que pone la baja: ACTIVO = false, ESTADO = Cerrada…) */
@@ -363,7 +366,7 @@
           if (S.per !== '-' && !listaPer.some(function (p) { return p.id === S.per; })) S.per = perAhora ? perAhora.id : '';
         }
       }
-      function vista(v) { S.vista = v; S.q = ''; S.bajas = false; guardado(CLAVE + 'vista', v); pintar(); window.scrollTo(0, 0); }
+      function vista(v) { S.vista = v; S.q = ''; S.bajas = false; guardado(CLAVE + 'vista', v); pintar(); window.scrollTo(0, 0); document.body.scrollTop = 0; }
 
       /* ---------- pintar ---------- */
 
@@ -423,10 +426,12 @@
           }).join('');
         // T0294 (Javi): con una acción de inicio (el camino de la temporada), dos pestañas: la acción, que se abre al
         // entrar, y «Todas las tablas». Se recuerda la última. Si la acción ya está abierta, se repinta ella sola.
-        var pest = arriba && guardado(CLAVE + 'inicio') !== 'TABLAS' ? 'ACCION' : 'TABLAS';
+        // T0729: con TODAS: false (Telas), sin «Todas las tablas»: la acción de inicio es todo el inicio.
+        var sinTodas = !!arriba && cfg.TODAS === false;
+        var pest = arriba && (sinTodas || guardado(CLAVE + 'inicio') !== 'TABLAS') ? 'ACCION' : 'TABLAS';
         if (pest === 'ACCION' && abiertaAccion === claveInicio() && cont.querySelector('#aj-accion.aj-inicio')) return;
         if (pest === 'TABLAS' && abiertaAccion) cerrarAccion();
-        cont.innerHTML = (arriba ? '<div class="u-pestanas aj-modos" role="tablist">' + [['ACCION', arriba.titulo], ['TABLAS', 'Todas las tablas']].map(function (x) {
+        cont.innerHTML = (arriba && !sinTodas ? '<div class="u-pestanas aj-modos" role="tablist">' + [['ACCION', arriba.titulo], ['TABLAS', 'Todas las tablas']].map(function (x) {
             return '<button type="button" role="tab" data-inicio="' + x[0] + '" aria-selected="' + (x[0] === pest) + '">' + texto(x[1]) + '</button>';
           }).join('') + '</div>' : '') +
           (!puede ? '<p class="u-aviso">Puedes mirarlo todo, pero no cambiar nada.</p>' : '') +
@@ -890,7 +895,7 @@
         if (!x || !el.contains(x)) return;
         if (x.hasAttribute('data-cerrar')) { cerrar(); return; }
         if (x.hasAttribute('data-atras')) { atras(); return; }
-        if (x.hasAttribute('data-inicio')) { guardado(CLAVE + 'inicio', x.getAttribute('data-inicio')); pintar(); window.scrollTo(0, 0); return; }
+        if (x.hasAttribute('data-inicio')) { guardado(CLAVE + 'inicio', x.getAttribute('data-inicio')); pintar(); window.scrollTo(0, 0); document.body.scrollTop = 0; return; }
         if (x.hasAttribute('data-vista')) { vista(x.getAttribute('data-vista')); return; }
         if (x.hasAttribute('data-modo')) { var sm = specDe(S.vista); if (sm) { guardado(CLAVE + 'modo_' + sm.tabla, x.getAttribute('data-modo')); pintar(); } return; }
         if (x.hasAttribute('data-accion')) { vista('A:' + x.getAttribute('data-accion')); return; }

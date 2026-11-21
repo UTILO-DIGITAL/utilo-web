@@ -37,6 +37,15 @@
  */
 (function () {
   'use strict';
+  /** T0736 · Sin tildes ni mayúsculas, para buscar y comparar: «Ébano» → «ebano». La misma para todas las secciones (UN.plano),
+   *  buscar.js y elegir.js; catalogo.js, la página pública, lleva la suya. Mantiene la longitud (para resaltar lo que casa:
+   *  los saltos de línea y tabuladores, espacios) y no recorta: quien compara valores, con .trim(). null o undefined son '';
+   *  el 0, «0». En Node (las pruebas), solo esto y cumpleCifra. */
+  function plano(s) {
+    var t = s == null ? '' : String(s);
+    return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\S ]/g, ' ').slice(0, t.length);
+  }
+  if (typeof window === 'undefined') { if (typeof module !== 'undefined') module.exports = { plano: plano, cumpleCifra: cumpleCifra }; return; }
   var C = window.KANBAN || {};
   var CLAVE = 'nucleo_' + (C.clave || 'negocio');
   // Raíz de utilo-web (…/utilo-web/): de aquí cuelgan nucleo/, kanban4/, estilos/ y la carpeta de cada negocio.
@@ -50,8 +59,74 @@
   }
   var MENU_CLAVE = 'kanbanMenuPlegado'; // el mismo que kanban4/app.js (T0225): cada dispositivo recuerda cómo dejó el menú
 
+  /* T0740 · La letra sigue el tamaño de texto del iPhone y el iPad (Ajustes › Pantalla y brillo › Tamaño del texto), en las
+     apps que lo piden (KANBAN.letraDelSistema). La hoja da los tamaños en px; se agrandan o se achican todos a la vez, como
+     el «aA» de Safari, con -webkit-text-size-adjust (--letra-sistema, en body.u de base.css): el tamaño de
+     -apple-system-body entre 17 px, el normal de iOS. Solo con pantalla táctil: en el Mac, -apple-system-body es la letra
+     de escritorio (13 px). Entre 85 % y 140 %, para que no se rompa lo que tiene alto fijo. Se vuelve a mirar al volver a
+     la app (por si se ha cambiado en Ajustes). */
+  function ajustarLetra() {
+    if (!C.letraDelSistema || !window.CSS || !CSS.supports('font', '-apple-system-body')) return;
+    if (!window.matchMedia || !matchMedia('(hover: none) and (pointer: coarse)').matches) return;
+    var de = document.documentElement, p = document.createElement('span');
+    de.style.removeProperty('--letra-sistema'); // se mide sin el ajuste de antes
+    p.style.cssText = 'font:-apple-system-body;-webkit-text-size-adjust:100%;position:absolute;visibility:hidden';
+    p.textContent = 'x';
+    de.appendChild(p);
+    var px = parseFloat(getComputedStyle(p).fontSize);
+    p.remove();
+    if (px > 0) de.style.setProperty('--letra-sistema', proporcionLetra(px) + '%');
+  }
+  function proporcionLetra(px) { return Math.round(Math.max(0.85, Math.min(1.4, px / 17)) * 100); }
+  ajustarLetra();
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') ajustarLetra(); });
+
+  /* T0740 · Modo oscuro, voluntario, en las apps que lo tienen (KANBAN.modoOscuro): quien entra elige en Perfil › Aspecto
+     Claro (lo de siempre, por defecto), Oscuro o Como el móvil (sigue al sistema, también si cambia con la app abierta). Cada
+     dispositivo recuerda lo suyo. Se pone <html data-tema="oscuro"> y los colores están en base.css y en la marca.css. */
+  var TEMA_CLAVE = 'nucleo_tema_' + (C.clave || 'negocio');
+  var TEMAS = [['claro', 'Claro'], ['oscuro', 'Oscuro'], ['sistema', 'Como el móvil']];
+  function temaElegido() {
+    var t = ''; try { t = localStorage.getItem(TEMA_CLAVE) || ''; } catch (e) {}
+    return /^(claro|oscuro|sistema)$/.test(t) ? t : 'claro';
+  }
+  var SISTEMA_OSCURO = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
+  function aplicarTema() {
+    if (!C.modoOscuro) return;
+    var t = temaElegido(), oscuro = t === 'oscuro' || (t === 'sistema' && !!(SISTEMA_OSCURO && SISTEMA_OSCURO.matches));
+    var de = document.documentElement;
+    if (oscuro) de.setAttribute('data-tema', 'oscuro'); else de.removeAttribute('data-tema');
+    // La barra de Safari y del iPhone, del color del fondo.
+    var tc = document.querySelector('meta[name="theme-color"]'), fondo = getComputedStyle(de).getPropertyValue('--color-fondo').trim();
+    if (tc && fondo) tc.setAttribute('content', fondo);
+  }
+  aplicarTema();
+  if (SISTEMA_OSCURO) {
+    var alCambiar = function () { if (temaElegido() === 'sistema') aplicarTema(); };
+    if (SISTEMA_OSCURO.addEventListener) SISTEMA_OSCURO.addEventListener('change', alCambiar); else if (SISTEMA_OSCURO.addListener) SISTEMA_OSCURO.addListener(alCambiar);
+  }
+  /** El bloque «Aspecto» de Perfil (vacío si la app no tiene modo oscuro): el interruptor de tres, como el de Calcular precio. */
+  function htmlAspecto() {
+    if (!C.modoOscuro) return '';
+    var t = temaElegido();
+    return '<section class="pf-bloque pf-aspecto"><h2 class="n-grupo">Aspecto</h2>' +
+      '<div class="pr-seg" role="group" aria-label="Aspecto de la app">' + TEMAS.map(function (x) {
+        return '<button type="button" data-n-tema="' + x[0] + '" aria-pressed="' + (t === x[0]) + '">' + x[1] + '</button>';
+      }).join('') + '</div>' +
+      '<p class="u-nota">«Como el móvil» la pone oscura cuando el móvil o el ordenador lo están. Se recuerda en este dispositivo.</p></section>';
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-n-tema]');
+    if (!b) return;
+    try { localStorage.setItem(TEMA_CLAVE, b.getAttribute('data-n-tema')); } catch (err) {}
+    aplicarTema();
+    [].forEach.call(document.querySelectorAll('[data-n-tema]'), function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+  });
+
   var ICONO_PERFIL = '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"/>';
   var ICONO_SECCION = '<circle cx="12" cy="12" r="3"/>';
+  var ICONO_LUPA = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>';
+  var MAC = /mac|iphone|ipad/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '');
 
   function $(id) { return document.getElementById(id); }
   function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -251,10 +326,13 @@
       version: r.version || '', versiones: Array.isArray(r.versiones) ? r.versiones : [] }; // T0283
     if (r.persona_id) o.persona_id = r.persona_id; // T0387: con Supabase, el id de la persona (acceso.personas)
     if (Array.isArray(r.roles)) o.roles = r.roles; // T0394: con Supabase, sus roles (ctx.roles); antes se perdían aquí
+    if (Array.isArray(r.equipo)) o.equipo = r.equipo; // T0689: quién más trabaja en la app (Mías / Todas de Listado)
     if (r.aviso) o.aviso = String(r.aviso); // T0639: el aviso de arriba (config.json · nucleo.aviso)
     if (r.perfilEnMenu === false) o.perfilEnMenu = false; // T0415: Perfil fuera del menú (se abre con el nombre de la cabecera)
     if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
     if (r.uso && r.uso.app && r.uso.url) o.uso = { app: String(r.uso.app), url: String(r.uso.url), clave: String(r.uso.clave || '') }; // T0682
+    if (r.buscar && Array.isArray(r.buscar.grupos) && r.buscar.grupos.length) o.buscar = r.buscar; // T0685: la lupa (nucleo.buscar)
+    if (r.partes && typeof r.partes === 'object') o.partes = r.partes; // T0742: las tablas que se leen por partes (nucleo.partes)
     if (r.ocultar && Array.isArray(r.ocultar.tablas)) o.ocultar = { tablas: r.ocultar.tablas, refs: r.ocultar.refs || {}, filas: r.ocultar.filas || {}, columnas: r.ocultar.columnas || {} }; // T0650; T0671: columnas
     return o;
   }
@@ -281,6 +359,18 @@
   /* ---------- el marco ---------- */
 
   var cred = null;          // quién ha entrado y sus secciones (lo guardado y, después, lo que dice el motor)
+  /* T0749 · Si el menú ya lo ha dicho el motor en esta carga (false mientras se ve el guardado de la última vez y aún no ha
+   * contestado: con la sesión caducada, hasta que se toca «Continuar»). Personalizar no se enseña hasta entonces, para no
+   * enseñar secciones de antes de un cambio del menú (T0688: Clientes y Prospección, ya Marcas). */
+  var alDia = false;
+  /** T0749 · El motor ha contestado y el menú no ha cambiado: Personalizar sale donde esperaba (Perfil del marco: [data-n-pers];
+   *  la sección Perfil: el evento «un-al-dia» del document). */
+  function ponerAlDia() {
+    if (alDia) return;
+    alDia = true;
+    [].forEach.call(document.querySelectorAll('[data-n-pers]'), function (d) { d.innerHTML = htmlPersonalizarDentro(); });
+    try { document.dispatchEvent(new CustomEvent('un-al-dia')); } catch (e) {}
+  }
   var actual = '';          // sección abierta
   var abierta = null;       // { id, def } de la sección abierta (para cerrarla al cambiar)
   var DEF = {};             // secciones registradas: ID → { abrir, cerrar }
@@ -289,10 +379,24 @@
   var T = null;             // tablas al momento (kanban4/tablas.js), una copia para todas las secciones
 
   window.UN = {
+    /** T0736 · Sin tildes ni mayúsculas, con la misma longitud (ver plano, arriba): la forma de buscar de todas las secciones. */
+    plano: plano,
     /** Cada sección se registra al cargar su JS: UN.registrar('EJEMPLO', { abrir: function (el, ctx) {}, cerrar: function () {} }). */
     registrar: function (id, def) { DEF[String(id).toUpperCase()] = def; },
+    /**
+     * T0692 · Otra sección que ve quien ha entrado, para usar sus cuentas sin abrirla (las ventas de una marca, de Pedidos, en
+     * su ficha de Clientes): su JS (una vez) y su configuración, { id, titulo, def, config }. null si no la ve: lo de esa
+     * sección no sale en otra a quien no la tiene (y el motor tampoco le daría sus tablas).
+     */
+    seccion: function (id) {
+      var s = cred ? seccion(String(id || '').toUpperCase()) : null;
+      if (!s || !s.web) return Promise.resolve(null);
+      return cargar(s).then(function (def) { return { id: s.id, titulo: s.titulo, def: def, config: s.config || {} }; }, function () { return null; });
+    },
     /** T0283: el bloque «Versión» de Perfil (vacío si no hay versión: DEV, local sin ejemplo). */
     htmlVersion: function () { return htmlVersion(); },
+    /** T0740: el bloque «Aspecto» de Perfil (Claro, Oscuro o Como el móvil); vacío si la app no tiene modo oscuro. */
+    htmlAspecto: function () { return htmlAspecto(); },
     /**
      * T0599 · El orden del menú que ha elegido quien personaliza (la sección Listado lo guarda para todos): ids de las
      * secciones. Se recuerda en el dispositivo, para pintar el menú en ese orden desde el principio, y se vuelve a pintar.
@@ -321,7 +425,7 @@
   function tablas() {
     if (T) return T;
     // T0275: la copia del dispositivo es de quien ha entrado (sin correo, solo en memoria).
-    T = window.UT.crear({ llamar: llamar, clave: C.clave || 'negocio', persona: copiaDe(cred), aviso: aviso });
+    T = window.UT.crear({ llamar: llamar, clave: C.clave || 'negocio', persona: copiaDe(cred), aviso: aviso, partes: (cred && cred.partes) || {} }); // T0742: partes
     T.en('cambio', function (tabla, info) {
       (oyentes[actual] || []).forEach(function (f) { try { f(tabla, info); } catch (e) { if (window.console) console.error(e); } });
       contarCifras(tabla); // T0412
@@ -364,13 +468,16 @@
     document.body.classList.toggle('u-menu-plegado', plegado);
     var et = plegado ? 'Desplegar el menú' : 'Plegar el menú', p = partirMenu(menu());
     function enlace(s) {
-      return '<a href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '" title="' + texto(s.titulo) + '">' +
+      // T0749: draggable="false", para que al mantener apretado iOS no lo levante para arrastrarlo (con -webkit-user-drag en nucleo-2.css).
+      return '<a href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '" title="' + texto(s.titulo) + '" draggable="false">' +
         '<svg viewBox="0 0 24 24" aria-hidden="true">' + (s.icono || ICONO_SECCION) + '</svg><span>' + texto(s.titulo) +
         (s.id === 'PERFIL' ? '<span class="sx-quien">' + texto(cred.persona) + '</span>' : '') + '</span>' +
         (s.cifra ? '<span class="bj-n hay" data-cifra="' + texto(s.id) + '" hidden></span>' : '') + '</a>'; // T0412
     }
     return '<nav class="sx u-sx' + (p.resto.length ? ' sx-mucho' : '') + '" aria-label="Secciones"><div class="sx-in"><div class="sx-cab"><span class="sx-marca">' + texto(C.nombreApp || cred.negocio || '') + '</span>' +
       '<button type="button" class="sx-plegar" id="n-plegar" aria-label="' + et + '" title="' + et + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button></div>' +
+      (cred.buscar ? '<button type="button" class="sx-buscar" data-n-buscar title="Buscar en toda la app (' + (MAC ? '⌘K' : 'Ctrl+K') + ')">' + ICONO_LUPA +
+        '<span>Buscar</span><kbd>' + (MAC ? '⌘K' : 'Ctrl K') + '</kbd></button>' : '') + // T0685: solo en el ordenador (en el móvil, la lupa de la cabecera)
       p.barra.map(enlace).join('') +
       (p.resto.length ? '<div class="sx-resto" id="n-sx-resto">' + p.resto.map(enlace).join('') + '</div>' +
         '<button type="button" class="sx-mas" id="n-sx-mas" aria-expanded="false" aria-controls="n-sx-resto" title="Más secciones">' +
@@ -408,13 +515,16 @@
   }
 
   /** Pinta el marco entero y abre la sección de la URL (o la primera). */
-  function marco(c) {
+  /** guardado: true si c es lo guardado de la última vez, sin que el motor lo haya dicho en esta carga (T0749). */
+  function marco(c, guardado) {
+    alDia = !guardado;
     if (T && T.persona() !== copiaDe(c)) soltarTablas();  // T0275: otra persona, otra copia
     if (cerrarVersiones) cerrarVersiones(false);           // T0283: la ventana de novedades se va con el body; sin darla por vista
     cred = c;
     document.body.className = 'u u-con-barra' + (cred.como ? ' n-viendo-como' : '') + (sinPerfil() ? ' n-perfil-arriba' : '');
     document.body.innerHTML = bandaDev(cred.dev) + htmlMenu() +
       '<div id="sx-panel">' + htmlComo() + htmlAviso() + '<header class="u-cab n-cab"><h1 id="n-titulo"></h1>' +
+      (cred.buscar ? '<button type="button" class="n-lupa" data-n-buscar aria-label="Buscar en toda la app" title="Buscar en toda la app">' + ICONO_LUPA + '</button>' : '') + // T0685
       '<a class="n-quien" href="?s=perfil" data-sx="PERFIL"><span>' + texto(cred.persona) + '</span>' + (cred.perfil ? '<small>' + texto(cred.perfil) + '</small>' : '') + '</a></header>' +
       '<main class="u-main n-main" id="n-sec"></main></div>' +
       '<div class="u-aviso" id="n-aviso" role="status" hidden></div>';
@@ -424,6 +534,7 @@
     abrir(pedida() || menu()[0].id, false);
     avisarVersiones();
     cifras();
+    if (cred.buscar) setTimeout(function () { cargarBuscar().catch(function () {}); }, 1500); // T0685
   }
 
   /* ---------- T0412 · las cifras del menú ----------
@@ -432,12 +543,40 @@
    * con la misma copia de las tablas, la cuenta cada vez que esa tabla cambia y, con Supabase, la vuelve a leer en cuanto
    * cambia algo en las tablas de «directo» (Realtime). Sin nada que contar, no se ve. */
   var cifrasDirecto = [];
+  /** T0710 · Las condiciones de una cifra («si»), como las de Listado: es, no, vacio y, en una fecha, desde y hasta en días
+   * desde hoy (incluidos; «dias» es el «dias» de la cifra). Sin condiciones, todas. */
+  function cumpleCifra(f, si, dias) {
+    function norm(v) { return plano(v).trim(); }
+    function lista(x) { return Array.isArray(x) ? x : [x]; }
+    function dia(v) {
+      if (v instanceof Date) return isNaN(v) ? null : new Date(v.getFullYear(), v.getMonth(), v.getDate());
+      var s = String(v == null ? '' : v).trim(), m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+      if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+      m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s);
+      return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
+    }
+    function d(x) { return x === 'dias' ? dias : x === '-dias' ? -dias : x; }
+    var h = new Date(); h = new Date(h.getFullYear(), h.getMonth(), h.getDate());
+    return (si || []).every(function (c) {
+      var v = f[c.campo], vac = norm(v) === '';
+      if (c.es !== undefined && lista(c.es).map(norm).indexOf(norm(v)) < 0) return false;
+      if (c.no !== undefined && lista(c.no).map(norm).indexOf(norm(v)) >= 0) return false;
+      if (c.vacio !== undefined && vac !== !!c.vacio) return false;
+      if (c.desde !== undefined || c.hasta !== undefined) {
+        var x = dia(v); if (!x) return false;
+        var n = Math.round((x - h) / 864e5);
+        if (c.desde !== undefined && n < d(c.desde)) return false;
+        if (c.hasta !== undefined && n > d(c.hasta)) return false;
+      }
+      return true;
+    });
+  }
   function contarCifras(tabla) {
     if (!cred || !T) return;
     menu().forEach(function (s) {
       var c = s.cifra;
       if (!c || (tabla && tabla !== c.tabla)) return;
-      var n = T.filas(c.tabla).filter(function (f) { return Object.keys(c.donde || {}).every(function (k) { return f[k] === c.donde[k]; }); }).length;
+      var n = T.filas(c.tabla).filter(function (f) { return Object.keys(c.donde || {}).every(function (k) { return f[k] === c.donde[k]; }) && cumpleCifra(f, c.si, c.dias); }).length;
       var b = document.querySelector('[data-cifra="' + s.id + '"]');
       if (!b) return;
       b.textContent = n ? String(n) : ''; b.hidden = !n;
@@ -641,7 +780,7 @@
     if (c && c.como) soltarTablas(copiaDe(c), true);
     var g = leer();
     if (!g || !g.persona) { acceso(msg || ''); return; }
-    marco(g);
+    marco(g, true);
     comprobar();
     if (msg) aviso(msg);
   }
@@ -700,7 +839,8 @@
     var n = 0;
     (function paso() {
       if (actual !== id) return;
-      window.scrollTo(0, y);
+      // T0722 (R49): en el iPhone quien se desplaza es body, no la ventana: se mueven los dos.
+      window.scrollTo(0, y); document.body.scrollTop = y;
       if (Math.abs(bajado() - y) > 2 && ++n < 25) setTimeout(paso, 80);
     })();
   }
@@ -751,12 +891,15 @@
       autor: cred.como ? cred.como.persona + ' como ' + cred.persona : cred.persona,
       personaId: cred.persona_id || '', // T0387
       roles: cred.roles || [], // T0417
+      // T0689: quien administra y las personas con perfil ([{ persona, correo, admin }]), si una sección que ve usa MIAS; si no, [].
+      equipo: cred.equipo || [],
       // T0650: lo que su perfil no ve (nucleo.ocultar del motor): { tablas, refs: { TABLA: [columnas que apuntan a una oculta] },
       // filas: { TABLA: { COLUMNA: [valores que no ve] } } } o null.
       ocultar: cred.ocultar || null,
       // T0420: la sección de la que vienes ({ id, titulo }, o null si se ha entrado directo) y volver a ella como estaba.
       desde: (function () { var d = history.state && history.state.desde, x = d && seccion(d); return x ? { id: x.id, titulo: x.titulo } : null; })(),
       volver: function () { history.back(); },
+      alDia: function () { return alDia; }, // T0749: si el menú (secciones) ya lo ha dicho el motor en esta carga
       correo: cred.correo || '', secciones: todas().map(function (x) {
         if (x.enPerfil) return { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true };
         // T0644: las que esta persona personaliza (Listado: quien administra o su perfil en PERSONALIZAN) salen en su Perfil.
@@ -832,9 +975,11 @@
   function personaliza(x) {
     return (x.base || x.id) === 'LISTADO' && !x.enPerfil && (!!cred.admin || ((x.config || {}).PERSONALIZAN || []).indexOf(cred.perfil) >= 0);
   }
-  /** T0644 · Personalizar en el Perfil del marco (sin sección PERFIL), como en la sección Perfil: una línea por sección. */
-  function htmlPersonalizar() {
-    var ss = todas().filter(personaliza);
+  /** T0644 · Personalizar en el Perfil del marco (sin sección PERFIL), como en la sección Perfil: una línea por sección.
+   *  T0749: en su caja (data-n-pers), vacía hasta que el motor dice el menú (alDia). */
+  function htmlPersonalizar() { return '<div data-n-pers>' + (alDia ? htmlPersonalizarDentro() : '') + '</div>'; }
+  function htmlPersonalizarDentro() {
+    var ss = cred ? todas().filter(personaliza) : [];
     if (!ss.length) return '';
     return '<section class="pf-pers"><h2 class="n-grupo">Personalizar</h2><p class="u-nota">El orden del menú, qué vistas ve cada sección y con cuántos días avisa.</p>' +
       '<ul class="pf-pers-l">' + ss.map(function (x) {
@@ -860,7 +1005,7 @@
       (window.UG.avisos && !cred.como ? '<div class="n-avisos" id="n-avisos"></div>' : '') +
       (dentro.length ? '<div class="n-botones">' + dentro.map(function (s) {
         return '<a class="u-btn" href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '">' + texto(s.titulo) + '</a>';
-      }).join('') + '</div>' : '') + htmlPersonalizar() + '</div>' + htmlVersion();
+      }).join('') + '</div>' : '') + htmlPersonalizar() + '</div>' + htmlAspecto() + htmlVersion(); // T0740: Aspecto
   }
 
   function conCodigo() { return !!(window.UG.formas && window.UG.formas().indexOf('codigo') >= 0); }
@@ -1039,7 +1184,7 @@
       var nuevo = credDe(r);
       nuevo.correo = nuevo.correo || cred.correo;
       if (como && !nuevo.como) { volver(); return; }
-      if (JSON.stringify(nuevo) === JSON.stringify(cred)) return;
+      if (JSON.stringify(nuevo) === JSON.stringify(cred)) { ponerAlDia(); return; }
       if (como) guardarComo(nuevo); else guardar(nuevo);
       marco(nuevo);
     }, function (e) {
@@ -1055,6 +1200,35 @@
     });
   }
 
+  /* ---------- T0685 · buscar en toda la app (nucleo/buscar.js) ----------
+   * La lupa del menú (ordenador) y de la cabecera (móvil), y ⌘K: carga nucleo/buscar.js la primera vez (con la huella que
+   * pone montar.js) y lo abre con los grupos de quien ha entrado (los de las secciones que ve), sus tablas y lo que no ve. */
+  var cargaBuscar = null;
+  /** El JS de la búsqueda, una vez (el marco lo pide un poco después de pintar, para que al abrirla ya esté y no se pierda
+   *  lo primero que se escribe). */
+  function cargarBuscar() {
+    var b = cred && cred.buscar;
+    if (!b) return Promise.reject(new Error('sin búsqueda'));
+    if (!cargaBuscar) cargaBuscar = new Promise(function (ok, ko) {
+      if (window.UBuscar) { ok(); return; }
+      var sc = document.createElement('script');
+      sc.src = RAIZ + 'nucleo/buscar.js?v=' + encodeURIComponent(b.version || '1');
+      sc.onload = function () { if (window.UBuscar) ok(); else ko(new Error('sin UBuscar')); };
+      sc.onerror = function () { cargaBuscar = null; ko(new Error('No se ha podido cargar la búsqueda.')); };
+      document.head.appendChild(sc);
+    });
+    return cargaBuscar;
+  }
+  function buscar() {
+    if (!cred || !cred.buscar) return;
+    var b = cred.buscar;
+    cargarBuscar().then(function () {
+      verMas(false);
+      window.UBuscar.abrir({ grupos: b.grupos, texto: b.texto || '', placeholder: b.placeholder || '', tablas: tablas(), ocultar: cred.ocultar || null,
+        secciones: todas().map(function (s) { return { id: s.id, titulo: s.titulo, icono: s.icono || ICONO_SECCION }; }) });
+    }, function () { aviso('No se ha podido abrir la búsqueda. Comprueba la conexión y vuelve a probar.'); });
+  }
+
   /* ---------- navegación ---------- */
 
   document.addEventListener('click', function (e) {
@@ -1062,6 +1236,7 @@
     if (e.target.closest && e.target.closest('#n-sx-mas')) { verMas($('n-sx-mas').getAttribute('aria-expanded') !== 'true'); return; }
     verMas(false);
     // T0273: «Entrar como otra persona» (en Perfil) y «Volver a mi cuenta» (franja y Perfil), estén donde estén.
+    if (e.target.closest && e.target.closest('[data-n-buscar]')) { buscar(); return; } // T0685
     var b = e.target.closest && e.target.closest('[data-n-como], [data-n-volver], [data-n-versiones]');
     if (b && cred) { e.preventDefault(); if (b.hasAttribute('data-n-volver')) volver(); else if (b.hasAttribute('data-n-versiones')) verVersiones(); else verComo(); return; }
     var a = e.target.closest && e.target.closest('a[data-sx]');
@@ -1071,9 +1246,22 @@
     if (a.getAttribute('data-sx') === 'PERFIL' && sinPerfil() && (seccion('PERFIL') || {}).propia) { verPerfil(); return; }
     abrir(a.getAttribute('data-sx'), true, a.getAttribute('href'));
   });
+  // T0685: ⌘K (Ctrl+K fuera del Mac) abre la búsqueda desde cualquier sección.
+  document.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && String(e.key).toLowerCase() === 'k' && cred && cred.buscar) { e.preventDefault(); buscar(); }
+  });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && $('n-sx-mas') && $('n-sx-mas').getAttribute('aria-expanded') === 'true') { verMas(false); $('n-sx-mas').focus(); } }); // T0629
   try { history.scrollRestoration = 'manual'; } catch (e) {} // T0420: dónde estabas lo pone abrir() (alSitio)
-  window.addEventListener('popstate', function () { if (cred) abrir(pedida() || menu()[0].id, false); });
+  // T0732 (R50): si atrás (o adelante) se queda en la misma sección, se le pregunta antes a ella (def.atras): la ficha abierta
+  // se cierra (o se vuelve a abrir) sin pintar la sección de nuevo. Si no lo resuelve (false), se abre como siempre.
+  window.addEventListener('popstate', function () {
+    if (!cred) return;
+    var id = pedida() || menu()[0].id;
+    if (abierta && abierta.id === id && abierta.def && typeof abierta.def.atras === 'function') {
+      try { if (abierta.def.atras(history.state || {})) return; } catch (e) {}
+    }
+    abrir(id, false);
+  });
 
   /* ---------- arranque ---------- */
 
@@ -1110,7 +1298,7 @@
       // T0273: si en esta pestaña estaba viendo como otra persona (y es la misma cuenta), sigue igual.
       var como = leerComo();
       if (como && (!como.como || bajo(como.como.correo) !== bajo(guardada.correo))) { borrarComo(); como = null; }
-      marco(como || guardada);  // al momento, con lo guardado
+      marco(como || guardada, true);  // al momento, con lo guardado (T0749: sin Personalizar hasta que conteste el motor)
       comprobar();      // y por detrás, con el motor
     } else { borrarComo(); acceso(''); }
   }
