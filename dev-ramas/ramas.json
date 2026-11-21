@@ -1633,6 +1633,14 @@
    "quien": "Javi Canela",
    "rama": "T0734-proveedores-portatil",
    "carpeta": "T0734-proveedores-portatil"
+  },
+  "DEV-1": {
+   "cliente": "utilo",
+   "commit": "bf00abe3",
+   "subido": "21/11/26, 1:28",
+   "quien": "Javi Canela",
+   "rama": "T0733-economia-gestoria",
+   "carpeta": "T0733-economia-gestoria"
   }
  }
 }
