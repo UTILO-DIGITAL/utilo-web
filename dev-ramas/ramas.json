@@ -961,12 +961,12 @@
   },
   "T0742-seguimiento-por-partes": {
    "tarea": "T0742",
-   "titulo": "Seguimiento se lee por partes: lo vivo siempre y lo antiguo bajo demanda",
-   "pr": null,
+   "titulo": "Historial y Hoy no leen todo el seguimiento cada vez (lo antiguo, con «Ver más»)",
+   "pr": 425,
    "commit": "eb2d87e6",
    "ultimo": "T0742: Seguimiento se lee por partes: lo vivo siempre y lo antiguo bajo demanda",
    "quien": "Javi Canela",
-   "fecha": "2026-11-21T07:42:14.179Z",
+   "fecha": "2026-11-21T07:42:58.910Z",
    "toca": [
     "telas"
    ],
