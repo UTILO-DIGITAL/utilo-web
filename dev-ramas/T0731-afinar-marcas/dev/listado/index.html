@@ -20,7 +20,7 @@
   window.LI_MARCA = (/[?&]marca=(utilo|konamigas|telas)\b/.exec(location.search) || [])[1] || 'telas';
   document.write('<link rel="stylesheet" href="../../' + window.LI_MARCA + '/marca.css?v=4">');
 </script>
-<link rel="stylesheet" href="../../estilos/base.css?v=930eb42fc7">
+<link rel="stylesheet" href="../../estilos/base.css?v=7c2367f6e6">
 <style>
   /* El selector de quién entra: fuera del marco (que rehace el body), abajo a la derecha, encima de la barra del móvil. */
   #mf-quien { position: fixed; right: max(12px, env(safe-area-inset-right, 0px)); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 90;
@@ -34,6 +34,7 @@
 </style>
 <script>
   window.KANBAN = { clave: 'listado-ejemplo', marca: 'utilo', nombreApp: 'Telas', api: 'motor-de-ejemplo' };
+  if (window.LI_MARCA === 'telas') { window.KANBAN.letraDelSistema = true; window.KANBAN.modoOscuro = true; } // T0740: como la app de Marta
   // Las tablas viven en el motor de mentira: sin copia en el dispositivo (IndexedDB), que traería las de otra vez.
   try { Object.defineProperty(window, 'indexedDB', { value: undefined, configurable: true }); } catch (e) {}
 </script>
@@ -42,7 +43,7 @@
 <div class="kz"><div class="kz-caja kz-centro" role="status"><div class="u-carga"></div><p>Cargando…</p></div></div>
 <script src="ejemplo-telas.js"></script>
 <script src="motor-falso.js"></script>
-<script src="../../kanban4/tablas.js?v=ed1ea31f1f"></script>
-<script src="../../nucleo/nucleo.js?v=9787a384d7"></script>
+<script src="../../kanban4/tablas.js?v=4083257296"></script>
+<script src="../../nucleo/nucleo.js?v=6107dd713a"></script>
 </body>
 </html>

@@ -21,6 +21,8 @@
   --color-error: #B42318;
   /* T0149: dinero a favor (Economía): funcional, el mismo verde que Completada. */
   --color-bien: #2F6B47;
+  /* T0740: el texto sobre un color de estado lleno (avisos, números, «Borrar»): blanco; en oscuro, tinta (base.css, abajo). */
+  --sobre-estado: #FFFFFF;
 
   /* Tonos derivados de la marca (sin HEX nuevos) */
   --color-linea: color-mix(in srgb, var(--color-texto) 14%, var(--color-fondo));
@@ -63,7 +65,7 @@
 /* ---------- Página ---------- */
 .u, .u * { box-sizing: border-box; }
 body.u { margin: 0; background: var(--color-fondo); color: var(--color-texto);
-  font: 400 15px/1.45 var(--fuente-texto); -webkit-text-size-adjust: 100%;
+  font: 400 15px/1.45 var(--fuente-texto); -webkit-text-size-adjust: var(--letra-sistema, 100%); text-size-adjust: var(--letra-sistema, 100%);
   /* T0224: sin zoom con doble toque (el pellizco lo quita kanban4/app.js) y nada bajo el notch con el móvil en horizontal */
   touch-action: manipulation; padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
 .u h1, .u h2, .u h3 { font-family: var(--fuente-titulos); font-weight: var(--peso-titulos); line-height: 1.2; margin: 0; }
@@ -461,7 +463,7 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .pf-detalle > summary::before { content: ""; flex: none; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s; }
 .u .pf-detalle[open] > summary::before { transform: rotate(45deg); }
 .u .pf-marca { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--color-bloque); color: var(--color-texto); white-space: nowrap; }
-.u .pf-marca[data-m="pagado"] { background: var(--color-bien); color: var(--color-superficie, #fff); }
+.u .pf-marca[data-m="pagado"] { background: var(--color-bien); color: var(--sobre-estado); }
 .u .pf-marca[data-m="por"], .u .pf-marca[data-m="falta"] { box-shadow: inset 0 0 0 2px var(--color-accion); background: transparent; }
 /* T0269: cabecera de cada grupo de filas de un bloque (Próximos, Jugados), el enlace a todas tus tareas y los botones de
  * las secciones que van dentro de Perfil (Pedir a Utilo). */
@@ -823,7 +825,7 @@ body.aj-cu-arrastrando { cursor: grabbing; user-select: none; -webkit-user-selec
 .u .aj-se-cab small { color: var(--color-suave); font-size: 13px; }
 .u .aj-se-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
 .u .aj-se-chip { background: color-mix(in srgb, var(--estado-pr) 18%, var(--color-superficie)); color: var(--color-texto); font-size: 12px; }
-.u .aj-se-chip-parada { background: var(--color-error); color: #fff; font-size: 12px; }
+.u .aj-se-chip-parada { background: var(--color-error); color: var(--sobre-estado); font-size: 12px; }
 .u .aj-se-pendiente { border-left: 4px solid var(--estado-pr); }
 .u .aj-se-parada { border: 1px dashed var(--color-error); border-left: 4px solid var(--color-error); background: color-mix(in srgb, var(--color-error) 6%, var(--color-superficie)); }
 .u .aj-se-parada strong { color: var(--color-suave); }
@@ -1117,7 +1119,7 @@ body.u-con-barra .rp-toast { bottom: calc(var(--alto-barra, 64px) + var(--e2) + 
 .u .eco-rec .eco-dl { align-self: stretch; margin: 0; }
 .u #p-lista input { text-align: right; font-variant-numeric: tabular-nums; }
 /* Abrir una factura en Drive (enlace que se abre en otra pestaña) */
-.u .eco-drive { font-weight: 700; white-space: nowrap; }
+.u .eco-drive { white-space: nowrap; } /* T0726 (R56): como los enlaces del Listado (li-enl), sin negrita ni flecha */
 /* T0627 · Las líneas de una factura emitida (FACTURA_LINEAS): qué se vende y su detalle, a lo ancho; debajo, la
    cantidad, la unidad, el precio, «IVA incl.» (su precio ya lleva el IVA), el importe y quitar. */
 .u .eco-lin { display: grid; grid-template-columns: 4.5em 3.2em minmax(5em, 1fr) auto auto auto; gap: var(--e2); align-items: center; padding: var(--e2) 0 var(--e3); border-bottom: 1px solid var(--color-linea); }
@@ -2087,7 +2089,7 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-arriba { display: flex; align-items: flex-end; gap: var(--e2); margin: 0 0 var(--e3); }
 .u .li-pers { flex: none; text-decoration: none; }
 .u .li-n { display: inline-block; min-width: 20px; padding: 0 var(--e1); margin-left: var(--e1); border-radius: 999px; text-align: center;
-  background: var(--estado-bl); color: #fff; font: 700 12px/20px var(--fuente-texto); font-variant-numeric: tabular-nums; }
+  background: var(--estado-bl); color: var(--sobre-estado); font: 700 12px/20px var(--fuente-texto); font-variant-numeric: tabular-nums; }
 .u .li-cli { font-weight: 400; font-size: 12px; opacity: .85; }
 .u .li-texto { margin: 0 0 var(--e3); }
 /* T0708 · El resumen de todo lo que hay, sobre la lista («203 telas · 39 diseños»), con su frase debajo. */
@@ -2116,7 +2118,7 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-av[aria-pressed=true] { background: var(--li-fondo, var(--color-pendiente-fondo)); border: 1.5px solid var(--li-c, var(--color-pendiente)); }
 .u .li-alto { --li-c: var(--color-vencido); --li-fondo: var(--color-vencido-fondo); }
 .u .li-medio { --li-c: var(--color-pendiente); --li-fondo: var(--color-pendiente-fondo); }
-.u .li-info { --li-c: var(--estado-ec); --li-fondo: color-mix(in srgb, var(--estado-ec) 9%, #FFFFFF); }
+.u .li-info { --li-c: var(--estado-ec); --li-fondo: color-mix(in srgb, var(--estado-ec) 9%, var(--color-superficie)); }
 .u .li-bien { --li-c: var(--color-bien); } .u .li-apagado { --li-c: var(--color-suave); }
 .u .li-grupo { margin: 0 0 var(--e4); }
 .u .li-grupo .n-grupo { margin-top: var(--e3); }
@@ -2339,7 +2341,7 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-confirma p { margin: 0; }
 .u .li-no-borrar { border-color: var(--linea-caja); background: var(--fondo-encima); }
 .u .li-btn-peligro { color: var(--color-error); border-color: color-mix(in srgb, var(--color-error) 40%, transparent); }
-.u .li-confirma .li-btn-peligro { background: var(--color-error); color: #fff; border-color: var(--color-error); }
+.u .li-confirma .li-btn-peligro { background: var(--color-error); color: var(--sobre-estado); border-color: var(--color-error); }
 .u .li-cod-nuevo { margin: 0; }
 @media (prefers-reduced-motion: reduce) { .u .li-ed, .u a.li-va, .u .li-va-i, .u .li-rel-chev { transition: none; } }
 .u .li-mias { display: inline-flex; flex: none; border: 1px solid var(--linea-btn); border-radius: var(--radio, 6px); overflow: hidden; background: var(--color-superficie); }
@@ -2359,7 +2361,7 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
 .u .li-barra .li-filtrar { font-size: 15px; padding: 0 var(--e3); gap: var(--e1); }
 .u .li-filtrar[aria-pressed=true] { border-color: var(--color-principal-oscuro); color: var(--color-principal-oscuro); }
 .u .li-nf { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px;
-  background: var(--color-principal-oscuro); color: #fff; font: 700 13px/1 var(--fuente-texto); font-variant-numeric: tabular-nums; }
+  background: var(--color-principal-oscuro); color: var(--color-sobre-principal, #fff); font: 700 13px/1 var(--fuente-texto); font-variant-numeric: tabular-nums; }
 .u .li-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); margin: calc(var(--e1) * -1) 0 var(--e3); }
 .u .li-fchip { display: inline-flex; align-items: center; gap: var(--e1); min-height: 36px; padding: 0 var(--e2) 0 var(--e3); border-radius: 18px; cursor: pointer;
   border: 1.5px solid var(--color-principal-oscuro); background: color-mix(in srgb, var(--color-principal-oscuro) 8%, var(--color-superficie));
@@ -2699,7 +2701,7 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
   .sx.u-sx .sx-plegar { width: 32px; height: 32px; }
   /* El número de atrasadas (o de nuevas), teja macizo: es lo único de color del menú. */
   .sx.u-sx a .bj-n, .sx.u-sx a .bj-n.hay, .sx.u-sx a[aria-current=page] .bj-n { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; text-align: center;
-    background: var(--est-teja); color: #fff; font: 600 12px/20px var(--fuente-texto); }
+    background: var(--est-teja); color: var(--sobre-estado); font: 600 12px/20px var(--fuente-texto); }
 }
 /* El móvil: la barra de abajo en blanco; la abierta, en el color de la marca y con el icono en el de acción. */
 @media (max-width: 699px) {
@@ -2707,7 +2709,7 @@ body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
   .sx.u-sx a, .sx.u-sx .sx-mas { font: 500 11px/1.2 var(--fuente-texto); border-top-color: transparent; }
   .sx.u-sx a[aria-current=page], .sx.u-sx .sx-mas.sx-dentro { color: var(--color-principal-oscuro); font-weight: 600; border-top-color: transparent; }
   .sx.u-sx a[aria-current=page] svg { color: var(--color-accion); }
-  .sx.u-sx a .bj-n, .sx.u-sx .sx-mas .bj-n { background: var(--est-teja); color: #fff; border-radius: 9px; }
+  .sx.u-sx a .bj-n, .sx.u-sx .sx-mas .bj-n { background: var(--est-teja); color: var(--sobre-estado); border-radius: 9px; }
   .sx.u-sx .sx-resto { background: var(--color-superficie); }
   .sx.u-sx .sx-resto a { font-size: 15px; font-weight: 400; }
   .sx.u-sx .sx-resto a[aria-current=page] { background: var(--fondo-sel); border-left-color: var(--color-accion); }
@@ -3331,8 +3333,34 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
  * T0723 · Que en el iPhone y el iPad se porte como una app de Apple.
  * ========================================================================================================================== */
 /* R54 · La app es clara aunque el iPhone esté en oscuro: así los controles del sistema (casillas, listas, calendario) no salen
-   oscuros sobre fondo blanco. El modo oscuro de verdad es otra tarea (T0740). Va con su <meta name="color-scheme">. */
-:root { color-scheme: light; }
+   oscuros sobre fondo blanco. Va con su <meta name="color-scheme" content="light">. En :where, para que el modo oscuro
+   (T0740, abajo y en marca.css) lo cambie. */
+:where(:root) { color-scheme: light; }
+
+/* T0740 · Modo oscuro, voluntario: en las apps que lo tienen (KANBAN.modoOscuro), quien entra lo elige en Perfil › Aspecto
+   (Claro, Oscuro o Como el móvil) y nucleo.js pone <html data-tema="oscuro">. Los colores de la marca, en su marca.css; aquí,
+   los que son iguales en todas: los de estado, más suaves para que se lean sobre tinta (maqueta de T0702: teja para lo
+   atrasado, índigo, oliva), con su fondo apagado; el texto sobre un color lleno pasa a tinta, y el velo y las sombras, a
+   negro (con el texto claro saldrían claros). */
+:root[data-tema="oscuro"] {
+  --est-gris: #B5B0A6;  --est-gris-f: #2B2925;
+  --est-azul: #9DB4DE;  --est-azul-f: #1E2634;
+  --est-ocre: #D9B26A;  --est-ocre-f: #2F2718;
+  --est-verde: #9CC78F; --est-verde-f: #1F2A1C;
+  --est-teja: #E08A6F;  --est-teja-f: #34211B;
+  --est-teal: #8CC7BF;  --est-teal-f: #1A2B29;
+  --estado-bl: #E08A6F; --estado-ec: #9DB4DE; --estado-pr: #D9B26A; --estado-co: #9CC78F; --estado-ni: #B5B0A6; --estado-x: #B5B0A6;
+  --color-error: #E08A6F;
+  --color-bien: #9CC78F;
+  --sobre-estado: #171815;
+  --color-velo: rgb(0 0 0 / 60%);
+  --sombra-flota: 0 6px 20px rgb(0 0 0 / 55%);
+}/* En oscuro, la opción elegida de un interruptor (Mías/Todas, las vistas, Calcular precio, Aspecto) sobre su carril: un gris
+   más claro, que la superficie casi no se distingue del carril. */
+:root[data-tema="oscuro"] .u .li-mias button[aria-pressed=true], :root[data-tema="oscuro"] .u .pr-seg button[aria-pressed=true],
+:root[data-tema="oscuro"] .u .li-arriba .u-pestanas.li-vistas button[aria-selected=true] {
+  background: color-mix(in srgb, var(--color-texto) 20%, var(--color-superficie)); box-shadow: none; }
+
 /* R47 · Mantener apretado lo que se toca no saca el menú del enlace de Safari ni selecciona texto, y el toque no deja el
    recuadro gris. Lo que se copia (un teléfono, un correo, las notas y los campos) sigue pudiéndose copiar. */
 .u a:not(.li-enl), .u button, .u .u-btn, .u [role=tab], .u label, .sx.u-sx a, .sx.u-sx button {
@@ -3360,3 +3388,20 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
   .u .li-ventana .n-ventana > .li-ficha-cab { margin: 0 calc(-1 * var(--e5)); padding: var(--e2) var(--e5) var(--e1); }
   .u .li-ventana .n-ventana > .li-ficha-cab:first-child { margin-top: calc(-1 * var(--e4)); padding-top: var(--e4); }
 }
+
+/* ---------- T0726 · Economía y Pedidos, más claros ---------- */
+/* Un gasto sin previsto: su barra en gris (no hay con qué compararla), no en teja. */
+.u .eco-barra-p i.eco-sinprev { background: color-mix(in srgb, var(--est-gris) 45%, var(--color-superficie)); }
+/* Facturas: lo que suman las emitidas y lo que suman las recibidas, aparte; el estado, en su píldora junto a la fecha. */
+.u .eco-fac-tot { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e1) var(--e4); margin: 0 0 var(--e3); font-size: 14px; }
+.u .eco-fac-tot b { font-weight: 600; }
+.u .eco-fac-l .u-chip { margin-left: var(--e1); vertical-align: middle; }
+.u .u-chip.eco-anulada { text-decoration: line-through; }
+/* El importe de un movimiento con su moneda al lado (€, ₹, $) y, para la que no tiene cambio guardado, «1 € = … $». */
+.u .eco-imp-m { display: flex; gap: var(--e2); min-width: 0; }
+.u .eco-imp-m .eco-imp { flex: 1; min-width: 0; }
+.u .eco-imp-m .eco-moneda { flex: none; width: auto; min-width: 4.2em; }
+.u .eco-cambio-f { display: flex; align-items: center; gap: var(--e2); white-space: nowrap; }
+.u .eco-cambio-f input { width: 7em; text-align: right; }
+/* Pedidos: las cifras, todas a 24 px (antes, de 22 a 40). */
+.u .eco-kpis-ven .eco-val, .u .eco-kpis-ven .eco-grande .eco-val { font-size: 24px; line-height: 1.2; }

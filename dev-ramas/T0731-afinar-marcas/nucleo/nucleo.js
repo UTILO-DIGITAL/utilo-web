@@ -50,6 +50,70 @@
   }
   var MENU_CLAVE = 'kanbanMenuPlegado'; // el mismo que kanban4/app.js (T0225): cada dispositivo recuerda cómo dejó el menú
 
+  /* T0740 · La letra sigue el tamaño de texto del iPhone y el iPad (Ajustes › Pantalla y brillo › Tamaño del texto), en las
+     apps que lo piden (KANBAN.letraDelSistema). La hoja da los tamaños en px; se agrandan o se achican todos a la vez, como
+     el «aA» de Safari, con -webkit-text-size-adjust (--letra-sistema, en body.u de base.css): el tamaño de
+     -apple-system-body entre 17 px, el normal de iOS. Solo con pantalla táctil: en el Mac, -apple-system-body es la letra
+     de escritorio (13 px). Entre 85 % y 140 %, para que no se rompa lo que tiene alto fijo. Se vuelve a mirar al volver a
+     la app (por si se ha cambiado en Ajustes). */
+  function ajustarLetra() {
+    if (!C.letraDelSistema || !window.CSS || !CSS.supports('font', '-apple-system-body')) return;
+    if (!window.matchMedia || !matchMedia('(hover: none) and (pointer: coarse)').matches) return;
+    var de = document.documentElement, p = document.createElement('span');
+    de.style.removeProperty('--letra-sistema'); // se mide sin el ajuste de antes
+    p.style.cssText = 'font:-apple-system-body;-webkit-text-size-adjust:100%;position:absolute;visibility:hidden';
+    p.textContent = 'x';
+    de.appendChild(p);
+    var px = parseFloat(getComputedStyle(p).fontSize);
+    p.remove();
+    if (px > 0) de.style.setProperty('--letra-sistema', proporcionLetra(px) + '%');
+  }
+  function proporcionLetra(px) { return Math.round(Math.max(0.85, Math.min(1.4, px / 17)) * 100); }
+  ajustarLetra();
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') ajustarLetra(); });
+
+  /* T0740 · Modo oscuro, voluntario, en las apps que lo tienen (KANBAN.modoOscuro): quien entra elige en Perfil › Aspecto
+     Claro (lo de siempre, por defecto), Oscuro o Como el móvil (sigue al sistema, también si cambia con la app abierta). Cada
+     dispositivo recuerda lo suyo. Se pone <html data-tema="oscuro"> y los colores están en base.css y en la marca.css. */
+  var TEMA_CLAVE = 'nucleo_tema_' + (C.clave || 'negocio');
+  var TEMAS = [['claro', 'Claro'], ['oscuro', 'Oscuro'], ['sistema', 'Como el móvil']];
+  function temaElegido() {
+    var t = ''; try { t = localStorage.getItem(TEMA_CLAVE) || ''; } catch (e) {}
+    return /^(claro|oscuro|sistema)$/.test(t) ? t : 'claro';
+  }
+  var SISTEMA_OSCURO = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
+  function aplicarTema() {
+    if (!C.modoOscuro) return;
+    var t = temaElegido(), oscuro = t === 'oscuro' || (t === 'sistema' && !!(SISTEMA_OSCURO && SISTEMA_OSCURO.matches));
+    var de = document.documentElement;
+    if (oscuro) de.setAttribute('data-tema', 'oscuro'); else de.removeAttribute('data-tema');
+    // La barra de Safari y del iPhone, del color del fondo.
+    var tc = document.querySelector('meta[name="theme-color"]'), fondo = getComputedStyle(de).getPropertyValue('--color-fondo').trim();
+    if (tc && fondo) tc.setAttribute('content', fondo);
+  }
+  aplicarTema();
+  if (SISTEMA_OSCURO) {
+    var alCambiar = function () { if (temaElegido() === 'sistema') aplicarTema(); };
+    if (SISTEMA_OSCURO.addEventListener) SISTEMA_OSCURO.addEventListener('change', alCambiar); else if (SISTEMA_OSCURO.addListener) SISTEMA_OSCURO.addListener(alCambiar);
+  }
+  /** El bloque «Aspecto» de Perfil (vacío si la app no tiene modo oscuro): el interruptor de tres, como el de Calcular precio. */
+  function htmlAspecto() {
+    if (!C.modoOscuro) return '';
+    var t = temaElegido();
+    return '<section class="pf-bloque pf-aspecto"><h2 class="n-grupo">Aspecto</h2>' +
+      '<div class="pr-seg" role="group" aria-label="Aspecto de la app">' + TEMAS.map(function (x) {
+        return '<button type="button" data-n-tema="' + x[0] + '" aria-pressed="' + (t === x[0]) + '">' + x[1] + '</button>';
+      }).join('') + '</div>' +
+      '<p class="u-nota">«Como el móvil» la pone oscura cuando el móvil o el ordenador lo están. Se recuerda en este dispositivo.</p></section>';
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-n-tema]');
+    if (!b) return;
+    try { localStorage.setItem(TEMA_CLAVE, b.getAttribute('data-n-tema')); } catch (err) {}
+    aplicarTema();
+    [].forEach.call(document.querySelectorAll('[data-n-tema]'), function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+  });
+
   var ICONO_PERFIL = '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"/>';
   var ICONO_SECCION = '<circle cx="12" cy="12" r="3"/>';
   var ICONO_LUPA = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>';
@@ -307,6 +371,8 @@
     },
     /** T0283: el bloque «Versión» de Perfil (vacío si no hay versión: DEV, local sin ejemplo). */
     htmlVersion: function () { return htmlVersion(); },
+    /** T0740: el bloque «Aspecto» de Perfil (Claro, Oscuro o Como el móvil); vacío si la app no tiene modo oscuro. */
+    htmlAspecto: function () { return htmlAspecto(); },
     /**
      * T0599 · El orden del menú que ha elegido quien personaliza (la sección Listado lo guarda para todos): ids de las
      * secciones. Se recuerda en el dispositivo, para pintar el menú en ese orden desde el principio, y se vuelve a pintar.
@@ -909,7 +975,7 @@
       (window.UG.avisos && !cred.como ? '<div class="n-avisos" id="n-avisos"></div>' : '') +
       (dentro.length ? '<div class="n-botones">' + dentro.map(function (s) {
         return '<a class="u-btn" href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '">' + texto(s.titulo) + '</a>';
-      }).join('') + '</div>' : '') + htmlPersonalizar() + '</div>' + htmlVersion();
+      }).join('') + '</div>' : '') + htmlPersonalizar() + '</div>' + htmlAspecto() + htmlVersion(); // T0740: Aspecto
   }
 
   function conCodigo() { return !!(window.UG.formas && window.UG.formas().indexOf('codigo') >= 0); }

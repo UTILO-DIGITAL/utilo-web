@@ -277,6 +277,11 @@
       refrescar: function (nombres, fresco) { return refrescarTodo([].concat(nombres), fresco); },
       /** T0256 · ¿Tiene ya la copia esa tabla, o esa parte ({ clave })? Para pintar al momento sin esperar. */
       tiene: function (n, p) { return tiene(n, p); },
+      /**
+       * T0726 · Lo que devuelve una función de una sección que ha escrito filas (r.otras = { TABLA: [filas] }: las líneas de
+       * una factura, su PDF) → a la copia al momento, sin volver a leer el Excel. Como lo que llega con un alta o un cambio.
+       */
+      anotar: function (r) { otras(r); },
       /** Filas de la copia (las que ya se han leído). */
       filas: function (n) { return mem[n] ? mem[n].filas : []; },
       fila: function (n, id) { return mem[n] ? mem[n].ids[String(id)] || null : null; },
