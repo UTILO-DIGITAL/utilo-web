@@ -35,6 +35,9 @@
  * y UT.olvidar(negocio, correo) borra del dispositivo la copia de esa persona (al cerrar sesión). Sin persona, como antes.
  * T0273: persona puede ser '<correo>><correo>' (quien administra viendo como otra persona); olvidar a quien administra
  * borra también esas.
+ * T0742 · Tablas que crecen con los años (UT.crear({ …, partes: { SEGUIMIENTO: { fecha, meses, cerradas } } }), de config.json ·
+ * nucleo.partes): leer, sin pedir otra cosa, trae su parte viva (lo no cerrado y lo de los últimos meses); lo antiguo, con
+ * leerAntiguo(t) o, de una fila, leerDe(t, columna, valor). faltaAntiguo(t) dice si aún no ha llegado; no se guarda en el dispositivo.
  */
 (function () {
   'use strict';
@@ -111,6 +114,21 @@
     var enVuelo = {};   // 'tabla|id' → [cambios aún sin confirmar], para no perderlos si llega un refresco
     var oyentes = { cambio: [], error: [] };
     var nuevos = 0, pendientes = 0;
+    // T0742 · Tablas que crecen con los años (o.partes = { SEGUIMIENTO: { fecha, meses, cerradas } }, de config.json ·
+    // nucleo.partes): sin pedir otra cosa, se lee su parte viva (lo que no está cerrado y lo de los últimos meses, desde el
+    // día 1 de ese mes: la misma parte todo el mes); lo antiguo, solo con leerAntiguo («Ver más» en Historial, buscar).
+    var porPartes = o.partes || {};
+    function desdeViva(n) {
+      var d = new Date(), m = Number(porPartes[n].meses) || 6;
+      d.setDate(1); d.setMonth(d.getMonth() - m);
+      return d.getFullYear() + '-' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1) + '-01';
+    }
+    function parteFecha(n, antiguo) {
+      var c = porPartes[n], desde = desdeViva(n);
+      return { clave: (antiguo ? 'antigua:' : 'viva:') + desde, fecha: c.fecha, desde: desde, cerradas: c.cerradas || [], antiguo: !!antiguo };
+    }
+    /** Lo que va al motor de una parte (sin su nombre ni lo que guarda la copia). */
+    function aMotor(p) { var r = {}; for (var k in p) if (k !== 'clave' && k !== 'ids' && k !== 'v') r[k] = p[k]; return r; }
 
     function emitir(ev, a, b) { if (cerrada) return; (oyentes[ev] || []).forEach(function (f) { try { f(a, b); } catch (e) { if (window.console) console.error(e); } }); }
     function llamar(fn, args) { return Promise.resolve().then(function () { return o.llamar(fn, args); }); }
@@ -141,23 +159,44 @@
     /**
      * T0256 · Una parte que manda el motor (p = { clave, col, valores }) → a la copia: se quitan las filas que eran de esa
      * parte (su col es uno de los valores) y se ponen las que llegan. Lo de otras partes y las altas sin confirmar se quedan.
+     * T0742 · Una parte por fecha (p = { clave, fecha, desde, cerradas, antiguo }): sus filas son las que llegaron la última
+     * vez (ids), las de esta parte y las de la viva (o la antigua) de otro mes, que deja de usarse. Una copia entera de una
+     * tabla por partes (de antes de T0742) se cambia por su parte viva.
      */
     function deParte(nombre, t, p) {
       var m = mem[nombre];
+      if (m && p.fecha && m.entera !== false) {
+        if (p.antiguo) return m; // entera ya lo tiene todo
+        m = mem[nombre] = { cols: t.cols, filas: m.filas.filter(function (f) { return f._nueva; }), ids: {}, v: '', leido: t.leido, clave: claveDe(t.cols), entera: false, partes: {} };
+      }
       if (!m) m = mem[nombre] = { cols: t.cols, filas: [], ids: {}, v: '', leido: t.leido, clave: claveDe(t.cols), entera: false, partes: {} };
-      var de = {}, nuevas = filasDe(nombre, t, m.clave), llegan = {};
-      [].concat(p.valores || []).forEach(function (x) { de[String(x)] = 1; });
+      var nuevas = filasDe(nombre, t, m.clave), llegan = {}, quitar;
       nuevas.forEach(function (f) { llegan[String(f[m.clave])] = 1; });
-      m.filas = m.filas.filter(function (f) { return f._nueva || (!de[String(f[p.col] == null ? '' : f[p.col])] && !llegan[String(f[m.clave])]); }).concat(nuevas);
+      if (p.fecha) {
+        var pre = p.antiguo ? 'antigua:' : 'viva:', eran = {};
+        Object.keys(m.partes || {}).forEach(function (k) {
+          if (k.indexOf(pre) !== 0) return;
+          (m.partes[k].ids || []).forEach(function (x) { eran[x] = 1; });
+          if (k !== p.clave) delete m.partes[k];
+        });
+        quitar = function (f) { return !!eran[String(f[m.clave])]; };
+      } else {
+        var de = {};
+        [].concat(p.valores || []).forEach(function (x) { de[String(x)] = 1; });
+        quitar = function (f) { return !!de[String(f[p.col] == null ? '' : f[p.col])]; };
+      }
+      m.filas = m.filas.filter(function (f) { return f._nueva || (!quitar(f) && !llegan[String(f[m.clave])]); }).concat(nuevas);
       m.ids = {};
       m.filas.forEach(function (f) { m.ids[String(f[m.clave])] = f; });
       m.cols = t.cols;
       if (!m.entera) {
         delete m.partes[p.clave];
-        m.partes[p.clave] = { col: p.col, valores: [].concat(p.valores || []), v: t.v };
+        if (p.fecha) { var g = aMotor(p); g.v = t.v; g.ids = Object.keys(llegan); m.partes[p.clave] = g; }
+        else m.partes[p.clave] = { col: p.col, valores: [].concat(p.valores || []), v: t.v };
         // Se recuerdan las últimas PARTES: las filas de las más viejas se quedan, pero ya no se refrescan solas (se vuelven
-        // a pedir al leerlas otra vez). Así abrir muchas fichas no multiplica las llamadas de cada refresco.
-        var ks = Object.keys(m.partes);
+        // a pedir al leerlas otra vez). Así abrir muchas fichas no multiplica las llamadas de cada refresco. T0742: las de
+        // fecha no cuentan (la viva se refresca siempre).
+        var ks = Object.keys(m.partes).filter(function (k) { return !m.partes[k].fecha; });
         while (ks.length > PARTES) delete m.partes[ks.shift()];
       }
       return m;
@@ -166,8 +205,25 @@
     function guardarLocal(nombre) {
       var m = mem[nombre];
       if (!m || !guardaLocal()) return;
-      var filas = m.filas.filter(function (f) { return !f._nueva; }).map(function (f) { return m.cols.map(function (c) { return f[c]; }); });
-      bdGuardar(clave + nombre, { cols: m.cols, filas: filas, v: m.v, leido: m.leido, entera: m.entera !== false, partes: m.partes || {} });
+      var fs = m.filas.filter(function (f) { return !f._nueva; }), partes = m.partes || {};
+      // T0742: de una tabla por partes, lo antiguo no se guarda en el dispositivo (se pide otra vez si hace falta): así su
+      // copia no crece con los años. Se queda lo de las demás partes.
+      if (porPartes[nombre] && m.entera === false) {
+        var ids = {}, cols = [];
+        partes = {};
+        Object.keys(m.partes || {}).forEach(function (k) {
+          var p = m.partes[k];
+          if (p.antiguo) return;
+          partes[k] = p;
+          if (p.fecha) (p.ids || []).forEach(function (x) { ids[x] = 1; });
+          else { var vs = {}; [].concat(p.valores || []).forEach(function (x) { vs[String(x)] = 1; }); cols.push({ col: p.col, vs: vs }); }
+        });
+        fs = fs.filter(function (f) {
+          return ids[String(f[m.clave])] || cols.some(function (c) { return c.vs[String(f[c.col] == null ? '' : f[c.col])]; });
+        });
+      }
+      var filas = fs.map(function (f) { return m.cols.map(function (c) { return f[c]; }); });
+      bdGuardar(clave + nombre, { cols: m.cols, filas: filas, v: m.v, leido: m.leido, entera: m.entera !== false, partes: partes });
     }
     /** ¿Tiene ya la copia esa tabla (entera, o la parte que se pide)? */
     function tiene(n, p) { var m = mem[n]; return !!m && (m.entera !== false || (!!p && !!(m.partes || {})[p.clave])); }
@@ -201,7 +257,7 @@
       var desde = {}, pm = {};
       nombres.forEach(function (n) {
         var m = mem[n], p = partes[n];
-        if (p) { pm[n] = { col: p.col, valores: p.valores }; if (m && m.entera === false && m.partes[p.clave] && m.partes[p.clave].v) desde[n] = m.partes[p.clave].v; }
+        if (p) { pm[n] = aMotor(p); if (m && m.entera === false && m.partes[p.clave] && m.partes[p.clave].v) desde[n] = m.partes[p.clave].v; }
         else if (m && m.entera !== false && m.v) desde[n] = m.v;
       });
       return llamar('tablasLeer', [nombres, { desde: desde, fresco: !!fresco, partes: pm }]).then(function (r) {
@@ -224,8 +280,10 @@
       var enteras = [], ps = [];
       nombres.forEach(function (n) {
         var m = mem[n];
+        // T0742: una tabla por partes que aún tiene la copia entera, por su parte viva.
+        if (porPartes[n] && (!m || m.entera !== false)) { var v = {}; v[n] = parteFecha(n); ps.push(refrescar([n], fresco, v)); return; }
         if (!m || m.entera !== false) { enteras.push(n); return; }
-        Object.keys(m.partes || {}).forEach(function (k) { var o = {}; o[n] = { clave: k, col: m.partes[k].col, valores: m.partes[k].valores }; ps.push(refrescar([n], fresco, o)); });
+        Object.keys(m.partes || {}).forEach(function (k) { var o = {}; o[n] = aMotor(m.partes[k]); o[n].clave = k; ps.push(refrescar([n], fresco, o)); });
       });
       if (enteras.length) ps.unshift(refrescar(enteras, fresco));
       return Promise.all(ps).then(function (rs) { return [].concat.apply([], rs); });
@@ -245,7 +303,10 @@
       leer: function (nombres, op) {
         op = op || {};
         nombres = [].concat(nombres);
-        var partes = op.partes || {};
+        var partes = {};
+        for (var k in op.partes || {}) partes[k] = op.partes[k];
+        // T0742: de una tabla por partes, sin pedir otra cosa, su parte viva (op.entera: la tabla entera).
+        nombres.forEach(function (n) { if (porPartes[n] && !partes[n] && !op.entera) partes[n] = parteFecha(n); });
         return Promise.all(nombres.map(function (n) {
           if (tiene(n, partes[n])) return true;
           if (mem[n] || !guardaLocal()) return false;
@@ -282,6 +343,30 @@
        * una factura, su PDF) → a la copia al momento, sin volver a leer el Excel. Como lo que llega con un alta o un cambio.
        */
       anotar: function (r) { otras(r); },
+      /** T0742 · ¿Se lee esa tabla por partes (config.json · nucleo.partes)? */
+      porPartes: function (n) { return !!porPartes[n]; },
+      /** T0742 · Desde cuándo es la parte viva ('aaaa-mm-dd'): lo antiguo es lo cerrado de antes. '' si no va por partes. */
+      desdeAntiguo: function (n) { return porPartes[n] ? desdeViva(n) : ''; },
+      /** T0742 · ¿Le falta lo antiguo (se lee por partes y aún no se ha pedido)? Para «Ver más» en Historial. */
+      faltaAntiguo: function (n) {
+        var m = mem[n];
+        if (!porPartes[n] || !m || m.entera !== false) return false;
+        return !Object.keys(m.partes || {}).some(function (k) { return m.partes[k].antiguo; });
+      },
+      /** T0742 · Lo antiguo de una tabla por partes (cerrado y de antes de sus meses), bajo demanda. Sin partes, nada. */
+      leerAntiguo: function (n) {
+        if (!porPartes[n]) return Promise.resolve(api.filas(n));
+        return api.leer([n], { local: true }).then(function () { var o = {}; o[n] = parteFecha(n, true); return api.leer([n], { partes: o }); });
+      },
+      /**
+       * T0742 · Las filas de una tabla por partes con esa columna en ese valor (la historia entera de una marca en su ficha),
+       * también las antiguas. Sin partes, la tabla ya está entera: nada que pedir.
+       */
+      leerDe: function (n, col, valor) {
+        if (!porPartes[n] || valor === '' || valor == null) return Promise.resolve(api.filas(n));
+        var o = {}; o[n] = { clave: col + ':' + valor, col: col, valores: [String(valor)] };
+        return api.leer([n], { local: true }).then(function () { return api.leer([n], { partes: o }); });
+      },
       /** Filas de la copia (las que ya se han leído). */
       filas: function (n) { return mem[n] ? mem[n].filas : []; },
       fila: function (n, id) { return mem[n] ? mem[n].ids[String(id)] || null : null; },
@@ -372,6 +457,9 @@
           var mm = mem[n];
           if (mm !== m) { if (!mm.ids[r.id]) { mm.filas.push(f); mm.ids[r.id] = f; } else { mm.filas.splice(mm.filas.indexOf(f), 1); } }
           else m.ids[r.id] = f;
+          // T0742: lo nuevo es de la parte viva (así se guarda en el dispositivo hasta que la viva se vuelva a leer).
+          var mv = mem[n];
+          if (porPartes[n] && mv && mv.entera === false) Object.keys(mv.partes || {}).forEach(function (k) { if (k.indexOf('viva:') === 0) (mv.partes[k].ids = mv.partes[k].ids || []).push(String(r.id)); });
           guardarLocal(n);
           emitir('cambio', n, { id: r.id, antes: tmp, confirmado: true });
           otras(r);

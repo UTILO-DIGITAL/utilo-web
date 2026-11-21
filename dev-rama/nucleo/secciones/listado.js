@@ -1,3 +1,4 @@
+// Generado por node herramientas/piezas.js con sus piezas de web/nucleo/secciones/listado/ (T0743): no se cambia a mano, se cambia su pieza.
 /*
  * Sección Listado base del núcleo · UTILO_CORE 5.0 (T0599) · motor/modulos/listado de utilo-apps
  *
@@ -274,7 +275,7 @@
       nombre: cfg.NOMBRE || cfg.CLAVE || 'ID', columnas: cfg.COLUMNAS || [], detalle: cfg.DETALLE || [], orden: cfg.ORDEN || '',
       buscar: cfg.BUSCAR && cfg.BUSCAR.length ? cfg.BUSCAR : null, campos: cfg.CAMPOS || {}, ficha: cfg.FICHA || [],
       relacionados: cfg.RELACIONADOS || [], vistas: cfg.VISTAS || [], avisos: cfg.AVISOS || [], editar: cfg.EDITAR || [],
-      crear: !!cfg.CREAR, texto: cfg.TEXTO || '', vacio: cfg.VACIO || '', refs: cfg._refs || {}, filtro: cfg.FILTRO || [],
+      crear: !!cfg.CREAR, texto: cfg.TEXTO || '', vacio: cfg.VACIO || '', antiguo: cfg.ANTIGUO === true, refs: cfg._refs || {}, filtro: cfg.FILTRO || [],
       nueva: cfg.NUEVA || {}, obligatorias: cfg.OBLIGATORIAS || [], filtros: cfg.FILTROS || [], filas: cfg.FILAS && cfg.FILAS.length ? cfg.FILAS : null,
       rapidas: rapidasDe(cfg.RAPIDAS), alta: cfg.ALTA && lista(cfg.ALTA.campos).length ? { campos: lista(cfg.ALTA.campos), mas: lista(cfg.ALTA.mas), titulo: cfg.ALTA.titulo || '', abrir: !!cfg.ALTA.abrir, nuevo: altaNuevoDe(cfg.ALTA.nuevo) } : null,
       deducir: cfg.DEDUCIR || {}, acciones: cfg.ACCIONES || [], contexto: contextoDe(cfg.CONTEXTO), resumen: resumenCifras(cfg.RESUMEN), arriba: arribaDe(cfg.ARRIBA),
@@ -715,6 +716,16 @@
     });
   }
 
+  /** T0746 · Las dos opciones de un campo que se elige con dos botones juntos (Sí | No): [{ valor, nombre, color }], o null
+   *  si no son dos (o lo que tiene no es ninguna de las dos: entonces, su desplegable, que lo enseña). */
+  function dosOpciones(cp, v) {
+    if (cp.varios) return null;
+    var ops = cp.ids ? Object.keys(cp.ids).map(function (n) { return { valor: String(cp.ids[n]), nombre: n }; })
+      : (cp.opciones || []).map(function (o) { return { valor: String(o), nombre: String(o) }; });
+    if (ops.length !== 2 || (!vacio(v) && !ops.some(function (o) { return o.valor === String(v); }))) return null;
+    ops.forEach(function (o) { o.color = cp.colores && cp.colores[o.nombre] || ''; });
+    return ops;
+  }
   /**
    * Comprueba la configuración de una sección (para quien administra y para las pruebas): columnas que faltan, un precio
    * cuyo cálculo no lleva el envío, una vista para clientes que enseñaría algo privado, columnas con datos que no se
@@ -1002,9 +1013,12 @@
         if (!(d && (d.calculo || d.plantilla || d.de || d.primero))) hay(String(c).split('.')[0], q + ' usa', r.tabla, cs);
       });
       // T0651: lo que se edita, se añade o se elige desde la ficha, columnas de esa tabla; con «tarjeta» o «contiene», no se edita.
+      // T0738: con «tarjeta», sí se añade («crear»: la comparativa de una marca), pero no se edita ni se quita.
       if (r.editar || r.crear || r.quitar) {
         var e = relEdicion(r);
-        if (r.tarjeta || r.contiene || r.juntar) errores.push(donde + q + ': con «' + (r.tarjeta ? 'tarjeta' : r.contiene ? 'contiene' : 'juntar') + '» no se edita desde la ficha.');
+        if (r.contiene || r.juntar) errores.push(donde + q + ': con «' + (r.contiene ? 'contiene' : 'juntar') + '» no se edita desde la ficha.');
+        else if (r.tarjeta && (r.editar || r.quitar)) errores.push(donde + q + ': con «tarjeta» solo se añade («crear») desde la ficha: ni «editar» ni «quitar».');
+        if (r.tarjeta && r.elegir) errores.push(donde + q + ': con «tarjeta» no se añade eligiendo («elegir»): se pide con «alta».');
         if (cs) e.editar.concat(e.crear ? e.alta : [], e.elegir ? [e.elegir] : [], e.obligatorias).forEach(function (c) { hay(c, q + ' edita', r.tabla, cs); });
         if (cs) Object.keys(r.poner || {}).forEach(function (c) { hay(c, q + ' pone', r.tabla, cs); }); // T0737
         if (e.crear && !e.elegir && !e.alta.length) errores.push(donde + q + ': «crear» necesita lo que se pide al añadir («alta» o «editar»).');
@@ -2172,13 +2186,19 @@
   /**
    * T0651 · La fila nueva de lo relacionado: lo escrito (sin lo vacío), la columna que la une (r.campo = el «con» de esta
    * fila) y su código, si lleva plantilla o su tabla prefijo conocido (si no, lo pone el motor). → { valores, faltan }.
+   * T0738: idDe(columna, valor), si se pasa, da el código de lo de «poner» que apunta a otra tabla y va por su nombre
+   * («Buscando» → ECO01); si no lo encuentra (undefined), no se pone.
    */
-  function altaRelacionada(r, crudo, valores, existentes, prefijos) {
+  function altaRelacionada(r, crudo, valores, existentes, prefijos, idDe) {
     var e = relEdicion(r), v = {};
     Object.keys(valores || {}).forEach(function (k) { if (!vacio(valores[k])) v[k] = typeof valores[k] === 'string' ? valores[k].trim() : valores[k]; });
     v[r.campo] = (crudo || {})[r.con || 'ID'];
     // T0737: «poner», lo que lleva siempre una fila nueva si no se ha escrito (la tela que le interesa: «Le interesa»).
-    Object.keys(r.poner || {}).forEach(function (k) { if (vacio(v[k])) v[k] = r.poner[k]; });
+    Object.keys(r.poner || {}).forEach(function (k) {
+      if (!vacio(v[k])) return;
+      var p = idDe ? idDe(k, r.poner[k]) : r.poner[k];
+      if (p !== undefined) v[k] = p;
+    });
     var faltan = e.obligatorias.filter(function (c) { return vacio(v[c]); });
     if (e.id) { var id = nuevoId(e.id, v, existentes); if (id) v[e.clave] = id; else if (!faltan.length) faltan.push(e.clave); }
     return { valores: v, faltan: faltan };
@@ -2209,7 +2229,7 @@
   /** T0651 · La palabra pequeña junto a la etiqueta de lo que no se edita en una ficha que sí: «calculado» o la del «ir» de un «de». */
   function sufijoFijo(cp) { return cp.calculo ? 'calculado' : (cp.de && cp.ir && cp.ir.texto ? String(cp.ir.texto) : ''); }
 
-  var CALC = { pctVer: pctVer, pctEscrito: pctEscrito, deEscrito: deEscrito, nuevoId: nuevoId, altaNuevoDe: altaNuevoDe, codigoAltaNuevo: codigoAltaNuevo, plantillaPrefijo: plantillaPrefijo, codigoNuevo: codigoNuevo, esRuta: esRuta, destinoDe: destinoDe, avisoRuta: avisoRuta, borrarDe: borrarDe, queBorra: queBorra, borrarCon: borrarCon, seccionDeFila: seccionDeFila, seccionesRel: seccionesRel, plantillaPara: plantillaPara, sinMarcas: sinMarcas, sinComunes: sinComunes, palabraTodos: palabraTodos, yaEsta: yaEsta, yaPuestos: yaPuestos, esSoporte: esSoporte, htmlErrores: htmlErrores, cuantas: cuantas, yJuntos: yJuntos, relEdicion: relEdicion, altaRelacionada: altaRelacionada, paraElegir: paraElegir, sufijoFijo: sufijoFijo,
+  var CALC = { pctVer: pctVer, pctEscrito: pctEscrito, deEscrito: deEscrito, nuevoId: nuevoId, altaNuevoDe: altaNuevoDe, codigoAltaNuevo: codigoAltaNuevo, plantillaPrefijo: plantillaPrefijo, codigoNuevo: codigoNuevo, esRuta: esRuta, destinoDe: destinoDe, avisoRuta: avisoRuta, borrarDe: borrarDe, queBorra: queBorra, borrarCon: borrarCon, seccionDeFila: seccionDeFila, seccionesRel: seccionesRel, plantillaPara: plantillaPara, sinMarcas: sinMarcas, sinComunes: sinComunes, palabraTodos: palabraTodos, yaEsta: yaEsta, yaPuestos: yaPuestos, esSoporte: esSoporte, htmlErrores: htmlErrores, cuantas: cuantas, yJuntos: yJuntos, relEdicion: relEdicion, altaRelacionada: altaRelacionada, paraElegir: paraElegir, sufijoFijo: sufijoFijo, dosOpciones: dosOpciones,
     fechaDia: fechaDia, webCorta: webCorta, webSitio: webSitio, textoCorto: textoCorto, gruposConQuien: gruposConQuien, nombreCorto: nombreCorto, deshacerEnOrden: deshacerEnOrden, guardadoSolo: guardadoSolo, loDiceUnAviso: loDiceUnAviso, contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, queHacerAtras: queHacerAtras, dirFicha: dirFicha, cambiosHecha: cambiosHecha, conHablado: conHablado, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
     textoVuelta: textoVuelta, QUITAR_DE_VUELTA: QUITAR_DE_VUELTA, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, franja: franja, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, resumenCifras: resumenCifras, arribaDe: arribaDe, filasArriba: filasArriba, rangoFechas: rangoFechas, lineaArriba: lineaArriba, cifrasResumen: cifrasResumen, seguirCrudo: seguirCrudo, tablasDeRuta: tablasDeRuta, conCamposPropios: conCamposPropios, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
@@ -2516,6 +2536,7 @@
         else if (vista.tablero) html += pintarTablero(a, vista, fs, hoy);
         else if (vista.galeria) html += pintarGaleria(a, vista, agrupar(a, vista, fs, hoy), hoy);
         else html += pintarGrupos(a, vista, agrupar(a, vista, fs, hoy), hoy);
+        html += botonAntiguo(a, vista);
         if (vista.tablero || !conRapidas(a, vista)) S.menu = '';
         html += menuPasar(hoy);
         if (S.ctx) pintarCtx(); // T0652: el resumen abierto, con lo nuevo
@@ -2708,7 +2729,33 @@
         pCtx.hidden = false;
         if (foco) { var t = pCtx.querySelector('#li-ctx-t'); if (t) t.focus(); }
       }
-      function abrirCtx(id) { S.ctx = String(id); S.menu = ''; pintar(); pintarCtx(true); }
+      function abrirCtx(id) {
+        S.ctx = String(id); S.menu = ''; pintar(); pintarCtx(true);
+        // T0742: lo antiguo con quien es esta fila, si su tabla se lee por partes; al llegar, el resumen se rehace.
+        var a = ap(), f = filaVista(a, id);
+        if (f) historiaDe(a, f.__crudo, true).then(function (nuevo) { if (nuevo && S.ctx === String(id)) pintarCtx(); });
+      }
+      /**
+       * T0742 · La historia entera de una fila en las tablas que se leen por partes (nucleo.partes): las de su seguimiento
+       * (RELACIONADOS) y, con CONTEXTO, lo de su tabla con quien es. Devuelve una promesa con true si ha pedido algo que
+       * la copia aún no tenía (para rehacer la ficha), false si ya estaba todo.
+       */
+      function historiaDe(a, crudo, soloCtx) {
+        if (!crudo || !T.porPartes) return Promise.resolve(false);
+        var pide = [];
+        var de = function (t, col, v) {
+          if (!T.porPartes(t) || vacio(v) || esRuta(col)) return;
+          if (pide.some(function (x) { return x.t === t && x.col === col && x.v === String(v); })) return;
+          pide.push({ t: t, col: col, v: String(v), ya: T.tiene(t, { clave: col + ':' + v }) });
+        };
+        if (!soloCtx) a.relacionados.forEach(function (r) { if (r.tabla && r.campo && r.con && !r.contiene && !r.juntar) de(r.tabla, r.campo, crudo[r.con]); });
+        var cc = contextoCol(a, crudo);
+        if (cc) de(a.tabla, cc, crudo[cc]);
+        if (!pide.length) return Promise.resolve(false);
+        return Promise.all(pide.map(function (x) { return T.leerDe(x.t, x.col, x.v); })).then(function () {
+          return pide.some(function (x) { return !x.ya; });
+        }, function () { return false; });
+      }
       function cerrarCtx(sinFoco) {
         if (!S.ctx) return;
         var id = S.ctx; S.ctx = ''; pintarCtx(); pintar();
@@ -2814,6 +2861,17 @@
             lis(tz.abiertas) + li(tz.masA) + li(tz.plegar) + lis(tz.hechas) + li(tz.masH) + li(tz.antes) + '</ul></section>';
         }).join('') + '</div>';
         return tabla + tarjetas;
+      }
+      /**
+       * T0742 · Con ANTIGUO y su tabla leída por partes (nucleo.partes), al final de la lista «Ver más», que trae lo cerrado de
+       * antes de sus meses (una vez; después ya está en la lista, también al buscar y filtrar). Nunca en la vista para clientes.
+       */
+      function botonAntiguo(a, vista) {
+        if (!a.antiguo || vista.cliente || !T.faltaAntiguo || !T.faltaAntiguo(a.tabla)) return '';
+        var d = T.desdeAntiguo(a.tabla), m = /^(\d{4})-(\d\d)/.exec(d);
+        var cuando = m ? MESES[+m[2] - 1] + ' de ' + m[1] : '';
+        return '<p class="li-antiguo"><button type="button" class="li-vermas" data-antiguo' + (S.antiguo ? ' disabled aria-busy="true"' : '') + '>' +
+          (S.antiguo ? 'Buscando lo de antes…' : 'Ver más') + (cuando && !S.antiguo ? ' <span class="u-nota">· lo de antes de ' + cuando + '</span>' : '') + '</button></p>';
       }
       /** T0690 · «Ver N más»: cuántas quedan y el botón que enseña otras tantas (data-mas con su clave en S.mas). */
       function botonMas(k, quedan, paso) {
@@ -3001,9 +3059,23 @@
       function entradaRel(ra, c, x, pre) {
         return entrada(ra, c, x).replace(/(id|for)="li-c-/g, '$1="' + pre).replace(/ data-c="/g, ' data-rc="');
       }
+      /** T0746 · Los dos botones, como su desplegable escondido (el que guarda): el elegido, marcado y con su color. */
+      function pintarDos(sel) {
+        var g = sel.parentNode.querySelector('.li-dos'); if (!g) return;
+        [].forEach.call(g.querySelectorAll('[data-dos-v]'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-dos-v') === sel.value)); });
+      }
       function entrada(a, c, f) {
         var cp = campo(a, c), v = f ? f[c] : '', id = 'li-c-' + c;
         var et = '<label class="u-etiqueta" for="' + id + '">' + texto(cp.titulo) + '</label>';
+        var dos = dosOpciones(cp, v);
+        if (dos) {
+          // T0746: dos opciones (Sí | No), dos botones juntos; tocar el elegido lo deja vacío. Guarda su desplegable, escondido.
+          return '<div class="u-campo"><span class="u-etiqueta">' + texto(cp.titulo) + '</span><div class="li-dos" role="group" aria-label="' + texto(cp.titulo) + '">' + dos.map(function (o) {
+            return '<button type="button" class="li-dos-b' + (o.color ? ' li-' + texto(o.color) : '') + '" data-dos-v="' + texto(o.valor) + '" aria-pressed="' + (o.valor === String(v)) + '">' + texto(mostrar(cp, o.nombre)) + '</button>';
+          }).join('') + '</div><select id="' + id + '" hidden data-dos data-c="' + texto(c) + '"><option value=""></option>' + dos.map(function (o) {
+            return '<option value="' + texto(o.valor) + '"' + (o.valor === String(v) ? ' selected' : '') + '>' + texto(mostrar(cp, o.nombre)) + '</option>';
+          }).join('') + '</select></div>';
+        }
         if (cp.ids) {
           // Una columna que apunta a otra tabla: se elige por el nombre y se guarda el código.
           var ns = Object.keys(cp.ids);
@@ -3080,13 +3152,14 @@
         var puestos = [];
         // T0630: lo que tiene algo, cada uno en su sitio; lo vacío, junto en una línea al final de su apartado («Sin
         // rellenar: Formato, Notas»). Lo que se edita se abre al tocar su nombre (su campo ya está, escondido, en el form).
-        var lleno = function (c) { return ed.indexOf(c) >= 0 ? !vacio(crudoEd[c]) : verTexto(campo(a, c), f, VAL, PROHIB) !== ''; };
+        // T0746: un Sí | No que se edita sale aunque esté vacío (sus dos botones, sin elegir), no en «Sin rellenar».
+        var lleno = function (c) { return ed.indexOf(c) >= 0 ? !vacio(crudoEd[c]) || (tocar && !!dosOpciones(campo(a, c), crudoEd[c])) : verTexto(campo(a, c), f, VAL, PROHIB) !== ''; };
         var apartadoFicha = function (titulo, cs) {
           if (!cs.length) return '';
           cs.forEach(function (c) { puestos.push(c); });
           var rp = nueva ? { ver: cs, vacios: [] } : repartir(cs, lleno, a.obligatorias);
           var cuerpo = rp.ver.map(function (c) {
-            if (ed.indexOf(c) >= 0) return tocar && !campo(a, c).colores ? datoTocar(a, c, f, cli) : entrada(a, c, crudoEd);
+            if (ed.indexOf(c) >= 0) return tocar && !campo(a, c).colores && !dosOpciones(campo(a, c), crudoEd[c]) ? datoTocar(a, c, f, cli) : entrada(a, c, crudoEd); // T0746: Sí | No, siempre a la vista
             var cp = campo(a, c);
             // T0651: lo que no se edita en una ficha que sí: una palabra pequeña junto a su etiqueta («· calculado») y, si es de
             // otra fila que tiene su sección (el próximo paso, de su tarea), el dato entero lleva a ella, con una flecha suave.
@@ -3153,6 +3226,9 @@
         h += '</form>';
         // T0652: con quién es, ya abierto (sin la propia tarea: esa es la ficha).
         if (!nueva && !cli && a.contexto) { var rc = resumenDe(a, D, crudo, vistas(a), { hoy: hoy, prohib: PROHIB, sin: id }); if (rc) h += htmlResumen(rc, true); }
+        // T0742: de una tabla que se lee por partes, la historia entera de esta fila (su seguimiento, lo último con quien es);
+        // cuando llega, la ficha se rehace (una vez: después ya está en la copia).
+        if (!nueva && !cli) historiaDe(a, crudo).then(function (nuevo) { if (nuevo && abierta && String(abierta.id) === String(id)) rehacer(); });
         // T0692: sus ventas (de Pedidos), antes de lo relacionado; si aún no han llegado, su sitio, que se rellena al llegar.
         if (!nueva && !cli && VENTAS) h += '<div id="li-ventas">' + htmlVentasDe(crudo, hoy) + '</div>';
         // Lo relacionado (el seguimiento de un cliente): cada fila lleva a su sección, con su ficha abierta.
@@ -3186,7 +3262,9 @@
           var cuerpo;
           // T0651: lo de dentro que se edita, se añade o se quita desde la ficha (las personas de contacto de una marca).
           var ri = a.relacionados.indexOf(r), e = relEdicion(r, YO.admin), conEd = e.algo && !r.tarjeta && !!T.actualizar;
-          if (conEd) relAps[ri] = enriquecer(apartado({ TABLA: r.tabla, CLAVE: e.clave, CAMPOS: r.campos || {}, COLUMNAS: cols, _refs: a.refs }), D);
+          // T0738: con «tarjeta», solo «+ Añadir comparativa» (sus tarjetas no se editan).
+          var soloAlta = !!r.tarjeta && e.crear && !!T.crear;
+          if (conEd || soloAlta) relAps[ri] = enriquecer(apartado({ TABLA: r.tabla, CLAVE: e.clave, CAMPOS: r.campos || {}, COLUMNAS: cols, _refs: a.refs }), D);
           var claveDe = function (x) { return (x.__crudo || x)[e.clave]; };
           if (!rs.length) cuerpo = '<p class="u-vacio">' + texto(r.vacio || 'Nada todavía.') + '</p>';
           else if (r.tarjeta) cuerpo = tarjetas(r, otro, rs, max);
@@ -3237,8 +3315,8 @@
           // T0690: las primeras «max» (20 si no lo dice) y «Ver todo»: las demás van escondidas y salen al tocarlo.
           if (resto > 0) cuerpo += '<button type="button" class="li-vermas li-vertodo" data-ver-todo>Ver todo <span class="u-nota">· ' + num(rs.length) + ' en total</span></button>';
           // T0651: «+ Añadir persona de contacto» (o eligiendo: «+ Añadir tela que le interesa»), aquí mismo.
-          var an = conEd && e.crear && !(e.clave === r.campo && rs.length) ? '<button type="button" class="li-rel-anadir" data-rel-nueva>+ Añadir ' + texto(e.filas[0]) + '</button>' : '';
-          var secH = '<section class="li-fgrupo"' + (conEd ? ' data-rel="' + ri + '"' : '') + '>' + cab + cuerpo + an + nv + '</section>';
+          var an = (conEd || soloAlta) && e.crear && !(e.clave === r.campo && rs.length) ? '<button type="button" class="li-rel-anadir" data-rel-nueva>+ Añadir ' + texto(e.filas[0]) + '</button>' : '';
+          var secH = '<section class="li-fgrupo"' + (conEd || soloAlta ? ' data-rel="' + ri + '"' : '') + '>' + cab + cuerpo + an + nv + '</section>';
           // T0731 (R68): con «tras», justo detrás de ese apartado de la ficha («Su seguimiento», tras «En qué punto está»); si no
           // está (la vista para un cliente, un alta), en su sitio de siempre.
           var gTras = r.tras === undefined ? -1 : grupos.map(function (g) { return g.titulo; }).indexOf(r.tras), marca = '<!--li-tras-' + gTras + '-->';
@@ -3294,6 +3372,7 @@
           if (!i) { if (datoDe(c)) pintarDato(c); return; } // T0651: leído como texto, se vuelve a pintar con lo de ahora
           i.value = vacio(v) ? '' : String(v); ponerInicial(i, i.value);
           if (i.hasAttribute('data-pil')) i.dispatchEvent(new Event('change')); // su color
+          if (i.hasAttribute('data-dos')) pintarDos(i); // T0746: sus dos botones
         }
         /** T0651 · Lo de ahora de c, como se ve (el nombre de lo que apunta a otra tabla), para pintarlo leído. */
         function filaAhora(c) {
@@ -3447,8 +3526,9 @@
           var g = document.createElement('span'); g.className = 'li-guardado'; g.setAttribute('aria-live', 'polite'); u.appendChild(g);
           el.parentNode.replaceChild(u, el);
           var i = u.querySelector('input,select,textarea'); if (!i) return;
-          i.focus();
-          if (i.tagName === 'SELECT') { try { if (i.showPicker) i.showPicker(); } catch (e) {} } else if (i.select && i.type !== 'date') i.select();
+          var b2 = u.querySelector('[data-dos-v][aria-pressed=true]') || u.querySelector('[data-dos-v]'); // T0746: Sí | No, al primero
+          if (b2) b2.focus(); else i.focus();
+          if (b2) { /* sus botones */ } else if (i.tagName === 'SELECT') { try { if (i.showPicker) i.showPicker(); } catch (e) {} } else if (i.select && i.type !== 'date') i.select();
           var hecho = false;
           function cerrar(sin) {
             if (hecho) return;
@@ -3478,7 +3558,8 @@
           var existentes = function () { return filas(r.tabla).map(function (y) { return y[e.clave]; }); };
           // T0724 (R35): lo escrito sigue ahí hasta que el motor dice que sí; si dice que no, alFallar(lo que pasa, en palabras).
           var anadir = function (valores, nombre, alFallar) {
-            var q = altaRelacionada(r, crudo, valores, existentes(), a.prefijos);
+            // T0738: lo de «poner» que apunta a otra tabla, por su nombre («Buscando»): su código; si no está, no se pone.
+            var q = altaRelacionada(r, crudo, valores, existentes(), a.prefijos, function (c, v) { var cp = campo(ra, c); return !cp.ids ? v : v in cp.ids ? cp.ids[v] : Object.keys(cp.ids).some(function (n) { return String(cp.ids[n]) === String(v); }) ? v : undefined; });
             if (q.faltan.length) return 'Falta ' + yJuntos(q.faltan.map(function (c) { return campo(ra, c).titulo.toLowerCase(); })) + '.';
             Promise.resolve(T.crear(r.tabla, q.valores, { callado: true })).then(function (out) {
               rehacer();
@@ -3982,6 +4063,15 @@
       }
 
       /* ---------- eventos ---------- */
+      // T0746: Sí | No en la ficha (y en lo de dentro): el botón pone su valor en el desplegable escondido, que guarda como
+      // siempre; tocar el que ya está elegido lo deja vacío.
+      vent.addEventListener('click', function (ev) {
+        var b = ev.target.closest('[data-dos-v]'), sel = b && b.parentNode.parentNode.querySelector('select[data-dos]');
+        if (!sel) return;
+        sel.value = b.getAttribute('aria-pressed') === 'true' ? '' : b.getAttribute('data-dos-v');
+        pintarDos(sel);
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+      });
       cont.addEventListener('click', function (ev) {
         // T0724 (R44): un enlace de la tabla (la web, el correo) se abre él, sin abrir la ficha de su fila.
         if (ev.target.closest('a.li-enl')) return;
@@ -4016,6 +4106,17 @@
         // T0652: el nombre de con quién es abre su resumen (otra vez, lo cierra).
         var bx = ev.target.closest('[data-ctx]');
         if (bx) { var ix = bx.getAttribute('data-ctx'); if (S.ctx === ix) cerrarCtx(); else abrirCtx(ix); return; }
+        // T0742: «Ver más» al final de la lista: lo antiguo de su tabla (nucleo.partes), una vez.
+        var ba = ev.target.closest('[data-antiguo]');
+        if (ba) {
+          if (S.antiguo) return;
+          S.antiguo = true; pintar();
+          T.leerAntiguo(ap().tabla).then(function () { S.antiguo = false; pintar(); }, function (e) {
+            S.antiguo = false; pintar();
+            ctx.aviso('No se ha podido traer lo de antes: ' + ((e && e.message) || e));
+          });
+          return;
+        }
         // T0690: ordenar por una columna (se recuerda por vista en este dispositivo), «Ver más», lo hecho y lo de antes.
         var lg = ev.target.closest('[data-orden],[data-mas],[data-plegar],[data-antes]');
         if (lg) {
