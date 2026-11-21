@@ -961,12 +961,12 @@
   },
   "T0744-partir-base-css": {
    "tarea": "T0744",
-   "titulo": "Partir base.css en nucleo.css, konamigas.css y nucleo-2.css, en el mismo orden",
-   "pr": null,
+   "titulo": "Telas carga un tercio menos de estilos, sin cambiar nada de lo que se ve",
+   "pr": 430,
    "commit": "37cfe8a4",
    "ultimo": "T0744: Partir base.css en nucleo.css, konamigas.css y nucleo-2.css, en el mismo orden",
    "quien": "Javi Canela",
-   "fecha": "2026-11-21T09:53:32.974Z",
+   "fecha": "2026-11-21T09:55:06.598Z",
    "toca": [
     "telas",
     "utilo"
