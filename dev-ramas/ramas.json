@@ -1251,12 +1251,12 @@
   },
   "T0749-rematar-revision-telas": {
    "tarea": "T0749",
-   "titulo": "Rematar lo que quedó de la revisión de Telas",
-   "pr": null,
+   "titulo": "Telas: Ayuda solo mira Marcas, el aviso de sesión caducada encima de la barra y mantener apretado la barra sin recuadro",
+   "pr": 431,
    "commit": "abaf9572",
    "ultimo": "T0749: Rematar lo que quedó de la revisión de Telas",
    "quien": "Javi Canela",
-   "fecha": "2026-11-21T10:40:32.474Z",
+   "fecha": "2026-11-21T10:41:07.879Z",
    "toca": [
     "telas"
    ],
