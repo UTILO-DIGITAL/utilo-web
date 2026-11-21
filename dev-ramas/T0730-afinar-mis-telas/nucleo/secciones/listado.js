@@ -491,6 +491,7 @@
       palabras: Array.isArray(d.palabras) && d.palabras.length >= 2 ? d.palabras : null,
       ir: d.ir && d.ir.seccion ? { seccion: String(d.ir.seccion), texto: d.ir.texto || '' } : null, // T0651: un «de» que lleva a su fila
       genero: d.genero === 'f' ? 'f' : '', // T0724 (R38): «Todas» en su filtro (Fase, Prioridad)
+      siVacio: d.siVacio ? String(d.siVacio) : '', // T0731 (R67, R71): lo que dice en una lista si está vacío («Contacto», «Sin nada pendiente»)
       soloAlta: !!d.soloAlta }; // T0651: se elige al dar de alta y después no se cambia (el diseño de una tela: su código sale de él)
   }
   /** T0642 · Un valor como se enseña: sin el número de delante («1 Contactado» → «Contactado», con «sinNumero») y con su
@@ -628,14 +629,30 @@
     });
     return a;
   }
-  /** T0641 · Los campos que nombra una plantilla («Hoy {PRECIO_A_BATIR}[ ({ID_COMPETIDOR})]»). */
-  function enPlantilla(p) { var r = [], m, re = /\{([^{}]+)\}/g; while ((m = re.exec(String(p)))) r.push(m[1]); return r; }
+  /** T0641 · Los campos que nombra una plantilla («Hoy {PRECIO_A_BATIR}[ ({ID_COMPETIDOR})]»). T0731: también las de cada caso y su «segun». */
+  function enPlantilla(p) {
+    if (p && typeof p === 'object') { var t = [p.segun]; plantillasDe(p).forEach(function (x) { t = t.concat(enPlantilla(x)); }); return t.filter(Boolean); }
+    var r = [], m, re = /\{([^{}]+)\}/g; while ((m = re.exec(String(p)))) r.push(m[1]); return r;
+  }
+  /** T0731 · Las plantillas de una plantilla por casos: las de «casos» y la de «otro». */
+  function plantillasDe(p) { return Object.keys((p && p.casos) || {}).map(function (k) { return p.casos[k]; }).concat(p && p.otro ? [p.otro] : []); }
+  /**
+   * T0731 (R19) · La plantilla que toca a una fila: un texto, tal cual; o { "segun": "ID_TIPO_PRECIO", "casos": { "Objetivo":
+   * "Su objetivo: {…}", "Catálogo": "En catálogo…" }, "otro": "Hoy paga {…}" }, la del caso que dice ese campo de la fila (como
+   * se ve, sin mayúsculas ni tildes) y, si no es ninguno o está vacío, «otro» (sin «otro», nada).
+   */
+  function plantillaPara(p, f) {
+    if (!p || typeof p !== 'object') return p || '';
+    var v = norm(f ? f[p.segun] : ''), k = Object.keys(p.casos || {}).filter(function (x) { return v && norm(x) === v; })[0];
+    return k !== undefined ? p.casos[k] : (p.otro || '');
+  }
   /**
    * T0641 · Una plantilla rellenada: cada {CAMPO}, como se ve (con su unidad; un calculado que no da número, vacío). Lo que va
    * entre [corchetes] solo sale si todo lo de dentro tiene algo; si algo de fuera está vacío, toda la plantilla queda vacía.
    */
   function rellenar(ap, p, f, valores) {
     var hueco = false;
+    p = plantillaPara(p, f);
     function poner(t) {
       return t.replace(/\{([^{}]+)\}/g, function (x, c) {
         var cp = campo(ap, c), v = cp.calculo && isNaN(calcular(cp.calculo, f, valores)) ? '' : (cp.plantilla ? '' : verTexto(cp, f, valores, []));
@@ -949,6 +966,11 @@
       if (r.nueva && !r.seccion) errores.push(donde + q + ': «nueva» necesita la sección a la que lleva (seccion).');
       // T0724: «seccion» por fila, una lista de secciones o de { id, si }.
       if (r.seccion && typeof r.seccion !== 'string' && seccionesRel(r).length !== lista(r.seccion).length) errores.push(donde + q + ': cada «seccion» es el nombre de una sección o { "id", "si" }.');
+      // T0731 (R68): «tras», el título de un apartado de FICHA, para salir justo detrás de él; sin edición dentro (va en el formulario).
+      if (r.tras !== undefined && !(ap.ficha || []).some(function (g) { return g && g.titulo === r.tras; })) errores.push(donde + q + ': «tras» es el título de un apartado de FICHA («' + r.tras + '» no lo es).');
+      if (r.tras !== undefined && (r.editar || r.crear || r.quitar)) errores.push(donde + q + ': con «tras» no se edita desde la ficha.');
+      // T0731 (R19): una plantilla por casos dice según qué campo y trae algún caso.
+      Object.keys(r.campos || {}).forEach(function (c) { var pl = r.campos[c].plantilla; if (pl && typeof pl === 'object' && (!pl.segun || !plantillasDe(pl).length)) errores.push(donde + q + ': la plantilla de ' + c + ' por casos necesita «segun» y algún caso.'); });
       // T0641: en una «tarjeta», cada campo es una columna de esa tabla, una ruta o uno de sus «campos» (calculado, plantilla, «de»).
       if (cs && r.tarjeta) camposTarjeta(r).forEach(function (c) {
         var d = (r.campos || {})[c];
@@ -1186,6 +1208,14 @@
   function avisosActivos(ap, vista) {
     return (ap.avisos || []).filter(function (a) { return a.activo !== false && (!vista || !a.vistas || lista(a.vistas).indexOf(vista.id) >= 0); });
   }
+  /** T0731 (R69) · Una vista con «"marcas": false» no pone el nombre de su aviso en cada fila: ya lo dicen los botones de arriba (la franja de color sigue). */
+  function sinMarcas(vista) { return !!(vista && vista.marcas === false); }
+  /** T0727 (R21) · Los avisos de la barra de arriba: en una vista agrupada por el plazo de una fecha, sin los que solo miran
+   *  esa fecha («Con la fecha pasada», «Es para hoy», «Sin fecha»): ya son un grupo de la lista, con su número. */
+  function avisosBarra(ap, vista) {
+    var g = vista && vista.agrupar, c = g && g.por === 'plazo' ? g.campo : '';
+    return avisosActivos(ap, vista).filter(function (a) { var cs = lista(a.si); return !c || !cs.length || !cs.every(function (x) { return x && x.campo === c; }); });
+  }
   /** Los avisos que tiene una fila, en el orden del apartado (con vista, solo los de esa vista). */
   function avisosDe(ap, f, hoy, vista) {
     return avisosActivos(ap, vista).filter(function (a) { return cumple(f, a.si, { hoy: hoy, dias: a.dias === undefined ? 7 : a.dias }); });
@@ -1373,7 +1403,7 @@
   var PLAZOS = [
     { id: 'pasado', titulo: 'Con la fecha pasada', hasta: -1 },
     { id: 'hoy', titulo: 'Hoy', desde: 0, hasta: 0 },
-    { id: 'semana', titulo: 'Próximos 7 días', desde: 1, hasta: 7 },
+    { id: 'semana', titulo: 'Esta semana', desde: 1, hasta: 7 }, // T0727 (R21): como en el Excel de Telas
     { id: 'luego', titulo: 'Más adelante', desde: 8 },
     { id: 'sin', titulo: 'Sin fecha' }
   ];
@@ -1565,7 +1595,7 @@
   function sinRepetir(avs, tituloGrupo, campoPlazo) {
     var t = String(tituloGrupo || '').trim().toLowerCase();
     var r = t ? avs.filter(function (x) { return String(x.titulo || '').trim().toLowerCase() !== t; }) : avs;
-    // T0642: agrupado por el plazo de una fecha («Hoy», «Próximos 7 días»), un aviso que solo mira esa fecha («Es para
+    // T0642: agrupado por el plazo de una fecha («Hoy», «Esta semana»), un aviso que solo mira esa fecha («Es para
     // hoy») ya lo dice su grupo. La franja de color de la fila sigue.
     if (t && campoPlazo) r = r.filter(function (x) { var cs = lista(x.si); return !cs.length || !cs.every(function (c) { return c && c.campo === campoPlazo; }); });
     return r;
@@ -1786,22 +1816,26 @@
   /**
    * T0692 · «Sus ventas» en la ficha: lo que dice de un vistazo (la última, lo de este año y lo que debe) y cada venta, que
    * abre su sección (o.seccion, o.va: su título si quien mira la ve) con ella (?venta=). q: las de ventasPorQuien de Economía
-   * de esta fila; undefined, aún no han llegado («Mirando sus ventas…»); null o sin ventas, nada. o: { titulo, seccion, va, max, hoy }.
+   * de esta fila; undefined, aún no han llegado («Mirando sus ventas…»); null o sin ventas, nada. o: { titulo, seccion, va, max, hoy, nombre }.
+   * T0726 (R26) · nombre: cómo se llaman allí («pedido» en Telas; vacío, «venta»), para que diga lo mismo en todas partes.
    */
   function htmlVentas(q, o) {
-    var tit = texto(o.titulo || 'Sus ventas');
-    if (q === undefined) return '<section class="li-fgrupo"><h3 class="li-fg-t">' + tit + '</h3><p class="u-nota">Mirando sus ventas…</p></section>';
+    var uno = String(o.nombre || 'venta').toLowerCase(), varios = /[aeiouáéó]$/.test(uno) ? uno + 's' : uno + 'es', f = /a$/.test(uno);
+    var tit = texto(o.titulo || 'Sus ' + varios);
+    if (q === undefined) return '<section class="li-fgrupo"><h3 class="li-fg-t">' + tit + '</h3><p class="u-nota">Mirando sus ' + texto(varios) + '…</p></section>';
     if (!q || !q.ventas || !q.ventas.length) return '';
     var eur = function (c) { return num(c / 100, c % 100 ? 2 : 0) + ' €'; };
-    var partes = ['Última venta ' + (cuando(q.ultima, o.hoy) || fechaCorta(q.ultima))];
-    if (q.enAnio) partes.push(q.anio ? eur(q.anio) + ' este año' : (q.enAnio === 1 ? '1 venta' : q.enAnio + ' ventas') + ' este año, sin precio cerrado');
-    var debe = q.debe > 0 ? '<span class="u-mal">Te debe ' + eur(q.debe) + '</span>' : (q.sinPrecio ? 'Sin precio cerrado en ' + (q.sinPrecio === 1 ? 'una' : q.sinPrecio) : '<span class="u-bien">Al día</span>');
+    var partes = [(f ? 'Última ' : 'Último ') + uno + ' ' + (cuando(q.ultima, o.hoy) || fechaCorta(q.ultima))];
+    if (q.enAnio) partes.push(q.anio ? eur(q.anio) + ' este año' : (q.enAnio === 1 ? '1 ' + uno : q.enAnio + ' ' + varios) + ' este año, sin precio cerrado');
+    var debe = q.debe > 0 ? '<span class="u-mal">Te debe ' + eur(q.debe) + '</span>' : (q.sinPrecio ? 'Sin precio cerrado en ' + (q.sinPrecio === 1 ? (f ? 'una' : 'uno') : q.sinPrecio) : '<span class="u-bien">Al día</span>');
+    // El paso, concordando con la palabra: «Pedido», «Cobrado».
+    var paso = function (t) { return f ? String(t || '') : String(t || '').replace(/^(Pedid|Cobrad|Entregad|Pagad|Facturad)a\b/, '$1o'); };
     var sec = String(o.seccion || ''), va = o.va, max = o.max || 10;
     return '<section class="li-fgrupo li-ventas"><h3 class="li-fg-t">' + tit + ' <span class="u-cifra">' + q.ventas.length + '</span></h3>' +
       '<p class="li-ven-res">' + partes.map(texto).join(' · ') + ' · ' + debe + '</p><ul class="li-rel">' + q.ventas.slice(0, max).map(function (x) {
-        var paso = x.paso + (x.fechaPaso ? ' ' + fechaCorta(x.fechaPaso) : ''), extra = x.cobrada || x.adelantado ? (x.importe !== null ? eur(x.importe) : '') :
+        var pasoT = paso(x.paso) + (x.fechaPaso ? ' ' + fechaCorta(x.fechaPaso) : ''), extra = x.cobrada || x.adelantado ? (x.importe !== null ? eur(x.importe) : '') :
           (x.debe === null ? 'Sin precio cerrado' : x.debe > 0 ? 'Te debe ' + eur(x.debe) : '');
-        var dentro = '<span class="li-rel-n">' + texto(x.v.NOMBRE || x.v.ID) + '</span><span>' + texto(paso) + '</span>' +
+        var dentro = '<span class="li-rel-n">' + texto(x.v.NOMBRE || x.v.ID) + '</span><span>' + texto(pasoT) + '</span>' +
           (extra ? '<span' + (x.debe > 0 && !x.cobrada && !x.adelantado ? ' class="u-mal"' : '') + '>' + texto(extra) + '</span>' : '');
         return '<li>' + (va ? '<a class="li-rel-f" href="?s=' + encodeURIComponent(sec.toLowerCase()) + '&venta=' + encodeURIComponent(x.v.ID) + '" data-sx="' + texto(sec) + '">' + dentro + '<span class="li-ir">' + texto(va) + ' ›</span></a>' : '<div class="li-rel-f">' + dentro + '</div>') + '</li>';
       }).join('') + '</ul>' + (q.ventas.length > max ? '<p class="u-nota">Y ' + (q.ventas.length - max) + ' más, en ' + texto(va || 'Pedidos') + '.</p>' : '') + '</section>';
@@ -1925,8 +1959,9 @@
     return lista(r && r.seccion).map(function (s) { return typeof s === 'string' ? { id: s, si: [] } : { id: String((s && s.id) || ''), si: lista(s && s.si) }; }).filter(function (s) { return s.id; });
   }
   function seccionDeFila(r, x, veo) {
-    var crudo = (x && x.__crudo) || x || {};
-    var s = seccionesRel(r).filter(function (y) { return (!y.si.length || cumple(crudo, y.si, {})) && (!veo || veo[y.id.toUpperCase()]); })[0];
+    // T0731 (R18): las condiciones miran la fila como se ve («Hecha», «Nota»), no la de verdad (sus códigos: EST04, TSE03).
+    var f = x || {};
+    var s = seccionesRel(r).filter(function (y) { return (!y.si.length || cumple(f, y.si, {})) && (!veo || veo[y.id.toUpperCase()]); })[0];
     return s ? s.id.toUpperCase() : '';
   }
   /**
@@ -2039,12 +2074,12 @@
   /** T0651 · La palabra pequeña junto a la etiqueta de lo que no se edita en una ficha que sí: «calculado» o la del «ir» de un «de». */
   function sufijoFijo(cp) { return cp.calculo ? 'calculado' : (cp.de && cp.ir && cp.ir.texto ? String(cp.ir.texto) : ''); }
 
-  var CALC = { pctVer: pctVer, pctEscrito: pctEscrito, deEscrito: deEscrito, nuevoId: nuevoId, altaNuevoDe: altaNuevoDe, codigoAltaNuevo: codigoAltaNuevo, plantillaPrefijo: plantillaPrefijo, codigoNuevo: codigoNuevo, esRuta: esRuta, destinoDe: destinoDe, avisoRuta: avisoRuta, borrarDe: borrarDe, queBorra: queBorra, borrarCon: borrarCon, seccionDeFila: seccionDeFila, sinComunes: sinComunes, palabraTodos: palabraTodos, yaEsta: yaEsta, yaPuestos: yaPuestos, esSoporte: esSoporte, htmlErrores: htmlErrores, cuantas: cuantas, yJuntos: yJuntos, relEdicion: relEdicion, altaRelacionada: altaRelacionada, paraElegir: paraElegir, sufijoFijo: sufijoFijo,
+  var CALC = { pctVer: pctVer, pctEscrito: pctEscrito, deEscrito: deEscrito, nuevoId: nuevoId, altaNuevoDe: altaNuevoDe, codigoAltaNuevo: codigoAltaNuevo, plantillaPrefijo: plantillaPrefijo, codigoNuevo: codigoNuevo, esRuta: esRuta, destinoDe: destinoDe, avisoRuta: avisoRuta, borrarDe: borrarDe, queBorra: queBorra, borrarCon: borrarCon, seccionDeFila: seccionDeFila, seccionesRel: seccionesRel, plantillaPara: plantillaPara, sinMarcas: sinMarcas, sinComunes: sinComunes, palabraTodos: palabraTodos, yaEsta: yaEsta, yaPuestos: yaPuestos, esSoporte: esSoporte, htmlErrores: htmlErrores, cuantas: cuantas, yJuntos: yJuntos, relEdicion: relEdicion, altaRelacionada: altaRelacionada, paraElegir: paraElegir, sufijoFijo: sufijoFijo,
     fechaDia: fechaDia, webCorta: webCorta, webSitio: webSitio, textoCorto: textoCorto, gruposConQuien: gruposConQuien, nombreCorto: nombreCorto, deshacerEnOrden: deshacerEnOrden, loDiceUnAviso: loDiceUnAviso, contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
     textoVuelta: textoVuelta, QUITAR_DE_VUELTA: QUITAR_DE_VUELTA, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, franja: franja, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, resumenCifras: resumenCifras, arribaDe: arribaDe, filasArriba: filasArriba, rangoFechas: rangoFechas, lineaArriba: lineaArriba, cifrasResumen: cifrasResumen, seguirCrudo: seguirCrudo, tablasDeRuta: tablasDeRuta, conCamposPropios: conCamposPropios, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, vistaDeFila: vistaDeFila, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, recomendacionDe: recomendacionDe, camposCond: camposCond, irA: irA, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir, valorCon: valorCon, columnasCon: columnasCon, cambioCampo: cambioCampo, textoCambio: textoCambio, miasDe: miasDe, equipoLimpio: equipoLimpio, hayMias: hayMias, esMia: esMia, nombrePara: nombrePara, conEquipo: conEquipo,
-    avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
+    avisosDe: avisosDe, avisosActivos: avisosActivos, avisosBarra: avisosBarra, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
     relacionadas: relacionadas, juntarDe: juntarDe, partes: partes, verTexto: verTexto, rellenar: rellenar, enPlantilla: enPlantilla, veRelacionado: veRelacionado, expandir: expandir, camposTarjeta: camposTarjeta, desglose: desglose, cuando: cuando, comparar: comparar,
     filtrables: filtrables, aIntervalo: aIntervalo, cumpleFiltros: cumpleFiltros, filtrosQueValen: filtrosQueValen, textoFiltro: textoFiltro, sinVentas: sinVentas, deVentas: deVentas, sinCampos: sinCampos, htmlVentas: htmlVentas,
     compararCampo: compararCampo, siguienteOrden: siguienteOrden, plegados: plegados, POR_GRUPO: POR_GRUPO, POR_COLUMNA: POR_COLUMNA, EN_FICHA: EN_FICHA };
@@ -2166,7 +2201,7 @@
       var VENTAS = cfg.VENTAS && cfg.VENTAS.seccion ? cfg.VENTAS : null, venSec = VENTAS ? String(VENTAS.seccion).toUpperCase() : '';
       /** «Sus ventas» de una fila (vacío si no tiene; «Mirando…» mientras no han llegado). */
       function htmlVentasDe(crudo, hoy) {
-        return htmlVentas(D.ventas ? D.ventas[String(crudo[BASE.clave])] || null : undefined, { titulo: VENTAS.titulo, seccion: venSec, va: veo[venSec], max: VENTAS.max, hoy: hoy });
+        return htmlVentas(D.ventas ? D.ventas[String(crudo[BASE.clave])] || null : undefined, { titulo: VENTAS.titulo, nombre: VENTAS.nombre, seccion: venSec, va: veo[venSec], max: VENTAS.max, hoy: hoy });
       }
       /** Las ventas de cada fila, de su sección (sin abrirla). Al llegar, la lista (Última venta) y la ficha abierta las enseñan. */
       function leerVentas() {
@@ -2188,7 +2223,8 @@
       function celda(a, c, f, conEnlaces, cliente) {
         var cp = campo(a, c), t = verTexto(cp, f, VAL, PROHIB), enTabla = conEnlaces === 'tabla';
         if (c === a.codigo && t) return '<span class="li-cod">' + texto(t) + '</span>';
-        if (t === '') return '<span class="li-nada">—</span>';
+        // T0731 (R67, R71): en una lista (no en los datos de la ficha), lo vacío con «siVacio» lo dice en palabras, en suave.
+        if (t === '') return cp.siVacio && conEnlaces !== true ? '<span class="li-sinvalor">' + texto(cp.siVacio) + '</span>' : '<span class="li-nada">—</span>';
         // T0679: en la lista, lo de siempre («Tarea», «Pendiente») no se repite en cada fila: solo sale lo que es distinto.
         if (conEnlaces !== true && cp.comun && lista(cp.comun).indexOf(t) >= 0) return '<span class="li-nada li-comun"></span>';
         var v = f[c];
@@ -2297,7 +2333,7 @@
           html += '<p class="li-cliente">Vista para enseñar a un cliente: sin avisos y sin ' + (nombres.length ? nombres.map(function (t) { return t.toLowerCase(); }).join(', ').replace(/, ([^,]*)$/, ' ni $1') : 'los datos privados') + '.</p>';
         }
         var deVista = filtrar(a, vista, todas, { hoy: hoy });
-        var avs = vista.cliente ? [] : avisosActivos(a, vista).map(function (x) { return { a: x, n: filtrar(a, vista, todas, { hoy: hoy, aviso: x.id }).length }; }).filter(function (x) { return x.n; });
+        var avs = vista.cliente ? [] : avisosBarra(a, vista).map(function (x) { return { a: x, n: filtrar(a, vista, todas, { hoy: hoy, aviso: x.id }).length }; }).filter(function (x) { return x.n; });
         if (S.aviso && !avs.some(function (x) { return x.a.id === S.aviso; })) S.aviso = '';
         // T0625: los filtros que no valen en esta vista (una columna que no se ve, lo privado en la de clientes) se quitan.
         var disp = filtrables(a, vista, deVista, VAL);
@@ -2542,12 +2578,12 @@
         m.style.top = (r.bottom + 4 + h > window.innerHeight - 8 ? r.top - h - 4 : r.bottom + 4) + 'px';
       }
       function tarjeta(a, f, det, cli, hoy, arrastrar, tituloGrupo, foto, plazo, rap, vista) {
-        var avs = cli ? [] : avisosDe(a, f, hoy, vista), mar = sinRepetir(avs, tituloGrupo, plazo);
+        var avs = cli ? [] : avisosDe(a, f, hoy, vista), mar = sinMarcas(vista) ? [] : sinRepetir(avs, tituloGrupo, plazo);
         // T0652: con quién es, debajo de la tarjeta y aparte, para abrir su resumen (en el tablero, no: ahí se arrastra).
         var cx = !cli && !arrastrar && a.contexto && contextoCol(a, f.__crudo) ? a.contexto.campo : '';
         if (cx) det = det.filter(function (x) { return x !== cx; });
         // T0601: en la tarjeta, lo vacío no sale (una prospección sin estado ni nota no enseña «— —»).
-        var dets = det.filter(function (x) { return x !== foto; }).map(function (x) { return fechaAviso(a, x, celda(a, x, f, false, cli), avs); }).filter(function (h) { return h.indexOf('class="li-nada"') < 0; })
+        var dets = det.filter(function (x) { return x !== foto; }).map(function (x) { return fechaAviso(a, x, celda(a, x, f, false, cli), avs); }).filter(function (h) { return h.indexOf('class="li-nada"') < 0 && h.indexOf('class="li-sinvalor"') < 0; }) // T0731: «Sin nada pendiente», tampoco
           // T0677: lo que ya dice un aviso de la tarjeta no sale dos veces («Esperando respuesta» y «Esperando respuesta hace días»).
           .filter(function (h) { return !loDiceUnAviso(h.replace(/<[^>]*>/g, ''), mar); });
         // T0633: con foto, a la izquierda (sin foto, un hueco igual, para que los nombres caigan en línea).
@@ -2585,7 +2621,7 @@
         // T0690: cada grupo, en trozos: lo pendiente (50 y «Ver más»), lo hecho plegado (50 y «Ver más») y lo de antes.
         var trozos = gs.map(function (g) { return trozosDe(vista, g, hoy); });
         var fila = function (f, g) {
-          var avs = cli ? [] : avisosDe(a, f, hoy, vista), mar = sinRepetir(avs, g.titulo, plazo), r = (conCi || conPa) && rapidaEn(a, f, hoy);
+          var avs = cli ? [] : avisosDe(a, f, hoy, vista), mar = sinMarcas(vista) ? [] : sinRepetir(avs, g.titulo, plazo), r = (conCi || conPa) && rapidaEn(a, f, hoy);
           // T0677: en la tabla, el estado tiene su columna: el aviso que solo lo repite («Esperando respuesta hace días») no sale
           // (la fecha ya va en rojo con «hace 9 días»). En la tarjeta del móvil es al revés: se queda el aviso y se quita la etiqueta.
           var vistos = conCod.filter(function (c) { return c !== nom; }).map(function (c) { return verTexto(campo(a, c), f, VAL, PROHIB); });
@@ -2902,9 +2938,11 @@
             (mas.length ? '<details class="li-mas"><summary>Más: ' + texto(mas.map(function (c) { return campo(a, c).titulo.toLowerCase(); }).join(', ').replace(/, ([^,]*)$/, ' y $1')) + '</summary><div class="u-campos">' +
               mas.map(function (c) { return entradaAlta(a, c, crudo, ed, hoy); }).join('') + '</div></details>' : '');
         } else {
-          h += '<form id="li-form" class="li-form" novalidate>' + grupos.map(function (g) {
+          h += '<form id="li-form" class="li-form" novalidate>' + grupos.map(function (g, gi) {
             // Para enseñar a un cliente, la ficha enseña solo lo que enseña su vista (ni marcas interesadas ni muestras).
-            return apartadoFicha(g.titulo, (g.campos || []).filter(function (c) { return fuera.indexOf(c) < 0 && sinMias(c) && c !== a.codigo && !(nomTit && c === a.nombre) && (nueva ? ed.indexOf(c) >= 0 : true) && (!cli || columnasDe(a, vista).indexOf(c) >= 0); }));
+            // T0731 (R68): detrás de cada apartado, su sitio para lo relacionado que va «tras» él (se rellena abajo).
+            return apartadoFicha(g.titulo, (g.campos || []).filter(function (c) { return fuera.indexOf(c) < 0 && sinMias(c) && c !== a.codigo && !(nomTit && c === a.nombre) && (nueva ? ed.indexOf(c) >= 0 : true) && (!cli || columnasDe(a, vista).indexOf(c) >= 0); })) +
+              (nueva || cli ? '' : '<!--li-tras-' + gi + '-->'); // T0731 (R68): el sitio de lo relacionado que va «tras» este apartado
           }).join('');
           // Lo que se edita y no está en ningún apartado de la ficha, al final.
           // T0642: lo que cambia un botón de ACCIONES («Pasar a Clientes») no sale como campo.
@@ -3016,8 +3054,13 @@
           if (resto > 0) cuerpo += '<button type="button" class="li-vermas li-vertodo" data-ver-todo>Ver todo <span class="u-nota">· ' + num(rs.length) + ' en total</span></button>';
           // T0651: «+ Añadir persona de contacto» (o eligiendo: «+ Añadir tela que le interesa»), aquí mismo.
           var an = conEd && e.crear && !(e.clave === r.campo && rs.length) ? '<button type="button" class="li-rel-anadir" data-rel-nueva>+ Añadir ' + texto(e.filas[0]) + '</button>' : '';
-          h += '<section class="li-fgrupo"' + (conEd ? ' data-rel="' + ri + '"' : '') + '>' + cab + cuerpo + an + nv + '</section>';
+          var secH = '<section class="li-fgrupo"' + (conEd ? ' data-rel="' + ri + '"' : '') + '>' + cab + cuerpo + an + nv + '</section>';
+          // T0731 (R68): con «tras», justo detrás de ese apartado de la ficha («Su seguimiento», tras «En qué punto está»); si no
+          // está (la vista para un cliente, un alta), en su sitio de siempre.
+          var gTras = r.tras === undefined ? -1 : grupos.map(function (g) { return g.titulo; }).indexOf(r.tras), marca = '<!--li-tras-' + gTras + '-->';
+          if (gTras >= 0 && h.indexOf(marca) >= 0) h = h.replace(marca, function () { return secH + marca; }); else h += secH;
         });
+        h = h.replace(/<!--li-tras-\d+-->/g, '');
         // T0630: «Copiar para Claude», al final: arriba va lo que se decide. T0642: dentro de «Más», que no es para el día a día.
         // T0689: con lo que cambia la fila de ACCIONES («Pasar a Prospección»), también sin código.
         // T0651: borrar, lo último (lejos de lo del día a día).
