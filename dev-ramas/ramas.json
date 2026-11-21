@@ -1248,11 +1248,11 @@
   "T0739-lineas-pedido": {
    "tarea": "T0739",
    "titulo": "Las telas de cada pedido con su envío, y el anticipo desde la ficha de la marca",
-   "pr": null,
+   "pr": 422,
    "commit": "b9c4c7ce",
    "ultimo": "T0739: Las telas de cada pedido con su envío, y el anticipo desde la ficha de la marca",
    "quien": "Javi Canela",
-   "fecha": "2026-11-21T00:58:40.626Z",
+   "fecha": "2026-11-21T06:59:07.331Z",
    "toca": [
     "telas"
    ],
