@@ -1641,6 +1641,15 @@
    "quien": "Javi Canela",
    "rama": "T0734-proveedores-portatil",
    "carpeta": "T0734-proveedores-portatil"
+  },
+  "DEV-3": {
+   "cliente": "telas",
+   "modo": "ejemplo",
+   "commit": "e4e0f2b7",
+   "subido": "21/11/26, 1:43",
+   "quien": "Javi Canela",
+   "rama": "T0737-estado-muestras",
+   "carpeta": "T0737-estado-muestras"
   }
  }
 }
