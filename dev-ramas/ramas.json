@@ -1346,6 +1346,15 @@
    "quien": "Javi Canela",
    "rama": "T0733-economia-gestoria",
    "carpeta": "T0733-economia-gestoria"
+  },
+  "DEV-2": {
+   "cliente": "telas",
+   "modo": "ejemplo",
+   "commit": "76879ebf",
+   "subido": "21/11/26, 1:56",
+   "quien": "Javi Canela",
+   "rama": "T0732-listas-como-app",
+   "carpeta": "T0732-listas-como-app"
   }
  }
 }
