@@ -961,14 +961,16 @@
   },
   "T0747-anticipos-rectificativas": {
    "tarea": "T0747",
-   "titulo": "Merge pull request #426 from UTILO-DIGITAL/T0743-partir-listado",
+   "titulo": "Factura del anticipo desde el pedido y rectificativas en serie FR.",
    "pr": null,
-   "commit": "402a0373",
-   "ultimo": "Merge pull request #426 from UTILO-DIGITAL/T0743-partir-listado",
+   "commit": "81c79a9a",
+   "ultimo": "T0747: Factura del anticipo desde el pedido y rectificativas en serie FR.",
    "quien": "Javi Canela",
-   "fecha": "2026-11-21T08:27:11.096Z",
-   "toca": [],
-   "comun": false,
+   "fecha": "2026-11-21T08:28:05.475Z",
+   "toca": [
+    "telas"
+   ],
+   "comun": true,
    "paginas": [
     {
      "ruta": "dev/konamigas/",
@@ -1132,7 +1134,7 @@
        "nombre": "Admin"
       }
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/",
@@ -1149,7 +1151,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/catalogo/",
@@ -1164,7 +1166,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     }
    ],
    "migraciones": {
