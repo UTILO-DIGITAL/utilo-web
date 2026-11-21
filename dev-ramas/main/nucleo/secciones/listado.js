@@ -1182,6 +1182,12 @@
   function avisosActivos(ap, vista) {
     return (ap.avisos || []).filter(function (a) { return a.activo !== false && (!vista || !a.vistas || lista(a.vistas).indexOf(vista.id) >= 0); });
   }
+  /** T0727 (R21) · Los avisos de la barra de arriba: en una vista agrupada por el plazo de una fecha, sin los que solo miran
+   *  esa fecha («Con la fecha pasada», «Es para hoy», «Sin fecha»): ya son un grupo de la lista, con su número. */
+  function avisosBarra(ap, vista) {
+    var g = vista && vista.agrupar, c = g && g.por === 'plazo' ? g.campo : '';
+    return avisosActivos(ap, vista).filter(function (a) { var cs = lista(a.si); return !c || !cs.length || !cs.every(function (x) { return x && x.campo === c; }); });
+  }
   /** Los avisos que tiene una fila, en el orden del apartado (con vista, solo los de esa vista). */
   function avisosDe(ap, f, hoy, vista) {
     return avisosActivos(ap, vista).filter(function (a) { return cumple(f, a.si, { hoy: hoy, dias: a.dias === undefined ? 7 : a.dias }); });
@@ -1369,7 +1375,7 @@
   var PLAZOS = [
     { id: 'pasado', titulo: 'Con la fecha pasada', hasta: -1 },
     { id: 'hoy', titulo: 'Hoy', desde: 0, hasta: 0 },
-    { id: 'semana', titulo: 'Próximos 7 días', desde: 1, hasta: 7 },
+    { id: 'semana', titulo: 'Esta semana', desde: 1, hasta: 7 }, // T0727 (R21): como en el Excel de Telas
     { id: 'luego', titulo: 'Más adelante', desde: 8 },
     { id: 'sin', titulo: 'Sin fecha' }
   ];
@@ -1561,7 +1567,7 @@
   function sinRepetir(avs, tituloGrupo, campoPlazo) {
     var t = String(tituloGrupo || '').trim().toLowerCase();
     var r = t ? avs.filter(function (x) { return String(x.titulo || '').trim().toLowerCase() !== t; }) : avs;
-    // T0642: agrupado por el plazo de una fecha («Hoy», «Próximos 7 días»), un aviso que solo mira esa fecha («Es para
+    // T0642: agrupado por el plazo de una fecha («Hoy», «Esta semana»), un aviso que solo mira esa fecha («Es para
     // hoy») ya lo dice su grupo. La franja de color de la fila sigue.
     if (t && campoPlazo) r = r.filter(function (x) { var cs = lista(x.si); return !cs.length || !cs.every(function (c) { return c && c.campo === campoPlazo; }); });
     return r;
@@ -2038,7 +2044,7 @@
     textoVuelta: textoVuelta, QUITAR_DE_VUELTA: QUITAR_DE_VUELTA, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, resumenCifras: resumenCifras, arribaDe: arribaDe, filasArriba: filasArriba, rangoFechas: rangoFechas, lineaArriba: lineaArriba, cifrasResumen: cifrasResumen, seguirCrudo: seguirCrudo, tablasDeRuta: tablasDeRuta, conCamposPropios: conCamposPropios, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, vistaDeFila: vistaDeFila, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, recomendacionDe: recomendacionDe, camposCond: camposCond, irA: irA, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir, valorCon: valorCon, columnasCon: columnasCon, cambioCampo: cambioCampo, textoCambio: textoCambio, miasDe: miasDe, equipoLimpio: equipoLimpio, hayMias: hayMias, esMia: esMia, nombrePara: nombrePara, conEquipo: conEquipo,
-    avisosDe: avisosDe, avisosActivos: avisosActivos, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
+    avisosDe: avisosDe, avisosActivos: avisosActivos, avisosBarra: avisosBarra, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
     relacionadas: relacionadas, juntarDe: juntarDe, partes: partes, verTexto: verTexto, rellenar: rellenar, enPlantilla: enPlantilla, veRelacionado: veRelacionado, expandir: expandir, camposTarjeta: camposTarjeta, desglose: desglose, cuando: cuando, comparar: comparar,
     filtrables: filtrables, aIntervalo: aIntervalo, cumpleFiltros: cumpleFiltros, filtrosQueValen: filtrosQueValen, textoFiltro: textoFiltro, sinVentas: sinVentas, deVentas: deVentas, sinCampos: sinCampos, htmlVentas: htmlVentas,
     compararCampo: compararCampo, siguienteOrden: siguienteOrden, plegados: plegados, POR_GRUPO: POR_GRUPO, POR_COLUMNA: POR_COLUMNA, EN_FICHA: EN_FICHA };
@@ -2291,7 +2297,7 @@
           html += '<p class="li-cliente">Vista para enseñar a un cliente: sin avisos y sin ' + (nombres.length ? nombres.map(function (t) { return t.toLowerCase(); }).join(', ').replace(/, ([^,]*)$/, ' ni $1') : 'los datos privados') + '.</p>';
         }
         var deVista = filtrar(a, vista, todas, { hoy: hoy });
-        var avs = vista.cliente ? [] : avisosActivos(a, vista).map(function (x) { return { a: x, n: filtrar(a, vista, todas, { hoy: hoy, aviso: x.id }).length }; }).filter(function (x) { return x.n; });
+        var avs = vista.cliente ? [] : avisosBarra(a, vista).map(function (x) { return { a: x, n: filtrar(a, vista, todas, { hoy: hoy, aviso: x.id }).length }; }).filter(function (x) { return x.n; });
         if (S.aviso && !avs.some(function (x) { return x.a.id === S.aviso; })) S.aviso = '';
         // T0625: los filtros que no valen en esta vista (una columna que no se ve, lo privado en la de clientes) se quitan.
         var disp = filtrables(a, vista, deVista, VAL);
