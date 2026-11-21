@@ -964,7 +964,7 @@
           if (!j.tabla || !j.campo || !j.quien) { errores.push(donde + qj + ' necesita tabla, campo y quien.'); return; }
           var cj = columnasTabla ? columnasTabla(j.tabla) : null;
           if (columnasTabla && !cj) { errores.push(donde + qj + ': la tabla ' + j.tabla + ' no está.'); return; }
-          if (cj) [j.campo, String(j.quien).split('.')[0]].concat(j.cuando ? [String(j.cuando).split('.')[0]] : []).forEach(function (x) { hay(x, qj + ' usa', j.tabla, cj); });
+          if (cj) [j.campo, String(j.quien).split('.')[0]].concat(j.cuando ? [String(j.cuando).split('.')[0]] : [], j.estadoDe ? [String(j.estadoDe).split('.')[0]] : []).forEach(function (x) { hay(x, qj + ' usa', j.tabla, cj); });
           hay(j.con || ap.clave, qj + ' usa');
         });
         return;
@@ -995,6 +995,7 @@
         var e = relEdicion(r);
         if (r.tarjeta || r.contiene || r.juntar) errores.push(donde + q + ': con «' + (r.tarjeta ? 'tarjeta' : r.contiene ? 'contiene' : 'juntar') + '» no se edita desde la ficha.');
         if (cs) e.editar.concat(e.crear ? e.alta : [], e.elegir ? [e.elegir] : [], e.obligatorias).forEach(function (c) { hay(c, q + ' edita', r.tabla, cs); });
+        if (cs) Object.keys(r.poner || {}).forEach(function (c) { hay(c, q + ' pone', r.tabla, cs); }); // T0737
         if (e.crear && !e.elegir && !e.alta.length) errores.push(donde + q + ': «crear» necesita lo que se pide al añadir («alta» o «editar»).');
         if (r.elegir && !r.crear) errores.push(donde + q + ': «elegir» va con «crear».');
         if (r.quitar != null && r.quitar !== true && r.quitar !== false && r.quitar !== 'admin') errores.push(donde + q + ': «quitar» es true o "admin" (solo quien administra).');
@@ -1470,7 +1471,9 @@
    *  hay con él (el orden de juntar: comprada antes que propuesta, propuesta antes que interesada). Cada fuente:
    *  { tabla, campo, con, alFinal, quien, si, estado, color, cuando }: sus filas cuyo «campo» es el «con» de esta (con
    *  «alFinal», el código al final del texto: «… · BOR-004-01», como una línea de factura), que cumplen «si» (rutas
-   *  valen: «ID_FACTURA.TIPO»); «quien», la ruta que dice con quién (su nombre); «cuando», la fecha, la más reciente. */
+   *  valen: «ID_FACTURA.TIPO»); «quien», la ruta que dice con quién (su nombre); «cuando», la fecha, la más reciente.
+   *  T0737: «estadoDe», la columna de esa fila que dice el estado (el de la muestra: «Muestra enviada»), con «estado» si
+   *  está vacía, y «colores», el de cada valor (si no, «color»). */
   function juntarDe(a, D, r, f, filas) {
     var crudo = f.__crudo || f, por = {}, orden = [];
     lista(r.juntar).forEach(function (j, ij) {
@@ -1490,7 +1493,9 @@
         var cu = j.cuando ? ver(x, j.cuando) : '', ya = por[k];
         if (ya && (ya.de !== ij || !(aFecha(cu) && (!aFecha(ya.cuando) || aFecha(cu) > aFecha(ya.cuando))))) return;
         if (!ya) orden.push(k);
-        por[k] = { de: ij, quien: String(q), estado: j.estado || '', color: j.color || '', cuando: cu };
+        var es = j.estadoDe ? ver(x, j.estadoDe) : '';
+        es = vacio(es) ? j.estado || '' : String(es);
+        por[k] = { de: ij, quien: String(q), estado: es, color: (j.colores || {})[es] || j.color || '', cuando: cu };
       });
     });
     return orden.map(function (k) { return por[k]; });
@@ -2058,6 +2063,8 @@
     var e = relEdicion(r), v = {};
     Object.keys(valores || {}).forEach(function (k) { if (!vacio(valores[k])) v[k] = typeof valores[k] === 'string' ? valores[k].trim() : valores[k]; });
     v[r.campo] = (crudo || {})[r.con || 'ID'];
+    // T0737: «poner», lo que lleva siempre una fila nueva si no se ha escrito (la tela que le interesa: «Le interesa»).
+    Object.keys(r.poner || {}).forEach(function (k) { if (vacio(v[k])) v[k] = r.poner[k]; });
     var faltan = e.obligatorias.filter(function (c) { return vacio(v[c]); });
     if (e.id) { var id = nuevoId(e.id, v, existentes); if (id) v[e.clave] = id; else if (!faltan.length) faltan.push(e.clave); }
     return { valores: v, faltan: faltan };
