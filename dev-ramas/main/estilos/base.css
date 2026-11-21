@@ -2810,6 +2810,11 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
   .u .u-velo.li-v-ficha > .u-ventana { max-width: none; height: 100%; overflow-y: auto; border-radius: 0; border-left: 1px solid var(--linea-caja);
     box-shadow: -6px 0 20px color-mix(in srgb, var(--color-texto) 6%, transparent); }
   body.li-partida #sx-panel { padding-right: var(--ancho-ficha); }
+  /* T0732 (R45): con la ficha abierta al lado, «Añadir» de la barra pasa a contorno: lo único lleno es lo de la ficha. */
+  body.li-partida .li-nueva.u-btn-accion { background: var(--color-superficie); color: var(--color-principal-oscuro); border-color: var(--linea-btn); }
+}
+@media (min-width: 1000px) and (hover: hover) {
+  body.li-partida .li-nueva.u-btn-accion:hover:not(:disabled) { border-color: color-mix(in srgb, var(--color-texto) 35%, var(--color-fondo)); filter: none; }
 }
 /* Calcular precio y Economía: las cajas con la misma línea que las listas. */
 .u .pr-caja { border-color: var(--linea-caja); border-radius: var(--radio-caja); }
@@ -2947,8 +2952,8 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
   .sx.u-sx .sx-resto { bottom: calc(100% + 8px); border: 1px solid var(--linea-caja); border-radius: 18px; box-shadow: 0 8px 28px rgba(0, 0, 0, .14); }
 }
 
-/* ---------- T0679 · Mover a otro día, cerrar con contexto y filtros en pastillas ---------- */
-/* «Mover a otro día»: un icono (un calendario con su flecha), sin texto; tenue hasta que se pasa por la fila. */
+/* ---------- T0679 · Pasar a otro día, cerrar con contexto y filtros en pastillas ---------- */
+/* «Pasar a otro día»: un icono (un calendario con su flecha), sin texto; tenue hasta que se pasa por la fila. */
 .u .li-pasar { width: 36px; min-height: 36px; padding: 0; justify-content: center; border-color: transparent; background: transparent; color: var(--color-suave); }
 .u .li-pasar .u-icono { width: 20px; height: 20px; }
 .u .li-pasar[aria-expanded=true] { color: var(--color-principal-oscuro); border-color: var(--linea-btn); background: var(--color-superficie); } @media (hover: hover) { .u .li-pasar:hover { color: var(--color-principal-oscuro); border-color: var(--linea-btn); background: var(--color-superficie); } }

@@ -1222,7 +1222,16 @@
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && $('n-sx-mas') && $('n-sx-mas').getAttribute('aria-expanded') === 'true') { verMas(false); $('n-sx-mas').focus(); } }); // T0629
   try { history.scrollRestoration = 'manual'; } catch (e) {} // T0420: dónde estabas lo pone abrir() (alSitio)
-  window.addEventListener('popstate', function () { if (cred) abrir(pedida() || menu()[0].id, false); });
+  // T0732 (R50): si atrás (o adelante) se queda en la misma sección, se le pregunta antes a ella (def.atras): la ficha abierta
+  // se cierra (o se vuelve a abrir) sin pintar la sección de nuevo. Si no lo resuelve (false), se abre como siempre.
+  window.addEventListener('popstate', function () {
+    if (!cred) return;
+    var id = pedida() || menu()[0].id;
+    if (abierta && abierta.id === id && abierta.def && typeof abierta.def.atras === 'function') {
+      try { if (abierta.def.atras(history.state || {})) return; } catch (e) {}
+    }
+    abrir(id, false);
+  });
 
   /* ---------- arranque ---------- */
 

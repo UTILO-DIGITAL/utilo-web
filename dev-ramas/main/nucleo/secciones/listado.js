@@ -360,6 +360,7 @@
     if (!r || (!r.HECHA && !r.PASAR)) return null;
     var s = r.SIGUIENTE;
     return { hecha: r.HECHA && r.HECHA.campo ? { campo: r.HECHA.campo, valor: r.HECHA.valor } : null, pasar: r.PASAR || '', si: r.SI || [],
+      hoy: !!r.CERRAR_HOY, hablado: r.HABLADO || '', // T0732 (R23, R74)
       siguiente: s && lista(s.con).length ? { con: lista(s.con), copia: lista(s.copia).length ? lista(s.copia) : lista(s.con), pone: s.pone || {} } : null };
   }
   /**
@@ -877,6 +878,13 @@
           if (!ap.crear) errores.push(donde + 'RAPIDAS.SIGUIENTE crea una fila: hace falta CREAR.');
           rp.siguiente.con.concat(rp.siguiente.copia, Object.keys(rp.siguiente.pone)).forEach(function (c) { hay(c, 'RAPIDAS.SIGUIENTE usa'); });
         }
+      }
+      // T0732 (R23): cerrar antes de tiempo deja la fecha de hoy; (R74) lo hablado, en su columna, se pregunta con el siguiente paso.
+      if (rp.hoy && !(rp.hecha && rp.pasar)) errores.push(donde + 'RAPIDAS.CERRAR_HOY pone la fecha de hoy al cerrar: hacen falta HECHA y PASAR.');
+      if (rp.hablado) {
+        hay(rp.hablado, 'RAPIDAS.HABLADO usa');
+        if (!sePuede(rp.hablado)) errores.push(donde + 'RAPIDAS.HABLADO escribe en «' + rp.hablado + '», que no está en EDITAR.');
+        if (!rp.siguiente) errores.push(donde + 'RAPIDAS.HABLADO se pregunta con el siguiente paso: hace falta RAPIDAS.SIGUIENTE.');
       }
     }
     if (puesto(cfg.ALTA) && !ap.alta) errores.push(donde + 'ALTA no dice sus campos (campos).');
@@ -1605,6 +1613,24 @@
     u.set('ficha', id);
     return '?' + u.toString();
   }
+  /** T0732 (R50) · Qué hace la sección cuando atrás (o adelante) se queda en ella. st: la entrada del historial a la que se
+   *  llega (su «fichaLi», la ficha que se abrió desde la lista: su código, o «+» para una nueva); ahora: la ficha abierta ('' si
+   *  ninguna). { hacer: 'cerrar' } (la ficha se cierra y se ve la lista), { hacer: 'abrir', id }, { hacer: 'nada' } (ya está
+   *  como pide), o null: no es cosa de la ficha y el marco abre la sección como siempre. */
+  function queHacerAtras(st, ahora) {
+    var quiere = String((st && st.fichaLi) || ''); ahora = String(ahora || '');
+    if (quiere === ahora) return ahora ? { hacer: 'nada' } : null;
+    if (!quiere) return { hacer: 'cerrar' };
+    return { hacer: 'abrir', id: quiere };
+  }
+  /** T0732 (R50) · La dirección de una ficha que se abre desde la lista: con ?ficha=… (una nueva, sin ficha ni lo de antes). */
+  function dirFicha(search, id, quitar) {
+    if (id !== '+') return conFicha(search, id, quitar);
+    var u = new URLSearchParams(search);
+    ['ficha', 'nueva'].concat(quitar || []).forEach(function (k) { u.delete(k); });
+    var q = u.toString(); return q ? '?' + q : '';
+  }
+  var atrasDe = null; // T0732: lo que hace la sección abierta con atrás (def.atras, que llama el marco)
   // T0642: el nombre de la ficha desde la que se salta a otra (una tela, una tarea, «+ Nueva tarea»), hasta que la abre la
   // sección a la que se va (todas las de Listado comparten este archivo).
   var vueltaPendiente = null;
@@ -1743,6 +1769,27 @@
   function siguienteCon(ap, crudo) {
     var s = ap.rapidas && ap.rapidas.siguiente;
     return s ? s.con.filter(function (c) { return !vacio((crudo || {})[c]); })[0] || '' : '';
+  }
+  /** T0732 (R23) · Lo que cambia al cerrar una fila (la de verdad, con códigos) en un toque: HECHA y, con CERRAR_HOY, si su
+   *  fecha (PASAR) es de después de hoy, hoy (si no, se queda arriba del Historial con «En 6 días»). { cambios, antes }, para
+   *  deshacerlo entero. Una fecha pasada, la de hoy o sin fecha, no se toca. */
+  function cambiosHecha(ap, crudo, hoy) {
+    var r = ap.rapidas, cambios = {}, antes = {}, c = r.hecha.campo, fc = r.pasar;
+    crudo = crudo || {};
+    antes[c] = vacio(crudo[c]) ? '' : crudo[c];
+    cambios[c] = codigoDe(ap, c, r.hecha.valor);
+    var d = r.hoy && fc && !vacio(crudo[fc]) ? aFecha(crudo[fc]) : null, h = aFecha(hoy);
+    if (d && h && isoDe(d) > isoDe(h)) { antes[fc] = crudo[fc]; cambios[fc] = isoDe(h); }
+    return { cambios: cambios, antes: antes };
+  }
+  /** T0732 (R74) · Lo hablado al cerrar una tarea, en su columna (HABLADO): detrás de lo que ya tenía, en otra línea. null si
+   *  no hay nada escrito o la sección no lo pregunta. */
+  function conHablado(ap, crudo, txt) {
+    var c = ap.rapidas && ap.rapidas.hablado, t = String(txt == null ? '' : txt).trim();
+    if (!c || !t) return null;
+    var ya = vacio((crudo || {})[c]) ? '' : String(crudo[c]).trim(), r = {};
+    r[c] = ya ? ya + '\n' + t : t;
+    return r;
   }
   /** DEDUCIR: { DESTINO: { ORIGEN: nombre } }. Lo que se pone solo en una fila (con códigos) que tiene vacío el destino y
    *  algo en un origen: { ID_TEMA: 'TEM01' } (marca → Clientes). Lo que ya tiene algo no se toca. */
@@ -2096,7 +2143,7 @@
   function sufijoFijo(cp) { return cp.calculo ? 'calculado' : (cp.de && cp.ir && cp.ir.texto ? String(cp.ir.texto) : ''); }
 
   var CALC = { pctVer: pctVer, pctEscrito: pctEscrito, deEscrito: deEscrito, nuevoId: nuevoId, altaNuevoDe: altaNuevoDe, codigoAltaNuevo: codigoAltaNuevo, plantillaPrefijo: plantillaPrefijo, codigoNuevo: codigoNuevo, esRuta: esRuta, destinoDe: destinoDe, avisoRuta: avisoRuta, borrarDe: borrarDe, queBorra: queBorra, borrarCon: borrarCon, seccionDeFila: seccionDeFila, seccionesRel: seccionesRel, plantillaPara: plantillaPara, sinMarcas: sinMarcas, sinComunes: sinComunes, palabraTodos: palabraTodos, yaEsta: yaEsta, yaPuestos: yaPuestos, esSoporte: esSoporte, htmlErrores: htmlErrores, cuantas: cuantas, yJuntos: yJuntos, relEdicion: relEdicion, altaRelacionada: altaRelacionada, paraElegir: paraElegir, sufijoFijo: sufijoFijo,
-    fechaDia: fechaDia, webCorta: webCorta, webSitio: webSitio, textoCorto: textoCorto, gruposConQuien: gruposConQuien, nombreCorto: nombreCorto, deshacerEnOrden: deshacerEnOrden, loDiceUnAviso: loDiceUnAviso, contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
+    fechaDia: fechaDia, webCorta: webCorta, webSitio: webSitio, textoCorto: textoCorto, gruposConQuien: gruposConQuien, nombreCorto: nombreCorto, deshacerEnOrden: deshacerEnOrden, loDiceUnAviso: loDiceUnAviso, contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, queHacerAtras: queHacerAtras, dirFicha: dirFicha, cambiosHecha: cambiosHecha, conHablado: conHablado, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
     textoVuelta: textoVuelta, QUITAR_DE_VUELTA: QUITAR_DE_VUELTA, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, franja: franja, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
     valoresDe: valoresDe, resumenCifras: resumenCifras, arribaDe: arribaDe, filasArriba: filasArriba, rangoFechas: rangoFechas, lineaArriba: lineaArriba, cifrasResumen: cifrasResumen, seguirCrudo: seguirCrudo, tablasDeRuta: tablasDeRuta, conCamposPropios: conCamposPropios, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, vistaDeFila: vistaDeFila, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, recomendacionDe: recomendacionDe, camposCond: camposCond, irA: irA, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir, valorCon: valorCon, columnasCon: columnasCon, cambioCampo: cambioCampo, textoCambio: textoCambio, miasDe: miasDe, equipoLimpio: equipoLimpio, hayMias: hayMias, esMia: esMia, nombrePara: nombrePara, conEquipo: conEquipo,
@@ -2136,6 +2183,8 @@
   var teclaEsc = null, alMover = null, alSoltar = null, alCancelar = null, alDesplazar = null, alTocarFuera = null; // oyentes del documento, para quitarlos al cerrar
 
   window.UN.registrar('LISTADO', {
+    // T0732 (R50): el marco pregunta aquí antes de volver a abrir la sección con atrás (true: ya está hecho).
+    atras: function (st) { return atrasDe ? atrasDe(st) : false; },
     abrir: function (el, ctx) {
       // Las secciones a las que se puede ir (las que ve quien ha entrado), para los enlaces de lo relacionado.
       var veo = {}; (ctx.secciones || []).forEach(function (s) { veo[s.id] = s.titulo; });
@@ -2439,10 +2488,8 @@
       function marcarHecha(id) {
         var a = ap(), r = a.rapidas, f = filaVista(a, id);
         if (!f || !r || !r.hecha) return;
-        var crudo = f.__crudo || f, c = r.hecha.campo, antes = {}, cambios = {};
-        antes[c] = vacio(crudo[c]) ? '' : crudo[c];
-        cambios[c] = codigoDe(a, c, r.hecha.valor);
-        var volver = cambioDeshacible(a, id, cambios, antes);
+        var crudo = f.__crudo || f, ch = cambiosHecha(a, crudo, hoyIso()); // T0732 (R23): antes de tiempo, con la fecha de hoy
+        var volver = cambioDeshacible(a, id, ch.cambios, ch.antes);
         var con = siguienteCon(a, crudo);
         if (con) { sinDeshacer(); siguientePaso(a, f, con, volver); }
         else deshacible(r.hecha.valor + ': ' + quien(a, f), volver);
@@ -2457,9 +2504,9 @@
       /** «Otro día…»: una ventana con el calendario. */
       function pasarOtroDia(id) {
         var a = ap(), f = filaVista(a, id); if (!f) return;
-        abrirVentana('<div class="li-ficha-cab"><h2 id="li-vt">Mover a otro día</h2><button type="button" class="u-btn u-btn-icono" data-cerrar aria-label="Cerrar">' + ICONO_X + '</button></div>' +
+        abrirVentana('<div class="li-ficha-cab"><h2 id="li-vt">Pasar a otro día</h2><button type="button" class="u-btn u-btn-icono" data-cerrar aria-label="Cerrar">' + ICONO_X + '</button></div>' +
           '<p class="u-nota">' + texto(quien(a, f)) + '</p><form id="li-fotro" class="li-form" novalidate><div class="u-campo"><label class="u-etiqueta" for="li-otro">Día</label>' +
-          '<input id="li-otro" type="date" value="' + texto(masDias(hoyIso(), 1)) + '"></div><div class="n-botones"><button type="submit" class="u-btn u-btn-accion">Mover</button></div></form>', true);
+          '<input id="li-otro" type="date" value="' + texto(masDias(hoyIso(), 1)) + '"></div><div class="n-botones"><button type="submit" class="u-btn u-btn-accion">Pasar</button></div></form>', true);
         vent.querySelector('#li-fotro').addEventListener('submit', function (ev) {
           ev.preventDefault();
           var v = vent.querySelector('#li-otro').value; if (!v) return;
@@ -2489,7 +2536,11 @@
           '<button type="button" class="u-btn u-btn-icono" data-cerrar aria-label="Volver sin cerrarla" title="Volver sin cerrarla">' + ICONO_X + '</button></div>' +
           ctxSiguiente(a, f, con) +
           '<h2 id="li-vt">¿Cuál es el próximo paso con ' + texto(f[con] || '') + '?</h2>' +
-          '<form id="li-fsig" class="li-form" novalidate><div class="u-campo u-ancho"><label class="u-etiqueta" for="li-sig">Próximo paso</label>' +
+          '<form id="li-fsig" class="li-form" novalidate>' +
+          // T0732 (R74): lo hablado en la llamada, si quiere, en las notas de la tarea que se cierra.
+          (a.rapidas.hablado ? '<div class="u-campo u-ancho"><label class="u-etiqueta" for="li-hab">¿Qué habéis hablado? <span class="u-nota">(si quieres)</span></label>' +
+            '<textarea id="li-hab" rows="2" aria-describedby="li-sig-err"></textarea></div>' : '') +
+          '<div class="u-campo u-ancho"><label class="u-etiqueta" for="li-sig">Próximo paso</label>' +
           '<input id="li-sig" type="text" autocomplete="off" aria-describedby="li-sig-err"></div>' +
           (a.rapidas.pasar ? '<fieldset class="u-campo li-dias"><legend class="u-etiqueta">Cuándo</legend><div>' + fs.map(function (o, i) {
             return '<button type="button" class="li-dia" data-dia="' + o.fecha + '" aria-pressed="' + (i === marcado) + '">' + texto(o.titulo) + ' <small>' + texto(diaCorto(o.fecha)) + '</small></button>';
@@ -2500,14 +2551,25 @@
         abrirVentana(h, true);
         // Volver atrás (la ✕, fuera o Esc): sin «Deshecho», pero con su aviso si falla (T0677).
         alCerrar = function () { return Promise.resolve().then(volver).then(null, mal('deshecho')); };
-        var form = vent.querySelector('#li-fsig'), inp = vent.querySelector('#li-sig');
-        inp.focus();
+        var form = vent.querySelector('#li-fsig'), inp = vent.querySelector('#li-sig'), hab = vent.querySelector('#li-hab');
+        (hab || inp).focus();
+        /** T0732 (R74): guarda lo hablado (si hay) y da cómo deshacerlo junto con el cierre; false si lleva algo que no se guarda. */
+        function guardarHablado() {
+          var t = hab ? hab.value.trim() : '', p = prohibido(t, PROHIB), err = vent.querySelector('#li-sig-err');
+          if (p.length) { err.textContent = textoProhibido(p); err.hidden = false; hab.setAttribute('aria-invalid', 'true'); hab.focus(); return false; }
+          var ch = conHablado(a, crudo, t);
+          if (!ch) return volver;
+          var antes = {}; antes[a.rapidas.hablado] = vacio(crudo[a.rapidas.hablado]) ? '' : crudo[a.rapidas.hablado];
+          var dh = cambioDeshacible(a, f[a.clave], ch, antes);
+          return function () { return Promise.all([dh(), volver()]); };
+        }
         form.addEventListener('click', function (ev) {
           var d = ev.target.closest('[data-dia]');
           if (d) { [].forEach.call(form.querySelectorAll('[data-dia]'), function (x) { x.setAttribute('aria-pressed', String(x === d)); }); return; }
           if (ev.target.closest('[data-sig-no]')) {
+            var todo = guardarHablado(); if (!todo) return;
             alCerrar = null; cerrarVentana();
-            deshacible(a.rapidas.hecha.valor + ': ' + quien(a, f), volver);
+            deshacible(a.rapidas.hecha.valor + ': ' + quien(a, f), todo);
           }
         });
         form.addEventListener('submit', function (ev) {
@@ -2516,6 +2578,7 @@
           if (!t) { err.textContent = 'Escribe el próximo paso, o pulsa «No hay próximo paso».'; err.hidden = false; inp.setAttribute('aria-invalid', 'true'); inp.focus(); return; }
           if (p.length) { err.textContent = textoProhibido(p); err.hidden = false; inp.setAttribute('aria-invalid', 'true'); return; }
           var d = form.querySelector('[data-dia][aria-pressed="true"]');
+          if (!guardarHablado()) return;
           alCerrar = null; cerrarVentana();
           Promise.resolve(T.crear(a.tabla, filaSiguiente(a, crudo, t, d ? d.getAttribute('data-dia') : ''))).then(function () {
             ctx.aviso('Guardado el próximo paso con ' + (f[con] || '') + '.');
@@ -2535,7 +2598,7 @@
       function botonPasar(a, f) {
         if (!a.rapidas.pasar || editables(a).indexOf(a.rapidas.pasar) < 0) return '';
         var id = String(f[a.clave]);
-        return '<button type="button" class="u-btn li-pasar" data-pasar-menu="' + texto(id) + '" aria-haspopup="menu" aria-expanded="' + (S.menu === id) + '" aria-label="Mover a otro día: ' + texto(quien(a, f)) + '" title="Mover a otro día">' + ICONO_MOVER + '<span class="li-pasar-t" aria-hidden="true">Mover</span></button>';
+        return '<button type="button" class="u-btn li-pasar" data-pasar-menu="' + texto(id) + '" aria-haspopup="menu" aria-expanded="' + (S.menu === id) + '" aria-label="Pasar a otro día: ' + texto(quien(a, f)) + '" title="Pasar a otro día">' + ICONO_MOVER + '<span class="li-pasar-t" aria-hidden="true">Pasar</span></button>';
       }
       /* ---------- T0652 · el resumen de con quién es una fila ---------- */
       /** El nombre de con quién es (h, ya pintado) como botón que abre su resumen; sin nadie de CONTEXTO.de, tal cual. */
@@ -2562,8 +2625,8 @@
             '<button type="button" class="u-btn u-btn-icono" data-ctx-cerrar aria-label="Cerrar">' + ICONO_X + '</button></div>';
         if (r.chips.length) h += '<p class="li-ctx-chips">' + r.chips.map(function (c) { return '<span class="u-chip">' + texto(c) + '</span>'; }).join('') + '</p>';
         if (r.nota) h += '<p class="li-ctx-nota">' + texto(r.nota) + '</p>';
-        h += '<section class="li-ctx-bl"><h4 class="u-etiqueta">Lo último que hicimos</h4>' + (r.ultimas.length ? '<ul class="li-ctx-l">' + r.ultimas.map(function (e) { return ev(e, true); }).join('') + '</ul>' : '<p class="u-nota">Todavía no hay nada hecho con ellos.</p>') + '</section>';
-        h += '<section class="li-ctx-bl"><h4 class="u-etiqueta">' + (enFicha ? 'Lo demás pendiente' : 'Lo que tenemos pendiente') + '</h4>' + (r.pendientes.length ? '<ul class="li-ctx-l">' + r.pendientes.map(function (e) { return ev(e, false); }).join('') + '</ul>' +
+        h += '<section class="li-ctx-bl"><h4 class="u-etiqueta">Lo último que has hecho</h4>' + (r.ultimas.length ? '<ul class="li-ctx-l">' + r.ultimas.map(function (e) { return ev(e, true); }).join('') + '</ul>' : '<p class="u-nota">Aún no has hecho nada con él.</p>') + '</section>';
+        h += '<section class="li-ctx-bl"><h4 class="u-etiqueta">' + (enFicha ? 'Lo demás pendiente' : 'Lo que tienes pendiente') + '</h4>' + (r.pendientes.length ? '<ul class="li-ctx-l">' + r.pendientes.map(function (e) { return ev(e, false); }).join('') + '</ul>' +
           (r.masPendientes ? '<p class="u-nota">Y ' + r.masPendientes + ' más.</p>' : '') : '<p class="u-nota">Nada ' + (enFicha ? 'más ' : '') + 'pendiente con ellos.</p>') + '</section>';
         r.lineas.forEach(function (l) { h += '<p class="li-ctx-lin"><span class="u-etiqueta">' + texto(l.titulo) + '</span> ' + texto(l.texto) + '</p>'; });
         if (va) h += '<p><a class="u-btn li-ctx-ir" href="?s=' + encodeURIComponent(sec.toLowerCase()) + '&ficha=' + encodeURIComponent(r.id) + '" data-sx="' + texto(sec) + '">Abrir en ' + texto(va) + ' ›</a></p>';
@@ -2589,7 +2652,7 @@
       /** El menú de «Pasar», fuera de la tabla (no lo corta su desplazamiento); se coloca junto a su botón al pintar. */
       function menuPasar(hoy) {
         if (!S.menu) return '';
-        return '<div class="li-menu" role="menu" aria-label="Mover a otro día"><p class="li-menu-t" aria-hidden="true">Mover a…</p>' + opcionesPasar(hoy).map(function (o) {
+        return '<div class="li-menu" role="menu" aria-label="Pasar a otro día"><p class="li-menu-t" aria-hidden="true">Pasar a…</p>' + opcionesPasar(hoy).map(function (o) {
           return '<button type="button" role="menuitem" data-pasar-a="' + o.fecha + '" data-fila="' + texto(S.menu) + '">' + texto(o.titulo) + ' <small>' + texto(diaCorto(o.fecha)) + '</small></button>';
         }).join('') + '<button type="button" role="menuitem" data-pasar-otro="' + texto(S.menu) + '">Otro día…</button></div>';
       }
@@ -2788,7 +2851,7 @@
       function abrirVentana(html, corta) {
         partir(null);
         velo.classList.toggle('li-v-corta', !!corta); // T0679: una ventana corta, en el móvil, sale desde abajo (no a pantalla completa)
-        alCerrar = null; escDato = null; S.menu = '';
+        alCerrar = null; escDato = null; S.menu = ''; fichaVent = '';
         vent.innerHTML = html;
         velo.classList.add('abierto');
         var h = vent.querySelector('h2'); if (h) { h.setAttribute('tabindex', '-1'); h.focus(); }
@@ -2796,10 +2859,39 @@
       var alCerrar = null; // T0643: lo que se hace si la ventana se cierra sin terminar (el siguiente paso: volver atrás)
       var relAps = {}, relAbiertas = {}, relDeFicha = ''; // T0651: lo de dentro de la ficha abierta (cada uno, como apartado) y las filas abiertas
       var escDato = null; // T0651: Esc en un campo abierto de la ficha (o en lo de dentro): lo cierra sin cerrar la ficha
-      function cerrarVentana() {
+      /* T0732 (R50) · Atrás, o deslizar desde el borde, cierra la ficha: abrirla desde la lista añade una entrada al historial
+       * (fichaLi, con ?ficha=…) y cerrarla vuelve atrás. Otra ficha con una ya abierta (la vista partida) cambia esa entrada, y
+       * la ficha que trae la dirección al llegar no añade nada (atrás vuelve a donde se estaba). */
+      var fichaVent = '', saltarPop = 0, tras = ''; // la ficha que se ve; los «atrás» propios aún sin llegar; la que se abre al llegar
+      function apuntarFicha(id) {
+        if (saltarPop) { tras = id; return; } // aún no ha llegado el atrás de la que se ha cerrado: se apunta cuando llegue
+        var st = history.state || {};
+        if (st.fichaLi === id) return;
+        var nuevo = Object.assign({}, st, { fichaLi: id }), dir = location.pathname + dirFicha(location.search, id, editables(BASE)) + location.hash;
+        try {
+          if (st.fichaLi) { history.replaceState(nuevo, '', dir); return; }
+          // La de debajo se queda en la lista: sin la ficha que traía la dirección al llegar (si no, atrás la volvería a abrir).
+          var abajo = location.pathname + dirFicha(location.search, '+', editables(BASE)) + location.hash;
+          if (abajo !== location.pathname + location.search + location.hash) history.replaceState(st, '', abajo);
+          history.pushState(nuevo, '', dir);
+        } catch (e) {}
+      }
+      atrasDe = function (st) {
+        if (saltarPop) { saltarPop--; if (!saltarPop && tras) { var t = tras; tras = ''; apuntarFicha(t); } return true; }
+        var q = queHacerAtras(st, velo.classList.contains('abierto') ? fichaVent : '');
+        if (!q) return false;
+        if (q.hacer === 'cerrar') cerrarVentana(true);
+        else if (q.hacer === 'abrir') { if (velo.classList.contains('abierto')) cerrarVentana(true); if (q.id === '+') ficha(null, true); else ficha(q.id); }
+        return true;
+      };
+      /** Cierra la ventana; si es una ficha abierta desde la lista, también su entrada del historial (salvo con «seguir»: la
+       *  cierra atrás, o se abre otra en su lugar). */
+      function cerrarVentana(seguir) {
         var al = alCerrar; alCerrar = null;
         if (al) al();
+        var eraFicha = fichaVent; fichaVent = '';
         velo.classList.remove('abierto'); vent.innerHTML = ''; partir(null);
+        if (eraFicha && seguir !== true && (history.state || {}).fichaLi === eraFicha) { saltarPop++; history.back(); return; }
         // Si se llegó con ?ficha=…, se quita de la dirección para que al volver no se abra otra vez.
         var us = new URLSearchParams(location.search);
         if (us.get('ficha') || us.get('nueva')) { var u = new URL(location.href); ['ficha', 'nueva'].concat(editables(BASE)).forEach(function (k) { u.searchParams.delete(k); }); history.replaceState(history.state, '', u.pathname + u.search + u.hash); }
@@ -2978,13 +3070,14 @@
         h += '<p class="u-error" id="li-err" role="alert" hidden></p>';
         // T0679: Guardar y lo que se hace con la ficha, al final y fijos abajo (fuera del formulario: el botón lo nombra con form=).
         // T0689: con GUARDAR «solo» (de entrada), una ficha que ya está no tiene «Guardar»: cada campo se guarda al cambiarlo.
-        // En el pie, solo lo que lleva a otra sección («Hacer una factura», «Calcular precio»; el primero, el principal); lo que
+        // En el pie, solo lo que lleva a otra sección («Hacer una factura», «Calcular precio»; lleno, solo el de «principal»: T0732,
+        // R45, así «Calcular precio» pesa igual en todas las fichas y no hay dos botones llenos con «Añadir»); lo que
         // cambia la fila («Pasar a Prospección»), dentro de «Más», lejos de lo del día a día.
         var solo = !nueva && a.guardar === 'solo';
         var conBoton = ed.length && !solo, accIr = acc.filter(function (x) { return x.ir; }), accPoner = acc.filter(function (x) { return !x.ir && accRec.indexOf(x) < 0; });
         var pie = '';
         if (conBoton || accIr.length) pie += '<div class="li-pie"><div class="n-botones">' + (conBoton ? '<button type="submit" form="li-form" class="u-btn u-btn-accion">' + (nueva ? 'Añadir' : 'Guardar') + '</button>' : '') +
-          accIr.map(function (x, i) { return '<a class="u-btn' + (!conBoton && !i ? ' u-btn-accion' : '') + '" href="' + texto(irA(x, f.__crudo || f)) + '" data-sx="' + texto(String(x.ir).toUpperCase()) + '">' + texto(x.titulo) + '</a>'; }).join('') + '</div>' +
+          accIr.map(function (x) { return '<a class="u-btn' + (!conBoton && x.principal ? ' u-btn-accion' : '') + '" href="' + texto(irA(x, f.__crudo || f)) + '" data-sx="' + texto(String(x.ir).toUpperCase()) + '">' + texto(x.titulo) + '</a>'; }).join('') + '</div>' +
           accIr.filter(function (x) { return x.texto; }).map(function (x) { return '<p class="u-nota li-accion-t">' + texto(x.texto) + '</p>'; }).join('') + '</div>';
         var masAcc = accPoner.map(function (x) { return '<div class="li-mas-acc"><button type="button" class="u-btn" data-accion="' + acc.indexOf(x) + '">' + texto(x.titulo) + '</button>' + (x.texto ? '<span class="u-nota">' + texto(x.texto) + '</span>' : '') + '</div>'; }).join('');
         // T0651: borrar, lo último de «Más», con su confirmación debajo (o por qué no se puede y qué hacer en su lugar).
@@ -3092,6 +3185,8 @@
         h += pie;
         abrirVentana(h);
         partir(nueva ? '' : id);
+        fichaVent = nueva ? '+' : String(id);
+        if (!llegada) apuntarFicha(fichaVent); // T0732 (R50)
         // T0679: la pastilla de la fase o el estado cambia de color al elegir otro valor.
         [].forEach.call(vent.querySelectorAll('select[data-pil]'), function (sel) {
           sel.addEventListener('change', function () { var m = json(sel.getAttribute('data-pil')) || {}; sel.className = 'li-sel-pil li-estado li-' + (m[sel.value] || 'gris'); });
@@ -3956,7 +4051,7 @@
       cont.addEventListener('click', function (ev) { if (sinClic) { ev.stopImmediatePropagation(); ev.preventDefault(); } }, true);
       velo.addEventListener('click', function (ev) {
         if (ev.target === velo || ev.target.closest('[data-cerrar]')) { cerrarVentana(); return; }
-        if (ev.target.closest('[data-volver]')) { velo.classList.remove('abierto'); partir(null); ctx.volver(); return; }
+        if (ev.target.closest('[data-volver]')) { velo.classList.remove('abierto'); partir(null); fichaVent = ''; ctx.volver(); return; }
         // T0642: al saltar de esta ficha a otra (lo relacionado, «+ Nueva tarea»), la dirección de ahora se queda con la ficha
         // abierta, para que «Volver» o el atrás del móvil la vuelvan a abrir, y la siguiente dice «‹ Volver a <esta>».
         var sx = ev.target.closest('a[data-sx]');
@@ -3974,7 +4069,7 @@
         if (vt) { var sc = vt.closest('.li-fgrupo'); [].forEach.call(sc.querySelectorAll('[data-resto]'), function (x) { x.hidden = false; }); vt.remove(); return; }
         // T0652: una tarea del resumen de la ficha abre la suya.
         var cf = ev.target.closest('[data-ctx-fila]');
-        if (cf) { var idf = cf.getAttribute('data-ctx-fila'); cerrarVentana(); ficha(idf); return; }
+        if (cf) { var idf = cf.getAttribute('data-ctx-fila'); cerrarVentana(true); ficha(idf); return; }
         // T0643: cerrar o pasar desde la ficha (se cierra la ficha y se hace como en la lista).
         var rh = ev.target.closest('[data-r-hecha],[data-r-pasar]');
         if (rh && abierta) {
@@ -4068,6 +4163,7 @@
       });
     },
     cerrar: function () {
+      atrasDe = null;
       document.body.classList.remove('li-partida');
       if (teclaEsc) document.removeEventListener('keydown', teclaEsc); teclaEsc = null;
       if (alMover) document.removeEventListener('pointermove', alMover);
