@@ -359,6 +359,18 @@
   /* ---------- el marco ---------- */
 
   var cred = null;          // quién ha entrado y sus secciones (lo guardado y, después, lo que dice el motor)
+  /* T0749 · Si el menú ya lo ha dicho el motor en esta carga (false mientras se ve el guardado de la última vez y aún no ha
+   * contestado: con la sesión caducada, hasta que se toca «Continuar»). Personalizar no se enseña hasta entonces, para no
+   * enseñar secciones de antes de un cambio del menú (T0688: Clientes y Prospección, ya Marcas). */
+  var alDia = false;
+  /** T0749 · El motor ha contestado y el menú no ha cambiado: Personalizar sale donde esperaba (Perfil del marco: [data-n-pers];
+   *  la sección Perfil: el evento «un-al-dia» del document). */
+  function ponerAlDia() {
+    if (alDia) return;
+    alDia = true;
+    [].forEach.call(document.querySelectorAll('[data-n-pers]'), function (d) { d.innerHTML = htmlPersonalizarDentro(); });
+    try { document.dispatchEvent(new CustomEvent('un-al-dia')); } catch (e) {}
+  }
   var actual = '';          // sección abierta
   var abierta = null;       // { id, def } de la sección abierta (para cerrarla al cambiar)
   var DEF = {};             // secciones registradas: ID → { abrir, cerrar }
@@ -456,7 +468,8 @@
     document.body.classList.toggle('u-menu-plegado', plegado);
     var et = plegado ? 'Desplegar el menú' : 'Plegar el menú', p = partirMenu(menu());
     function enlace(s) {
-      return '<a href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '" title="' + texto(s.titulo) + '">' +
+      // T0749: draggable="false", para que al mantener apretado iOS no lo levante para arrastrarlo (con -webkit-user-drag en nucleo-2.css).
+      return '<a href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '" title="' + texto(s.titulo) + '" draggable="false">' +
         '<svg viewBox="0 0 24 24" aria-hidden="true">' + (s.icono || ICONO_SECCION) + '</svg><span>' + texto(s.titulo) +
         (s.id === 'PERFIL' ? '<span class="sx-quien">' + texto(cred.persona) + '</span>' : '') + '</span>' +
         (s.cifra ? '<span class="bj-n hay" data-cifra="' + texto(s.id) + '" hidden></span>' : '') + '</a>'; // T0412
@@ -502,7 +515,9 @@
   }
 
   /** Pinta el marco entero y abre la sección de la URL (o la primera). */
-  function marco(c) {
+  /** guardado: true si c es lo guardado de la última vez, sin que el motor lo haya dicho en esta carga (T0749). */
+  function marco(c, guardado) {
+    alDia = !guardado;
     if (T && T.persona() !== copiaDe(c)) soltarTablas();  // T0275: otra persona, otra copia
     if (cerrarVersiones) cerrarVersiones(false);           // T0283: la ventana de novedades se va con el body; sin darla por vista
     cred = c;
@@ -765,7 +780,7 @@
     if (c && c.como) soltarTablas(copiaDe(c), true);
     var g = leer();
     if (!g || !g.persona) { acceso(msg || ''); return; }
-    marco(g);
+    marco(g, true);
     comprobar();
     if (msg) aviso(msg);
   }
@@ -884,6 +899,7 @@
       // T0420: la sección de la que vienes ({ id, titulo }, o null si se ha entrado directo) y volver a ella como estaba.
       desde: (function () { var d = history.state && history.state.desde, x = d && seccion(d); return x ? { id: x.id, titulo: x.titulo } : null; })(),
       volver: function () { history.back(); },
+      alDia: function () { return alDia; }, // T0749: si el menú (secciones) ya lo ha dicho el motor en esta carga
       correo: cred.correo || '', secciones: todas().map(function (x) {
         if (x.enPerfil) return { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true };
         // T0644: las que esta persona personaliza (Listado: quien administra o su perfil en PERSONALIZAN) salen en su Perfil.
@@ -959,9 +975,11 @@
   function personaliza(x) {
     return (x.base || x.id) === 'LISTADO' && !x.enPerfil && (!!cred.admin || ((x.config || {}).PERSONALIZAN || []).indexOf(cred.perfil) >= 0);
   }
-  /** T0644 · Personalizar en el Perfil del marco (sin sección PERFIL), como en la sección Perfil: una línea por sección. */
-  function htmlPersonalizar() {
-    var ss = todas().filter(personaliza);
+  /** T0644 · Personalizar en el Perfil del marco (sin sección PERFIL), como en la sección Perfil: una línea por sección.
+   *  T0749: en su caja (data-n-pers), vacía hasta que el motor dice el menú (alDia). */
+  function htmlPersonalizar() { return '<div data-n-pers>' + (alDia ? htmlPersonalizarDentro() : '') + '</div>'; }
+  function htmlPersonalizarDentro() {
+    var ss = cred ? todas().filter(personaliza) : [];
     if (!ss.length) return '';
     return '<section class="pf-pers"><h2 class="n-grupo">Personalizar</h2><p class="u-nota">El orden del menú, qué vistas ve cada sección y con cuántos días avisa.</p>' +
       '<ul class="pf-pers-l">' + ss.map(function (x) {
@@ -1166,7 +1184,7 @@
       var nuevo = credDe(r);
       nuevo.correo = nuevo.correo || cred.correo;
       if (como && !nuevo.como) { volver(); return; }
-      if (JSON.stringify(nuevo) === JSON.stringify(cred)) return;
+      if (JSON.stringify(nuevo) === JSON.stringify(cred)) { ponerAlDia(); return; }
       if (como) guardarComo(nuevo); else guardar(nuevo);
       marco(nuevo);
     }, function (e) {
@@ -1280,7 +1298,7 @@
       // T0273: si en esta pestaña estaba viendo como otra persona (y es la misma cuenta), sigue igual.
       var como = leerComo();
       if (como && (!como.como || bajo(como.como.correo) !== bajo(guardada.correo))) { borrarComo(); como = null; }
-      marco(como || guardada);  // al momento, con lo guardado
+      marco(como || guardada, true);  // al momento, con lo guardado (T0749: sin Personalizar hasta que conteste el motor)
       comprobar();      // y por detrás, con el motor
     } else { borrarComo(); acceso(''); }
   }

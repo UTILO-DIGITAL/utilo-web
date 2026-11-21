@@ -332,6 +332,8 @@ body.u-con-barra { padding-bottom: calc(var(--alto-barra) + var(--e1) + env(safe
 /* ---------- Con barra de secciones abajo: lo que flota sube por encima ---------- */
 .u .u-perfil .u-nota { margin-top: var(--e3); }
 @media (max-width: 699px) {
+  /* T0749: el aviso de la sesión de Google caducada (kanban4/google.js) y los avisos de abajo, por encima de la barra */
+  body.u-con-barra .ug-clic { bottom: calc(var(--alto-barra) + var(--e3) + env(safe-area-inset-bottom, 0px)) !important; }
   body.u-con-barra #alta-btn { bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
   body.u-con-barra #alta-aviso, body.u-con-barra #estado-aviso { bottom: calc(136px + env(safe-area-inset-bottom, 0px)) !important; }
 }

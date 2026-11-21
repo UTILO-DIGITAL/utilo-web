@@ -209,6 +209,8 @@
   /** T0644 · Personalizar (el orden del menú, qué vistas se ven y los días de los avisos), aquí y no en cada sección: una
    *  línea por sección que se personaliza, que abre su ventana. */
   function htmlPersonalizar(ctx) {
+    // T0749: con el menú guardado de la última vez, aún sin la respuesta del motor, nada (sus secciones pueden ser las de antes).
+    if (typeof ctx.alDia === 'function' && !ctx.alDia()) return '';
     var ss = (ctx.secciones || []).filter(function (s) { return s.personaliza; });
     if (!ss.length) return '';
     return '<section class="pf-bloque pf-pers"><h2 class="n-grupo">Personalizar</h2>' +
@@ -271,6 +273,11 @@
           '<div class="pf-col pf-lado">' + htmlPersonalizar(ctx) + (window.UN.htmlAspecto ? window.UN.htmlAspecto() : '') + htmlCuenta(ctx) + htmlDentro(ctx) + (window.UN.htmlVersion ? window.UN.htmlVersion() : '') + // T0283: versión y novedades
           '<p class="u-nota pf-hora" id="pf-hora">' + (d ? 'Al día a las ' + hora(d.leido) + '.' : '') + '</p></div></div></div>';
       }
+      // T0749: cuando el motor dice que el menú no ha cambiado, sale Personalizar (si cambia, el marco abre el Perfil de nuevo).
+      document.addEventListener('un-al-dia', function alDia() {
+        if (!el.isConnected) { document.removeEventListener('un-al-dia', alDia); return; }
+        pintar(visto);
+      });
       var guardado = leer(ctx);
       pintar(guardado); // al momento: lo de la última vez (o quién eres, si es la primera)
       if (guardado) el.querySelector('#pf-hora').textContent = 'Al día a las ' + hora(guardado.leido) + '. Poniéndolo al día…';

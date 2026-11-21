@@ -2452,7 +2452,7 @@
             div.className = 'eco-lin';
             if (l.ID) div.setAttribute('data-id', l.ID);
             div.innerHTML = (ARTS.length
-              ? '<div class="eco-lin-cw"><textarea rows="1" class="eco-lin-c" aria-label="Concepto" autocomplete="off" role="combobox" aria-expanded="false" placeholder="Busca en ' + texto(ART.titulo || 'la lista') + ' por nombre o código, o escribe (el envío)">' + texto(l.CONCEPTO) + '</textarea>' +
+              ? '<div class="eco-lin-cw"><textarea rows="1" class="eco-lin-c" aria-label="Concepto" autocomplete="off" role="combobox" aria-expanded="false" placeholder="Busca en ' + texto(ART.titulo || 'la lista') + ' por nombre o código, o escríbelo a mano">' + texto(l.CONCEPTO) + '</textarea>' +
                 '<div class="eco-lin-op" role="listbox" hidden></div></div>'
               : '<textarea rows="1" class="eco-lin-c" aria-label="Concepto" placeholder="Qué (p. ej. Lino Celosía BOR-004-01)">' + texto(l.CONCEPTO) + '</textarea>') +
               '<textarea rows="1" class="eco-lin-d" aria-label="Detalle" placeholder="Detalle (opcional)">' + texto(l.DETALLE) + '</textarea>' +

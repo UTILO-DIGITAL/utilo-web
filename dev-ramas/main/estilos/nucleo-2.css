@@ -1322,12 +1322,15 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
   background: color-mix(in srgb, var(--color-texto) 20%, var(--color-superficie)); box-shadow: none; }
 
 /* R47 · Mantener apretado lo que se toca no saca el menú del enlace de Safari ni selecciona texto, y el toque no deja el
-   recuadro gris. Lo que se copia (un teléfono, un correo, las notas y los campos) sigue pudiéndose copiar. */
+   recuadro gris. Lo que se copia (un teléfono, un correo, las notas y los campos) sigue pudiéndose copiar. T0749: tampoco
+   lo levanta para arrastrarlo (el recuadro con sombra que salía al mantener apretado Hoy o Historial en la barra). */
 .u a:not(.li-enl), .u button, .u .u-btn, .u [role=tab], .u label, .sx.u-sx a, .sx.u-sx button {
-  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  -webkit-user-drag: none; }
 @media (hover: none) {
   .u .u-tabla tr[tabindex], .u .li-gal-t, .u .li-tarjeta, .u .u-chip, .u .li-av, .u .li-rel-f {
-    -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+    -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+    -webkit-user-drag: none; }
   /* Sin el recuadro gris, el toque se nota al momento en la fila. */
   .u .u-tabla tr[tabindex]:active td, .u .li-rel-f:active { background: var(--fondo-encima); }
 }

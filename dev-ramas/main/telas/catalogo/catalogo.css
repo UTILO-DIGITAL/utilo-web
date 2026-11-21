@@ -39,7 +39,7 @@ body.ca::before { content: ""; position: fixed; inset: 0 0 auto; height: env(saf
 .ca-foto { aspect-ratio: 1 / 1; width: 100%; max-width: 100%; border-radius: var(--radio); overflow: hidden; background: var(--color-bloque); display: flex; align-items: center; justify-content: center; }
 .ca-foto img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .ca-foto .ca-sin { color: #5A564E; font-size: 13px; }
-.ca-tarjeta:hover .ca-foto { box-shadow: 0 0 0 1px var(--color-destacado); }
+@media (hover: hover) { .ca-tarjeta:hover .ca-foto { box-shadow: 0 0 0 1px var(--color-destacado); } }
 .ca-color { font-weight: 500; margin: 0; overflow-wrap: anywhere; }
 .ca-datos { font-size: 13px; color: #5A564E; margin: 0; }
 .ca-codigo { font-variant-numeric: tabular-nums; letter-spacing: .03em; }

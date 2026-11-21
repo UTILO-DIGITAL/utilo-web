@@ -84,7 +84,7 @@
     '.ta-aj-lista{display:flex;flex-direction:column;gap:var(--e1)}' +
     '.ta-aj-chips{display:flex;flex-wrap:wrap;gap:var(--e2)}' +
     '.ta-aj-chip{border:1px solid var(--color-borde-campo);border-radius:999px;background:var(--color-superficie);color:var(--color-texto);padding:6px 12px;min-height:36px;font:inherit;font-size:14px;cursor:pointer}' +
-    '.ta-aj-chip:hover{border-color:var(--color-principal-oscuro)}' +
+    '@media (hover:hover){.ta-aj-chip:hover{border-color:var(--color-principal-oscuro)}}' +
     '.ta-aj-mas{border-style:dashed;color:var(--color-principal-oscuro)}' +
     '.ta-aj-nueva{display:flex;gap:var(--e2);align-items:center;flex-wrap:wrap}.ta-aj-nueva input{font-size:16px;min-width:12em}';
 
