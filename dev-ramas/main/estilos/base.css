@@ -3171,6 +3171,8 @@ body.u-con-barra .u-cab h1 { color: var(--color-texto); }
 .u .li-junta .li-rel-f { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e1) var(--e3); }
 .u .li-junta .li-rel-n { font-weight: 500; flex: 1 1 auto; }
 .u .li-gal-c.li-gal-sin { color: var(--color-suave); font-weight: 400; }
+/* T0730 (R41): el aviso cuando falta la cifra («Falta el coste»), una pastilla de su color. */
+.u .li-gal-c.li-gal-av { align-self: flex-start; color: var(--li-c); background: var(--li-fondo); border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 600; }
 /* ==========================================================================================================================
  * T0684 · Elegir escribiendo (nucleo/elegir.js): un desplegable largo es un botón como los demás campos (las mismas esquinas,
  * letra y flecha) que abre una lista con un buscador encima. En el ordenador, debajo del campo; en el móvil, desde abajo,
