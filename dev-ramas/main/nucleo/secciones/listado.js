@@ -326,13 +326,21 @@
     var cs = (r && Array.isArray(r.cifras) ? r.cifras : []).filter(function (x) { return x && x.tabla; });
     return cs.length ? { cifras: cs, texto: typeof r.texto === 'string' ? r.texto : '' } : null;
   }
-  /** T0708 · Las cifras del resumen: cuántas filas tiene cada tabla, todas (no las de la vista), con su nombre. */
+  /** T0708 · Las cifras del resumen: cuántas filas tiene cada tabla, todas (no las de la vista), con su nombre.
+   *  T0734: una cifra con «si» cuenta solo las filas que lo cumplen (sus campos pueden ser rutas, «ID_DISENO.ID_PROVEEDOR»,
+   *  que se miran con el código) y, si no hay ninguna, no sale: «21 sin proveedor». */
   function cifrasResumen(ap, D) {
     if (!ap.resumen) return [];
     return ap.resumen.cifras.map(function (x) {
-      var n = (D.filas(x.tabla) || []).length, f = x.filas && x.filas.length === 2 ? x.filas : ['fila', 'filas'];
-      return { n: n, nombre: n === 1 ? f[0] : f[1] };
-    });
+      var fs = D.filas(x.tabla) || [], f = x.filas && x.filas.length === 2 ? x.filas : ['fila', 'filas'];
+      var si = lista(x.si), rutas = camposCond(si).filter(function (c) { return c.indexOf('.') > 0; });
+      if (si.length) fs = fs.filter(function (fila) {
+        var g = fila;
+        if (rutas.length) { g = {}; Object.keys(fila).forEach(function (k) { g[k] = fila[k]; }); rutas.forEach(function (r) { g[r] = seguirCrudo(ap, D, x.tabla, fila, r); }); }
+        return cumple(g, si);
+      });
+      return si.length && !fs.length ? null : { n: fs.length, nombre: fs.length === 1 ? f[0] : f[1] };
+    }).filter(Boolean);
   }
   /** T0652 · CONTEXTO de la configuración, con sus claves por defecto; null sin ninguna tabla en «de». Cada sección de
    *  «seccion» es un nombre o { id, si: [condiciones] } (la primera que cumple la fila de la otra tabla: Clientes o Prospección). */
@@ -907,6 +915,12 @@
     if (puesto(cfg.RESUMEN) && !ap.resumen) errores.push(donde + 'RESUMEN no dice en «cifras» qué tablas cuenta.');
     if (ap.resumen) ap.resumen.cifras.forEach(function (x, i) {
       if (!x.filas || x.filas.length !== 2) errores.push(donde + 'RESUMEN.cifras[' + i + '] (' + x.tabla + ') no dice en «filas» cómo se llama una y cómo varias (["tela", "telas"]).');
+      // T0734: lo que mira su «si», columnas de esa tabla (el primer paso de una ruta).
+      var cs = columnasTabla ? columnasTabla(x.tabla) : null;
+      if (cs) camposCond(x.si).forEach(function (c) {
+        var p0 = String(c).split('.')[0];
+        if (cs.indexOf(p0) < 0) errores.push(donde + 'RESUMEN.cifras[' + i + '] (' + x.tabla + '): su «si» mira «' + c + '», y ' + p0 + ' no es una columna de ' + x.tabla + '.');
+      });
     });
     // T0710: lo de arriba (otra tabla): sus columnas y lo que ponen sus botones.
     ap.arriba.forEach(function (x, i) {
@@ -2167,7 +2181,10 @@
       function ruta(de) { if (de && de.tabla) tablasDeRuta(BASE, de.tabla, de.campo).forEach(function (t) { if (tablas.indexOf(t) < 0) tablas.push(t); }); }
       Object.keys(BASE.campos).forEach(function (c) { ruta(BASE.campos[c].de); });
       BASE.relacionados.forEach(function (r) { Object.keys(r.campos || {}).forEach(function (c) { ruta(r.campos[c].de); }); });
-      if (BASE.resumen) BASE.resumen.cifras.forEach(function (x) { if (tablas.indexOf(x.tabla) < 0) tablas.push(x.tabla); });
+      if (BASE.resumen) BASE.resumen.cifras.forEach(function (x) {
+        if (tablas.indexOf(x.tabla) < 0) tablas.push(x.tabla);
+        camposCond(x.si).forEach(function (c) { ruta({ tabla: x.tabla, campo: c }); }); // T0734: las de por medio de su «si»
+      });
       BASE.arriba.forEach(function (x) { if (tablas.indexOf(x.tabla) < 0) tablas.push(x.tabla); }); // T0710
       // T0652: las del resumen de con quién es cada fila (la marca, sus necesidades, sus personas).
       if (BASE.contexto) Object.keys(BASE.contexto.de).forEach(function (c) {
