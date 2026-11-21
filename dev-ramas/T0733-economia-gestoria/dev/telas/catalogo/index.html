@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Catálogo DEV</title>
+<!-- T0686: el catálogo para marcas (telas/catalogo/) en DEV, con el motor de DEV y los Excel de prueba (como dev/telas/, T0669):
+     el mismo código que el de Marta, con la «API DEV» y la clave de DEV, así que la sesión de dev/telas/ vale aquí.
+     El botón «Catálogo para marcas» del Perfil de dev/telas/ abre esta página. -->
+<meta name="dev-ramas" content="Catálogo para marcas (Excel de prueba)">
+<meta name="dev-iniciativa" content="telas">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../../../telas/marca.css?v=12b98ed422">
+<link rel="stylesheet" href="../../../telas/catalogo/catalogo.css?v=28c2492545">
+<script>
+  window.KANBAN = {
+    clave: 'dev-telas',
+    marca: 'telas',
+    nombreApp: 'Telas DEV',
+    google: '405319382307-oido241fdeknsvv2mub9u9e6qh9tao6h.apps.googleusercontent.com',
+    proyecto: '405319382307',
+    clavePicker: 'AIzaSyAZXmBAdcHLu2mdYeljY_WMe5w6iVn6hLg',
+    api: 'https://script.google.com/macros/s/AKfycbzTSqp1wxl1p8kBnNbvla2cRWKXYoljik9553GJglqSozv6wBmSITwu0d7LTEo5DG0O/exec'
+  };
+</script>
+</head>
+<body class="ca">
+<div class="ca-env">
+  <header class="ca-cab"><h1 class="ca-marca">Marta Canela</h1></header>
+</div>
+<div class="ca-barra" id="ca-barra" hidden><div class="ca-env">
+  <div class="ca-filtros" id="ca-filtros" role="group" aria-label="Técnica"></div>
+  <input id="ca-buscar" type="search" placeholder="Buscar color, lino, ikat…" aria-label="Buscar en el catálogo" autocomplete="off">
+</div></div>
+<main class="ca-env ca-principal" id="ca-principal"><p class="ca-nota">Cargando el catálogo…</p></main>
+<div class="ca-velo" id="ca-velo" hidden></div>
+<aside class="ca-ficha" id="ca-ficha" hidden role="dialog" aria-modal="true" aria-labelledby="ca-ficha-titulo"></aside>
+<script src="../../../kanban4/google.js?v=b58efb95a7"></script>
+<script src="../../../telas/catalogo/catalogo.js?v=94e3ede666"></script>
+</body>
+</html>
