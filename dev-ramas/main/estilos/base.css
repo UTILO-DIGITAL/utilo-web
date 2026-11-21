@@ -586,6 +586,15 @@ body.sx-otra > *:not(.sx):not(#sx-panel):not(script):not(style):not(link):not(.v
 .u .eco-pasos li.eco-ya::before { content: "✓"; color: var(--color-principal); font-weight: 700; }
 .u .eco-pasos li:not(.eco-ya) { color: var(--color-suave); }
 .u .eco-pasos li > span:first-of-type { flex: 1; }
+/* T0739 · Lo que lleva un pedido: cada tela con sus metros y su taller, y a la derecha cómo va su envío. */
+.u .eco-lvs { list-style: none; margin: 0 0 var(--e1); padding: 0; border-top: 1px solid var(--color-linea); }
+.u .eco-lv { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: var(--e3); padding: var(--e2) 0; min-height: 44px;
+  border: 0; border-bottom: 1px solid var(--color-linea); background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+@media (hover: hover) { .u .eco-lv:hover { background: color-mix(in srgb, var(--color-texto) 4%, var(--color-fondo)); } }
+.u .eco-lv-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.u .eco-lv-t b { font-weight: 600; overflow-wrap: anywhere; }
+.u .eco-lv-e { flex: none; max-width: 45%; text-align: right; font-size: 14px; overflow-wrap: anywhere; }
+.u .eco-lv-por { color: var(--color-suave); }
 /* T0270 · En una pantalla ancha, las cifras pequeñas (IVA, sin factura, pendientes) van al lado de las grandes, a su altura. */
 @media (min-width: 1400px) {
   .u .eco-arriba { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--e2); margin: 0 0 var(--e3); }

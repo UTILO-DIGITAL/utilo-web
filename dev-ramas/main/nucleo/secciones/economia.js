@@ -667,7 +667,9 @@
       if (faltaEnvio) co = NaN;
       if (!isNaN(pr)) pr = Math.round(pr * 100) / 100;
       return { codigo: cod, nombre: nom, detalle: det, unidad: String(art.unidad || ''), precio: isNaN(pr) || pr < 0 ? NaN : pr,
-        coste: isNaN(co) || co < 0 ? NaN : co, faltaEnvio: !!faltaEnvio, _b: normArt(nom + ' ' + cod + ' ' + det) };
+        coste: isNaN(co) || co < 0 ? NaN : co, faltaEnvio: !!faltaEnvio, _b: normArt(nom + ' ' + cod + ' ' + det),
+        // T0739: quién lo hace (el ID de su taller), para proponerlo en una línea de venta.
+        taller: art.taller ? String(seguirRuta(art, D, art.tabla, f, art.taller, true) || '') : '' };
     }).filter(function (a) { return a.codigo; }).sort(function (a, b) { return a.codigo.localeCompare(b.codigo, 'es'); });
   }
   /** T0673 · Lo que dice cada tela al elegirla en una factura: el recomendado si lo hay; si no, lo que te cuesta; si no, nada (nunca «sin precio»). */
@@ -933,6 +935,44 @@
     if (imp > 0) r.precio = Math.round(imp / r.cantidad * 100) / 10000;
     return r;
   }
+  /** T0739 · Las líneas de una venta (VENTA_LINEAS), en el orden en que se apuntaron. */
+  function lineasVenta(lineas, idVenta) {
+    return (lineas || []).filter(function (l) { return idVenta !== '' && idVenta != null && String(l.ID_VENTA) === String(idVenta); })
+      .sort(function (a, b) { return String(a.ID) < String(b.ID) ? -1 : String(a.ID) > String(b.ID) ? 1 : 0; });
+  }
+  /** T0739 · Cómo va el envío de una línea: «DHL · 1Z999AA1» o, sin transportista ni seguimiento, «Por salir». */
+  function envioLinea(l) {
+    var t = String((l && l.TRANSPORTISTA) || '').trim(), s = String((l && l.SEGUIMIENTO) || '').trim();
+    return t || s ? [t, s].filter(Boolean).join(' · ') : 'Por salir';
+  }
+  /**
+   * T0739 · Las líneas de la factura de una venta: con sus líneas (VENTA_LINEAS), una por tela con sus metros (el precio,
+   * el recomendado de cada tela; con una sola línea con metros y lo que paga la marca, lo que sale por metro, como
+   * lineaDeVenta). Sin líneas, la que sale de su nombre (lineaDeVenta). → [{ articulo, concepto, cantidad, unidad, precio }]
+   */
+  function lineasFacturaVenta(v, lineas, arts) {
+    var ls = lineasVenta(lineas, v && v.ID);
+    if (!ls.length) return [lineaDeVenta(v, arts)];
+    var imp = v && v.IMPORTE !== '' && v.IMPORTE != null ? cts(v.IMPORTE) : 0;
+    return ls.map(function (l) {
+      var cod = String(l.ARTICULO || '').trim(), a = (arts || []).filter(function (x) { return x.codigo === cod; })[0] || null;
+      var n = l.CANTIDAD === '' || l.CANTIDAD == null ? 0 : cantidad(l.CANTIDAD), r = { articulo: a ? cod : '', concepto: a ? '' : cod, cantidad: n > 0 ? n : '', unidad: a ? a.unidad : 'm', precio: NaN };
+      if (ls.length === 1 && imp > 0 && n > 0) r.precio = Math.round(imp / n * 100) / 10000;
+      return r;
+    });
+  }
+  /**
+   * T0739 · El anticipo que propone la ficha de una marca (ANTICIPO_MARCA), como fracción (0,5 = 50 %), o 0. fila: su fila
+   * de ant.tabla; nombreSi(tabla, id): el nombre de esa fila, cuando «si» apunta a otra tabla (SI_NO).
+   */
+  function anticipoMarca(ant, fila, nombreSi) {
+    if (!ant || !fila) return 0;
+    var v = fila[ant.columna], si = ant.si === undefined ? 'Sí' : ant.si;
+    if (v === '' || v == null) return 0;
+    var ok = si && typeof si === 'object' ? String(nombreSi(si.tabla, v) || '') === String(si.nombre) : String(v) === String(si);
+    var p = Number(ant.porcentaje);
+    return ok && p > 0 && p <= 100 ? p / 100 : 0;
+  }
   /** La factura que lleva un cobro de una venta, si no lleva ninguna: la emitida de esa venta (o ''). */
   function facturaDelCobro(m, fac, DS) {
     if (!m || m.TIPO !== 'Ingreso' || m.ID_FACTURA || !DS || !m[DS]) return '';
@@ -1079,7 +1119,7 @@
     return o;
   }
 
-  var CALC = { facturaDeVenta: facturaDeVenta, ventasSinFactura: ventasSinFactura, lineaDeVenta: lineaDeVenta, facturaDelCobro: facturaDelCobro, numeroTicket: numeroTicket, facturaCerrada: facturaCerrada, puedeSacarPdf: puedeSacarPdf, faltaCantidad: faltaCantidad, ultimaEmitida: ultimaEmitida, fechaEmitidaMal: fechaEmitidaMal,
+  var CALC = { facturaDeVenta: facturaDeVenta, ventasSinFactura: ventasSinFactura, lineaDeVenta: lineaDeVenta, lineasVenta: lineasVenta, envioLinea: envioLinea, lineasFacturaVenta: lineasFacturaVenta, anticipoMarca: anticipoMarca, facturaDelCobro: facturaDelCobro, numeroTicket: numeroTicket, facturaCerrada: facturaCerrada, puedeSacarPdf: puedeSacarPdf, faltaCantidad: faltaCantidad, ultimaEmitida: ultimaEmitida, fechaEmitidaMal: fechaEmitidaMal,
     filtrosMovPuestos: filtrosMovPuestos, cajaPartes: cajaPartes, clientesFactura: clientesFactura, direccionCliente: direccionCliente, categoriaUnica: categoriaUnica, cts: cts, pct: pct, tipoIva: tipoIva, opciones: opciones, opcionesConValor: opcionesConValor, importe: importe, baseDeTotal: baseDeTotal, eur: eur, eur0: eur0, fecha: fecha, periodos: periodos, periodoActual: periodoActual,
     anteriores: anteriores, movDe: movDe, facDe: facDe, preDe: preDe, resumen: resumen, saldos: saldos, cuenta: cuenta, pendientes: pendientes,
     sinFactura: sinFactura, presupuesto: presupuesto, grupos: grupos, estadoLinea: estadoLinea, avisos: avisos, cruzados: cruzados,
@@ -1173,6 +1213,14 @@
       var VEN = cfg.VENTAS && DS && R.DESGLOSE === cfg.VENTAS ? String(cfg.VENTAS) : '';
       var MIN = cfg.MARGEN_MINIMO && typeof cfg.MARGEN_MINIMO === 'object' && cfg.MARGEN_MINIMO.tabla ? cfg.MARGEN_MINIMO : null;
       if (VEN && MIN && tablas.indexOf(MIN.tabla) < 0) tablas.push(MIN.tabla);
+      // T0739 · Con LINEAS_VENTA, cada venta lleva sus líneas (VENTA_LINEAS): qué se vende (de ARTICULOS), cuánto, quién lo
+      // hace (el «taller» del artículo) y cómo va su envío. Con ANTICIPO_MARCA, el anticipo de una venta nueva sale de la ficha.
+      var LV = !!VEN && cfg.LINEAS_VENTA === 'Sí';
+      var ARTV = LV && cfg.ARTICULOS && cfg.ARTICULOS.tabla ? cfg.ARTICULOS : null;
+      var ANT = VEN && CLIV && cfg.ANTICIPO_MARCA && cfg.ANTICIPO_MARCA.tabla ? cfg.ANTICIPO_MARCA : null;
+      [LV ? 'VENTA_LINEAS' : '', VEN && CLIV ? CLIV.tabla : '', ANT ? ANT.tabla : '', ANT && ANT.si && ANT.si.tabla ? ANT.si.tabla : '']
+        .concat(ARTV ? [ARTV.tabla].concat(Object.keys(ARTV._refs || {})) : [])
+        .forEach(function (t) { if (t && tablas.indexOf(t) < 0) tablas.push(t); });
       function hayPest(s) { return PESTANAS[s] && (s !== 'VENTAS' || VEN); }
       var pest = String(cfg.PESTANAS || 'RESUMEN, MOVIMIENTOS, CAJA, PENDIENTE, FACTURAS, PRESUPUESTO').split(',').map(function (s) { return s.trim().toUpperCase(); })
         .filter(hayPest);
@@ -1245,7 +1293,8 @@
           fac: ivaLeido(T.filas('FACTURAS')), pre: T.filas('PRESUPUESTOS'), per: R.PERIODO ? T.filas(R.PERIODO) : [], des: R.DESGLOSE ? T.filas(R.DESGLOSE) : [],
           colsPre: T.columnas ? T.columnas('PRESUPUESTOS') : [], colsMov: T.columnas ? T.columnas('MOVIMIENTOS') : [],
           lin: LINEAS ? T.filas('FACTURA_LINEAS') : [], emp: LINEAS ? T.filas('EMPRESA')[0] || null : null, colsEmp: LINEAS && T.columnas ? T.columnas('EMPRESA') || [] : [], colsCtr: T.columnas ? T.columnas('CONTRAPARTES') : [],
-          colsFac: T.columnas ? T.columnas('FACTURAS') || [] : []
+          colsFac: T.columnas ? T.columnas('FACTURAS') || [] : [],
+          lv: LV ? T.filas('VENTA_LINEAS') || [] : [] // T0739
         };
       }
       var d, lista, per, ix;
@@ -2558,13 +2607,20 @@
           }
           // T0653 · Desde «Calcular precio» («Llevar a una factura»): la primera línea, con la tela y el precio calculado.
           // T0689 · Desde un pedido: además, los metros; y si su nombre no trae ninguna tela de la lista, la línea con lo que dice.
-          if (linea0 && cajaLin && porLineas()) {
-            var a0 = ARTS.length ? artPorCodigo(String(linea0.articulo || '')) : null, r0 = cajaLin.querySelector('.eco-lin');
-            if (r0 && (a0 || linea0.concepto)) {
-              if (a0) elegir(r0, a0);
-              else { r0.querySelector('.eco-lin-c').value = String(linea0.concepto); if (linea0.unidad) r0.querySelector('.eco-lin-u').value = linea0.unidad; crecer(r0); }
-              if (linea0.cantidad != null && linea0.cantidad !== '') r0.querySelector('.eco-lin-n').value = String(linea0.cantidad).replace('.', ',');
-              if (linea0.precio != null && !isNaN(linea0.precio)) { var pi0 = r0.querySelector('.eco-lin-p'); pi0.value = String(linea0.precio).replace('.', ','); leerPrecio(pi0); }
+          // T0739 · Desde un pedido con sus líneas: una por tela (linea0 es una lista).
+          var lins0 = [].concat(linea0 || []).filter(function (x) { return x && (x.articulo || x.concepto); });
+          if (lins0.length && cajaLin && porLineas()) {
+            var r0 = cajaLin.querySelector('.eco-lin');
+            lins0.forEach(function (l0, i) {
+              if (i) filaLin({ CANTIDAD: '', UNIDAD: '' });
+              var rr = i ? cajaLin.lastChild : r0, a0 = ARTS.length ? artPorCodigo(String(l0.articulo || '')) : null;
+              if (!rr || !(a0 || l0.concepto)) return;
+              if (a0) elegir(rr, a0);
+              else { rr.querySelector('.eco-lin-c').value = String(l0.concepto); if (l0.unidad) rr.querySelector('.eco-lin-u').value = l0.unidad; crecer(rr); }
+              if (l0.cantidad != null && l0.cantidad !== '') rr.querySelector('.eco-lin-n').value = String(l0.cantidad).replace('.', ',');
+              if (l0.precio != null && !isNaN(l0.precio)) { var pi0 = rr.querySelector('.eco-lin-p'); pi0.value = String(l0.precio).replace('.', ','); leerPrecio(pi0); }
+            });
+            if (r0) {
               pintaLineas(); pintaTot();
               // Desde un pedido, la ventana se abre desde arriba (a quién y de qué pedido), no en los metros.
               if (deVenta) setTimeout(function () { var uv = vent.closest('.u-ventana'); if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); if (uv) uv.scrollTop = 0; }, 0);
@@ -2806,7 +2862,7 @@
         var arts = ART ? articulos(ART, { filas: function (t) { return T.filas(t) || []; }, fila: filaDe }) : [];
         var pre = { TIPO: 'Emitida', FECHA: hoy(), ID_CONTRAPARTE: v.ID_CONTRAPARTE || '' };
         pre[DS] = v.ID;
-        formFac(null, pre, null, lineaDeVenta(v, arts));
+        formFac(null, pre, null, LV ? lineasFacturaVenta(v, d.lv, arts) : lineaDeVenta(v, arts)); // T0739: con sus líneas, una por tela
       }
       /** Desde la ficha de una marca (idCtr: su contraparte, o «marca:M-214» si aún no lo es): si tiene pedidos sin factura,
        *  primero de cuál (sale ya con lo que pidió); si no, una factura a su nombre. */
@@ -3051,6 +3107,17 @@
         var h = (S.ven.volver ? '<button type="button" class="u-btn u-btn-texto eco-volver" data-accion="volverficha">‹ Volver a ' + texto(S.ven.volver.titulo) + '</button>' : '<button type="button" class="u-btn u-btn-texto eco-volver" data-accion="todasventas">‹ ' + V('Tod{a}s {los} {ventas}') + '</button>') +
           '<div class="eco-kpis eco-kpis-ven"><div class="eco-kpi eco-grande"><b>' + texto(nombreVenta(v)) + '</b><span class="eco-val">' +
           (x.cobrada ? eur0(x.ganado) + ' ganados' : x.adelantado ? paso('Cobrada por adelantado') : eur0(x.enJuego) + ' en juego') + '</span><span class="eco-sub">' + sub + '</span></div></div>@@FACTURA@@';
+        // T0739 · Lo que lleva: cada tela con sus metros, su taller y cómo va su envío (como su pestaña Pedidos).
+        if (LV && !v._nueva) {
+          var lvs = lineasVenta(d.lv, v.ID);
+          h += '<h2 class="n-grupo">' + V('Qué lleva {la} {venta}') + '</h2>' + (lvs.length ? '<ul class="eco-lvs">' + lvs.map(function (l) {
+            var env = envioLinea(l), quien = l.ID_PROVEEDOR ? nombreTaller(l.ID_PROVEEDOR) : '';
+            return '<li><button type="button" class="eco-lv" data-linea="' + texto(l.ID) + '"><span class="eco-lv-t"><b>' + texto(nombreTela(l.ARTICULO)) + '</b>' +
+              '<span class="u-nota">' + texto([metrosDe(l), quien ? 'taller ' + quien : 'sin taller'].join(' · ')) + '</span></span>' +
+              '<span class="eco-lv-e' + (env === 'Por salir' ? ' eco-lv-por' : '') + '">' + texto(env) + '</span></button></li>';
+          }).join('') + '</ul>' : '<p class="u-vacio">' + V('Aún no has apuntado las telas de {este} {venta}.') + '</p>') +
+            '<p><button type="button" class="u-btn u-btn-texto" data-accion="nuevalinea">+ Añadir línea</button></p>';
+        }
         // T0689 · Su factura (la emitida que la elige), como un paso más y, abajo, para abrirla o hacerla.
         var fv = facPorVenta() ? facturaDeVenta(d.fac, DS, v.ID) : null;
         var pasos = [[paso('Pedida'), v.FECHA]];
@@ -3085,6 +3152,71 @@
           '<button type="button" class="u-btn" data-accion="editarventa">' + V('Editar {la} {venta}') + '</button></div>';
       }
 
+      /* ---------- T0739 · las líneas de una venta ---------- */
+      function artsVenta() { return ARTV ? articulos(ARTV, { filas: function (t) { return T.filas(t) || []; }, fila: filaDe }) : []; }
+      /** Una tela como se dice: «BOR-004-01 · Bordado · Arena» (su código, si ya no está en la lista). */
+      function nombreTela(cod) {
+        cod = String(cod || '').trim();
+        var a = artsVenta().filter(function (x) { return x.codigo === cod; })[0];
+        if (a) return a.nombre && a.nombre !== cod ? cod + ' · ' + a.nombre : cod;
+        return cod || 'Sin tela';
+      }
+      function nombreTaller(id) { var t = ARTV ? (ARTV._refs || {}) : {}, f = null; Object.keys(t).forEach(function (k) { if (!f && /PROVEEDOR/.test(k)) f = filaDe(k, id); }); return f ? String(f.NOMBRE || id) : String(id); }
+      function metrosDe(l) { return l.CANTIDAD === '' || l.CANTIDAD == null ? 'sin metros' : String(cantidad(l.CANTIDAD)).replace('.', ',') + ' m'; }
+      /** Los talleres que se pueden elegir: los de las telas de la lista, por nombre (y el que ya tenga la línea). */
+      function talleres(arts, sel) {
+        var vistos = {}, xs = [];
+        arts.map(function (a) { return a.taller; }).concat(sel ? [sel] : []).forEach(function (id) {
+          if (!id || vistos[id]) return; vistos[id] = 1; xs.push([id, nombreTaller(id)]);
+        });
+        return xs.sort(function (a, b) { return String(a[1]).localeCompare(String(b[1]), 'es'); });
+      }
+      /** Añadir (l null) o cambiar una línea: la tela, los metros, el taller y su envío. */
+      function formLinea(v, l) {
+        var arts = artsVenta(), x = l || {}, cod = String(x.ARTICULO || '');
+        var trs = {}; d.lv.forEach(function (y) { var t = String(y.TRANSPORTISTA || '').trim(); if (t) trs[t] = 1; });
+        var html = '<h2 id="eco-vt">' + (l ? 'Cambiar la línea' : 'Añadir una línea') + '</h2><p class="u-nota">' + texto(nombreVenta(v)) + '</p><div class="u-campos">' +
+          campo('Tela', '<input type="text" id="l-ART" list="l-arts" value="' + texto(cod) + '" placeholder="Busca por código o nombre" autocomplete="off" data-foco>' +
+            '<datalist id="l-arts">' + arts.map(function (a) { return '<option value="' + texto(a.codigo) + '">' + texto(a.nombre) + '</option>'; }).join('') + '</datalist>', 'u-ancho') +
+          campo('Metros', '<input type="text" inputmode="decimal" id="l-CANTIDAD" value="' + texto(x.CANTIDAD === '' || x.CANTIDAD == null ? '' : String(x.CANTIDAD).replace('.', ',')) + '" placeholder="Si aún no se sabe, vacío">') +
+          campo('Taller', '<select id="l-ID_PROVEEDOR">' + opciones(talleres(arts, x.ID_PROVEEDOR), x.ID_PROVEEDOR, 'Sin taller') + '</select>') +
+          campo('Transportista <span class="eco-opc">(al salir)</span>', '<input type="text" id="l-TRANSPORTISTA" list="l-trs" value="' + texto(x.TRANSPORTISTA) + '" maxlength="60" placeholder="DHL, FedEx, tu transitario…" autocomplete="off">' +
+            '<datalist id="l-trs">' + Object.keys(trs).sort().map(function (t) { return '<option value="' + texto(t) + '"></option>'; }).join('') + '</datalist>') +
+          campo('Nº de seguimiento <span class="eco-opc">(al salir)</span>', '<input type="text" id="l-SEGUIMIENTO" value="' + texto(x.SEGUIMIENTO) + '" maxlength="80" autocomplete="off">') +
+          '</div><p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="l-guardar">' + (l ? 'Guardar' : 'Añadir') + '</button>' +
+          (l ? '<button type="button" class="u-btn" id="l-quitar">Quitar la línea</button>' : '') +
+          '<button type="button" class="u-btn" data-cerrar>Cancelar</button></div>';
+        ventana(html, function () {
+          var inA = vent.querySelector('#l-ART'), selT = vent.querySelector('#l-ID_PROVEEDOR');
+          function artEscrito() { var c = val('l-ART').split('·')[0].trim().toUpperCase(); return arts.filter(function (a) { return a.codigo.toUpperCase() === c; })[0] || null; }
+          // Al elegir la tela, su taller (si es otra tela que la de antes; el que se haya puesto a mano en esta, no se toca).
+          inA.addEventListener('change', function () {
+            var a = artEscrito(); if (!a) return;
+            inA.value = a.codigo;
+            if (a.taller && (!l || a.codigo !== cod)) {
+              if (!selT.querySelector('option[value="' + a.taller.replace(/"/g, '') + '"]')) selT.insertAdjacentHTML('beforeend', opciones([[a.taller, nombreTaller(a.taller)]], ''));
+              selT.value = a.taller;
+            }
+          });
+          vent.querySelector('#l-guardar').onclick = function () {
+            var a = artEscrito(), tm = val('l-CANTIDAD'), mal = [];
+            var nl = { ARTICULO: a ? a.codigo : '', CANTIDAD: tm === '' ? '' : cantidad(tm), ID_PROVEEDOR: val('l-ID_PROVEEDOR'), TRANSPORTISTA: val('l-TRANSPORTISTA'), SEGUIMIENTO: val('l-SEGUIMIENTO') };
+            if (!a) mal.push(val('l-ART') ? 'Esa tela no está en ' + (ARTV && ARTV.titulo ? ARTV.titulo : 'la lista') + ': elígela de la lista.' : 'Falta la tela.');
+            if (tm !== '' && !(cantidad(tm) > 0)) mal.push('Los metros tienen que ser un número mayor que 0 (o vacío).');
+            if (mal.length) { verError(mal); return; }
+            cerrar();
+            if (l) T.actualizar('VENTA_LINEAS', l.ID, cambios(l, nl)).then(function () { if (ctx.abierta()) ctx.aviso('Línea guardada en el Excel.'); }, function () {});
+            else T.crear('VENTA_LINEAS', Object.assign({ ID_VENTA: v.ID }, nl)).then(function () { if (ctx.abierta()) ctx.aviso('Línea añadida.'); }, function () {});
+          };
+          var bq = vent.querySelector('#l-quitar');
+          if (bq) bq.onclick = function () {
+            if (bq.getAttribute('data-seguro') !== '1') { bq.setAttribute('data-seguro', '1'); bq.textContent = '¿Seguro? Quitarla'; return; }
+            cerrar();
+            T.borrar('VENTA_LINEAS', l.ID).then(function () { if (ctx.abierta()) ctx.aviso('Línea quitada.'); }, function () {});
+          };
+        });
+      }
+
       /**
        * T0725 (R04) · Las marcas de una venta. Con CLIENTES, como en una factura emitida (clientesFactura): las contrapartes
        * Cliente y las marcas que aún no lo son (las de su lista arriba y las de prospección aparte), que se dan de alta al
@@ -3112,6 +3244,15 @@
           return idc;
         });
       }
+      /** T0739 · La fila de ANTICIPO_MARCA (NECESIDADES) de la marca elegida: una contraparte con su ficha o «marca:M-…». */
+      function fichaAnticipo(v0) {
+        v0 = String(v0 || '');
+        var campoM = String(CLIV.campo || 'ID_MARCA'), c = /^marca:/.test(v0) ? null : ix.ctr[v0];
+        var idm = /^marca:/.test(v0) ? v0.slice(6) : c ? String(c[campoM] || '') : '';
+        if (!idm) return null;
+        var col = String(ANT.marca || campoM);
+        return (T.filas(ANT.tabla) || []).filter(function (r) { return String(r[col] || '') === idm; })[0] || null;
+      }
       /** Nueva venta (v null) o cambiar una: la marca, qué es, lo que paga, el anticipo y las fechas. */
       function formVenta(v) {
         var cols = T.columnas ? T.columnas(VEN) : [], hay = function (c) { return !cols.length || cols.indexOf(c) >= 0; };
@@ -3122,7 +3263,7 @@
           campo('Qué es', '<input type="text" id="v-NOMBRE" value="' + texto(x.NOMBRE) + '" maxlength="120" placeholder="Por ejemplo: Celosía arena · 300 m" data-foco>', 'u-ancho') +
           campo('Fecha del pedido', '<input type="date" id="v-FECHA" value="' + texto(x.FECHA) + '">') +
           (hay('IMPORTE') ? campo('Lo que paga la marca, sin IVA', '<input type="text" inputmode="decimal" id="v-IMPORTE" value="' + texto(x.IMPORTE === '' || x.IMPORTE == null ? '' : String(x.IMPORTE).replace('.', ',')) + '" placeholder="Si aún no está cerrado, vacío">') : '') +
-          (hay('ANTICIPO') ? campo('Anticipo (%)', '<input type="text" inputmode="decimal" id="v-ANTICIPO" value="' + (ant ? String(Math.round(ant * 1000) / 10).replace('.', ',') : '') + '" placeholder="Sin anticipo, vacío">') : '') +
+          (hay('ANTICIPO') ? campo('Anticipo (%)', '<input type="text" inputmode="decimal" id="v-ANTICIPO" value="' + (ant ? String(Math.round(ant * 1000) / 10).replace('.', ',') : '') + '" placeholder="Sin anticipo, vacío"><span class="u-nota" id="v-ant-nota" hidden>Lo pone su ficha: acepta anticipo. Puedes cambiarlo.</span>') : '') +
           (hay('FECHA_ENVIO') ? campo('Salieron las telas <span class="eco-opc">(en camino)</span>', '<input type="date" id="v-FECHA_ENVIO" value="' + texto(x.FECHA_ENVIO) + '">') : '') +
           (hay('FECHA_ENTREGA') ? campo('Las recibió la marca', '<input type="date" id="v-FECHA_ENTREGA" value="' + texto(x.FECHA_ENTREGA) + '">') : '') +
           (hay('NOTAS') ? campo('Notas <span class="eco-opc">(opcional)</span>', '<textarea id="v-NOTAS" rows="2" placeholder="Condiciones, plazos, lo que hayáis acordado…">' + texto(x.NOTAS) + '</textarea>', 'u-ancho') : '') +
@@ -3130,6 +3271,15 @@
           '<p class="u-error" role="alert" hidden></p><div class="n-botones"><button type="button" class="u-btn u-btn-accion" id="v-guardar">' + (v ? 'Guardar' : V('Crear {la} {venta}')) + '</button>' +
           '<button type="button" class="u-btn" data-cerrar>Cancelar</button></div>';
         ventana(html, function () {
+          // T0739 · En un pedido nuevo, al elegir la marca, el anticipo que dice su ficha (si no se ha escrito otro).
+          var selM = vent.querySelector('#v-ID_CONTRAPARTE'), inAnt = vent.querySelector('#v-ANTICIPO'), notaAnt = vent.querySelector('#v-ant-nota'), puesto = '';
+          if (ANT && !v && selM && inAnt) selM.addEventListener('change', function () {
+            var p = anticipoMarca(ANT, fichaAnticipo(selM.value), function (t, id) { var f = filaDe(t, id); return f ? f.NOMBRE : ''; });
+            if (inAnt.value.trim() !== '' && inAnt.value !== puesto) return; // lo ha escrito ella: no se toca
+            puesto = p ? String(Math.round(p * 1000) / 10).replace('.', ',') : '';
+            inAnt.value = puesto; notaAnt.hidden = !p;
+          });
+          if (inAnt && notaAnt) inAnt.addEventListener('input', function () { notaAnt.hidden = true; });
           vent.querySelector('#v-guardar').onclick = function () {
             var nv = { NOMBRE: val('v-NOMBRE'), FECHA: val('v-FECHA') }, mal = [];
             if (hay('ID_CONTRAPARTE')) nv.ID_CONTRAPARTE = val('v-ID_CONTRAPARTE');
@@ -3189,6 +3339,8 @@
           var ti = /^(\d{4})-(\d)$/.exec(ir.getAttribute('data-trim-ir') || ''); if (ti) S.gest.q = { ano: ti[1], t: Number(ti[2]) }; // T0733: el del Resumen
           if (pest.indexOf(ir.getAttribute('data-ir')) >= 0) irA(ir.getAttribute('data-ir')); return;
         }
+        var bl = t.closest('[data-linea]'); // T0739: una línea de la venta abierta
+        if (bl) { var vb = ix.des[S.ven.id], lb = d.lv.filter(function (y) { return String(y.ID) === bl.getAttribute('data-linea'); })[0]; if (vb && lb && !lb._nueva) formLinea(vb, lb); return; }
         var a = t.closest('[data-accion]');
         if (a) {
           var ac = a.getAttribute('data-accion');
@@ -3209,6 +3361,7 @@
           else if (ac === 'cruzados') verMovs({ cruz: true }, S.tab);
           else if (ac === 'sinfac') verMovs({ tipo: 'Gasto', sinFac: true }, S.tab);
           else if (ac === 'nuevaventa') formVenta(null);
+          else if (ac === 'nuevalinea') { var vl = ix.des[S.ven.id]; if (vl && LV) formLinea(vl, null); } // T0739
           else if (ac === 'editarventa') { var ve = ix.des[S.ven.id]; if (ve && !ve._nueva) formVenta(ve); }
           else if (ac === 'movventa') { var pv = {}; pv[DS] = S.ven.id; formMov(null, pv); }
           else if (ac === 'facturaventa') { volverTras = null; facturarVenta(ix.des[S.ven.id]); } // T0689
