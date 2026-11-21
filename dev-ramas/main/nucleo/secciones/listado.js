@@ -420,6 +420,23 @@
     return '';
   }
   function quitada(vs, n) { var k = String(n).trim().toLowerCase(); return vs.some(function (v) { return String(v).trim().toLowerCase() === k; }); }
+  /**
+   * T0717 · SOLO_LEER: quien está ahí (y no administra) ve la sección entera, pero sin nada que cambie: sin «Añadir» (CREAR,
+   * ALTA), sin «Borrar», sin editar la ficha ni tocando (EDITAR, que también quita arrastrar en el tablero), sin cerrar ni pasar
+   * (RAPIDAS), sin los botones que cambian la fila o lo de arriba (ACCIONES con «poner», ARRIBA), sin cambiar lo de dentro de
+   * la ficha (RELACIONADOS) y sin personalizar. Los botones que llevan a otra sección («ir») se quedan. El motor tampoco le deja.
+   * Con _soloMirar: true, para decirlo en la pantalla. me: { admin, perfil }.
+   */
+  function soloMirar(cfg, me) {
+    if (!cfg || !me || me.admin || lista(cfg.SOLO_LEER).indexOf(me.perfil) < 0) return cfg;
+    var c = JSON.parse(JSON.stringify(cfg));
+    c.EDITAR = []; c.CREAR = false; c.BORRAR = {}; c.RAPIDAS = {}; c.ALTA = {}; c.PERSONALIZAN = [];
+    c.ACCIONES = lista(c.ACCIONES).filter(function (x) { return x && x.ir; }).map(function (x) { delete x.poner; return x; });
+    c.RELACIONADOS = lista(c.RELACIONADOS).map(function (r) { if (r && typeof r === 'object') { delete r.editar; delete r.crear; delete r.quitar; delete r.elegir; delete r.poner; } return r; });
+    c.ARRIBA = lista(c.ARRIBA).map(function (x) { if (x && typeof x === 'object') x.botones = []; return x; });
+    c._soloMirar = true;
+    return c;
+  }
   function sinOcultas(cfg, oc) {
     var ts = (oc && oc.tablas) || [], fs = ((oc && oc.filas) || {})[cfg && cfg.TABLA] || {}, vacias = (oc && oc.columnas) || {};
     if ((!ts.length && !Object.keys(fs).length && !Object.keys(vacias).length) || !cfg) return cfg;
@@ -2232,7 +2249,7 @@
   var CALC = { pctVer: pctVer, pctEscrito: pctEscrito, deEscrito: deEscrito, nuevoId: nuevoId, altaNuevoDe: altaNuevoDe, codigoAltaNuevo: codigoAltaNuevo, plantillaPrefijo: plantillaPrefijo, codigoNuevo: codigoNuevo, esRuta: esRuta, destinoDe: destinoDe, avisoRuta: avisoRuta, borrarDe: borrarDe, queBorra: queBorra, borrarCon: borrarCon, seccionDeFila: seccionDeFila, seccionesRel: seccionesRel, plantillaPara: plantillaPara, sinMarcas: sinMarcas, sinComunes: sinComunes, palabraTodos: palabraTodos, yaEsta: yaEsta, yaPuestos: yaPuestos, esSoporte: esSoporte, htmlErrores: htmlErrores, cuantas: cuantas, yJuntos: yJuntos, relEdicion: relEdicion, altaRelacionada: altaRelacionada, paraElegir: paraElegir, sufijoFijo: sufijoFijo, dosOpciones: dosOpciones,
     fechaDia: fechaDia, webCorta: webCorta, webSitio: webSitio, textoCorto: textoCorto, gruposConQuien: gruposConQuien, nombreCorto: nombreCorto, deshacerEnOrden: deshacerEnOrden, guardadoSolo: guardadoSolo, loDiceUnAviso: loDiceUnAviso, contextoCol: contextoCol, resumenDe: resumenDe, opcionesPasar: opcionesPasar, fechasSiguiente: fechasSiguiente, rapidaEn: rapidaEn, siguienteCon: siguienteCon, queHacerAtras: queHacerAtras, dirFicha: dirFicha, cambiosHecha: cambiosHecha, conHablado: conHablado, deducidos: deducidos, filaSiguiente: filaSiguiente, codigoDe: codigoDe, diaCorto: diaCorto, masDias: masDias,
     textoVuelta: textoVuelta, QUITAR_DE_VUELTA: QUITAR_DE_VUELTA, conFicha: conFicha, mostrar: mostrar, cuentaInstagram: cuentaInstagram, instagramUrl: instagramUrl, imagen: imagen, fotoDeTarjeta: fotoDeTarjeta, SIN_FOTO: SIN_FOTO, sinRepetir: sinRepetir, franja: franja, nivelDeCampo: nivelDeCampo, columnaDelGrupo: columnaDelGrupo, titulo: titulo, aFecha: aFecha, diasHasta: diasHasta, aNumero: aNumero, esTelefono: esTelefono, telDe: telDe, cumple: cumple, calcular: calcular, usa: usa,
-    valoresDe: valoresDe, resumenCifras: resumenCifras, arribaDe: arribaDe, filasArriba: filasArriba, rangoFechas: rangoFechas, lineaArriba: lineaArriba, cifrasResumen: cifrasResumen, seguirCrudo: seguirCrudo, tablasDeRuta: tablasDeRuta, conCamposPropios: conCamposPropios, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, campo: campo,
+    valoresDe: valoresDe, resumenCifras: resumenCifras, arribaDe: arribaDe, filasArriba: filasArriba, rangoFechas: rangoFechas, lineaArriba: lineaArriba, cifrasResumen: cifrasResumen, seguirCrudo: seguirCrudo, tablasDeRuta: tablasDeRuta, conCamposPropios: conCamposPropios, prohibido: prohibido, tapar: tapar, num: num, textoProhibido: textoProhibido, apartado: apartado, sinOcultas: sinOcultas, soloMirar: soloMirar, campo: campo,
     ocultas: ocultas, vistasDe: vistasDe, vistaDeFila: vistaDeFila, enriquecer: enriquecer, preparar: preparar, seguir: seguir, conNombres: conNombres, nombradas: nombradas, columnasDe: columnasDe, comprobar: comprobar, aplicar: aplicar, accionesDe: accionesDe, recomendacionDe: recomendacionDe, camposCond: camposCond, irA: irA, ocultasDe: ocultasDe, mover: mover, paraClaude: paraClaude, cuenta: cuenta, textoDe: textoDe, repartir: repartir, valorCon: valorCon, columnasCon: columnasCon, cambioCampo: cambioCampo, textoCambio: textoCambio, miasDe: miasDe, equipoLimpio: equipoLimpio, hayMias: hayMias, esMia: esMia, nombrePara: nombrePara, conEquipo: conEquipo,
     avisosDe: avisosDe, avisosActivos: avisosActivos, avisosBarra: avisosBarra, filtrar: filtrar, agrupar: agrupar, columnasTablero: columnasTablero,
     relacionadas: relacionadas, juntarDe: juntarDe, partes: partes, verTexto: verTexto, rellenar: rellenar, enPlantilla: enPlantilla, veRelacionado: veRelacionado, expandir: expandir, camposTarjeta: camposTarjeta, desglose: desglose, cuando: cuando, comparar: comparar,
@@ -2276,7 +2293,8 @@
       // Las secciones a las que se puede ir (las que ve quien ha entrado), para los enlaces de lo relacionado.
       var veo = {}; (ctx.secciones || []).forEach(function (s) { veo[s.id] = s.titulo; });
       // T0692: las ventas (VENTAS y los campos con «venta»), solo para quien ve su sección (Pedidos).
-      var T = ctx.tablas, cfg = sinVentas(sinOcultas(ctx.config || {}, ctx.ocultar), veo), PROHIB = cfg.PROHIBIDO === undefined ? PROHIB_DEFECTO : cfg.PROHIBIDO;
+      // T0717: con SOLO_LEER, sin nada que cambie.
+      var T = ctx.tablas, cfg = soloMirar(sinVentas(sinOcultas(ctx.config || {}, ctx.ocultar), veo), { admin: !!ctx.admin, perfil: ctx.perfil }), PROHIB = cfg.PROHIBIDO === undefined ? PROHIB_DEFECTO : cfg.PROHIBIDO;
       var BASE = apartado(cfg, ctx.id, ctx.titulo), PREF = cfg.PREFERENCIAS || '';
       var puedePersonalizar = !!ctx.admin || (cfg.PERSONALIZAN || []).indexOf(ctx.perfil) >= 0;
       var K = 'li_' + ctx.id + '_';
@@ -2468,6 +2486,7 @@
         // T0644: Personalizar va al Perfil; lo que es la vista, a mano en el ordenador y tras «i» en el móvil.
         var ayuda = textoDe(a, vista);
         html += '<span class="u-nota li-cuenta">@@CUENTA@@</span>';
+        if (cfg._soloMirar) html += '<span class="u-nota li-solo">Solo para mirar</span>'; // T0717
         if (ayuda) html += '<button type="button" class="u-btn u-btn-icono li-qes" data-qes aria-expanded="' + !!S.qes + '" aria-controls="li-texto" aria-label="Qué es esta vista">' + ICONO_INFO + '</button>';
         html += '</div>';
         if (ayuda) html += '<p class="u-nota li-texto' + (S.qes ? ' li-abierto' : '') + '" id="li-texto">' + texto(ayuda) + '</p>';

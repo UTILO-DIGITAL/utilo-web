@@ -153,6 +153,23 @@
     return '';
   }
   function quitada(vs, n) { var k = String(n).trim().toLowerCase(); return vs.some(function (v) { return String(v).trim().toLowerCase() === k; }); }
+  /**
+   * T0717 · SOLO_LEER: quien está ahí (y no administra) ve la sección entera, pero sin nada que cambie: sin «Añadir» (CREAR,
+   * ALTA), sin «Borrar», sin editar la ficha ni tocando (EDITAR, que también quita arrastrar en el tablero), sin cerrar ni pasar
+   * (RAPIDAS), sin los botones que cambian la fila o lo de arriba (ACCIONES con «poner», ARRIBA), sin cambiar lo de dentro de
+   * la ficha (RELACIONADOS) y sin personalizar. Los botones que llevan a otra sección («ir») se quedan. El motor tampoco le deja.
+   * Con _soloMirar: true, para decirlo en la pantalla. me: { admin, perfil }.
+   */
+  function soloMirar(cfg, me) {
+    if (!cfg || !me || me.admin || lista(cfg.SOLO_LEER).indexOf(me.perfil) < 0) return cfg;
+    var c = JSON.parse(JSON.stringify(cfg));
+    c.EDITAR = []; c.CREAR = false; c.BORRAR = {}; c.RAPIDAS = {}; c.ALTA = {}; c.PERSONALIZAN = [];
+    c.ACCIONES = lista(c.ACCIONES).filter(function (x) { return x && x.ir; }).map(function (x) { delete x.poner; return x; });
+    c.RELACIONADOS = lista(c.RELACIONADOS).map(function (r) { if (r && typeof r === 'object') { delete r.editar; delete r.crear; delete r.quitar; delete r.elegir; delete r.poner; } return r; });
+    c.ARRIBA = lista(c.ARRIBA).map(function (x) { if (x && typeof x === 'object') x.botones = []; return x; });
+    c._soloMirar = true;
+    return c;
+  }
   function sinOcultas(cfg, oc) {
     var ts = (oc && oc.tablas) || [], fs = ((oc && oc.filas) || {})[cfg && cfg.TABLA] || {}, vacias = (oc && oc.columnas) || {};
     if ((!ts.length && !Object.keys(fs).length && !Object.keys(vacias).length) || !cfg) return cfg;

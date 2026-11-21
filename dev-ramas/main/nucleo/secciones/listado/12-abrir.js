@@ -34,7 +34,8 @@
       // Las secciones a las que se puede ir (las que ve quien ha entrado), para los enlaces de lo relacionado.
       var veo = {}; (ctx.secciones || []).forEach(function (s) { veo[s.id] = s.titulo; });
       // T0692: las ventas (VENTAS y los campos con «venta»), solo para quien ve su sección (Pedidos).
-      var T = ctx.tablas, cfg = sinVentas(sinOcultas(ctx.config || {}, ctx.ocultar), veo), PROHIB = cfg.PROHIBIDO === undefined ? PROHIB_DEFECTO : cfg.PROHIBIDO;
+      // T0717: con SOLO_LEER, sin nada que cambie.
+      var T = ctx.tablas, cfg = soloMirar(sinVentas(sinOcultas(ctx.config || {}, ctx.ocultar), veo), { admin: !!ctx.admin, perfil: ctx.perfil }), PROHIB = cfg.PROHIBIDO === undefined ? PROHIB_DEFECTO : cfg.PROHIBIDO;
       var BASE = apartado(cfg, ctx.id, ctx.titulo), PREF = cfg.PREFERENCIAS || '';
       var puedePersonalizar = !!ctx.admin || (cfg.PERSONALIZAN || []).indexOf(ctx.perfil) >= 0;
       var K = 'li_' + ctx.id + '_';

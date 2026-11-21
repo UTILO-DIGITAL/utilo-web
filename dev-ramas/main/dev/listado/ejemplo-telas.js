@@ -445,7 +445,7 @@
 
   // T0662 · Lo que la sección no dice llega a la web con el defecto de motor/modulos/listado/modulo.json, como lo monta
   // montar.js (RAPIDAS, ALTA y CONTEXTO, {}): así se ve aquí lo mismo que en la app de verdad. probar-listado.js comprueba que son esos.
-  var DEFECTOS = {"TABLA":"","CLAVE":"ID","CODIGO":"","NOMBRE":"","COLUMNAS":[],"DETALLE":[],"ORDEN":"","FILTRO":[],"BUSCAR":[],"CAMPOS":{},"FICHA":[],"RELACIONADOS":[],"VISTAS":[],"AVISOS":[],"EDITAR":[],"CREAR":false,"NUEVO_ID":"","BORRAR":{},"ACCIONES":[],"GUARDAR":"solo","MIAS":{},"NUEVA":{},"RAPIDAS":{},"ALTA":{},"DEDUCIR":{},"CONTEXTO":{},"RESUMEN":{},"ARRIBA":[],"OBLIGATORIAS":[],"FILTROS":[],"TEXTO":"","FILAS":[],"VACIO":"","ANTIGUO":false,"VALORES":{},"PROHIBIDO":["CONTRASENA","CUENTA","DNI"],"PERSONALIZAN":[],"VENTAS":{},"PREFERENCIAS":""};
+  var DEFECTOS = {"TABLA":"","CLAVE":"ID","CODIGO":"","NOMBRE":"","COLUMNAS":[],"DETALLE":[],"ORDEN":"","FILTRO":[],"BUSCAR":[],"CAMPOS":{},"FICHA":[],"RELACIONADOS":[],"VISTAS":[],"AVISOS":[],"EDITAR":[],"CREAR":false,"NUEVO_ID":"","BORRAR":{},"ACCIONES":[],"GUARDAR":"solo","MIAS":{},"NUEVA":{},"RAPIDAS":{},"ALTA":{},"DEDUCIR":{},"CONTEXTO":{},"RESUMEN":{},"ARRIBA":[],"OBLIGATORIAS":[],"FILTROS":[],"TEXTO":"","FILAS":[],"VACIO":"","ANTIGUO":false,"VALORES":{},"PROHIBIDO":["CONTRASENA","CUENTA","DNI"],"SOLO_LEER":[],"PERSONALIZAN":[],"VENTAS":{},"PREFERENCIAS":""};
   Object.keys(SECCIONES).forEach(function (n) {
     var c = SECCIONES[n].config;
     Object.keys(DEFECTOS).forEach(function (k) { if (!(k in c)) c[k] = JSON.parse(JSON.stringify(DEFECTOS[k])); });
@@ -454,6 +454,8 @@
   // T0672 · El aviso de arriba, como en la app de Marta (nucleo.aviso), y una sección sin él ("": Mis telas), para ver que
   // cambia al pasar de una sección a otra. En su app, Economía lleva el suyo («Aquí sí se guarda…»; npm run local -- telas).
   SECCIONES.telas.aviso = '';
+  // T0717 · La ayudante solo mira Clientes (SOLO_LEER): la ve entera, sin nada que cambie; Prospección y Seguimiento, sí los cambia.
+  SECCIONES.clientes.config.SOLO_LEER = ['Ayudante'];
   var E = { nucleo: { perfiles: ['Dueña', 'Ayudante'], aviso: 'Esto es una prueba: lo que cambies aquí no se guarda. Tu Excel sigue mandando.', secciones: SECCIONES }, tablas: TABLAS, refs: REFS, defectos: DEFECTOS };
   if (typeof module !== 'undefined' && module.exports) module.exports = E;
   if (typeof window !== 'undefined') window.LISTADO_EJEMPLO = E;

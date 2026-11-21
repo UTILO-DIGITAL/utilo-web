@@ -19,6 +19,7 @@
         // T0644: Personalizar va al Perfil; lo que es la vista, a mano en el ordenador y tras «i» en el móvil.
         var ayuda = textoDe(a, vista);
         html += '<span class="u-nota li-cuenta">@@CUENTA@@</span>';
+        if (cfg._soloMirar) html += '<span class="u-nota li-solo">Solo para mirar</span>'; // T0717
         if (ayuda) html += '<button type="button" class="u-btn u-btn-icono li-qes" data-qes aria-expanded="' + !!S.qes + '" aria-controls="li-texto" aria-label="Qué es esta vista">' + ICONO_INFO + '</button>';
         html += '</div>';
         if (ayuda) html += '<p class="u-nota li-texto' + (S.qes ? ' li-abierto' : '') + '" id="li-texto">' + texto(ayuda) + '</p>';
