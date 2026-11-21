@@ -999,9 +999,12 @@
         if (!(d && (d.calculo || d.plantilla || d.de || d.primero))) hay(String(c).split('.')[0], q + ' usa', r.tabla, cs);
       });
       // T0651: lo que se edita, se añade o se elige desde la ficha, columnas de esa tabla; con «tarjeta» o «contiene», no se edita.
+      // T0738: con «tarjeta», sí se añade («crear»: la comparativa de una marca), pero no se edita ni se quita.
       if (r.editar || r.crear || r.quitar) {
         var e = relEdicion(r);
-        if (r.tarjeta || r.contiene || r.juntar) errores.push(donde + q + ': con «' + (r.tarjeta ? 'tarjeta' : r.contiene ? 'contiene' : 'juntar') + '» no se edita desde la ficha.');
+        if (r.contiene || r.juntar) errores.push(donde + q + ': con «' + (r.contiene ? 'contiene' : 'juntar') + '» no se edita desde la ficha.');
+        else if (r.tarjeta && (r.editar || r.quitar)) errores.push(donde + q + ': con «tarjeta» solo se añade («crear») desde la ficha: ni «editar» ni «quitar».');
+        if (r.tarjeta && r.elegir) errores.push(donde + q + ': con «tarjeta» no se añade eligiendo («elegir»): se pide con «alta».');
         if (cs) e.editar.concat(e.crear ? e.alta : [], e.elegir ? [e.elegir] : [], e.obligatorias).forEach(function (c) { hay(c, q + ' edita', r.tabla, cs); });
         if (cs) Object.keys(r.poner || {}).forEach(function (c) { hay(c, q + ' pone', r.tabla, cs); }); // T0737
         if (e.crear && !e.elegir && !e.alta.length) errores.push(donde + q + ': «crear» necesita lo que se pide al añadir («alta» o «editar»).');
@@ -2105,13 +2108,19 @@
   /**
    * T0651 · La fila nueva de lo relacionado: lo escrito (sin lo vacío), la columna que la une (r.campo = el «con» de esta
    * fila) y su código, si lleva plantilla o su tabla prefijo conocido (si no, lo pone el motor). → { valores, faltan }.
+   * T0738: idDe(columna, valor), si se pasa, da el código de lo de «poner» que apunta a otra tabla y va por su nombre
+   * («Buscando» → ECO01); si no lo encuentra (undefined), no se pone.
    */
-  function altaRelacionada(r, crudo, valores, existentes, prefijos) {
+  function altaRelacionada(r, crudo, valores, existentes, prefijos, idDe) {
     var e = relEdicion(r), v = {};
     Object.keys(valores || {}).forEach(function (k) { if (!vacio(valores[k])) v[k] = typeof valores[k] === 'string' ? valores[k].trim() : valores[k]; });
     v[r.campo] = (crudo || {})[r.con || 'ID'];
     // T0737: «poner», lo que lleva siempre una fila nueva si no se ha escrito (la tela que le interesa: «Le interesa»).
-    Object.keys(r.poner || {}).forEach(function (k) { if (vacio(v[k])) v[k] = r.poner[k]; });
+    Object.keys(r.poner || {}).forEach(function (k) {
+      if (!vacio(v[k])) return;
+      var p = idDe ? idDe(k, r.poner[k]) : r.poner[k];
+      if (p !== undefined) v[k] = p;
+    });
     var faltan = e.obligatorias.filter(function (c) { return vacio(v[c]); });
     if (e.id) { var id = nuevoId(e.id, v, existentes); if (id) v[e.clave] = id; else if (!faltan.length) faltan.push(e.clave); }
     return { valores: v, faltan: faltan };
@@ -3119,7 +3128,9 @@
           var cuerpo;
           // T0651: lo de dentro que se edita, se añade o se quita desde la ficha (las personas de contacto de una marca).
           var ri = a.relacionados.indexOf(r), e = relEdicion(r, YO.admin), conEd = e.algo && !r.tarjeta && !!T.actualizar;
-          if (conEd) relAps[ri] = enriquecer(apartado({ TABLA: r.tabla, CLAVE: e.clave, CAMPOS: r.campos || {}, COLUMNAS: cols, _refs: a.refs }), D);
+          // T0738: con «tarjeta», solo «+ Añadir comparativa» (sus tarjetas no se editan).
+          var soloAlta = !!r.tarjeta && e.crear && !!T.crear;
+          if (conEd || soloAlta) relAps[ri] = enriquecer(apartado({ TABLA: r.tabla, CLAVE: e.clave, CAMPOS: r.campos || {}, COLUMNAS: cols, _refs: a.refs }), D);
           var claveDe = function (x) { return (x.__crudo || x)[e.clave]; };
           if (!rs.length) cuerpo = '<p class="u-vacio">' + texto(r.vacio || 'Nada todavía.') + '</p>';
           else if (r.tarjeta) cuerpo = tarjetas(r, otro, rs, max);
@@ -3170,8 +3181,8 @@
           // T0690: las primeras «max» (20 si no lo dice) y «Ver todo»: las demás van escondidas y salen al tocarlo.
           if (resto > 0) cuerpo += '<button type="button" class="li-vermas li-vertodo" data-ver-todo>Ver todo <span class="u-nota">· ' + num(rs.length) + ' en total</span></button>';
           // T0651: «+ Añadir persona de contacto» (o eligiendo: «+ Añadir tela que le interesa»), aquí mismo.
-          var an = conEd && e.crear && !(e.clave === r.campo && rs.length) ? '<button type="button" class="li-rel-anadir" data-rel-nueva>+ Añadir ' + texto(e.filas[0]) + '</button>' : '';
-          var secH = '<section class="li-fgrupo"' + (conEd ? ' data-rel="' + ri + '"' : '') + '>' + cab + cuerpo + an + nv + '</section>';
+          var an = (conEd || soloAlta) && e.crear && !(e.clave === r.campo && rs.length) ? '<button type="button" class="li-rel-anadir" data-rel-nueva>+ Añadir ' + texto(e.filas[0]) + '</button>' : '';
+          var secH = '<section class="li-fgrupo"' + (conEd || soloAlta ? ' data-rel="' + ri + '"' : '') + '>' + cab + cuerpo + an + nv + '</section>';
           // T0731 (R68): con «tras», justo detrás de ese apartado de la ficha («Su seguimiento», tras «En qué punto está»); si no
           // está (la vista para un cliente, un alta), en su sitio de siempre.
           var gTras = r.tras === undefined ? -1 : grupos.map(function (g) { return g.titulo; }).indexOf(r.tras), marca = '<!--li-tras-' + gTras + '-->';
@@ -3423,7 +3434,8 @@
           var existentes = function () { return filas(r.tabla).map(function (y) { return y[e.clave]; }); };
           // T0724 (R35): lo escrito sigue ahí hasta que el motor dice que sí; si dice que no, alFallar(lo que pasa, en palabras).
           var anadir = function (valores, nombre, alFallar) {
-            var q = altaRelacionada(r, crudo, valores, existentes(), a.prefijos);
+            // T0738: lo de «poner» que apunta a otra tabla, por su nombre («Buscando»): su código; si no está, no se pone.
+            var q = altaRelacionada(r, crudo, valores, existentes(), a.prefijos, function (c, v) { var cp = campo(ra, c); return !cp.ids ? v : v in cp.ids ? cp.ids[v] : Object.keys(cp.ids).some(function (n) { return String(cp.ids[n]) === String(v); }) ? v : undefined; });
             if (q.faltan.length) return 'Falta ' + yJuntos(q.faltan.map(function (c) { return campo(ra, c).titulo.toLowerCase(); })) + '.';
             Promise.resolve(T.crear(r.tabla, q.valores, { callado: true })).then(function (out) {
               rehacer();
