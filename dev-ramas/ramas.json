@@ -1247,14 +1247,16 @@
   },
   "T0736-ordenar-nucleo": {
    "tarea": "T0736",
-   "titulo": "Merge pull request #421 from UTILO-DIGITAL/T0732-listas-como-app",
+   "titulo": "Una sola forma de buscar en el núcleo y el guardado de las fichas probado de verdad",
    "pr": null,
-   "commit": "26839fb5",
-   "ultimo": "Merge pull request #421 from UTILO-DIGITAL/T0732-listas-como-app",
+   "commit": "087e3315",
+   "ultimo": "T0736: Una sola forma de buscar en el núcleo y el guardado de las fichas probado de verdad",
    "quien": "Javi Canela",
-   "fecha": "2026-11-21T07:13:30.820Z",
-   "toca": [],
-   "comun": false,
+   "fecha": "2026-11-21T07:15:26.634Z",
+   "toca": [
+    "telas"
+   ],
+   "comun": true,
    "paginas": [
     {
      "ruta": "dev/konamigas/",
@@ -1289,7 +1291,7 @@
       "google",
       "codigo"
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/plataforma/",
@@ -1327,7 +1329,7 @@
      "entrar": [
       "google"
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/area/",
@@ -1362,7 +1364,7 @@
       "codigo",
       "google"
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/konamigas/competiciones/",
@@ -1418,7 +1420,7 @@
        "nombre": "Admin"
       }
      ],
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/",
@@ -1435,7 +1437,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     },
     {
      "ruta": "dev/telas/catalogo/",
@@ -1450,7 +1452,7 @@
      ],
      "motor": true,
      "local": true,
-     "cambia": false
+     "cambia": true
     }
    ],
    "migraciones": {
