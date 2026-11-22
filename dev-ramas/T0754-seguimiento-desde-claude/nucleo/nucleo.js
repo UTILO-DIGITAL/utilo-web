@@ -1,0 +1,1400 @@
+/*
+ * Marco del núcleo · UTILO_CORE 5.0 (T0253) · la parte del navegador de motor/core/NUCLEO.js de utilo-apps
+ *
+ * El núcleo es solo el marco común de todas las webs: entrar con Google, la cabecera, quién ha entrado y con qué perfil,
+ * y el menú de secciones (abajo en el móvil, a la izquierda en el ordenador). Las secciones (Kanban, Economía, Perfil,
+ * Pedir a Utilo y las de cada cliente) se enchufan con el mismo contrato (docs/CONTRATO_SECCION.md de utilo-apps).
+ *
+ * - Cada negocio tiene un index.html que define window.KANBAN = { api, clave, marca, nombreApp, google, proyecto,
+ *   clavePicker } y carga, por este orden, su marca.css, estilos/base.css, kanban4/google.js, kanban4/tablas.js y este archivo.
+ * - Al volver a entrar, el marco se pinta al momento con lo guardado en el dispositivo (quién eres y tus secciones) y se
+ *   comprueba con el motor por detrás («entrar»); si algo ha cambiado (perfil, secciones), se vuelve a pintar.
+ * - El menú solo enseña las secciones que el motor dice que ves: las activas del cliente que tu perfil puede ver. El motor
+ *   lo vuelve a comprobar en cada llamada, así que no basta con tocar la web.
+ * - Cada sección es un JS de utilo-web (su «web» en modulo.json) que se carga la primera vez que se abre, con su versión
+ *   (?v=), y se registra con UN.registrar('ID', { abrir: function (el, ctx) {…}, cerrar: function () {…} }).
+ *   abrir recibe el <main> de la sección y ctx (ver ctxDe más abajo): quién eres, su personalización, las tablas al
+ *   momento (kanban4/tablas.js, una copia para todas las secciones), llamar a sus funciones del motor y avisar.
+ * - Perfil va siempre al final del menú: si el cliente tiene la sección PERFIL (T0259), esa; si no, la del marco
+ *   (quién eres, tu perfil y cerrar sesión).
+ * - T0269: una sección con «enPerfil» (Pedir a Utilo, por defecto) no sale en el menú: se abre desde un botón al final de
+ *   Perfil y, mientras está abierta, el menú marca Perfil.
+ * - La sección va en la URL (?s=ejemplo). Cambiar de sección no recarga la página.
+ * - T0275: la copia de las tablas del dispositivo es de cada persona (su correo): en un dispositivo compartido, quien entra
+ *   empieza con la suya o vacía. Si entra otra persona en la misma página, se deja la copia de la anterior; al cerrar
+ *   sesión (o si el motor dice que ya no tiene acceso), se borra del dispositivo la de quien sale.
+ * - T0273 · Entrar como otra persona: quien administra elige a alguien de la tabla de accesos (botón en Perfil, data-n-como)
+ *   y la app se pinta como la ve esa persona: su perfil, su menú y lo suyo. Cada llamada al motor lleva «como» (su correo)
+ *   y el motor comprueba que quien llama administra (si no, «COMO:» y se vuelve a la cuenta propia). Arriba, siempre, la
+ *   franja «Viendo como …» con «Volver a mi cuenta» (data-n-volver). Se recuerda en la pestaña (sessionStorage): al
+ *   recargar sigue igual y al cerrarla se vuelve a la cuenta propia. Su copia de las tablas va aparte
+ *   (<correo de quien administra>><correo de ella>) y se borra al volver.
+ * - T0386 · Sin motor: con nucleo/acceso-supabase.js en lugar de kanban4/google.js, «inicio», «entrar» y lo que piden las
+ *   secciones van a Supabase (UG.inicio, UG.volviendo al volver de Google); sin «entrar como otra persona» (UG.sinComo).
+ * - T0283 · Versiones: «entrar» trae la versión que se ve («5.0-1.2») y las publicadas con sus novedades. Perfil enseña
+ *   el bloque «Versión» (UN.htmlVersion) con «Ver las novedades» (data-n-versiones), que abre la ventana con la lista. Si
+ *   hay una versión con novedades que no se ha visto en este dispositivo, la ventana se abre sola una vez al entrar.
+ */
+(function () {
+  'use strict';
+  /** T0736 · Sin tildes ni mayúsculas, para buscar y comparar: «Ébano» → «ebano». La misma para todas las secciones (UN.plano),
+   *  buscar.js y elegir.js; catalogo.js, la página pública, lleva la suya. Mantiene la longitud (para resaltar lo que casa:
+   *  los saltos de línea y tabuladores, espacios) y no recorta: quien compara valores, con .trim(). null o undefined son '';
+   *  el 0, «0». En Node (las pruebas), solo esto, cumpleCifra y nombreCifra (T0751). */
+  function plano(s) {
+    var t = s == null ? '' : String(s);
+    return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\S ]/g, ' ').slice(0, t.length);
+  }
+  /** T0283 · T0751 · Las versiones con novedades sin ver aquí (vs, la más reciente primero; vista, la última vista o null). La
+   *  primera vez (null) o si la vista ya no está, desde la última que trae novedades; si no, las de después de la vista. */
+  function versionesSinVer(vs, vista) {
+    var i = -1;
+    vs.forEach(function (x, k) { if (i < 0 && x.v === vista) i = k; });
+    var con = vs.filter(function (x) { return (x.novedades || []).length; });
+    if (vista === null || vista === undefined) return con.slice(0, 1);
+    return (i < 0 ? vs : vs.slice(0, i)).filter(function (x) { return (x.novedades || []).length; });
+  }
+  /** T0751 · Más de NOVEDADES_CORTA líneas sin ver: { version, lineas: lo principal (o sus 5 primeras), total }; si no, null. */
+  var NOVEDADES_CORTA = 8;
+  function novedadesCortas(sv) {
+    var total = sv.reduce(function (n, x) { return n + (x.novedades || []).length; }, 0);
+    if (!sv.length || total <= NOVEDADES_CORTA) return null;
+    var x = sv[0], p = Array.isArray(x.principal) && x.principal.length ? x.principal : (x.novedades || []).slice(0, 5);
+    return { version: x, lineas: p, total: total };
+  }
+  if (typeof window === 'undefined') { if (typeof module !== 'undefined') module.exports = { plano: plano, cumpleCifra: cumpleCifra, nombreCifra: nombreCifra, miaCifra: miaCifra, versionesSinVer: versionesSinVer, novedadesCortas: novedadesCortas }; return; }
+  var C = window.KANBAN || {};
+  var CLAVE = 'nucleo_' + (C.clave || 'negocio');
+  // Raíz de utilo-web (…/utilo-web/): de aquí cuelgan nucleo/, kanban4/, estilos/ y la carpeta de cada negocio.
+  var RAIZ = (function () { var s = document.currentScript && document.currentScript.src; return s ? s.replace(/nucleo\/[^/]*$/, '') : '../'; })();
+  // T0446: en la app «Utilo DEV» (dev-ramas/<rama>/…), su marco (el borde amarillo y la línea DEV), de dev-ramas/marco.js.
+  var APP_DEV = (/^(.*\/dev-ramas\/)[^/]+\//.exec(location.pathname) || [])[1] || '';
+  if (APP_DEV) {
+    var mDev = document.createElement('script');
+    mDev.src = APP_DEV + 'marco.js?v=' + Math.floor(Date.now() / 600000); // GitHub Pages lo guarda 10 minutos
+    document.head.appendChild(mDev);
+  }
+  var MENU_CLAVE = 'kanbanMenuPlegado'; // el mismo que kanban4/app.js (T0225): cada dispositivo recuerda cómo dejó el menú
+
+  /* T0740 · La letra sigue el tamaño de texto del iPhone y el iPad (Ajustes › Pantalla y brillo › Tamaño del texto), en las
+     apps que lo piden (KANBAN.letraDelSistema). La hoja da los tamaños en px; se agrandan o se achican todos a la vez, como
+     el «aA» de Safari, con -webkit-text-size-adjust (--letra-sistema, en body.u de base.css): el tamaño de
+     -apple-system-body entre 17 px, el normal de iOS. Solo con pantalla táctil: en el Mac, -apple-system-body es la letra
+     de escritorio (13 px). Entre 85 % y 140 %, para que no se rompa lo que tiene alto fijo. Se vuelve a mirar al volver a
+     la app (por si se ha cambiado en Ajustes). */
+  function ajustarLetra() {
+    if (!C.letraDelSistema || !window.CSS || !CSS.supports('font', '-apple-system-body')) return;
+    if (!window.matchMedia || !matchMedia('(hover: none) and (pointer: coarse)').matches) return;
+    var de = document.documentElement, p = document.createElement('span');
+    de.style.removeProperty('--letra-sistema'); // se mide sin el ajuste de antes
+    p.style.cssText = 'font:-apple-system-body;-webkit-text-size-adjust:100%;position:absolute;visibility:hidden';
+    p.textContent = 'x';
+    de.appendChild(p);
+    var px = parseFloat(getComputedStyle(p).fontSize);
+    p.remove();
+    if (px > 0) de.style.setProperty('--letra-sistema', proporcionLetra(px) + '%');
+  }
+  function proporcionLetra(px) { return Math.round(Math.max(0.85, Math.min(1.4, px / 17)) * 100); }
+  ajustarLetra();
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') ajustarLetra(); });
+
+  /* T0740 · Modo oscuro, voluntario, en las apps que lo tienen (KANBAN.modoOscuro): quien entra elige en Perfil › Aspecto
+     Claro (lo de siempre, por defecto), Oscuro o Como el móvil (sigue al sistema, también si cambia con la app abierta). Cada
+     dispositivo recuerda lo suyo. Se pone <html data-tema="oscuro"> y los colores están en base.css y en la marca.css. */
+  var TEMA_CLAVE = 'nucleo_tema_' + (C.clave || 'negocio');
+  var TEMAS = [['claro', 'Claro'], ['oscuro', 'Oscuro'], ['sistema', 'Como el móvil']];
+  function temaElegido() {
+    var t = ''; try { t = localStorage.getItem(TEMA_CLAVE) || ''; } catch (e) {}
+    return /^(claro|oscuro|sistema)$/.test(t) ? t : 'claro';
+  }
+  var SISTEMA_OSCURO = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
+  function aplicarTema() {
+    if (!C.modoOscuro) return;
+    var t = temaElegido(), oscuro = t === 'oscuro' || (t === 'sistema' && !!(SISTEMA_OSCURO && SISTEMA_OSCURO.matches));
+    var de = document.documentElement;
+    if (oscuro) de.setAttribute('data-tema', 'oscuro'); else de.removeAttribute('data-tema');
+    // La barra de Safari y del iPhone, del color del fondo.
+    var tc = document.querySelector('meta[name="theme-color"]'), fondo = getComputedStyle(de).getPropertyValue('--color-fondo').trim();
+    if (tc && fondo) tc.setAttribute('content', fondo);
+  }
+  aplicarTema();
+  if (SISTEMA_OSCURO) {
+    var alCambiar = function () { if (temaElegido() === 'sistema') aplicarTema(); };
+    if (SISTEMA_OSCURO.addEventListener) SISTEMA_OSCURO.addEventListener('change', alCambiar); else if (SISTEMA_OSCURO.addListener) SISTEMA_OSCURO.addListener(alCambiar);
+  }
+  /** El bloque «Aspecto» de Perfil (vacío si la app no tiene modo oscuro): el interruptor de tres, como el de Calcular precio. */
+  function htmlAspecto() {
+    if (!C.modoOscuro) return '';
+    var t = temaElegido();
+    return '<section class="pf-bloque pf-aspecto"><h2 class="n-grupo">Aspecto</h2>' +
+      '<div class="pr-seg" role="group" aria-label="Aspecto de la app">' + TEMAS.map(function (x) {
+        return '<button type="button" data-n-tema="' + x[0] + '" aria-pressed="' + (t === x[0]) + '">' + x[1] + '</button>';
+      }).join('') + '</div>' +
+      '<p class="u-nota">«Como el móvil» la pone oscura cuando el móvil o el ordenador lo están. Se recuerda en este dispositivo.</p></section>';
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-n-tema]');
+    if (!b) return;
+    try { localStorage.setItem(TEMA_CLAVE, b.getAttribute('data-n-tema')); } catch (err) {}
+    aplicarTema();
+    [].forEach.call(document.querySelectorAll('[data-n-tema]'), function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+  });
+
+  var ICONO_PERFIL = '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"/>';
+  var ICONO_SECCION = '<circle cx="12" cy="12" r="3"/>';
+  var ICONO_LUPA = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>';
+  var MAC = /mac|iphone|ipad/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '');
+
+  function $(id) { return document.getElementById(id); }
+  function texto(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function leer() { try { return JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) { return null; } }
+  function guardar(o) { try { localStorage.setItem(CLAVE, JSON.stringify(o)); } catch (e) {} }
+  function borrar() { try { localStorage.removeItem(CLAVE); } catch (e) {} }
+  // T0273: viendo como otra persona, lo que dijo el motor de ella, solo en esta pestaña.
+  var COMO = 'nucleo_como_' + (C.clave || 'negocio');
+  function leerComo() { try { return JSON.parse(sessionStorage.getItem(COMO) || 'null'); } catch (e) { return null; } }
+  function guardarComo(o) { try { sessionStorage.setItem(COMO, JSON.stringify(o)); } catch (e) {} }
+  function borrarComo() { try { sessionStorage.removeItem(COMO); } catch (e) {} }
+  function bajo(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
+  /** T0275/T0273 · De quién es la copia de las tablas: su correo o, viendo como otra persona, «<quien administra>><ella>». */
+  function copiaDe(c) { return !c ? '' : c.como && c.como.correo ? bajo(c.como.correo) + '>' + bajo(c.correo) : bajo(c.correo); }
+
+  /**
+   * Llamada al motor con la llave de Google; pide conectar un Excel si falta (google.js · UG.seccion). T0273: viendo como
+   * otra persona, lleva «como»; si el motor no lo deja (COMO:), se vuelve a la cuenta propia.
+   */
+  function llamar(fn, args) {
+    var c = { fn: fn, args: args || [] };
+    if (cred && cred.como) c.como = cred.correo;
+    return window.UG.seccion(C.api, c, CLAVE).catch(function (e) {
+      if (/^COMO:/.test(e.message) && c.como && cred && cred.como && cred.correo === c.como) volver(e.message.replace(/^COMO:\s*/, ''));
+      throw new Error(String(e.message).replace(/^COMO:\s*/, ''));
+    });
+  }
+  /** «entrar», con los errores tal cual (ACCESO: vuelve a la pantalla de entrada). T0273: como, el correo de otra persona. */
+  function entrar(como) {
+    como = typeof como === 'string' && /^[^@\s]+@[^@\s]+$/.test(como) ? como : ''; // solo un correo
+    return window.UG.llamar(C.api, como ? { fn: 'entrar', como: como } : { fn: 'entrar' });
+  }
+  function inicio() {
+    if (window.UG.inicio) return window.UG.inicio(); // T0386: sin motor (acceso-supabase.js)
+    return fetch(C.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: 'inicio' }) })
+      .then(function (r) { if (!r.ok) throw new Error('No hay conexión con el motor del negocio (' + r.status + ').'); return r.json(); })
+      .then(function (o) { if (!o.ok) throw new Error(String(o.error || 'Error')); return o.r; });
+  }
+
+  /* ---------- pantallas de carga y de entrada ---------- */
+
+  function pantalla(html) { document.body.className = 'u'; document.body.innerHTML = '<div class="kz">' + html + '</div>'; }
+  function cargando(msg) { pantalla('<div class="kz-caja kz-centro" role="status"><div class="u-carga"></div><p>' + texto(msg || 'Cargando…') + '</p></div>'); }
+  function falloPantalla(msg) {
+    pantalla('<div class="kz-caja"><p>' + texto(msg) + '</p><button type="button" class="u-btn" onclick="location.reload()">Volver a intentarlo</button></div>');
+  }
+
+  /** Entrar con Google: el motor dice el nombre del negocio y si tiene sesión larga (T0209); después, «entrar». */
+  function acceso(aviso) {
+    usoParar(); // T0682: en la pantalla de entrada no hay nadie a quien apuntar
+    cargando('Conectando…');
+    inicio().then(function (ini) {
+      if (window.UG.configurar) window.UG.configurar(ini);
+      if (!ini.nucleo) { falloPantalla('Esta web todavía no tiene el núcleo nuevo: abre la web de siempre del negocio.'); return; }
+      var titulo = C.nombreApp || ini.titulo || ini.negocio || 'Entrar';
+      document.title = titulo;
+      var ant = leer() || {};
+      // T0391: con Supabase, la web puede entrar también (o solo) con un código al correo.
+      var formas = window.UG.formas ? window.UG.formas() : ['google'];
+      if (formas.indexOf('codigo') >= 0) { entrarConCodigo(ini, titulo, ant, aviso, formas); return; }
+      pantalla('<div class="kz-caja" id="n-entrar">' + bandaDev(ini.nucleo.dev) + '<h1>' + texto(titulo) + '</h1>' +
+        '<p class="kz-ayuda">' + texto(ant.persona ? 'Vuelve a entrar con tu cuenta de Google, ' + ant.persona.split(' ')[0] + '.' :
+          'Entra con la cuenta de Google con la que te han dado acceso.') + '</p>' +
+        '<button type="button" class="u-btn u-btn-accion">' + (ant.persona ? 'Continuar con Google' : 'Entrar con Google') + '</button>' +
+        '<p class="kz-aviso" id="n-aviso-entrar">' + texto(aviso || '') + '</p></div>');
+      var b = $('n-entrar').querySelector('button');
+      b.onclick = function () {
+        b.disabled = true; b.textContent = 'Entrando…';
+        // T0273: sin pasar la llave que devuelve Google a entrar (su argumento es «como»).
+        window.UG.entrar().then(function () { return entrar(); }).then(function (r) {
+          window.UG.recordarCorreo(r.correo || '');
+          var cred = credDe(r);
+          guardar(cred); borrarComo(); marco(cred); // T0273: al entrar con Google, siempre con la cuenta propia
+        }, function (e) {
+          if (/^CONECTAR:/.test(e.message)) { conectarYEntrar(e); return; }
+          b.disabled = false; b.textContent = ant.persona ? 'Continuar con Google' : 'Entrar con Google';
+          $('n-aviso-entrar').textContent = String(e.message).replace(/^ACCESO:\s*/, '');
+        });
+      };
+      b.focus();
+    }, function (e) { falloPantalla(e.message); });
+  }
+
+  /**
+   * T0391 · Entrar con un código al correo (y, si la web lo tiene también, con Google): primero el correo y «Enviarme un
+   * código»; después, las 6 cifras y «Entrar». En local y DEV el correo no sale: «Ver el buzón de pruebas» lo enseña aquí.
+   */
+  function entrarConCodigo(ini, titulo, ant, aviso, formas) {
+    var conGoogle = formas.indexOf('google') >= 0, correo = bajo(ant.correo || (window.UG.correo && window.UG.correo()) || '');
+    function listo(r) {
+      window.UG.recordarCorreo(r.correo || '');
+      var c = credDe(r);
+      guardar(c); borrarComo(); marco(c);
+    }
+    function paso1(msg) {
+      pantalla('<div class="kz-caja" id="n-entrar">' + bandaDev(ini.nucleo.dev) + '<h1>' + texto(titulo) + '</h1>' +
+        '<p class="kz-ayuda">' + texto(ant.persona ? 'Hola, ' + ant.persona.split(' ')[0] + '. Te enviamos un código a tu correo para volver a entrar.' :
+          'Escribe tu correo y te enviamos un código para entrar. Sin contraseñas.') + '</p>' +
+        '<form id="n-f-correo" class="kz-form" novalidate><label>Tu correo<input type="email" id="n-correo" autocomplete="email" inputmode="email" ' +
+          'autocapitalize="off" spellcheck="false" value="' + texto(correo) + '" required></label>' +
+        '<button type="submit" class="u-btn u-btn-accion">Enviarme un código</button></form>' +
+        (conGoogle ? '<p class="kz-o">o</p><button type="button" class="u-btn" id="n-google">' + (ant.persona ? 'Continuar con Google' : 'Entrar con Google') + '</button>' : '') +
+        '<p class="kz-aviso" id="n-aviso-entrar" role="alert">' + texto(msg || '') + '</p></div>');
+      var f = $('n-f-correo'), b = f.querySelector('button'), i = $('n-correo');
+      f.onsubmit = function (e) {
+        e.preventDefault();
+        b.disabled = true; b.textContent = 'Enviando…'; $('n-aviso-entrar').textContent = '';
+        window.UG.pedirCodigo(i.value).then(function (c) { correo = c; paso2(''); }, function (x) {
+          b.disabled = false; b.textContent = 'Enviarme un código'; $('n-aviso-entrar').textContent = x.message; i.focus();
+        });
+      };
+      if (conGoogle) {
+        var g = $('n-google');
+        g.onclick = function () {
+          g.disabled = true; g.textContent = 'Entrando…';
+          window.UG.entrar().then(function () { return entrar(); }).then(listo, function (x) {
+            g.disabled = false; g.textContent = ant.persona ? 'Continuar con Google' : 'Entrar con Google';
+            $('n-aviso-entrar').textContent = String(x.message).replace(/^ACCESO:\s*/, '');
+          });
+        };
+      }
+      (i.value ? b : i).focus();
+    }
+    function paso2(msg) {
+      var dev = !!ini.nucleo.dev;
+      pantalla('<div class="kz-caja" id="n-entrar">' + bandaDev(ini.nucleo.dev) + '<h1>' + texto(titulo) + '</h1>' +
+        '<p class="kz-ayuda">Te hemos enviado un código a <strong>' + texto(correo) + '</strong>. Escríbelo aquí: caduca en 10 minutos.</p>' +
+        '<form id="n-f-codigo" class="kz-form" novalidate><label>Código<input type="text" id="n-codigo" class="kz-codigo" inputmode="numeric" ' +
+          'autocomplete="one-time-code" pattern="[0-9]*" maxlength="10" required></label>' +
+        '<button type="submit" class="u-btn u-btn-accion">Entrar</button></form>' +
+        '<p class="kz-aviso" id="n-aviso-entrar" role="alert">' + texto(msg || '') + '</p>' +
+        '<p class="kz-ayuda">¿No te llega? Mira en el correo no deseado. Si tampoco está, puede que ese correo no sea el que diste al apuntarte: pídeselo a quien te dio de alta.</p>' +
+        '<div class="kz-otros"><button type="button" class="u-btn" id="n-otro">Enviarme otro código</button>' +
+        '<button type="button" class="u-btn" id="n-cambiar">Usar otro correo</button></div>' +
+        (dev ? '<button type="button" class="u-btn" id="n-buzon">Ver el buzón de pruebas</button><div id="n-buzon-ver" class="kz-buzon" hidden></div>' : '') +
+        '</div>');
+      var f = $('n-f-codigo'), b = f.querySelector('button'), i = $('n-codigo');
+      // Al pegar el código o al ponerlo el móvil (lo sugiere del correo), entra solo; escrito a mano, con «Entrar». Auth
+      // manda 6 u 8 cifras según el proyecto: no se sabe cuántas faltan.
+      var antes = 0;
+      i.oninput = function () {
+        i.value = i.value.replace(/\D+/g, '').slice(0, 10);
+        var de_golpe = i.value.length - antes >= 6; antes = i.value.length;
+        if (de_golpe && !b.disabled) { if (f.requestSubmit) f.requestSubmit(); else f.onsubmit(new Event('submit')); }
+      };
+      f.onsubmit = function (e) {
+        if (e && e.preventDefault) e.preventDefault();
+        b.disabled = true; b.textContent = 'Entrando…'; $('n-aviso-entrar').textContent = '';
+        window.UG.entrarConCodigo(correo, i.value).then(function () { return entrar(); }).then(listo, function (x) {
+          b.disabled = false; b.textContent = 'Entrar';
+          $('n-aviso-entrar').textContent = String(x.message).replace(/^ACCESO:\s*/, '');
+          i.select(); i.focus();
+        });
+      };
+      $('n-otro').onclick = function () {
+        var o = $('n-otro');
+        o.disabled = true; o.textContent = 'Enviando…';
+        window.UG.pedirCodigo(correo).then(function () {
+          o.textContent = 'Enviado: mira tu correo'; $('n-aviso-entrar').textContent = '';
+          setTimeout(function () { if ($('n-otro')) { o.disabled = false; o.textContent = 'Enviarme otro código'; } }, 30000);
+        }, function (x) { o.disabled = false; o.textContent = 'Enviarme otro código'; $('n-aviso-entrar').textContent = x.message; });
+      };
+      $('n-cambiar').onclick = function () { paso1(''); };
+      if (dev) {
+        $('n-buzon').onclick = function () {
+          var v = $('n-buzon-ver');
+          window.UG.buzon(correo).then(function (ms) {
+            v.hidden = false;
+            v.innerHTML = !ms ? '<p class="u-nota">Aquí no hay buzón de pruebas para ' + texto(correo) + ' (solo los correos de prueba, como los de @ejemplo.com).' +
+                (window.UG.entorno === 'dev' ? ' En DEV, además, solo se lee después de entrar con tu Google en «Entrar como» de la app Utilo DEV.' : '') + '</p>' :
+              !ms.length ? '<p class="u-nota">No ha llegado nada a ' + texto(correo) + '. Si el correo no está dado de alta, no se envía ningún código.</p>' :
+              '<p class="u-nota">Buzón de pruebas: los correos no salen de verdad.</p><p><strong>' + texto(ms[0].asunto) + '</strong></p><p>' + texto(ms[0].texto).replace(/\n/g, '<br>') + '</p>';
+          });
+        };
+      }
+      i.focus();
+    }
+    paso1(aviso);
+  }
+
+  /** Falta conectar con la web el Excel de los accesos (permiso «solo los archivos de esta web», T0201). */
+  function conectarYEntrar(e) {
+    var m = /^CONECTAR:([^:]+):\s*(.*)$/.exec(e.message) || [];
+    pantalla('<div class="kz-caja" id="n-con"><h1>' + texto(C.nombreApp || 'Conectar') + '</h1>' +
+      '<p class="kz-ayuda">Para que la web pueda usar el Excel del negocio, elígelo una vez en la ventana de Google. Solo hace falta la primera vez.</p>' +
+      '<button type="button" class="u-btn u-btn-accion">Conectar el Excel</button><p class="kz-aviso" id="n-aviso-con"></p></div>');
+    var b = $('n-con').querySelector('button');
+    b.onclick = function () {
+      b.disabled = true;
+      window.UG.conectar(m[1]).then(function () { location.reload(); }, function (x) { b.disabled = false; $('n-aviso-con').textContent = x.message; });
+    };
+    b.focus();
+  }
+
+  function credDe(r) {
+    var o = { persona: r.persona, correo: r.correo || '', perfil: r.perfil || '', admin: !!r.admin, negocio: r.negocio || '', dev: r.dev || '', secciones: r.secciones || [],
+      version: r.version || '', versiones: Array.isArray(r.versiones) ? r.versiones : [] }; // T0283
+    if (r.persona_id) o.persona_id = r.persona_id; // T0387: con Supabase, el id de la persona (acceso.personas)
+    if (Array.isArray(r.roles)) o.roles = r.roles; // T0394: con Supabase, sus roles (ctx.roles); antes se perdían aquí
+    if (Array.isArray(r.equipo)) o.equipo = r.equipo; // T0689: quién más trabaja en la app (Mías / Todas de Listado)
+    if (r.aviso) o.aviso = String(r.aviso); // T0639: el aviso de arriba (config.json · nucleo.aviso)
+    if (r.perfilEnMenu === false) o.perfilEnMenu = false; // T0415: Perfil fuera del menú (se abre con el nombre de la cabecera)
+    if (r.como && r.como.correo) o.como = { correo: r.como.correo, persona: r.como.persona || r.como.correo }; // T0273
+    if (r.uso && r.uso.app && r.uso.url) o.uso = { app: String(r.uso.app), url: String(r.uso.url), clave: String(r.uso.clave || '') }; // T0682
+    if (r.buscar && Array.isArray(r.buscar.grupos) && r.buscar.grupos.length) o.buscar = r.buscar; // T0685: la lupa (nucleo.buscar)
+    if (r.partes && typeof r.partes === 'object') o.partes = r.partes; // T0742: las tablas que se leen por partes (nucleo.partes)
+    if (r.ocultar && Array.isArray(r.ocultar.tablas)) o.ocultar = { tablas: r.ocultar.tablas, refs: r.ocultar.refs || {}, filas: r.ocultar.filas || {}, columnas: r.ocultar.columnas || {} }; // T0650; T0671: columnas
+    return o;
+  }
+
+  /** En DEV, la banda «DEV · rama · commit · modo» (la misma que DEV.gs del motor: colores fijos, solo en DEV). */
+  // T0446: en la app «Utilo DEV» (dev-ramas/<rama>/), sin banda: la marca de DEV es el marco de la app (dev-ramas/marco.js).
+  function bandaDev(t) {
+    return t && !APP_DEV ? '<div role="status" style="position:sticky;top:0;z-index:99999;padding:6px 12px;font:600 13px/1.35 system-ui,sans-serif;text-align:center;' +
+      'color:#1C1C1C;background:#FFE08A;border-bottom:2px solid #B88A00;overflow-wrap:anywhere">' + texto(t) + '</div>' : '';
+  }
+
+  /** T0639 · El aviso del proyecto (config.json · nucleo.aviso), arriba en todas las secciones; sin él, nada. No se queda
+   *  fijo al bajar: no tapa nada. */
+  function htmlAviso() { return '<div id="n-aviso-app"></div>'; }
+
+  /** T0672 · El aviso de la sección abierta: el suyo (nucleo.secciones.<id>.aviso; "" = ninguno) o, si no tiene, el del proyecto. */
+  function ponerAviso(s) {
+    var c = $('n-aviso-app'); if (!c) return;
+    var t = s && s.aviso !== undefined ? s.aviso : cred.aviso || '';
+    c.innerHTML = t ? '<p class="n-aviso-app" role="note"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/>' +
+      '<path d="M12 11v5M12 8h.01"/></svg><span>' + texto(t) + '</span></p>' : '';
+  }
+
+  /* ---------- el marco ---------- */
+
+  var cred = null;          // quién ha entrado y sus secciones (lo guardado y, después, lo que dice el motor)
+  /* T0749 · Si el menú ya lo ha dicho el motor en esta carga (false mientras se ve el guardado de la última vez y aún no ha
+   * contestado: con la sesión caducada, hasta que se toca «Continuar»). Personalizar no se enseña hasta entonces, para no
+   * enseñar secciones de antes de un cambio del menú (T0688: Clientes y Prospección, ya Marcas). */
+  var alDia = false;
+  /** T0749 · El motor ha contestado y el menú no ha cambiado: Personalizar sale donde esperaba (Perfil del marco: [data-n-pers];
+   *  la sección Perfil: el evento «un-al-dia» del document). */
+  function ponerAlDia() {
+    if (alDia) return;
+    alDia = true;
+    [].forEach.call(document.querySelectorAll('[data-n-pers]'), function (d) { d.innerHTML = htmlPersonalizarDentro(); });
+    try { document.dispatchEvent(new CustomEvent('un-al-dia')); } catch (e) {}
+  }
+  var actual = '';          // sección abierta
+  var abierta = null;       // { id, def } de la sección abierta (para cerrarla al cambiar)
+  var DEF = {};             // secciones registradas: ID → { abrir, cerrar }
+  var cargas = {};          // ID → promesa de su JS
+  var oyentes = {};         // ID → funciones que quieren saber cuándo cambia una tabla (solo la sección abierta)
+  var T = null;             // tablas al momento (kanban4/tablas.js), una copia para todas las secciones
+
+  window.UN = {
+    /** T0736 · Sin tildes ni mayúsculas, con la misma longitud (ver plano, arriba): la forma de buscar de todas las secciones. */
+    plano: plano,
+    /** Cada sección se registra al cargar su JS: UN.registrar('EJEMPLO', { abrir: function (el, ctx) {}, cerrar: function () {} }). */
+    registrar: function (id, def) { DEF[String(id).toUpperCase()] = def; },
+    /**
+     * T0692 · Otra sección que ve quien ha entrado, para usar sus cuentas sin abrirla (las ventas de una marca, de Pedidos, en
+     * su ficha de Clientes): su JS (una vez) y su configuración, { id, titulo, def, config }. null si no la ve: lo de esa
+     * sección no sale en otra a quien no la tiene (y el motor tampoco le daría sus tablas).
+     */
+    seccion: function (id) {
+      var s = cred ? seccion(String(id || '').toUpperCase()) : null;
+      if (!s || !s.web) return Promise.resolve(null);
+      return cargar(s).then(function (def) { return { id: s.id, titulo: s.titulo, def: def, config: s.config || {} }; }, function () { return null; });
+    },
+    /** T0283: el bloque «Versión» de Perfil (vacío si no hay versión: DEV, local sin ejemplo). */
+    htmlVersion: function () { return htmlVersion(); },
+    /** T0740: el bloque «Aspecto» de Perfil (Claro, Oscuro o Como el móvil); vacío si la app no tiene modo oscuro. */
+    htmlAspecto: function () { return htmlAspecto(); },
+    /**
+     * T0599 · El orden del menú que ha elegido quien personaliza (la sección Listado lo guarda para todos): ids de las
+     * secciones. Se recuerda en el dispositivo, para pintar el menú en ese orden desde el principio, y se vuelve a pintar.
+     * Sin ids, el de config.json. Lo que no nombra va detrás, como venía.
+     */
+    ordenMenu: function (ids) {
+      if (ids === undefined) return ordenGuardado();
+      var antes = JSON.stringify(ordenGuardado());
+      try { if (ids && ids.length) localStorage.setItem(ORDEN_CLAVE, JSON.stringify(ids)); else localStorage.removeItem(ORDEN_CLAVE); } catch (e) {}
+      if (cred && JSON.stringify(ordenGuardado()) !== antes) repintarMenu();
+    }
+  };
+  var ORDEN_CLAVE = 'nucleo_orden_' + (C.clave || 'negocio');
+  function ordenGuardado() { try { var o = JSON.parse(localStorage.getItem(ORDEN_CLAVE) || '[]'); return Array.isArray(o) ? o.map(String) : []; } catch (e) { return []; } }
+  /** Vuelve a pintar solo el menú (con el orden nuevo), con la sección abierta marcada. */
+  function repintarMenu() {
+    var nav = document.querySelector('nav.sx');
+    if (!nav) return;
+    var d = document.createElement('div'); d.innerHTML = htmlMenu();
+    nav.parentNode.replaceChild(d.firstChild, nav);
+    $('n-plegar').onclick = plegar;
+    marcarMenu((seccion(actual) || {}).enPerfil ? 'PERFIL' : actual);
+    cifras();
+  }
+
+  function tablas() {
+    if (T) return T;
+    // T0275: la copia del dispositivo es de quien ha entrado (sin correo, solo en memoria).
+    T = window.UT.crear({ llamar: llamar, clave: C.clave || 'negocio', persona: copiaDe(cred), aviso: aviso, partes: (cred && cred.partes) || {} }); // T0742: partes
+    T.en('cambio', function (tabla, info) {
+      (oyentes[actual] || []).forEach(function (f) { try { f(tabla, info); } catch (e) { if (window.console) console.error(e); } });
+      contarCifras(tabla); // T0412
+    });
+    return T;
+  }
+
+  /** T0275 · Deja la copia de las tablas de quien estaba (otra persona entra o sale); con olvidar, la borra del dispositivo. */
+  function soltarTablas(correo, olvidar) {
+    if (T) { T.cerrar(); T = null; }
+    if (olvidar && correo && window.UT.olvidar) window.UT.olvidar(C.clave || 'negocio', correo);
+  }
+
+  /** Las secciones que ves y, al final, Perfil (la sección PERFIL si el cliente la tiene; si no, la del marco). */
+  function todas() {
+    var ss = (cred.secciones || []).filter(function (s) { return s.id !== 'PERFIL'; });
+    // T0599: en el orden que ha elegido quien personaliza (UN.ordenMenu); las que no nombra, detrás y como venían.
+    var o = ordenGuardado();
+    if (o.length) ss = ss.filter(function (s) { return o.indexOf(s.id) >= 0; }).sort(function (a, b) { return o.indexOf(a.id) - o.indexOf(b.id); })
+      .concat(ss.filter(function (s) { return o.indexOf(s.id) < 0; }));
+    var p = (cred.secciones || []).filter(function (s) { return s.id === 'PERFIL'; })[0] || { id: 'PERFIL', titulo: 'Perfil', icono: ICONO_PERFIL, propia: true };
+    return ss.concat([p]);
+  }
+  /** Las del menú: todas menos las que van dentro de Perfil (T0269) y, si el proyecto lo dice (perfilEnMenu: false, T0415),
+   *  sin Perfil: se abre con el nombre de la cabecera, que entonces se ve también en el ordenador. */
+  function sinPerfil() { return cred && cred.perfilEnMenu === false; }
+  function menu() { return todas().filter(function (s) { return !s.enPerfil && !(s.id === 'PERFIL' && sinPerfil()); }); }
+  function seccion(id) { return todas().filter(function (s) { return s.id === id; })[0] || null; }
+
+  /* T0629: en el móvil la barra de abajo lleva como mucho MAX_BARRA botones: con más secciones, las MAX_BARRA - 1 primeras
+   * y «Más», que abre las demás (y Perfil) en una lista encima de la barra. En el ordenador, el menú de la izquierda las
+   * lleva todas (la lista de «Más» se deshace con display: contents y el botón no se ve). */
+  var MAX_BARRA = 5;
+  function partirMenu(ss) {
+    return ss.length > MAX_BARRA ? { barra: ss.slice(0, MAX_BARRA - 1), resto: ss.slice(MAX_BARRA - 1) } : { barra: ss, resto: [] };
+  }
+  function htmlMenu() {
+    var plegado = false;
+    try { plegado = localStorage.getItem(MENU_CLAVE) === '1'; } catch (e) {}
+    document.body.classList.toggle('u-menu-plegado', plegado);
+    var et = plegado ? 'Desplegar el menú' : 'Plegar el menú', p = partirMenu(menu());
+    function enlace(s) {
+      // T0749: draggable="false", para que al mantener apretado iOS no lo levante para arrastrarlo (con -webkit-user-drag en nucleo-2.css).
+      return '<a href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '" title="' + texto(s.titulo) + '" draggable="false">' +
+        '<svg viewBox="0 0 24 24" aria-hidden="true">' + (s.icono || ICONO_SECCION) + '</svg><span>' + texto(s.titulo) +
+        (s.id === 'PERFIL' ? '<span class="sx-quien">' + texto(cred.persona) + '</span>' : '') + '</span>' +
+        (s.cifra ? '<span class="bj-n hay" data-cifra="' + texto(s.id) + '" hidden></span>' : '') + '</a>'; // T0412
+    }
+    return '<nav class="sx u-sx' + (p.resto.length ? ' sx-mucho' : '') + '" aria-label="Secciones"><div class="sx-in"><div class="sx-cab"><span class="sx-marca">' + texto(C.nombreApp || cred.negocio || '') + '</span>' +
+      '<button type="button" class="sx-plegar" id="n-plegar" aria-label="' + et + '" title="' + et + '"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button></div>' +
+      (cred.buscar ? '<button type="button" class="sx-buscar" data-n-buscar title="Buscar en toda la app (' + (MAC ? '⌘K' : 'Ctrl+K') + ')">' + ICONO_LUPA +
+        '<span>Buscar</span><kbd>' + (MAC ? '⌘K' : 'Ctrl K') + '</kbd></button>' : '') + // T0685: solo en el ordenador (en el móvil, la lupa de la cabecera)
+      p.barra.map(enlace).join('') +
+      (p.resto.length ? '<div class="sx-resto" id="n-sx-resto">' + p.resto.map(enlace).join('') + '</div>' +
+        '<button type="button" class="sx-mas" id="n-sx-mas" aria-expanded="false" aria-controls="n-sx-resto" title="Más secciones">' +
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>' +
+        '<span>Más</span><span class="bj-n hay" id="n-sx-mas-n" hidden></span></button>' : '') + '</div></nav>';
+  }
+  /** T0629 · Abre o cierra la lista de «Más» (si la barra la tiene). */
+  function verMas(si) {
+    var b = $('n-sx-mas');
+    if (!b) return;
+    b.setAttribute('aria-expanded', si ? 'true' : 'false');
+    b.parentNode.parentNode.classList.toggle('sx-abierto', !!si);
+  }
+  /** Marca en el menú la sección abierta; si está dentro de «Más», «Más» también se ve marcado (T0629). */
+  function marcarMenu(marcada) {
+    [].forEach.call(document.querySelectorAll('.sx a[data-sx]'), function (a) {
+      if (a.getAttribute('data-sx') === marcada) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    var b = $('n-sx-mas');
+    if (b) b.classList.toggle('sx-dentro', !!document.querySelector('#n-sx-resto a[aria-current]'));
+  }
+  /** T0629 · Las cifras de lo que va dentro de «Más», sumadas en el botón, para que no se pierdan en el móvil. */
+  function cifraMas() {
+    var b = $('n-sx-mas-n');
+    if (!b) return;
+    var n = 0;
+    [].forEach.call(document.querySelectorAll('#n-sx-resto [data-cifra]'), function (c) { if (!c.hidden) n += +c.textContent || 0; });
+    b.textContent = n ? String(n) : ''; b.hidden = !n;
+  }
+
+  function plegar() {
+    var p = document.body.classList.toggle('u-menu-plegado');
+    this.setAttribute('aria-label', p ? 'Desplegar el menú' : 'Plegar el menú'); this.title = this.getAttribute('aria-label');
+    try { if (p) localStorage.setItem(MENU_CLAVE, '1'); else localStorage.removeItem(MENU_CLAVE); } catch (e) {}
+  }
+
+  /** Pinta el marco entero y abre la sección de la URL (o la primera). */
+  /** guardado: true si c es lo guardado de la última vez, sin que el motor lo haya dicho en esta carga (T0749). */
+  function marco(c, guardado) {
+    alDia = !guardado;
+    if (T && T.persona() !== copiaDe(c)) soltarTablas();  // T0275: otra persona, otra copia
+    if (cerrarVersiones) cerrarVersiones(false);           // T0283: la ventana de novedades se va con el body; sin darla por vista
+    cred = c;
+    document.body.className = 'u u-con-barra' + (cred.como ? ' n-viendo-como' : '') + (sinPerfil() ? ' n-perfil-arriba' : '');
+    document.body.innerHTML = bandaDev(cred.dev) + htmlMenu() +
+      '<div id="sx-panel">' + htmlComo() + htmlAviso() + '<header class="u-cab n-cab"><h1 id="n-titulo"></h1>' +
+      (cred.buscar ? '<button type="button" class="n-lupa" data-n-buscar aria-label="Buscar en toda la app" title="Buscar en toda la app">' + ICONO_LUPA + '</button>' : '') + // T0685
+      '<a class="n-quien" href="?s=perfil" data-sx="PERFIL"><span>' + texto(cred.persona) + '</span>' + (cred.perfil ? '<small>' + texto(cred.perfil) + '</small>' : '') + '</a></header>' +
+      '<main class="u-main n-main" id="n-sec"></main></div>' +
+      '<div class="u-aviso" id="n-aviso" role="status" hidden></div>';
+    $('n-plegar').onclick = plegar;
+    tope();
+    usoSegun(cred); // T0682: antes de abrir, para que la primera sección cuente
+    abrir(pedida() || menu()[0].id, false);
+    avisarVersiones();
+    cifras();
+    if (cred.buscar) setTimeout(function () { cargarBuscar().catch(function () {}); }, 1500); // T0685
+  }
+
+  /* ---------- T0412 · las cifras del menú ----------
+   * Una sección con «cifra» en su modulo.json (montar.js: { tabla, donde, directo, que }) lleva en el menú cuántas filas de
+   * esa tabla cumplen «donde» (las Nuevas que puedes atender, en la Bandeja), estés en la sección que estés: el marco la lee
+   * con la misma copia de las tablas, la cuenta cada vez que esa tabla cambia y, con Supabase, la vuelve a leer en cuanto
+   * cambia algo en las tablas de «directo» (Realtime). Sin nada que contar, no se ve. */
+  var cifrasDirecto = [];
+  /** T0710 · Las condiciones de una cifra («si»), como las de Listado: es, no, vacio y, en una fecha, desde y hasta en días
+   * desde hoy (incluidos; «dias» es el «dias» de la cifra). Sin condiciones, todas.
+   * T0751 · nombre(campo, valor): en una columna que apunta a otra tabla (ID_ESTADO), el nombre de esa fila («Hecha»); «es» y
+   * «no» valen con el nombre, como en Listado, o con el código guardado (EST04). */
+  function cumpleCifra(f, si, dias, nombre) {
+    function norm(v) { return plano(v).trim(); }
+    function lista(x) { return Array.isArray(x) ? x : [x]; }
+    function dia(v) {
+      if (v instanceof Date) return isNaN(v) ? null : new Date(v.getFullYear(), v.getMonth(), v.getDate());
+      var s = String(v == null ? '' : v).trim(), m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+      if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+      m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s);
+      return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
+    }
+    function d(x) { return x === 'dias' ? dias : x === '-dias' ? -dias : x; }
+    var h = new Date(); h = new Date(h.getFullYear(), h.getMonth(), h.getDate());
+    return (si || []).every(function (c) {
+      var v = f[c.campo], vac = norm(v) === '';
+      var n = nombre && !vac ? nombre(c.campo, v) : undefined, vs = [norm(v)].concat(n !== undefined && n !== null ? [norm(n)] : []);
+      function hay(x) { var l = lista(x).map(norm); return vs.some(function (y) { return l.indexOf(y) >= 0; }); }
+      if (c.es !== undefined && !hay(c.es)) return false;
+      if (c.no !== undefined && hay(c.no)) return false;
+      if (c.vacio !== undefined && vac !== !!c.vacio) return false;
+      if (c.desde !== undefined || c.hasta !== undefined) {
+        var x = dia(v); if (!x) return false;
+        var k = Math.round((x - h) / 864e5);
+        if (c.desde !== undefined && k < d(c.desde)) return false;
+        if (c.hasta !== undefined && k > d(c.hasta)) return false;
+      }
+      return true;
+    });
+  }
+  /** T0751 · El nombre de lo guardado en una columna con referencia (refs: { ID_ESTADO: 'ESTADOS_TAREA' }), como lo enseña
+   *  Listado: NOMBRE, TITULO o DETALLE de esa fila. fila(tabla, id) la busca. Sin refs, null (se compara lo guardado). */
+  function nombreCifra(refs, fila) {
+    if (!refs || !fila || !Object.keys(refs).length) return null;
+    return function (campo, v) {
+      if (!refs[campo]) return undefined;
+      var x = fila(refs[campo], v);
+      if (!x) return undefined;
+      var k = ['NOMBRE', 'TITULO', 'DETALLE'].filter(function (y) { return x[y] !== undefined && x[y] !== null && String(x[y]).trim() !== ''; })[0];
+      return k ? String(x[k]) : undefined;
+    };
+  }
+  /** T0752 · Si la sección abre en «Mías» (cifra.mias: { campo, sinNadie }, de su MIAS) y en el equipo hay alguien más, la cifra
+   *  cuenta solo las filas de quien entra, como la lista al abrirla (esMia de Listado): la de su correo y la que no es de nadie,
+   *  si administra o su perfil está en sinNadie. Sin eso, todas. q: { correo, perfil, admin, equipo }. */
+  function miaCifra(mias, q) {
+    var yo = String((q && q.correo) || '').trim().toLowerCase();
+    var otro = ((q && q.equipo) || []).some(function (p) { var c = String((p && p.correo) || '').trim().toLowerCase(); return c && c !== yo; });
+    if (!mias || !mias.campo || !otro) return function () { return true; };
+    return function (f) {
+      var v = String((f && f[mias.campo]) || '').trim().toLowerCase();
+      return v ? v === yo : !!q.admin || (mias.sinNadie || []).indexOf(String(q.perfil || '')) >= 0;
+    };
+  }
+  function contarCifras(tabla) {
+    if (!cred || !T) return;
+    menu().forEach(function (s) {
+      var c = s.cifra;
+      if (!c || (tabla && tabla !== c.tabla)) return;
+      var nom = nombreCifra(c.refs, T.fila ? function (t, id) { return T.fila(t, id); } : null), mia = miaCifra(c.mias, cred);
+      var n = T.filas(c.tabla).filter(function (f) { return Object.keys(c.donde || {}).every(function (k) { return f[k] === c.donde[k]; }) && mia(f) && cumpleCifra(f, c.si, c.dias, nom); }).length;
+      var b = document.querySelector('[data-cifra="' + s.id + '"]');
+      if (!b) return;
+      b.textContent = n ? String(n) : ''; b.hidden = !n;
+      b.parentNode.title = s.titulo + (n ? ' · ' + n + (c.que ? ' ' + c.que : '') : '');
+      b.parentNode.setAttribute('aria-label', b.parentNode.title);
+    });
+    cifraMas();
+  }
+  function cifras() {
+    cifrasDirecto.forEach(function (d) { try { d.cerrar(); } catch (e) {} });
+    cifrasDirecto = [];
+    menu().filter(function (s) { return s.cifra; }).forEach(function (s) {
+      var c = s.cifra, t = tablas(), espera = 0;
+      var refs = Object.keys(c.refs || {}).map(function (k) { return c.refs[k]; }); // T0751: para saber sus nombres
+      t.leer([c.tabla].concat(refs)).then(function () { contarCifras(c.tabla); }, function () {});
+      if (c.directo && c.directo.length && window.UG && typeof window.UG.enDirecto === 'function') {
+        var d = window.UG.enDirecto(c.directo, function () {
+          if (espera) return;
+          espera = setTimeout(function () { espera = 0; if (T === t) t.refrescar([c.tabla], true).then(function () { contarCifras(c.tabla); }, function () {}); }, 800);
+        });
+        if (d) cifrasDirecto.push(d);
+      }
+    });
+  }
+
+  /* ---------- T0283 · versión y novedades ---------- */
+
+  // La última versión cuyas novedades se han visto aquí. DEV (dev-rama/, dev-ramas/) comparte dirección con producción: va aparte.
+  function vista() { return 'nucleo_version_vista_' + (cred && cred.dev ? 'dev_' : '') + (C.clave || 'negocio'); }
+  function leerVista() { try { return localStorage.getItem(vista()); } catch (e) { return null; } }
+  function marcarVista() { var v = cred && cred.versiones && cred.versiones[0]; if (v) try { localStorage.setItem(vista(), v.v); } catch (e) {} }
+  var cerrarVersiones = null; // la ventana abierta: cerrarVersiones(darPorVista)
+
+  /** Las versiones con novedades que no se han visto en este dispositivo. La primera vez, solo la última que trae novedades
+   *  (T0751: aunque después haya salido una de arreglos, que no trae; antes, si la última no traía, no se veía nada). */
+  function sinVer() { return versionesSinVer((cred && cred.versiones) || [], leerVista()); }
+
+  /** El bloque «Versión» de Perfil: cuál es y, si hay lista, el botón para ver las novedades. */
+  function htmlVersion() {
+    if (!cred || !cred.version) return '';
+    var vs = cred.versiones || [], ult = vs[0] && vs[0].v === cred.version ? vs[0] : null, nuevas = sinVer().length;
+    return '<section class="pf-bloque n-version" aria-label="Versión"><h2 class="n-grupo">Versión</h2>' +
+      '<p>Usas la versión <strong>' + texto(cred.version) + '</strong>' + (ult && ult.fecha ? ', del ' + texto(ult.fecha) : '') + '.</p>' +
+      (vs.length ? '<div class="n-botones"><button type="button" class="u-btn" data-n-versiones>Ver las novedades' +
+        (nuevas ? ' <span class="n-nuevo">' + (nuevas === 1 ? 'nueva' : nuevas + ' nuevas') + '</span>' : '') + '</button></div>' : '') + '</section>';
+  }
+
+  /** La ventana con las versiones publicadas y sus novedades, la más reciente arriba. Las no vistas, marcadas «Nueva».
+   *  T0751 · Al entrar (corta: true), si lo nuevo pasa de NOVEDADES_CORTA líneas, solo lo principal de la última y «Ver todas
+   *  las novedades», que abre la lista entera en la misma ventana. */
+  function verVersiones(corta) {
+    if (!cred || !(cred.versiones || []).length || $('n-ver-velo')) return;
+    var sv = sinVer(), nuevas = sv.map(function (x) { return x.v; }), antes = document.activeElement;
+    var resumen = corta ? novedadesCortas(sv) : null;
+    var velo = document.createElement('div');
+    velo.className = 'u-velo abierto'; velo.id = 'n-ver-velo';
+    function todas() {
+      return '<ol class="n-versiones">' + cred.versiones.map(function (x, k) {
+        var ns = x.novedades || [], primera = k === cred.versiones.length - 1;
+        return '<li><h3>Versión ' + texto(x.v) + (nuevas.indexOf(x.v) >= 0 ? ' <span class="n-nuevo">Nueva</span>' : '') +
+          (x.fecha ? ' <small>' + texto(x.fecha) + '</small>' : '') + '</h3>' +
+          (ns.length ? '<ul>' + ns.map(function (n) { return '<li>' + texto(n) + '</li>'; }).join('') + '</ul>'
+            : '<p class="u-nota">' + (primera ? 'Primera versión.' : 'Arreglos y mejoras por dentro: nada cambia en cómo se usa.') + '</p>') + '</li>';
+      }).join('') + '</ol>';
+    }
+    function corto() {
+      var x = resumen.version;
+      return '<ol class="n-versiones"><li><h3>Versión ' + texto(x.v) + ' <span class="n-nuevo">Nueva</span>' + (x.fecha ? ' <small>' + texto(x.fecha) + '</small>' : '') + '</h3>' +
+        '<p class="u-nota">Lo principal:</p><ul>' + resumen.lineas.map(function (n) { return '<li>' + texto(n) + '</li>'; }).join('') + '</ul></li></ol>';
+    }
+    velo.innerHTML = '<div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="n-ver-t"><div class="n-ventana">' +
+      '<h2 id="n-ver-t">' + (nuevas.length ? 'Novedades' : 'Versiones') + '</h2>' +
+      '<div id="n-ver-lista">' + (resumen ? corto() : todas()) + '</div>' +
+      '<div class="n-botones">' + (resumen ? '<button type="button" class="u-btn" id="n-ver-todas">Ver todas las novedades (' + resumen.total + ')</button>' : '') +
+      '<button type="button" class="u-btn u-btn-accion" id="n-ver-cerrar">Entendido</button></div></div></div>';
+    document.body.appendChild(velo);
+    if (resumen) $('n-ver-todas').onclick = function () {
+      $('n-ver-lista').innerHTML = todas();
+      this.parentNode.removeChild(this);
+      $('n-ver-cerrar').focus();
+    };
+    function cerrar(darPorVista) {
+      cerrarVersiones = null;
+      document.removeEventListener('keydown', tecla, true);
+      if (velo.parentNode) velo.parentNode.removeChild(velo);
+      if (darPorVista === false) return;
+      marcarVista();
+      var b = document.querySelector('[data-n-versiones] .n-nuevo'); if (b) b.parentNode.removeChild(b);
+      if (antes && antes.focus && document.body.contains(antes)) antes.focus();
+    }
+    // Escape cierra solo esta ventana (va antes que las de las secciones y no sigue hacia ellas).
+    function tecla(e) { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); cerrar(); } }
+    document.addEventListener('keydown', tecla, true);
+    cerrarVersiones = cerrar;
+    velo.addEventListener('click', function (e) { if (e.target === velo || e.target.id === 'n-ver-cerrar') cerrar(); });
+    $('n-ver-cerrar').focus();
+  }
+
+  /**
+   * T0415 · Con Perfil fuera del menú (perfilEnMenu: false), el nombre de la cabecera abre el Perfil del marco en una ventana
+   * encima de la sección en la que estás: se cierra con ✕, con Escape o pulsando fuera, y sigues donde estabas.
+   */
+  function verPerfil() {
+    if (!cred || $('n-perfil-velo')) return;
+    var antes = document.activeElement, velo = document.createElement('div');
+    velo.className = 'u-velo abierto'; velo.id = 'n-perfil-velo';
+    velo.innerHTML = '<div class="u-ventana n-perfil-ventana" role="dialog" aria-modal="true" aria-labelledby="n-perfil-t"><div class="n-ventana">' +
+      '<div class="n-perfil-cab"><h2 id="n-perfil-t">Tu perfil</h2><button type="button" class="n-perfil-x" id="n-perfil-cerrar" aria-label="Cerrar" title="Cerrar">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' + htmlPerfil() + '</div></div>';
+    document.body.appendChild(velo);
+    correosPerfil(); avisosPerfil();
+    function cerrar() {
+      document.removeEventListener('keydown', tecla, true);
+      if (velo.parentNode) velo.parentNode.removeChild(velo);
+      if (antes && antes.focus && document.body.contains(antes)) antes.focus();
+    }
+    // Escape cierra solo esta ventana (si encima está la de las novedades, primero esa).
+    function tecla(e) { if (e.key === 'Escape' && !$('n-ver-velo')) { e.stopPropagation(); e.preventDefault(); cerrar(); } }
+    document.addEventListener('keydown', tecla, true);
+    velo.addEventListener('click', function (e) {
+      if (e.target === velo || (e.target.closest && e.target.closest('#n-perfil-cerrar'))) { cerrar(); return; }
+      // Lo que lleva a otra parte (entrar como otra persona, una sección de dentro de Perfil) cierra la ventana antes.
+      if (e.target.closest && e.target.closest('[data-n-como], [data-n-volver], a[data-sx]')) cerrar();
+    });
+    $('n-perfil-cerrar').focus();
+  }
+
+  /** Al entrar: si hay novedades sin ver, la ventana se abre sola (una vez; viendo como otra persona, no). */
+  function avisarVersiones() {
+    if (cred && !cred.como && sinVer().length) verVersiones(true);
+  }
+
+  /* ---------- T0273 · entrar como otra persona ---------- */
+
+  /** La franja de arriba mientras quien administra ve como otra persona. */
+  function htmlComo() {
+    if (!cred.como) return '';
+    return '<div class="n-como" id="n-como" role="status"><p><span>Viendo como</span> <strong>' + texto(cred.persona) + '</strong>' +
+      (cred.perfil ? ' · ' + texto(cred.perfil) : '') + '<small>Lo que guardes queda a tu nombre: «' + texto(cred.como.persona + ' como ' + cred.persona) + '».</small></p>' +
+      '<button type="button" class="u-btn" data-n-volver>Volver a mi cuenta</button></div>';
+  }
+  /** Lo que ocupa la franja (--tope), para que lo que se queda fijo arriba al bajar (cabeceras de tabla…) quede debajo. */
+  var obsTope = null;
+  // T0752: y --alto-cab, lo que ocupa la cabecera de la sección cuando se queda fija arriba (en el móvil, nucleo-2.css), para
+  // que lo demás que se pega arriba quede debajo de ella.
+  function tope() {
+    if (obsTope) { obsTope.disconnect(); obsTope = null; }
+    var f = $('n-como'), c = document.querySelector('.n-cab');
+    var poner = function () {
+      var st = document.body.style, fija = c && window.getComputedStyle(c).position === 'sticky';
+      if (f) st.setProperty('--tope', f.offsetHeight + 'px'); else st.removeProperty('--tope');
+      if (fija) st.setProperty('--alto-cab', c.offsetHeight + 'px'); else st.removeProperty('--alto-cab');
+    };
+    poner();
+    if (window.ResizeObserver && (f || c)) { obsTope = new ResizeObserver(poner); if (f) obsTope.observe(f); if (c) obsTope.observe(c); }
+  }
+
+  /** La ventana para elegir como quién entrar: las personas de la tabla de accesos (solo quien administra; lo comprueba el motor). */
+  function verComo() {
+    if (!cred || !cred.admin || cred.como || window.UG.sinComo || $('n-como-velo')) return;
+    var velo = document.createElement('div');
+    velo.className = 'u-velo abierto'; velo.id = 'n-como-velo';
+    velo.innerHTML = '<div class="u-ventana" role="dialog" aria-modal="true" aria-labelledby="n-como-t"><div class="n-ventana">' +
+      '<h2 id="n-como-t">Entrar como otra persona</h2>' +
+      '<p class="u-nota">Verás la app como la ve: su perfil, su menú y lo suyo. Puedes guardar cambios, y quedarán a tu nombre. ' +
+      'Se usan tus permisos de Google: si no tiene compartido algún Excel, tú sí verás lo que hay en él.</p>' +
+      '<label class="u-campo"><span class="u-etiqueta">Buscar</span><input type="search" id="n-como-buscar" placeholder="Nombre, correo o perfil" autocomplete="off"></label>' +
+      '<div id="n-como-lista" aria-live="polite"><div class="kz-centro" role="status"><div class="u-carga"></div></div></div>' +
+      '<div class="n-botones"><button type="button" class="u-btn" id="n-como-cerrar">Cerrar sin elegir</button></div></div></div>';
+    document.body.appendChild(velo);
+    var lista = $('n-como-lista'), buscar = $('n-como-buscar'), ps = null, antes = document.activeElement;
+    function cerrar() {
+      document.removeEventListener('keydown', tecla);
+      if (velo.parentNode) velo.parentNode.removeChild(velo);
+      if (antes && antes.focus && document.body.contains(antes)) antes.focus();
+    }
+    function tecla(e) { if (e.key === 'Escape') cerrar(); }
+    function pintar() {
+      if (!ps) return;
+      var q = bajo(buscar.value), xs = ps.filter(function (p) { return !q || bajo(p.persona + ' ' + p.correo + ' ' + p.perfil).indexOf(q) >= 0; });
+      lista.innerHTML = !ps.length ? '<p class="u-vacio">No hay nadie más con acceso a la app. Se añade en la tabla de accesos del negocio.</p>' :
+        !xs.length ? '<p class="u-vacio">Nadie coincide con «' + texto(buscar.value) + '». Prueba con otra parte del nombre o del correo.</p>' :
+        '<ul class="n-como-lista">' + xs.map(function (p) {
+          return '<li><button type="button" data-c="' + texto(p.correo) + '"><strong>' + texto(p.persona) + '</strong><span>' + texto(p.perfil) + ' · ' + texto(p.correo) + '</span></button></li>';
+        }).join('') + '</ul>';
+    }
+    document.addEventListener('keydown', tecla);
+    velo.addEventListener('click', function (e) {
+      if (e.target === velo || e.target.id === 'n-como-cerrar') { cerrar(); return; }
+      var b = e.target.closest && e.target.closest('button[data-c]');
+      if (!b) return;
+      var p = ps.filter(function (x) { return x.correo === b.getAttribute('data-c'); })[0];
+      [].forEach.call(lista.querySelectorAll('button'), function (x) { x.disabled = true; });
+      lista.insertAdjacentHTML('afterbegin', '<p class="u-nota" role="status">Entrando como ' + texto(p.persona) + '…</p>');
+      entrarComo(p.correo).then(cerrar, function (x) {
+        pintar();
+        lista.insertAdjacentHTML('afterbegin', '<p class="u-error" role="alert">No se ha podido entrar como ' + texto(p.persona) + ': ' +
+          texto(String(x.message).replace(/^\w+:\s*/, '')) + '</p>');
+      });
+    });
+    buscar.addEventListener('input', pintar);
+    buscar.focus();
+    llamar('nucleoPersonas').then(function (r) { ps = r || []; pintar(); }, function (e) {
+      lista.innerHTML = '<p class="u-error" role="alert">No se ha podido cargar la lista: ' + texto(e.message) + '</p><p class="u-nota">Cierra esta ventana y vuelve a probar.</p>';
+    });
+  }
+
+  /** Entra como esa persona: el motor dice qué ve y lo comprueba; la pantalla se pinta como la suya. */
+  function entrarComo(correo) {
+    return entrar(correo).then(function (r) {
+      var c = credDe(r);
+      if (!c.como) throw new Error('El motor no ha dejado entrar como esa persona.');
+      guardarComo(c);
+      marco(c);
+    }, function (e) { throw new Error(String(e.message).replace(/^(COMO|ACCESO):\s*/, '')); });
+  }
+
+  /** Vuelve a la cuenta de quien administra y borra del dispositivo la copia de lo que ha visto como la otra persona. */
+  function volver(msg) {
+    var c = cred;
+    borrarComo();
+    if (c && c.como) soltarTablas(copiaDe(c), true);
+    var g = leer();
+    if (!g || !g.persona) { acceso(msg || ''); return; }
+    marco(g, true);
+    comprobar();
+    if (msg) aviso(msg);
+  }
+
+  function pedida() {
+    var s = String(new URLSearchParams(location.search).get('s') || '').toUpperCase();
+    return seccion(s) ? s : '';
+  }
+
+  /**
+   * Abre una sección dentro del marco: título, menú, su JS (la primera vez) y su abrir(el, ctx). Con push, la apunta en la
+   * URL; href, si el enlace lleva algo más para la sección (T0269: ?s=kanban&asignado=…).
+   */
+  function abrir(id, push, href) {
+    var s = seccion(id) || menu()[0], antes = actual;
+    if (abierta && abierta.def && abierta.def.cerrar) { try { abierta.def.cerrar(); } catch (e) {} }
+    abierta = null;
+    oyentes[actual] = [];
+    actual = s.id;
+    marcarMenu(s.enPerfil ? 'PERFIL' : s.id); // una sección de dentro de Perfil marca Perfil en el menú (T0269)
+    verMas(false);
+    usar(function (u) { u.seccion(s.id, s.titulo); }); // T0682
+    $('n-titulo').textContent = s.titulo;
+    ponerAviso(s);
+    document.title = s.titulo + ' · ' + (C.nombreApp || cred.negocio || '');
+    if (push) {
+      // T0420: cuánto habías bajado donde estabas y de qué sección vienes, para que «atrás» (o «Volver a …» de la ficha de
+      // una tarea abierta desde Para mí o Entregas) te deje donde estabas.
+      try { history.replaceState(Object.assign({}, history.state, { y: bajado() }), ''); } catch (e) {}
+      history.pushState({ s: s.id, desde: antes && antes !== s.id ? antes : '' }, '', href && /^\?s=/.test(href) ? href : '?s=' + s.id.toLowerCase());
+    }
+    var y = (!push && history.state && history.state.y) || 0;
+    window.scrollTo(0, 0); document.body.scrollTop = 0;
+    // T0292: cada sección recibe un <main> nuevo, sin los oyentes que le pusieron las de antes (si no, un clic en otra
+    // sección también lo atendía la anterior, y volver a una le duplicaba los suyos).
+    var viejo = $('n-sec'), el = viejo.cloneNode(false);
+    viejo.parentNode.replaceChild(el, viejo);
+    if (s.propia) { el.innerHTML = htmlPerfil(); correosPerfil(); avisosPerfil(); return; }
+    var t = setTimeout(function () { if (actual === s.id && !el.childNodes.length) el.innerHTML = '<div class="kz-centro" role="status"><div class="u-carga"></div></div>'; }, 150);
+    cargar(s).then(function (def) {
+      clearTimeout(t);
+      if (actual !== s.id) return;
+      el.innerHTML = '';
+      abierta = { id: s.id, def: def };
+      def.abrir(el, ctxDe(s));
+      if (y) alSitio(s.id, y);
+    }, function () {
+      clearTimeout(t);
+      if (actual === s.id) el.innerHTML = '<p>No se ha podido cargar ' + texto(s.titulo) + '.</p><p class="u-nota">Comprueba la conexión y vuelve a abrir la sección.</p>';
+    });
+  }
+
+  function bajado() { return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0; }
+  /** T0420 · Vuelve a bajar hasta y en cuanto la sección es lo bastante larga (pinta con lo guardado y luego trae lo último). */
+  function alSitio(id, y) {
+    var n = 0;
+    (function paso() {
+      if (actual !== id) return;
+      // T0722 (R49): en el iPhone quien se desplaza es body, no la ventana: se mueven los dos.
+      window.scrollTo(0, y); document.body.scrollTop = y;
+      if (Math.abs(bajado() - y) > 2 && ++n < 25) setTimeout(paso, 80);
+    })();
+  }
+
+  /** El JS de una sección, una vez. */
+  function cargar(s) {
+    // T0599: una sección que sale varias veces en el menú (Seguimiento y Clientes, las dos de Listado) lleva en «base» el id
+    // con el que se registra su JS, que se carga una sola vez.
+    var k = s.base || s.id;
+    if (DEF[k]) return Promise.resolve(DEF[k]);
+    if (cargas[k]) return cargas[k];
+    cargas[k] = new Promise(function (ok, ko) {
+      var sc = document.createElement('script');
+      sc.src = RAIZ + s.web + '?v=' + encodeURIComponent(s.version || '1');
+      sc.onload = function () { if (DEF[k]) ok(DEF[k]); else ko(new Error('La sección ' + k + ' no se ha registrado.')); };
+      sc.onerror = function () { delete cargas[k]; ko(new Error('No se ha podido cargar la sección.')); };
+      document.head.appendChild(sc);
+    });
+    return cargas[k];
+  }
+
+  /**
+   * Lo que recibe cada sección en abrir(el, ctx):
+   * - id, titulo, persona, perfil, admin y config (su personalización de config.json · nucleo, con los valores por defecto).
+   * - autor (T0273): el nombre para lo que se apunta (como ctx.autor del motor).
+   * - correo y secciones (T0259): la cuenta con la que ha entrado y las secciones que ve ({ id, titulo }), en orden; las de
+   *   dentro de Perfil, con enPerfil e icono (T0269).
+   * - tablas: las tablas al momento (UT de kanban4/tablas.js): leer, filas, fila, actualizar, crear, borrar.
+   * - alCambiar(f): f(tabla, info) cada vez que cambia una tabla, solo mientras la sección está abierta.
+   * - llamar(fn, args): una función de su «api» del motor (recibe ctx en el motor). Devuelve una promesa.
+   * - aviso(texto): mensaje corto abajo de la pantalla. ponerTitulo(texto): cambia el título de la cabecera.
+   * - abierta(): si la sección sigue abierta (para no pintar tarde en otra).
+   * - enDirecto(tablas, f) (T0386, solo con Supabase; si no, null): f(tabla) en cuanto cambia algo en esas tablas de la base.
+   * - personaId (T0387, solo con Supabase; si no, ''): el id de quien ha entrado, el de las columnas persona (ASIGNADO…).
+   * - roles (T0417, solo con Supabase; si no, []): sus roles, [{ rol, ambito, ambito_id }], para no ofrecer lo que la base no le
+   *   deja (en qué iniciativas es responsable). La que manda sigue siendo la base.
+   * - ocultar (T0650): lo que su perfil no ve (config.json · nucleo.ocultar): { tablas, refs: { TABLA: [columnas] }, filas: { TABLA:
+   *   { COLUMNA: [valores] } } } o null. La sección no pide esas tablas, no enseña esas columnas ni ofrece esos valores; el motor no las da.
+   * - desde y volver() (T0420): la sección de la que se viene con un enlace ({ id, titulo } o null) y volver a ella como estaba.
+   */
+  function ctxDe(s) {
+    return {
+      id: s.id, titulo: s.titulo, persona: cred.persona, perfil: cred.perfil, admin: cred.admin, config: s.config || {},
+      // T0259: las secciones que ves, en orden; T0269: con enPerfil (y su icono) las que van dentro de Perfil.
+      // T0273: como, quien administra si está viendo como esta persona ({ correo, persona }); verComo, la ventana para elegir (solo quien administra).
+      como: cred.como || null, verComo: cred.admin && !cred.como && !window.UG.sinComo ? verComo : null, // T0386: con Supabase, no
+      // T0273: el nombre con el que se apunta lo que hace (HISTORIAL…), como en el motor: «Javi Canela como Ana».
+      autor: cred.como ? cred.como.persona + ' como ' + cred.persona : cred.persona,
+      personaId: cred.persona_id || '', // T0387
+      roles: cred.roles || [], // T0417
+      // T0689: quien administra y las personas con perfil ([{ persona, correo, admin }]), si una sección que ve usa MIAS; si no, [].
+      equipo: cred.equipo || [],
+      // T0650: lo que su perfil no ve (nucleo.ocultar del motor): { tablas, refs: { TABLA: [columnas que apuntan a una oculta] },
+      // filas: { TABLA: { COLUMNA: [valores que no ve] } } } o null.
+      ocultar: cred.ocultar || null,
+      // T0420: la sección de la que vienes ({ id, titulo }, o null si se ha entrado directo) y volver a ella como estaba.
+      desde: (function () { var d = history.state && history.state.desde, x = d && seccion(d); return x ? { id: x.id, titulo: x.titulo } : null; })(),
+      volver: function () { history.back(); },
+      alDia: function () { return alDia; }, // T0749: si el menú (secciones) ya lo ha dicho el motor en esta carga
+      correo: cred.correo || '', secciones: todas().map(function (x) {
+        if (x.enPerfil) return { id: x.id, titulo: x.titulo, icono: x.icono || '', enPerfil: true };
+        // T0644: las que esta persona personaliza (Listado: quien administra o su perfil en PERSONALIZAN) salen en su Perfil.
+        return personaliza(x) ? { id: x.id, titulo: x.titulo, personaliza: true } : { id: x.id, titulo: x.titulo };
+      }),
+      tablas: tablas(),
+      alCambiar: function (f) { (oyentes[s.id] = oyentes[s.id] || []).push(f); },
+      llamar: llamar,
+      aviso: aviso,
+      ponerTitulo: function (t) { if (actual === s.id) $('n-titulo').textContent = t; },
+      abierta: function () { return actual === s.id; },
+      // T0386: con Supabase, enDirecto(tablas, f): f(tabla) en cuanto cambia algo en esas tablas de la base (null si no se puede).
+      enDirecto: window.UG && typeof window.UG.enDirecto === 'function' ? function (ts, f) { return window.UG.enDirecto(ts, f); } : null
+    };
+  }
+
+  /* ---------- T0682 · el uso de la app (nucleo/uso.js) ----------
+   * Si «entrar» trae uso ({ app, url, clave }: config.json · nucleo.uso) y no se está viendo como otra persona, se carga
+   * nucleo/uso.js cuando la sección ya está pintada y apunta quién entra, las secciones, los avisos en rojo, los errores y las
+   * esperas del motor, y cuándo sale. Lo de antes de que cargue espera en usoPend. Otra persona o sin uso: se para. */
+  var usoAhora = null, usoPend = [], usoCargando = false, usoOyentes = false;
+  function usar(f) { if (usoAhora) { try { f(usoAhora); } catch (e) {} } else if (usoCargando) usoPend.push(f); }
+  function usoParar() { if (usoAhora) usoAhora.parar(); usoAhora = null; usoPend = []; usoCargando = false; }
+  function usoSegun(c) {
+    if (!c || !c.uso || c.como || !c.correo) { usoParar(); return; }
+    if (usoAhora && usoAhora.correo === c.correo) return;
+    if (usoCargando && usoCargando === c.correo) return;
+    usoParar();
+    usoCargando = c.correo;
+    var listo = function () {
+      if (usoCargando !== c.correo || !window.NUCLEO_USO) return;
+      var U = window.NUCLEO_USO;
+      usoAhora = U.crear({
+        app: c.uso.app, url: c.uso.url, clave: c.uso.clave, correo: c.correo, persona: c.persona, perfil: c.perfil, version: c.version,
+        aparato: U.aparato(navigator, window.innerWidth),
+        local: /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) || location.protocol === 'file:'
+      });
+      usoCargando = false;
+      var p = usoPend; usoPend = [];
+      p.forEach(usar);
+      U.envolver(window.UG, function () { return usoAhora; });
+      if (!usoOyentes) {
+        usoOyentes = true;
+        U.vigilarAvisos(document, function () { return usoAhora; });
+        document.addEventListener('visibilitychange', function () { usar(function (u) { if (document.visibilityState === 'hidden') u.salir(); else u.volver(); }); });
+        window.addEventListener('pagehide', function () { usar(function (u) { u.salir(); }); });
+        window.addEventListener('error', function (e) { usar(function (u) { u.falloPagina(e && (e.message || e.error)); }); });
+      }
+    };
+    if (window.NUCLEO_USO) { listo(); return; }
+    // Cuando la página ya está pintada: no compite con lo que se ve al entrar.
+    setTimeout(function () {
+      if (usoCargando !== c.correo) return;
+      var sc = document.createElement('script');
+      sc.src = RAIZ + 'nucleo/uso.js?v=1';
+      sc.onload = listo;
+      sc.onerror = function () { if (usoCargando === c.correo) { usoCargando = false; usoPend = []; } };
+      document.head.appendChild(sc);
+    }, 1200);
+  }
+
+  var tAviso = 0;
+  function aviso(t) {
+    var a = $('n-aviso');
+    if (!a) return;
+    a.textContent = t; a.hidden = false;
+    clearTimeout(tAviso);
+    tAviso = setTimeout(function () { a.hidden = true; }, 5000);
+  }
+
+  /** T0644 · Si quien ha entrado personaliza esta sección (Listado: quien administra o su perfil en PERSONALIZAN). Lo usan el
+   *  Perfil del marco y, por ctx.secciones (personaliza), la sección Perfil. */
+  function personaliza(x) {
+    return (x.base || x.id) === 'LISTADO' && !x.enPerfil && (!!cred.admin || ((x.config || {}).PERSONALIZAN || []).indexOf(cred.perfil) >= 0);
+  }
+  /** T0644 · Personalizar en el Perfil del marco (sin sección PERFIL), como en la sección Perfil: una línea por sección.
+   *  T0749: en su caja (data-n-pers), vacía hasta que el motor dice el menú (alDia). */
+  function htmlPersonalizar() { return '<div data-n-pers>' + (alDia ? htmlPersonalizarDentro() : '') + '</div>'; }
+  function htmlPersonalizarDentro() {
+    var ss = cred ? todas().filter(personaliza) : [];
+    if (!ss.length) return '';
+    return '<section class="pf-pers"><h2 class="n-grupo">Personalizar</h2><p class="u-nota">El orden del menú, qué vistas ve cada sección y con cuántos días avisa.</p>' +
+      '<ul class="pf-pers-l">' + ss.map(function (x) {
+        return '<li><a href="?s=' + encodeURIComponent(x.id.toLowerCase()) + '&personalizar=1" data-sx="' + texto(x.id) + '"><span>' + texto(x.titulo) + '</span><span aria-hidden="true">›</span></a></li>';
+      }).join('') + '</ul></section>';
+  }
+
+  /** Perfil del marco, mientras el cliente no tenga la sección PERFIL: quién eres, tu perfil, las de dentro de Perfil y cerrar sesión. */
+  function htmlPerfil() {
+    var ves = menu().filter(function (s) { return s.id !== 'PERFIL'; }).map(function (s) { return s.titulo; }).join(', ');
+    var dentro = todas().filter(function (s) { return s.enPerfil; });
+    return '<div class="u-perfil"><div class="u-perfil-quien"><strong>' + texto(cred.persona) + '</strong>' +
+      '<span>' + texto(cred.admin ? (cred.perfil ? cred.perfil + ' · administras el negocio' : 'Administras el negocio') : cred.perfil) + '</span></div>' +
+      '<dl><dt>Cuenta</dt><dd>' + texto(cred.correo || '') + '</dd>' +
+      '<dt>Secciones</dt><dd>' + texto(ves || 'Ninguna') + '</dd>' +
+      '<dt>Dispositivo</dt><dd>' + (cred.como ? 'Viendo como ' + texto(cred.persona) + ' desde la cuenta de ' + texto(cred.como.persona) : 'Sesión guardada en este dispositivo') + '</dd></dl>' +
+      (cred.como ? '<button type="button" class="u-btn" data-n-volver>Volver a mi cuenta</button>' :
+        '<div class="n-botones">' + (cred.admin && !window.UG.sinComo ? '<button type="button" class="u-btn" data-n-como>Entrar como otra persona</button>' : '') +
+        '<a class="u-btn" href="?salir">Cerrar sesión</a></div>' +
+        '<p class="u-nota">' + (conCodigo() ? 'Al cerrar la sesión tendrás que volver a entrar con un código a tu correo.' :
+          'Al cerrar la sesión tendrás que volver a entrar con tu cuenta de Google.') + '</p>') +
+      (window.UG.correos && !cred.como ? '<div class="n-correos" id="n-correos"></div>' : '') +
+      (window.UG.avisos && !cred.como ? '<div class="n-avisos" id="n-avisos"></div>' : '') +
+      (dentro.length ? '<div class="n-botones">' + dentro.map(function (s) {
+        return '<a class="u-btn" href="?s=' + encodeURIComponent(s.id.toLowerCase()) + '" data-sx="' + texto(s.id) + '">' + texto(s.titulo) + '</a>';
+      }).join('') + '</div>' : '') + htmlPersonalizar() + '</div>' + htmlAspecto() + htmlVersion(); // T0740: Aspecto
+  }
+
+  function conCodigo() { return !!(window.UG.formas && window.UG.formas().indexOf('codigo') >= 0); }
+
+  /**
+   * T0391 · «Tus correos» en el Perfil del marco (con Supabase): con cualquiera de ellos entras en tu misma cuenta. Añadir
+   * uno manda un código a ese correo, que se escribe aquí mismo; hasta entonces sale «por confirmar». El principal no se
+   * quita. Lo pinta en #n-correos cuando contesta la base.
+   */
+  function correosPerfil() {
+    var caja = $('n-correos'), C2 = window.UG.correos;
+    if (!caja || !C2) return;
+    var aviso2 = '', pidiendo = '';
+    function pintar(lista) {
+      if (!document.body.contains(caja)) return;
+      lista = lista || [];
+      var pend = lista.filter(function (x) { return x.pendiente; });
+      caja.innerHTML = '<h3>Tus correos</h3><p class="u-nota">Puedes entrar con cualquiera de ellos: siempre es tu misma cuenta.</p>' +
+        '<ul class="n-correos-lista">' + lista.map(function (x) {
+          return '<li><span>' + texto(x.correo) + '</span><span class="u-nota">' + (x.principal ? 'principal' : x.pendiente ? 'por confirmar' : '') + '</span>' +
+            (x.principal ? '' : '<button type="button" class="u-btn" data-n-quitar="' + texto(x.correo) + '">Quitar</button>') + '</li>';
+        }).join('') + '</ul>' +
+        pend.map(function (x) {
+          return '<form class="kz-form n-correo-codigo" data-n-confirmar="' + texto(x.correo) + '"><label>Código que ha llegado a ' + texto(x.correo) +
+            '<input type="text" class="kz-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="10"></label>' +
+            '<div class="n-botones"><button type="submit" class="u-btn u-btn-accion">Confirmar</button>' +
+            '<button type="button" class="u-btn" data-n-reenviar="' + texto(x.correo) + '">Enviar otro código</button>' +
+            (window.UG.entorno !== 'prod' && window.UG.buzon ? '<button type="button" class="u-btn" data-n-buzon="' + texto(x.correo) + '">Ver el buzón de pruebas</button>' : '') +
+            '</div></form>';
+        }).join('') +
+        '<form class="kz-form" id="n-correo-nuevo" novalidate><label>Añadir otro correo<input type="email" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false" value="' + texto(pidiendo) + '"></label>' +
+        '<button type="submit" class="u-btn">Enviarme un código</button></form>' +
+        '<p class="kz-aviso" role="status">' + texto(aviso2) + '</p>';
+      var nuevo = $('n-correo-nuevo');
+      nuevo.onsubmit = function (e) {
+        e.preventDefault();
+        var i = nuevo.querySelector('input'), b = nuevo.querySelector('button');
+        pidiendo = i.value; b.disabled = true; b.textContent = 'Enviando…';
+        C2.anadir(i.value).then(function (r) { pidiendo = ''; aviso2 = 'Te hemos enviado un código a ' + r.correo + ': escríbelo aquí arriba.'; cargar(); },
+          function (x) { b.disabled = false; b.textContent = 'Enviarme un código'; aviso2 = String(x.message).replace(/^\w+:\s*/, ''); pintar(lista); });
+      };
+      Array.prototype.forEach.call(caja.querySelectorAll('[data-n-confirmar]'), function (f) {
+        f.onsubmit = function (e) {
+          e.preventDefault();
+          var b = f.querySelector('button[type=submit]');
+          b.disabled = true;
+          C2.confirmar(f.getAttribute('data-n-confirmar'), f.querySelector('input').value).then(function (r) {
+            aviso2 = r && r.ok ? 'Listo: ya puedes entrar también con ' + r.correo + '.' : (r && r.error) || 'No se ha podido confirmar.';
+            cargar();
+          }, function (x) { b.disabled = false; aviso2 = String(x.message).replace(/^\w+:\s*/, ''); pintar(lista); });
+        };
+      });
+      Array.prototype.forEach.call(caja.querySelectorAll('[data-n-reenviar]'), function (b) {
+        b.onclick = function () {
+          b.disabled = true;
+          C2.anadir(b.getAttribute('data-n-reenviar')).then(function (r) { aviso2 = 'Te hemos enviado otro código a ' + r.correo + '.'; cargar(); },
+            function (x) { b.disabled = false; aviso2 = String(x.message).replace(/^\w+:\s*/, ''); pintar(lista); });
+        };
+      });
+      // Local y DEV: el código del buzón de pruebas, como en la pantalla de entrar.
+      Array.prototype.forEach.call(caja.querySelectorAll('[data-n-buzon]'), function (b) {
+        b.onclick = function () {
+          window.UG.buzon(b.getAttribute('data-n-buzon')).then(function (ms) {
+            aviso2 = !ms ? 'Aquí no hay buzón de pruebas para ese correo' + (window.UG.entorno === 'dev' ? ' (en DEV, solo después de entrar con tu Google en la app Utilo DEV).' : '.') : !ms.length ? 'No ha llegado nada a ese correo.' : 'Buzón de pruebas: ' + ms[0].asunto;
+            pintar(lista);
+          });
+        };
+      });
+      Array.prototype.forEach.call(caja.querySelectorAll('[data-n-quitar]'), function (b) {
+        b.onclick = function () {
+          var c = b.getAttribute('data-n-quitar');
+          if (b.getAttribute('data-seguro') !== '1') { b.setAttribute('data-seguro', '1'); b.textContent = '¿Seguro? Quitar'; return; }
+          b.disabled = true;
+          C2.quitar(c).then(function () { aviso2 = 'Quitado: con ' + c + ' ya no se entra en tu cuenta.'; cargar(); },
+            function (x) { b.disabled = false; aviso2 = String(x.message).replace(/^\w+:\s*/, ''); pintar(lista); });
+        };
+      });
+    }
+    function cargar() {
+      C2.mios().then(pintar, function (x) { if (document.body.contains(caja)) caja.innerHTML = '<h3>Tus correos</h3><p class="kz-aviso">' + texto(String(x.message).replace(/^\w+:\s*/, '')) + '</p>'; });
+    }
+    caja.innerHTML = '<h3>Tus correos</h3><p class="u-nota">Cargando…</p>';
+    cargar();
+  }
+
+  /**
+   * T0432 · «Avisos al móvil» en el Perfil del marco (con Supabase y la clave de los avisos en el montaje): recibirlos en este
+   * dispositivo, mandarse uno de prueba, dejar de recibirlos y los últimos que te han llegado, con cuánto han tardado (lo
+   * apunta el móvil al recibirlos). En el iPhone solo llegan con la app en la pantalla de inicio: si no lo está, lo dice.
+   * Lo pinta en #n-avisos.
+   */
+  function avisosPerfil() {
+    var caja = $('n-avisos'), A = window.UG.avisos;
+    if (!caja || !A) return;
+    var aviso2 = '', ocupado = false;
+    function limpio(x) { return String((x && x.message) || x).replace(/^\w+:\s*/, ''); }
+    function cuando(iso) {
+      var d = new Date(iso), hoy = new Date(), ayer = new Date(Date.now() - 864e5);
+      var h = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+      if (d.toDateString() === hoy.toDateString()) return 'hoy, ' + h;
+      if (d.toDateString() === ayer.toDateString()) return 'ayer, ' + h;
+      return d.getDate() + '/' + (d.getMonth() + 1) + ', ' + h;
+    }
+    function tardo(a, b) {
+      var s = Math.max(0, Math.round((new Date(b) - new Date(a)) / 1000));
+      return s < 60 ? s + ' s' : s < 3600 ? Math.round(s / 60) + ' min' : Math.round(s / 360) / 10 + ' h';
+    }
+    /** Qué le ha pasado a un aviso, en palabras. */
+    function como(x) {
+      if (x.recibido) return 'Llegó en ' + tardo(x.enviado, x.recibido) + (x.abierto ? ' · lo abriste' : '');
+      if (x.resultado === 'Enviado') return 'No ha llegado';
+      if (x.resultado === 'Caducado') return 'No ha llegado: ese dispositivo ya no existe';
+      if (x.resultado === 'Enviando') return 'Saliendo…';
+      return 'No ha salido (' + x.resultado + ')';
+    }
+    function pintar(est, mios) {
+      if (!document.body.contains(caja)) return;
+      mios = mios || { dispositivos: [], avisos: [] };
+      var h = '<h3>Avisos al móvil</h3>', botones = '';
+      if (!est.soportado) {
+        h += '<p class="u-nota">' + (est.ios && !est.instalada ?
+          'En el iPhone, los avisos solo llegan con Utilo en la pantalla de inicio: en Safari, Compartir › Añadir a pantalla de inicio, y ábrela desde allí.' :
+          'Este navegador no puede recibir avisos.') + '</p>';
+      } else if (est.permiso === 'denied') {
+        h += '<p class="u-nota">Has dicho que no a los avisos de Utilo en este dispositivo: se cambia en sus ajustes (Notificaciones › Utilo).</p>';
+      } else if (!est.activo) {
+        h += '<p class="u-nota">Activa los avisos y te llegarán aquí, aunque no tengas Utilo abierta.</p>';
+        botones = '<button type="button" class="u-btn u-btn-accion" data-n-avisos="activar">Recibir avisos aquí</button>';
+      } else {
+        h += '<p class="u-nota">Este dispositivo recibe los avisos.</p>';
+        botones = '<button type="button" class="u-btn u-btn-accion" data-n-avisos="prueba">Mandarme un aviso de prueba</button>' +
+          '<button type="button" class="u-btn" data-n-avisos="desactivar">Dejar de recibirlos aquí</button>';
+      }
+      if (botones) h += '<div class="n-botones">' + botones + '</div>';
+      h += '<p class="kz-aviso" role="status">' + texto(aviso2) + '</p>';
+      var ds = (mios.dispositivos || []).filter(function (x) { return x.activa; });
+      if (ds.length) h += '<p class="u-nota">Los reciben: ' + texto(ds.map(function (x) { return x.dispositivo; }).join(', ')) + '.</p>';
+      var as = (mios.avisos || []).slice(0, 10);
+      if (as.length) {
+        h += '<h4>Los últimos</h4><ul class="n-avisos-lista">' + as.map(function (x) {
+          return '<li><span>' + texto(x.titulo) + '</span><span class="u-nota">' + texto(cuando(x.enviado) + ' · ' + x.dispositivo + ' · ' + como(x)) + '</span></li>';
+        }).join('') + '</ul>';
+      }
+      caja.innerHTML = h;
+      Array.prototype.forEach.call(caja.querySelectorAll('[data-n-avisos]'), function (b) {
+        b.onclick = function () {
+          if (ocupado) return;
+          var que = b.getAttribute('data-n-avisos');
+          if (que === 'desactivar' && b.getAttribute('data-seguro') !== '1') { b.setAttribute('data-seguro', '1'); b.textContent = '¿Seguro? Dejar de recibirlos'; return; }
+          ocupado = true; b.disabled = true;
+          var p = que === 'activar' ? A.activar().then(function () { aviso2 = 'Listo: los avisos te llegarán aquí. Prueba a mandarte uno.'; })
+            : que === 'prueba' ? A.prueba().then(function (r) {
+              aviso2 = !r || !r.dispositivos ? 'No hay ningún dispositivo que reciba avisos.' :
+                r.enviados ? 'Mandado' + (r.dispositivos > 1 ? ' a ' + r.enviados + ' de ' + r.dispositivos + ' dispositivos' : '') + ': tiene que llegarte en unos segundos.' :
+                'No ha salido: ' + ((r.errores || [])[0] || {}).detalle;
+            })
+            : A.desactivar().then(function () { aviso2 = 'Este dispositivo ya no recibe avisos.'; });
+          p.then(null, function (x) { aviso2 = limpio(x); }).then(function () { ocupado = false; cargar(); });
+        };
+      });
+    }
+    function cargar() {
+      A.estado().then(function (est) {
+        return A.mios().then(function (m) { pintar(est, m); }, function (x) { aviso2 = aviso2 || limpio(x); pintar(est, null); });
+      });
+    }
+    caja.innerHTML = '<h3>Avisos al móvil</h3><p class="u-nota">Cargando…</p>';
+    cargar();
+  }
+
+  /** Comprueba con el motor quién eres y qué ves; si ha cambiado, vuelve a pintar el marco. */
+  function comprobar() {
+    var antes = cred, como = antes.como ? antes.correo : '';
+    entrar(como).then(function (r) {
+      if (cred !== antes) return; // mientras, se ha entrado como otra persona o se ha vuelto
+      var nuevo = credDe(r);
+      nuevo.correo = nuevo.correo || cred.correo;
+      if (como && !nuevo.como) { volver(); return; }
+      if (JSON.stringify(nuevo) === JSON.stringify(cred)) { ponerAlDia(); return; }
+      if (como) guardarComo(nuevo); else guardar(nuevo);
+      marco(nuevo);
+    }, function (e) {
+      if (cred !== antes) return;
+      // T0273: el motor ya no deja ver como esa persona (ya no administras, o ella ya no puede entrar): a tu cuenta.
+      if (/^COMO:/.test(e.message)) { volver(String(e.message).replace(/^COMO:\s*/, '')); return; }
+      if (e.acceso) {
+        var yo = antes.como ? antes.como.correo : antes.correo;
+        borrar(); borrarComo(); soltarTablas(yo, true); acceso(String(e.message).replace(/^ACCESO:\s*/, '')); return;
+      }
+      if (/^CONECTAR:/.test(e.message)) { conectarYEntrar(e); return; }
+      aviso('No se ha podido comprobar tu acceso: ' + String(e.message).replace(/^\w+:\s*/, ''));
+    });
+  }
+
+  /* ---------- T0685 · buscar en toda la app (nucleo/buscar.js) ----------
+   * La lupa del menú (ordenador) y de la cabecera (móvil), y ⌘K: carga nucleo/buscar.js la primera vez (con la huella que
+   * pone montar.js) y lo abre con los grupos de quien ha entrado (los de las secciones que ve), sus tablas y lo que no ve. */
+  var cargaBuscar = null;
+  /** El JS de la búsqueda, una vez (el marco lo pide un poco después de pintar, para que al abrirla ya esté y no se pierda
+   *  lo primero que se escribe). */
+  function cargarBuscar() {
+    var b = cred && cred.buscar;
+    if (!b) return Promise.reject(new Error('sin búsqueda'));
+    if (!cargaBuscar) cargaBuscar = new Promise(function (ok, ko) {
+      if (window.UBuscar) { ok(); return; }
+      var sc = document.createElement('script');
+      sc.src = RAIZ + 'nucleo/buscar.js?v=' + encodeURIComponent(b.version || '1');
+      sc.onload = function () { if (window.UBuscar) ok(); else ko(new Error('sin UBuscar')); };
+      sc.onerror = function () { cargaBuscar = null; ko(new Error('No se ha podido cargar la búsqueda.')); };
+      document.head.appendChild(sc);
+    });
+    return cargaBuscar;
+  }
+  function buscar() {
+    if (!cred || !cred.buscar) return;
+    var b = cred.buscar;
+    cargarBuscar().then(function () {
+      verMas(false);
+      window.UBuscar.abrir({ grupos: b.grupos, texto: b.texto || '', placeholder: b.placeholder || '', tablas: tablas(), ocultar: cred.ocultar || null,
+        secciones: todas().map(function (s) { return { id: s.id, titulo: s.titulo, icono: s.icono || ICONO_SECCION }; }) });
+    }, function () { aviso('No se ha podido abrir la búsqueda. Comprueba la conexión y vuelve a probar.'); });
+  }
+
+  /* ---------- navegación ---------- */
+
+  document.addEventListener('click', function (e) {
+    // T0629: «Más» abre o cierra su lista; pulsar en cualquier otro sitio la cierra (y lo pulsado sigue su camino).
+    if (e.target.closest && e.target.closest('#n-sx-mas')) { verMas($('n-sx-mas').getAttribute('aria-expanded') !== 'true'); return; }
+    verMas(false);
+    // T0273: «Entrar como otra persona» (en Perfil) y «Volver a mi cuenta» (franja y Perfil), estén donde estén.
+    if (e.target.closest && e.target.closest('[data-n-buscar]')) { buscar(); return; } // T0685
+    var b = e.target.closest && e.target.closest('[data-n-como], [data-n-volver], [data-n-versiones]');
+    if (b && cred) { e.preventDefault(); if (b.hasAttribute('data-n-volver')) volver(); else if (b.hasAttribute('data-n-versiones')) verVersiones(); else verComo(); return; }
+    var a = e.target.closest && e.target.closest('a[data-sx]');
+    if (!a || !cred || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+    e.preventDefault();
+    // T0415: sin Perfil en el menú, el Perfil del marco es una ventana, no una sección.
+    if (a.getAttribute('data-sx') === 'PERFIL' && sinPerfil() && (seccion('PERFIL') || {}).propia) { verPerfil(); return; }
+    abrir(a.getAttribute('data-sx'), true, a.getAttribute('href'));
+  });
+  // T0685: ⌘K (Ctrl+K fuera del Mac) abre la búsqueda desde cualquier sección.
+  document.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && String(e.key).toLowerCase() === 'k' && cred && cred.buscar) { e.preventDefault(); buscar(); }
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && $('n-sx-mas') && $('n-sx-mas').getAttribute('aria-expanded') === 'true') { verMas(false); $('n-sx-mas').focus(); } }); // T0629
+  try { history.scrollRestoration = 'manual'; } catch (e) {} // T0420: dónde estabas lo pone abrir() (alSitio)
+  // T0732 (R50): si atrás (o adelante) se queda en la misma sección, se le pregunta antes a ella (def.atras): la ficha abierta
+  // se cierra (o se vuelve a abrir) sin pintar la sección de nuevo. Si no lo resuelve (false), se abre como siempre.
+  window.addEventListener('popstate', function () {
+    if (!cred) return;
+    var id = pedida() || menu()[0].id;
+    if (abierta && abierta.id === id && abierta.def && typeof abierta.def.atras === 'function') {
+      try { if (abierta.def.atras(history.state || {})) return; } catch (e) {}
+    }
+    abrir(id, false);
+  });
+
+  /* ---------- arranque ---------- */
+
+  /** T0386 · Entrar sin el botón (ya hay sesión): «entrar», y el marco; si no deja, la pantalla de entrada con el motivo. */
+  function entrarYa() {
+    entrar().then(function (r) {
+      window.UG.recordarCorreo(r.correo || '');
+      var c = credDe(r);
+      if (cred && copiaDe(cred) !== copiaDe(c)) soltarTablas();
+      guardar(c); borrarComo(); marco(c);
+    }, function (e) { borrar(); acceso(String(e.message).replace(/^ACCESO:\s*/, '')); });
+  }
+
+  function arrancar() {
+    // T0386: con Supabase (acceso-supabase.js), si se vuelve de Google se espera a tener la sesión y se entra.
+    if (window.UG.volviendo) {
+      var v = window.UG.volviendo;
+      window.UG.volviendo = null;
+      cargando('Entrando…');
+      v.then(function (vuelve) { if (vuelve) entrarYa(); else arrancar(); }, function (e) { acceso(String(e.message).replace(/^ACCESO:\s*/, '')); });
+      return;
+    }
+    // T0386: con la sesión de Supabase guardada pero sin saber aún quién eres (otro dispositivo, otra persona), se entra solo.
+    if (window.UG.supabase && window.UG.tieneSesion() && !(leer() || {}).persona) { cargando('Entrando…'); entrarYa(); return; }
+    if (new URLSearchParams(location.search).get('salir') !== null) {
+      soltarTablas((leer() || {}).correo, true);  // T0275: la copia de quien sale no se queda en el dispositivo (T0273: ni la de «como»)
+      borrar(); borrarComo(); window.UG.salir(); history.replaceState(null, '', location.pathname);
+    }
+    var guardada = leer();
+    // T0275: si la llave de Google es de otra cuenta que la sesión guardada, no se pinta lo de la guardada.
+    var deLlave = String((window.UG.correo && window.UG.correo()) || '').trim().toLowerCase();
+    if (guardada && deLlave && guardada.correo && deLlave !== String(guardada.correo).trim().toLowerCase()) guardada = null;
+    if (guardada && guardada.persona && (window.UG.llave() || (window.UG.tieneSesion && window.UG.tieneSesion()))) {
+      // T0273: si en esta pestaña estaba viendo como otra persona (y es la misma cuenta), sigue igual.
+      var como = leerComo();
+      if (como && (!como.como || bajo(como.como.correo) !== bajo(guardada.correo))) { borrarComo(); como = null; }
+      marco(como || guardada, true);  // al momento, con lo guardado (T0749: sin Personalizar hasta que conteste el motor)
+      comprobar();      // y por detrás, con el motor
+    } else { borrarComo(); acceso(''); }
+  }
+  /* T0644 · Un solo patrón de pestañas (.u-pestanas) en toda la app: una línea que se desliza de lado, con la activa a la
+     vista (sin mover la página arriba o abajo) y el borde difuminado donde hay más. Vale para cualquier sección, que solo
+     pinta sus pestañas. */
+  function pestanasAVista() {
+    [].forEach.call(document.querySelectorAll('.u-pestanas'), function (p) {
+      var a = p.querySelector('[aria-selected=true]');
+      if (a && p.scrollWidth > p.clientWidth && p._activa !== a) {
+        p._activa = a;
+        var izq = a.getBoundingClientRect().left - p.getBoundingClientRect().left + p.scrollLeft, der = izq + a.offsetWidth;
+        if (izq < p.scrollLeft + 24) p.scrollLeft = Math.max(0, izq - 24);
+        else if (der > p.scrollLeft + p.clientWidth - 40) p.scrollLeft = der - p.clientWidth + 40;
+      }
+      bordes(p);
+      if (!p._conBordes) { p._conBordes = true; p.addEventListener('scroll', function () { bordes(p); }, { passive: true }); }
+    });
+  }
+  function bordes(p) {
+    var hay = p.scrollWidth > p.clientWidth + 1;
+    p.classList.toggle('u-mas-izda', hay && p.scrollLeft > 1);
+    p.classList.toggle('u-mas-dcha', hay && p.scrollLeft + p.clientWidth < p.scrollWidth - 1);
+  }
+  var tPest = 0;
+  function pestanasLuego() { cancelAnimationFrame(tPest); tPest = requestAnimationFrame(pestanasAVista); }
+  if (window.MutationObserver) new MutationObserver(pestanasLuego).observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('resize', pestanasLuego);
+
+  // Con la página ya leída: así, una sección que va en la misma página (después de este archivo) ya se ha registrado.
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arrancar); else arrancar();
+})();
