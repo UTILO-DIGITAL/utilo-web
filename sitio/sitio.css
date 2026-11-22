@@ -159,3 +159,12 @@ body.si { font-size: 18px; line-height: 1.6; }
 .si-pie-fila { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e4); padding-top: var(--e6); padding-bottom: var(--e6); }
 .si-pie p { font-weight: 700; }
 .si-pie a { color: var(--color-sobre-principal); }
+
+/* T0753 · La política de privacidad (privacidad.html): texto largo, a una columna que se lee bien */
+.si-legal { max-width: 760px; padding-top: var(--e7, 48px); padding-bottom: var(--e7, 48px); }
+.si-legal h1 { font-size: clamp(32px, 5vw, 48px); line-height: 1.1; margin-bottom: var(--e4); }
+.si-legal h2 { font-size: clamp(22px, 3vw, 28px); margin: var(--e6) 0 var(--e3); }
+.si-legal p, .si-legal li { line-height: 1.6; margin-bottom: var(--e3); }
+.si-legal ul { padding-left: 1.2em; }
+.si-legal-intro { font-size: 1.1em; }
+.si-legal-fecha { color: var(--color-texto-suave, inherit); opacity: .75; margin-top: var(--e6); }
