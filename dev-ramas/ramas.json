@@ -1860,8 +1860,8 @@
   },
   "utilo": {
    "rama": "main y las ramas abiertas",
-   "commit": "f7a9e002",
-   "fecha": "2026-11-21T11:46:50.393Z",
+   "commit": "534ea511",
+   "fecha": "2026-11-22T12:00:01.484Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
