@@ -1542,10 +1542,10 @@
    "tarea": "T0754",
    "titulo": "Tu Claude propone apuntar en tu app lo importante de cada conversación",
    "pr": 438,
-   "commit": "92161413",
-   "ultimo": "T0754: El Claude de Marta propone apuntar en Seguimiento lo que sale de cada conversación",
+   "commit": "94fb0da9",
+   "ultimo": "T0754: Al día con main (T0753)",
    "quien": "Javi Canela",
-   "fecha": "2026-11-22T06:20:26.672Z",
+   "fecha": "2026-11-22T06:26:51.673Z",
    "toca": [
     "telas"
    ],
