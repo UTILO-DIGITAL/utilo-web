@@ -1,0 +1,1375 @@
+/*
+ * Hoja de estilos del núcleo 5.0, segunda parte · T0744 (antes, el final de base.css, desde la zona segura del iPhone)
+ * Va después de nucleo.css (y, en base.css, de konamigas.css): Listado, lo de cada sección nueva, el rediseño de T0679,
+ * el modo oscuro y lo del iPhone. Lo nuevo de una sección general va al final de esta hoja.
+ */
+
+/* ---------- Zona segura de abajo en el iPhone (T0256) ----------
+ * Las ventanas ocupan toda la pantalla en el móvil y lo último (Guardar, Cerrar…) quedaba debajo de la barra de inicio
+ * del iPhone, sin poder tocarlo. Se deja ese hueco (env(safe-area-inset-bottom), con viewport-fit=cover) al final de cada
+ * ventana y en los pies fijos. Va con html delante para ganar a kanban.css, que se carga después. */
+html .u .u-velo, html .u .gs5 .gs-velo, html .u #alta-velo, html .u .ver-velo, html .u .sol-velo, html .u .fv-velo {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--e2)); scroll-padding-bottom: env(safe-area-inset-bottom, 0px); }
+@media (max-width: 640px) {
+  html .u .u-velo, html .u .gs5 .gs-velo, html .u #alta-velo, html .u .ver-velo, html .u .sol-velo, html .u .fv-velo {
+    padding-bottom: env(safe-area-inset-bottom, 0px); }
+  html .u .u-ventana, html .u .gs5 .gs-hoja { padding-bottom: calc(var(--e4) + env(safe-area-inset-bottom, 0px)); }
+  html .u .gs5 .gs-pie { padding-bottom: calc(var(--e2) + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* ---------- El body cubre toda la pantalla (T0421) ----------
+ * Sin la etiqueta black-translucent (T0430), la franja de la hora del iPhone instalado toma el color de fondo del body (la
+ * plataforma de Utilo lo pone verde en su index.html). */
+body.u { box-sizing: border-box; min-height: 100vh; min-height: 100dvh; }
+
+/* ---------- T0599 · Sección Listado (nucleo/secciones/listado.js): listado con ficha y avisos, configurable ----------
+ * T0624 · Una señal por cosa. El color de un aviso sale solo en la franja de la fila, en su fecha y en el número de su botón:
+ * alto = vencido (--color-vencido: rojo; en Telas, teja), medio = pendiente (--color-pendiente: ámbar; en Telas, ocre),
+ * info = azul de En curso (sin franja). Los botones de aviso, las etiquetas de estado y las marcas de cada fila, neutros. */
+.u .li-arriba { display: flex; align-items: flex-end; gap: var(--e2); margin: 0 0 var(--e3); }
+.u .li-pers { flex: none; text-decoration: none; }
+.u .li-n { display: inline-block; min-width: 20px; padding: 0 var(--e1); margin-left: var(--e1); border-radius: 999px; text-align: center;
+  background: var(--estado-bl); color: var(--sobre-estado); font: 700 12px/20px var(--fuente-texto); font-variant-numeric: tabular-nums; }
+.u .li-cli { font-weight: 400; font-size: 12px; opacity: .85; }
+.u .li-texto { margin: 0 0 var(--e3); }
+/* T0708 · El resumen de todo lo que hay, sobre la lista («203 telas · 39 diseños»), con su frase debajo. */
+.u .li-resumen { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e1) var(--e5); margin: 0 0 var(--e3); padding: var(--e3) var(--e4);
+  background: var(--color-superficie); border: 1px solid var(--color-linea); border-radius: var(--radio); }
+.u .li-cifra { font-size: 15px; white-space: nowrap; }
+.u .li-cifra b { font: var(--peso-titulos) 30px/1 var(--fuente-titulos); font-variant-numeric: tabular-nums; margin-right: var(--e1); }
+.u .li-resumen-t { flex-basis: 100%; font-size: 14px; color: var(--color-suave); }
+@media (max-width: 640px) { .u .li-resumen { padding: var(--e2) var(--e3); margin-bottom: var(--e2); } .u .li-cifra b { font-size: 26px; } }
+/* T0710 · Lo de otra tabla que pide una decisión, arriba de la lista (la feria a 45 días sin decidir, en Hoy): la franja del aviso
+   pendiente, el texto y sus botones al lado (debajo en el móvil). */
+.u .li-arriba-av { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e4); margin: 0 0 var(--e3); padding: var(--e3) var(--e4);
+  background: var(--color-superficie); border: 1px solid var(--color-linea); border-left: 3px solid var(--color-pendiente); border-radius: var(--radio); }
+.u .li-arriba-tx { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.u .li-arriba-tx strong { font-size: 15px; }
+.u .li-arriba-et { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-suave); }
+.u .li-arriba-bt { display: flex; flex-wrap: wrap; gap: var(--e2); }
+@media (max-width: 640px) { .u .li-arriba-av { padding: var(--e2) var(--e3); margin-bottom: var(--e2); } }
+.u .li-cliente { margin: 0 0 var(--e3); padding: var(--e2) var(--e3); border-radius: var(--radio); font-size: 14px;
+  background: color-mix(in srgb, var(--estado-ec) 10%, var(--color-superficie)); border-left: 4px solid var(--estado-ec); }
+.u .li-avisos { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); margin: 0 0 var(--e3); }
+.u .li-av { min-height: 36px; padding: 0 var(--e3); border-radius: var(--radio); cursor: pointer; text-align: left;
+  border: 1px solid var(--color-borde-campo); background: var(--color-superficie); color: var(--color-texto); font: 600 14px/1.2 var(--fuente-texto); }
+.u .li-av b { color: var(--li-c, var(--color-pendiente)); font-variant-numeric: tabular-nums; }
+@media (hover: hover) { .u .li-av:hover { border-color: var(--li-c, var(--color-pendiente)); } }
+.u .li-av[aria-pressed=true] { background: var(--li-fondo, var(--color-pendiente-fondo)); border: 1.5px solid var(--li-c, var(--color-pendiente)); }
+.u .li-alto { --li-c: var(--color-vencido); --li-fondo: var(--color-vencido-fondo); }
+.u .li-medio { --li-c: var(--color-pendiente); --li-fondo: var(--color-pendiente-fondo); }
+.u .li-info { --li-c: var(--estado-ec); --li-fondo: color-mix(in srgb, var(--estado-ec) 9%, var(--color-superficie)); }
+.u .li-bien { --li-c: var(--color-bien); } .u .li-apagado { --li-c: var(--color-suave); }
+.u .li-grupo { margin: 0 0 var(--e4); }
+.u .li-grupo .n-grupo { margin-top: var(--e3); }
+.u .li-tabla { overflow-x: auto; border: 1px solid var(--color-linea); border-radius: var(--radio); }
+.u .li-tabla .u-tabla th { position: static; }
+/* T0610: todos los grupos en una tabla; el título de cada grupo, una fila sobre fondo de bloque que separa sin repetir la cabecera */
+.u .li-tabla .li-g-cab th { position: static; padding: var(--e3) var(--e3) var(--e2); background: var(--color-fondo); border-bottom: 1px solid var(--color-borde-campo);
+  text-transform: none; letter-spacing: 0; white-space: normal; }
+.u .li-tabla tbody + tbody .li-g-cab th { border-top: 1px solid var(--color-linea); }
+.u .li-tabla .li-g-cab .n-grupo { margin: 0; font-size: 16px; }
+.u .li-tabla tbody tr:last-child td { border-bottom: 0; }
+.u .li-tabla tbody:not(:last-child) tr:last-child td { border-bottom: 1px solid var(--color-linea); }
+.u .li-nada { color: var(--color-suave); }
+.u .li-sinvalor { color: var(--color-suave); } /* T0731: «Contacto», «Sin nada pendiente» */
+.u .li-estado { background: var(--color-superficie); color: var(--color-texto); border: 1px solid color-mix(in srgb, var(--color-borde-campo) 45%, var(--color-superficie)); font-weight: 600; }
+.u .li-estado.li-apagado { color: var(--color-suave); }
+/* Los demás avisos de una fila, en palabras y sin color (la franja ya dice el más importante); en la ficha, con el suyo. */
+.u .li-aviso { display: inline-flex; align-items: center; font: 600 12px/1.4 var(--fuente-texto); color: var(--color-suave); margin-right: var(--e2); }
+.u .li-aviso + .li-aviso::before { content: "·"; margin-right: var(--e2); }
+.u .li-ficha-avisos .li-aviso { font-weight: 700; font-size: 13px; color: var(--li-c, var(--color-pendiente)); }
+.u .li-ficha-avisos .li-aviso + .li-aviso::before { color: var(--color-suave); }
+.u .li-marcas { margin-top: var(--e1); font-weight: 400; display: flex; flex-wrap: wrap; } /* T0677: dos avisos juntos bajan de línea (no ensanchan la tabla) */
+.u .li-fecha, .u .li-fecha .u-nota { color: var(--li-c); font-weight: 700; }
+.u .u-tabla tr.li-con-aviso td:first-child { box-shadow: inset 4px 0 0 var(--li-barra, transparent); }
+.u .li-f-alto { --li-barra: var(--color-vencido); } .u .li-f-medio { --li-barra: var(--color-pendiente); }
+.u .li-mini { width: 40px; height: 40px; border-radius: var(--radio-peq); object-fit: cover; display: block; border: 1px solid var(--color-linea); }
+.u .li-foto { width: 100%; max-width: 240px; aspect-ratio: 1; border-radius: var(--radio); object-fit: cover; display: block; border: 1px solid var(--color-linea); }
+.u .li-tarjetas { list-style: none; margin: 0; padding: 0; }
+@media (max-width: 639px) { .u .li-tarjetas { display: grid; gap: var(--e2); } }
+.u .li-tarjeta { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: var(--e1); text-align: left; cursor: pointer;
+  padding: var(--e3); border-radius: var(--radio); border: 1px solid var(--color-linea); background: var(--color-superficie); color: var(--color-texto);
+  font: 400 15px/1.35 var(--fuente-texto); box-shadow: inset 4px 0 0 var(--li-barra, transparent); }
+.u .li-tarjeta strong { font-weight: 700; display: flex; flex-direction: column; align-items: flex-start; gap: 0; } /* T0610: el código, encima del nombre */
+.u .li-det { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e3); font-size: 14px; color: var(--color-suave); }
+.u .li-det .li-mini { width: 32px; height: 32px; }
+/* T0633: en el móvil, la tarjeta con foto la lleva a la izquierda; sin foto, el hueco igual para que los nombres caigan en línea. */
+.u .li-tarjeta.li-con-foto { flex-direction: row; align-items: flex-start; gap: var(--e3); }
+.u .li-t-img { flex: none; width: 64px; height: 64px; border-radius: var(--radio-peq); }
+.u .li-t-vacia { background: var(--color-fondo); border: 1px solid var(--color-linea); }
+.u .li-t-txt { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: var(--e1); }
+/* T0633: una foto que no se puede ver (de Drive, sin compartir «con el enlace») dice por qué, en vez de dejar un hueco. */
+.u .li-nofoto { display: flex; align-items: center; justify-content: center; text-align: center; width: 40px; height: 40px;
+  border-radius: var(--radio-peq); border: 1px dashed var(--color-linea); background: var(--color-fondo); color: var(--color-suave);
+  font: 400 11px/1.15 var(--fuente-texto); white-space: normal; }
+.u .li-det .li-nofoto, .u .li-rel-f .li-nofoto { width: 32px; height: 32px; font-size: 9px; }
+.u .li-nofoto.li-t-img { width: 64px; height: 64px; font-size: 12px; }
+.u .li-nofoto.li-nofoto-g { width: auto; height: auto; max-width: 420px; justify-content: flex-start; text-align: left; padding: var(--e2) var(--e3);
+  border-radius: var(--radio); font-size: 14px; line-height: 1.4; margin-bottom: var(--e1); }
+.u .li-errores { margin: 0 0 var(--e3); border-left: 4px solid var(--estado-bl); font-size: 14px; }
+.u .li-errores ul { margin: var(--e1) 0 0; padding-left: var(--e4); }
+/* Ficha */
+.u .li-ficha-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e2); }
+.u .li-ficha-cab h2 { overflow-wrap: anywhere; }
+.u .li-ficha-avisos { margin-top: calc(var(--e2) * -1); }
+.u .li-recomienda { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e3); padding: var(--e2) var(--e3);
+  border-radius: var(--radio); background: var(--est-azul-f); border-left: 4px solid var(--est-azul); }
+.u .li-recomienda p { margin: 0; flex: 1 1 16em; font-size: 14px; line-height: 1.4; }
+.u .li-recomienda .u-btn { min-height: 36px; font-size: 14px; padding: 0 var(--e3); }
+.u .li-fgrupo { display: flex; flex-direction: column; gap: var(--e2); }
+.u .li-fg-t { font-size: 15px; color: var(--color-principal-oscuro); border-bottom: 1px solid var(--color-linea); padding-bottom: var(--e1); }
+.u .li-fg-t .u-cifra { font-family: var(--fuente-texto); font-weight: 400; color: var(--color-suave); }
+.u .li-dato { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.u .li-dato.u-ancho { grid-column: 1 / -1; }
+.u .li-valor { overflow-wrap: anywhere; white-space: pre-line; }
+.u .li-rel { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e1); }
+.u .li-rel-f { width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: var(--e1) var(--e3); text-align: left; cursor: pointer;
+  padding: var(--e2) var(--e3); border-radius: var(--radio-peq); border: 1px solid var(--color-linea); background: var(--color-superficie);
+  color: var(--color-texto); font: 400 14px/1.35 var(--fuente-texto); }
+.u .li-rel-f .li-mini { width: 32px; height: 32px; }
+/* Personalizar */
+.u .li-p-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e1); }
+.u .li-p-fila { display: flex; align-items: center; gap: var(--e2); padding: var(--e1) var(--e2); border-radius: var(--radio-peq); background: var(--color-superficie); border: 1px solid var(--color-linea); }
+.u .li-p-t { flex: 1; min-width: 0; font-weight: 600; display: flex; flex-direction: column; }
+.u .li-p-t small { font-weight: 400; }
+.u .li-p-fila .u-btn-icono { min-height: 36px; width: 36px; border-color: var(--color-linea); }
+.u .li-p-dias { display: inline-flex; align-items: center; gap: var(--e1); font-size: 14px; white-space: nowrap; }
+.u .li-p-dias input { width: 64px; min-height: 36px; text-align: right; }
+.u .li-form { display: flex; flex-direction: column; gap: var(--e5); }
+/* T0599 · Vista tablero de la sección Listado: una columna por valor, como el Kanban; en el móvil se desliza de lado. */
+.u .li-tablero { display: flex; gap: var(--e3); overflow-x: auto; padding: 0 0 var(--e2); scroll-snap-type: x proximity; align-items: stretch; }
+/* Todas las columnas llegan hasta abajo (la más larga): se suelta en cualquier punto de la columna, también debajo de su última tarjeta. */
+.u .li-col-l { align-content: start; }
+.u .li-col { flex: 1 0 220px; max-width: 320px; scroll-snap-align: start; background: color-mix(in srgb, var(--color-bloque) 45%, var(--color-fondo)); border-radius: var(--radio);
+  padding: var(--e2); border-top: 4px solid var(--li-c, var(--color-linea)); display: flex; flex-direction: column; gap: var(--e2); min-height: 120px; }
+.u .li-col.li-encima { outline: 3px dashed var(--color-principal-oscuro); outline-offset: -3px; }
+.u .li-col-t { font-size: 15px; padding: var(--e1) var(--e1) 0; }
+.u .li-col-t .u-cifra { font-family: var(--fuente-texto); font-weight: 400; color: var(--color-suave); }
+.u .li-col-l { display: grid; gap: var(--e2); }
+.u .li-col-vacia { margin: 0; padding: var(--e2) var(--e1); }
+.u .li-col .li-tarjeta[data-mover] { cursor: grab; touch-action: pan-x pan-y; }
+.u .li-fantasma { position: fixed; z-index: 80; pointer-events: none; opacity: .9; box-shadow: var(--sombra-flota); transform: rotate(1.5deg); }
+
+.u .li-tarjeta.li-cogida { opacity: .5; }
+.u .li-col-ayuda { margin: var(--e2) 0 0; }
+@media (max-width: 639px) { .u .li-col { flex-basis: 82%; } }
+/* T0599 · Listado como sección del menú: barra de buscar, el código de cada fila (T0012, para trabajarla en Claude) y la ficha. */
+.u .li-barra { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e3); margin: 0 0 var(--e3); }
+.u .li-barra .li-buscar { flex: 1 1 240px; display: flex; min-width: 0; }
+.u .li-barra .li-buscar input { flex: 1; min-width: 0; }
+.u .li-barra .li-cuenta { margin: 0; white-space: nowrap; }
+.u .li-barra .li-nueva { font-size: 15px; padding: 0 var(--e4); }
+.u .li-arriba .li-vistas { flex: 1; min-width: 0; }
+/* T0610: el código, discreto (antes una caja con letra de máquina que pesaba más que el nombre): gris, pequeño y con cifras de ancho fijo */
+.u .li-cod { display: inline-block; font: 600 12px/1.6 var(--fuente-texto); font-variant-numeric: tabular-nums; letter-spacing: .02em;
+  color: var(--color-suave); white-space: nowrap; }
+.u .u-tabla td.li-td-cod { width: 1%; white-space: nowrap; }
+.u .u-tabla td.li-td-corta { white-space: nowrap; }
+/* T0677: con la tabla estrecha (portátil pequeño, tableta, o el menú abierto), la fecha pone «hace 9 días» debajo y el estado
+   se puede partir, para que «Pasar» y el Estado no queden fuera. Mira el ancho de la tabla, no el de la pantalla. */
+.u .li-tabla { container-type: inline-size; }
+@container (max-width: 960px) {
+  .u .u-tabla td.li-td-fecha .li-cuando { display: block; }
+  .u .u-tabla td.li-td-fecha .li-punto { display: none; }
+  .u .u-tabla td.li-td-estado { white-space: normal; }
+  .u .u-tabla td.li-td-estado .u-chip { white-space: normal; line-height: 1.3; }
+  .u .li-tabla .u-tabla th, .u .li-tabla .u-tabla td { padding-left: var(--e2); padding-right: var(--e2); }
+  .u .li-tabla .u-tabla thead th { white-space: normal; } /* «Qué hay que hacer o qué pasó», en dos líneas */
+}
+.u .li-ficha-cab h2 .li-cod { font-size: 14px; vertical-align: 3px; }
+.u .li-claude { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2) var(--e3); padding-top: var(--e3); border-top: 1px solid var(--color-linea); }
+/* T0630 · En la ficha, lo vacío de un apartado, junto en una línea («Sin rellenar: Formato · Notas»); lo que se edita se abre al tocarlo. */
+.u .li-vacios { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e1) var(--e2); margin: 0; font-size: 14px; color: var(--color-suave); }
+.u .li-vacios .u-etiqueta { color: var(--color-suave); margin-right: var(--e1); }
+.u .li-vacios .li-vacio:not(:last-child)::after { content: ' ·'; }
+.u .li-rellenar { min-height: 32px; padding: 0 var(--e2); border: 1px dashed var(--color-linea); border-radius: var(--radio-peq); background: none;
+  color: var(--color-principal-oscuro); font: 400 14px/1 var(--fuente-texto); cursor: pointer; }
+.u .li-rellenar::before { content: '+ '; }
+.u .li-rellenar:focus-visible { border-style: solid; background: var(--color-superficie); } @media (hover: hover) { .u .li-rellenar:hover { border-style: solid; background: var(--color-superficie); } }
+.u .li-claude .u-btn { min-height: 36px; font-size: 14px; padding: 0 var(--e3); }
+.u .li-volver { align-self: flex-start; padding-left: 0; text-decoration: none; margin-bottom: calc(var(--e3) * -1); }
+.u a.li-rel-f { text-decoration: none; }
+/* T0692 · Una sección con una sola pestaña (Pedidos, de Economía) no enseña la barra. */
+.u .u-pestanas[hidden] { display: none; }
+/* T0692 · «Sus ventas» de una marca: lo que dice de un vistazo, encima de cada venta. */
+.u .li-ven-res { margin: 0 0 var(--e2); }
+.u .li-ven-res .u-bien { color: var(--color-bien); font-weight: 600; }
+.u .li-rel-f .li-ir { margin-left: auto; font-weight: 700; color: var(--color-principal-oscuro); white-space: nowrap; }
+.u div.li-rel-f { cursor: default; }
+/* T0642 · Lo relacionado con cada dato y su título («Qué buscan»), «+ Nueva tarea» debajo y «Copiar para Claude» dentro de «Más». */
+.u .li-rel-datos + .li-rel-datos { margin-top: var(--e3); padding-top: var(--e3); border-top: 1px solid var(--color-linea); }
+.u .li-rel-nueva { margin-top: var(--e2); padding-left: 0; padding-right: 0; justify-content: flex-start; }
+/* T0641 · Las cuentas de un precio debajo de su valor, un número en palabras según su signo («Ahorra 32 %», en verde) y lo
+   relacionado como tarjetas cortas (la comparativa de una marca): título, una línea, lo de debajo y «Ver detalle» con el cara a cara. */
+.u .li-desglose { font-size: 14px; color: var(--color-suave); }
+.u .li-signo-mas { color: var(--color-bien); font-weight: 600; }
+.u .li-signo-menos { color: var(--color-vencido); font-weight: 600; }
+.u .li-rt { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e2); }
+.u .li-rt-f { padding: var(--e2) var(--e3); border-radius: var(--radio-peq); border: 1px solid var(--color-linea); background: var(--color-superficie);
+  font: 400 14px/1.4 var(--fuente-texto); }
+.u .li-rt-t { font-weight: 600; font-size: 15px; }
+.u .li-rt-l, .u .li-rt-d { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e1) var(--e3); margin-top: var(--e1); }
+.u .li-rt-d { font-size: 13px; color: var(--color-suave); }
+.u .li-rt-mas > summary { cursor: pointer; min-height: 36px; display: flex; align-items: center; color: var(--color-principal-oscuro); font-size: 14px; }
+.u .li-rt-mas .u-campos { margin-top: var(--e2); }
+.u .li-cara { display: grid; gap: var(--e1) var(--e3); align-items: baseline; overflow-wrap: anywhere; }
+.u .li-cara-t { font-weight: 600; }
+.u .li-mas { border-top: 1px solid var(--color-linea); padding-top: var(--e2); }
+.u .li-mas > summary { cursor: pointer; min-height: 40px; display: flex; align-items: center; color: var(--color-suave); font-size: 14px; }
+.u .li-mas[open] .li-claude { border-top: 0; padding-top: var(--e1); }
+.u .li-accion-t { margin: var(--e1) 0 0; }
+/* T0689 · La ficha guarda sola: «Guardando…» y «Guardado» al lado de cada campo (en rojo, lo que no se ha guardado); lo que
+   cambia la fila («Pasar a Prospección»), dentro de «Más». Mías / Todas, delante de Buscar; en «Todas», para quién es cada fila. */
+.u .li-guardado { display: block; min-height: 1em; margin-top: 2px; font-size: 12.5px; color: var(--color-suave); }
+.u .li-guardado:empty { display: none; }
+.u .li-guardado-ok { color: var(--color-bien); }
+.u .li-guardado-ok::before { content: '✓ '; }
+.u .li-guardado-mal { color: var(--color-error); }
+.u .li-mas-acc { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e1) var(--e3); padding: var(--e1) 0 var(--e2); }
+.u .li-mas-acc .u-btn { min-height: 36px; font-size: 14px; padding: 0 var(--e3); }
+/* T0651 · La ficha se lee como texto y cada dato se edita tocándolo (al pasar el ratón o al tocar, se tiñe un momento; sin
+   lápices ni recuadros). Lo que no se edita lleva una palabra pequeña junto a su etiqueta («· calculado») y, si lleva a otra
+   fila (el próximo paso, a su tarea), el dato entero es el enlace, con una flecha suave. */
+.u .li-ed { position: relative; margin: -4px -6px; padding: 4px 6px; border-radius: var(--radio-peq); cursor: text; -webkit-tap-highlight-color: transparent; transition: background .12s; }
+@media (hover: hover) { .u .li-ed:hover { background: var(--fondo-encima); } }
+.u .li-ed:active { background: var(--fondo-encima); }
+.u .li-ed:focus-visible { outline: 2px solid var(--color-principal-oscuro); outline-offset: 0; }
+.u .li-ed .li-valor .li-nada { color: var(--color-suave); }
+.u .li-ed-abierto { display: flex; flex-direction: column; gap: 4px; }
+/* El nombre, en el título de la ficha: se lee como el título y, al tocarlo, su campo con la letra del título. */
+.u .li-ed-tit { display: inline-block; margin: -2px -6px; padding: 2px 6px; }
+.u .li-ed-tit > .u-etiqueta { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.u .li-ventana .li-ed-tit > .li-valor { font: inherit; color: inherit; }
+.u .li-ed-tit > .li-guardado { font: 400 12.5px/1.3 var(--fuente-texto); letter-spacing: 0; }
+.u .li-ficha-cab .li-ed-abierto { font: 400 12.5px/1.3 var(--fuente-texto); letter-spacing: 0; width: 100%; }
+.u .li-ficha-cab .li-ed-abierto input { font: inherit; font-family: var(--fuente-titulos); font-size: 20px; font-weight: 600; }
+.u .li-ed-aviso { font-size: 12.5px; }
+.u .li-suf { font-weight: 400; color: var(--color-suave); opacity: .8; }
+.u a.li-va { position: relative; display: flex; flex-direction: column; gap: 2px; margin: -4px -6px; padding: 4px 28px 4px 6px; border-radius: var(--radio-peq); color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; transition: background .12s; }
+@media (hover: hover) { .u a.li-va:hover { background: var(--fondo-encima); } .u a.li-va:hover .li-va-i { transform: translate(2px, -50%); color: var(--color-texto); } }
+.u a.li-va:active { background: var(--fondo-encima); }
+.u .li-va-i { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--color-suave); opacity: .7; transition: transform .15s, color .15s; }
+/* Lo de dentro de una ficha: cada fila se abre con sus datos; añadir, aquí mismo; quitar, preguntando en la misma fila. */
+.u .li-rel-ed > li { display: flex; flex-direction: column; }
+.u .li-rel-abre { width: 100%; background: none; font: inherit; color: inherit; flex-wrap: nowrap; }
+.u .li-rel-dentro { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--e1) var(--e3); }
+.u .li-rel-chev { margin-left: auto; width: 16px; height: 16px; color: var(--color-suave); transform: rotate(90deg); transition: transform .15s; }
+.u .li-rel-abre[aria-expanded="true"] .li-rel-chev { transform: rotate(-90deg); }
+.u .li-rel-d { display: flex; flex-direction: column; gap: var(--e2); padding: var(--e2) var(--e3) var(--e3); }
+.u .li-rel-acc { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e1) var(--e3); }
+.u .li-rel-ir { color: var(--color-enlace); font-weight: 600; font-size: 14px; text-decoration: none; }
+.u .li-rel-quitar { color: var(--color-suave); }
+@media (hover: hover) { .u .li-rel-quitar:hover { color: var(--color-error); } }
+.u .li-rel-linea { display: flex; align-items: center; gap: var(--e1); }
+.u .li-rel-linea > .li-rel-f { flex: 1; min-width: 0; }
+.u .li-rel-x { flex: none; color: var(--color-suave); }
+@media (hover: hover) { .u .li-rel-x:hover { color: var(--color-error); } }
+.u .li-rel-datos-ed { display: flex; flex-direction: column; gap: var(--e2); }
+.u .li-rel-datos-ed + .li-rel-datos-ed { border-top: 1px solid var(--linea-fila); padding-top: var(--e3); }
+.u .li-rel-anadir { align-self: flex-start; display: inline-flex; align-items: center; min-height: 32px; padding: 0 var(--e3); border: 1px dashed var(--color-linea); border-radius: var(--radio); background: none; font: 500 14px var(--fuente-texto); color: var(--color-principal-oscuro); cursor: pointer; }
+.u .li-rel-anadir:focus-visible { border-style: solid; background: var(--color-superficie); } @media (hover: hover) { .u .li-rel-anadir:hover { border-style: solid; background: var(--color-superficie); } }
+.u .li-rel-alta, .u .li-rel-elegir { display: flex; flex-direction: column; gap: var(--e2); padding: var(--e3); border: 1px solid var(--color-borde-campo); border-radius: var(--radio); background: var(--color-superficie); }
+.u .li-rel-opc { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; border: 1px solid var(--linea-fila); border-radius: var(--radio-peq); }
+.u .li-rel-opc > li + li { border-top: 1px solid var(--linea-fila); }
+.u .li-rel-opc .u-nota { padding: var(--e2); }
+.u .li-rel-opc-b { width: 100%; min-height: 40px; padding: 6px var(--e2); text-align: left; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; }
+.u .li-rel-opc-b:focus-visible { background: var(--fondo-encima); } @media (hover: hover) { .u .li-rel-opc-b:hover { background: var(--fondo-encima); } }
+/* Preguntar antes de quitar o borrar: en su sitio, sin ventanas encima. */
+.u .li-confirma { display: flex; flex-direction: column; gap: var(--e2); margin-top: var(--e2); padding: var(--e3); border-radius: var(--radio); font-size: 14px;
+  border: 1px solid color-mix(in srgb, var(--color-error) 35%, transparent); background: color-mix(in srgb, var(--color-error) 5%, var(--color-superficie)); }
+.u .li-confirma p { margin: 0; }
+.u .li-no-borrar { border-color: var(--linea-caja); background: var(--fondo-encima); }
+.u .li-btn-peligro { color: var(--color-error); border-color: color-mix(in srgb, var(--color-error) 40%, transparent); }
+.u .li-confirma .li-btn-peligro { background: var(--color-error); color: var(--sobre-estado); border-color: var(--color-error); }
+.u .li-cod-nuevo { margin: 0; }
+@media (prefers-reduced-motion: reduce) { .u .li-ed, .u a.li-va, .u .li-va-i, .u .li-rel-chev { transition: none; } }
+.u .li-mias { display: inline-flex; flex: none; border: 1px solid var(--linea-btn); border-radius: var(--radio, 6px); overflow: hidden; background: var(--color-superficie); }
+.u .li-mias button { min-height: 32px; padding: 0 var(--e3); border: 0; background: none; color: var(--color-texto); font: inherit; font-size: 14px; cursor: pointer; }
+.u .li-mias button + button { border-left: 1px solid var(--linea-btn); }
+.u .li-mias button[aria-pressed=true] { background: var(--color-principal-oscuro); color: var(--color-sobre-principal, #fff); font-weight: 600; }
+/* T0723 · «Mías/Todas», con el aspecto del interruptor de Calcular precio (.pr-seg): la elegida, blanca sobre gris, sin competir con «Añadir». */
+.u .li-mias { gap: 4px; padding: 3px; border: 0; background: color-mix(in srgb, var(--color-texto) 6%, var(--color-fondo)); }
+.u .li-mias button { min-height: 34px; border-radius: var(--radio-peq, 4px); }
+@media (min-width: 900px) { .u .li-mias button { min-height: 26px; } } /* 32 px con su marco, como los botones del ordenador */
+.u .li-mias button + button { border-left: 0; }
+.u .li-mias button[aria-pressed=true] { background: var(--color-superficie); color: var(--color-texto); box-shadow: 0 1px 2px rgba(0, 0, 0, .1); }
+.u .li-mias button:focus-visible { outline: 2px solid var(--color-principal-oscuro); outline-offset: -2px; }
+.u .li-para { display: inline-block; margin-left: var(--e1); padding: 0 6px; border-radius: var(--radio-peq, 4px); background: var(--color-bloque); color: var(--color-suave); font-size: 12px; font-weight: 400; vertical-align: 1px; white-space: nowrap; }
+/* T0625 · Filtrar en la sección Listado: el botón (con cuántos hay puestos), las etiquetas de los puestos, que se quitan con
+   su ✕ o todas con «Quitar filtros», y en el panel los rangos «de … a …» y «desde … hasta …». */
+.u .li-barra .li-filtrar { font-size: 15px; padding: 0 var(--e3); gap: var(--e1); }
+.u .li-filtrar[aria-pressed=true] { border-color: var(--color-principal-oscuro); color: var(--color-principal-oscuro); }
+.u .li-nf { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px;
+  background: var(--color-principal-oscuro); color: var(--color-sobre-principal, #fff); font: 700 13px/1 var(--fuente-texto); font-variant-numeric: tabular-nums; }
+.u .li-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); margin: calc(var(--e1) * -1) 0 var(--e3); }
+.u .li-fchip { display: inline-flex; align-items: center; gap: var(--e1); min-height: 36px; padding: 0 var(--e2) 0 var(--e3); border-radius: 18px; cursor: pointer;
+  border: 1.5px solid var(--color-principal-oscuro); background: color-mix(in srgb, var(--color-principal-oscuro) 8%, var(--color-superficie));
+  color: var(--color-texto); font: 600 14px/1.2 var(--fuente-texto); text-align: left; }
+.u .li-fchip .u-icono { width: 16px; height: 16px; flex: none; }
+@media (hover: hover) { .u .li-fchip:hover .u-icono { color: var(--color-principal-oscuro); } }
+.u .li-filtros .li-fquitar { min-height: 36px; font-size: 14px; }
+.u fieldset.li-rango { border: 0; padding: 0; margin: 0; }
+.u .li-rango legend { padding: 0; margin-bottom: var(--e1); }
+.u .li-rango-c { display: flex; align-items: center; gap: var(--e2); }
+.u .li-rango-c input { flex: 1 1 0; min-width: 0; width: auto; }
+.u .li-rango-c .u-nota { margin: 0; white-space: nowrap; }
+@media (max-width: 639px) { .u .li-barra .li-filtrar { order: 2; } }
+/* T0635 · Elegir lo que se vende en una línea (Mis telas): la lista bajo el concepto y el precio recomendado. */
+.u .eco-lin-cw { grid-column: 1 / -1; position: relative; }
+.u .eco-lin-cw .eco-lin-c { width: 100%; }
+.u .eco-lin-op { position: absolute; left: 0; right: 0; top: 100%; z-index: 5; margin-top: 2px; background: var(--color-fondo); border: 1px solid var(--color-linea); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.12); overflow: hidden; }
+.u .eco-lin-o { display: flex; justify-content: space-between; align-items: baseline; gap: var(--e3); width: 100%; padding: var(--e2) var(--e3); border: 0; border-top: 1px solid var(--color-linea); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.u .eco-lin-o:first-child { border-top: 0; }
+.u .eco-lin-o-sel { background: color-mix(in srgb, var(--color-texto) 6%, var(--color-fondo)); } @media (hover: hover) { .u .eco-lin-o:hover { background: color-mix(in srgb, var(--color-texto) 6%, var(--color-fondo)); } }
+.u .eco-lin-oc { color: var(--color-suave); font-size: 13px; white-space: nowrap; }
+.u .eco-lin-op-p { white-space: nowrap; font-size: 14px; }
+.u .eco-lin-rec { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--color-suave); }
+.u .eco-lin-falta { grid-column: 1 / -1; margin: 0; font-size: 13px; } /* T0725 (R62): «Faltan los metros.» */
+.u .eco-lin input[aria-invalid="true"] { border-color: var(--color-error); }
+.u .eco-lin-pon { min-height: 0; padding: 0 var(--e1); font-size: 13px; }
+.u .eco-lin textarea { resize: none; overflow: hidden; line-height: 1.35; }
+
+/* T0653 · Calcular precio (Telas): datos a la izquierda; el precio y lo que paga hoy la marca a la derecha (debajo en el móvil). */
+.u .pr-caja.u-campos { grid-template-columns: 1fr; } /* T0657: los datos, siempre uno debajo de otro (a 600-820 px, u-campos los partía en dos) */
+.u .pr-calc { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--e4); align-items: start; }
+.u .pr-lado { display: grid; gap: var(--e4); min-width: 0; }
+.u .pr-caja { background: var(--color-superficie); border: 1px solid var(--color-linea); border-radius: var(--radio); padding: var(--e4); display: grid; gap: var(--e2); align-content: start; min-width: 0; }
+.u .pr-caja > p { margin: 0; }
+.u .pr-manual { display: grid; gap: var(--e3); }
+.u .pr-dos { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e2); }
+.u .pr-ud { position: relative; display: block; }
+.u .pr-ud input:not([type=checkbox]):not([type=radio]) { width: 100%; padding-right: 44px; text-align: right; }
+.u .pr-ud i { position: absolute; right: var(--e3); top: 50%; transform: translateY(-50%); font-style: normal; font-size: 13px; color: var(--color-suave); pointer-events: none; }
+.u .pr-seg { display: inline-flex; width: max-content; max-width: 100%; border: 1px solid var(--color-borde-campo); border-radius: var(--radio); overflow: hidden; }
+.u .pr-seg button { font: inherit; font-size: 14px; min-height: 36px; padding: 0 var(--e3); border: 0; background: transparent; color: var(--color-texto); cursor: pointer; }
+.u .pr-seg button[aria-pressed=true] { background: var(--color-principal-oscuro); color: var(--color-sobre-principal); }
+.u .pr-par { display: grid; grid-template-columns: 1fr auto 1fr; gap: var(--e2); align-items: end; }
+.u .pr-o { padding-bottom: var(--e3); color: var(--color-suave); font-size: 13px; }
+.u .pr-activo input { border-color: var(--color-principal-oscuro); box-shadow: 0 0 0 1px var(--color-principal-oscuro); }
+.u .pr-grande { font-size: 30px; font-weight: 500; line-height: 1.15; }
+.u .pr-grande small, .u .pr-nada { font-size: 15px; font-weight: 400; color: var(--color-suave); }
+.u .pr-nada { font-size: 24px; }
+.u .pr-aviso { border-radius: var(--radio); padding: var(--e2) var(--e3); font-size: 14px; background: var(--color-pendiente-fondo); color: var(--color-pendiente); }
+.u .pr-aviso.pr-mal { background: var(--color-vencido-fondo); color: var(--color-vencido); }
+.u .pr-aviso .u-btn-texto { min-height: 0; padding: 0; font-size: 14px; }
+.u .pr-cuentas { font-size: 13.5px; color: var(--color-suave); border-top: 1px dashed var(--color-linea); padding-top: var(--e2); }
+.u .pr-cuentas b { color: var(--color-texto); font-weight: 500; }
+.u .pr-fac { width: max-content; }
+.u .pr-h { margin: 0; font-size: 15px; font-weight: 500; }
+.u .pr-cmp { display: grid; gap: 2px; padding: var(--e2) 0; border-top: 1px solid var(--color-linea); }
+.u .pr-h + .pr-cmp { border-top: 0; padding-top: 0; }
+.u .pr-cmp-t { font-weight: 500; }
+.u .pr-cmp .u-btn-texto { min-height: 0; padding: 0; font-size: 13.5px; }
+.u .pr-bien { color: var(--color-bien); font-weight: 500; }
+.u .pr-cmp .u-mal { font-weight: 500; }
+.u .pr-otras summary { cursor: pointer; font-size: 13.5px; color: var(--color-principal-oscuro); padding-top: var(--e1); }
+/* T0659 · «Sueles ganar unos 9 €/m» bajo Ganas: una línea suave con «Ponerlo» y, plegado, de dónde sale. */
+.u .pr-sueles { display: grid; gap: var(--e1); font-size: 14px; border-radius: var(--radio); padding: var(--e2) var(--e3); background: color-mix(in srgb, var(--color-accion) 9%, var(--color-superficie)); }
+.u .pr-sueles > p { margin: 0; }
+.u .pr-sueles .u-btn-texto { min-height: 0; padding: 0; font-size: 14px; }
+.u .pr-origen { font-size: 13px; color: var(--color-suave); }
+.u .pr-origen summary { cursor: pointer; color: var(--color-principal-oscuro); }
+.u .pr-origen ul { margin: var(--e1) 0 0; padding-left: 18px; display: grid; gap: 2px; }
+.u .pr-origen .u-nota { margin: var(--e1) 0 0; font-size: 13px; }
+@media (max-width: 820px) { .u .pr-calc { grid-template-columns: 1fr; } }
+@media (max-width: 420px) { .u .pr-par { grid-template-columns: 1fr; } .u .pr-o { display: none; } }
+/* T0687: guardar en la ficha de la marca o copiar para WhatsApp; en el móvil, el precio arriba y fijo mientras se escribe
+   (abajo lo tapa el teclado). En el ordenador el resultado ya está al lado: la barra no sale. */
+.u .pr-acciones { display: flex; flex-wrap: wrap; gap: var(--e2); margin-top: var(--e2); }
+.u .pr-barra { display: none; }
+@media (max-width: 820px) {
+  .u .pr-barra { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e1) var(--e3); position: sticky; top: var(--tope, 0px); z-index: 3;
+    margin: 0 calc(var(--e4) * -1) var(--e3); padding: var(--e2) var(--e4); background: var(--color-fondo); border-bottom: 1px solid var(--color-linea); }
+  .u .pr-barra-p { font-size: 20px; font-weight: 600; }
+  .u .pr-acciones .u-btn { flex: 1 1 auto; }
+}
+/* T0643 · Sección Listado: cerrar, pasar y apuntar en un toque. El círculo cierra una fila (como en una lista de tareas) y
+   «Pasar» la lleva a otro día; en el móvil, los dos van encima de la tarjeta (no dentro: un botón no va dentro de otro). */
+.u .li-circ { width: 26px; height: 26px; flex: none; padding: 0; border-radius: 50%; border: 1.5px solid var(--color-suave); background: var(--color-superficie);
+  color: transparent; display: inline-grid; place-items: center; cursor: pointer; }
+.u .li-circ .u-icono { width: 16px; height: 16px; }
+.u .li-circ:focus-visible { border-color: var(--color-bien); color: var(--color-bien); background: color-mix(in srgb, var(--color-bien) 10%, var(--color-superficie)); } @media (hover: hover) { .u .li-circ:hover { border-color: var(--color-bien); color: var(--color-bien); background: color-mix(in srgb, var(--color-bien) 10%, var(--color-superficie)); } }
+.u .li-pasar { min-height: 32px; padding: 0 var(--e2); font-size: 14px; gap: var(--e1); white-space: nowrap; }
+.u .li-pasar .u-icono { width: 16px; height: 16px; }
+.u .u-tabla th.li-td-ci, .u .u-tabla td.li-td-ci { width: 1%; padding-right: 0; }
+.u .u-tabla td.li-td-ci { vertical-align: middle; } /* T0723: el círculo, a la altura del texto */
+.u .u-tabla th.li-td-pa, .u .u-tabla td.li-td-pa { width: 1%; white-space: nowrap; text-align: right; }
+.u .li-t-rap { position: relative; }
+.u .li-t-rap .li-circ { position: absolute; left: var(--e3); top: var(--e3); width: 30px; height: 30px; z-index: 1; }
+.u .li-t-rap .li-pasar { position: absolute; right: var(--e2); top: var(--e2); z-index: 1; }
+.u .li-t-ci .li-tarjeta { padding-left: calc(var(--e3) * 2 + 30px); }
+.u .li-t-pa .li-tarjeta > strong, .u .li-t-pa .li-t-txt > strong { padding-right: 84px; } /* solo el título deja sitio a «Pasar»; el resto, el ancho entero */
+.u .li-menu { position: fixed; z-index: 70; display: grid; min-width: 200px; padding: var(--e1); background: var(--color-superficie);
+  border: 1px solid var(--color-linea); border-radius: var(--radio); box-shadow: var(--sombra-flota, 0 6px 18px rgba(0, 0, 0, .15)); }
+.u .li-menu button { display: flex; justify-content: space-between; gap: var(--e3); align-items: baseline; text-align: left; border: 0; background: none;
+  padding: var(--e2) var(--e3); border-radius: var(--radio-peq); font: 400 15px/1.3 var(--fuente-texto); color: var(--color-texto); cursor: pointer; }
+.u .li-menu button:focus-visible { background: var(--color-bloque); } @media (hover: hover) { .u .li-menu button:hover { background: var(--color-bloque); } }
+.u .li-menu small, .u .li-dia small { color: var(--color-suave); font-size: 13px; }
+.u .li-deshacer { display: flex; align-items: center; gap: var(--e3); }
+.u .li-deshacer[hidden] { display: none; }
+.u .li-deshacer button { border: 0; background: none; color: inherit; font: 700 15px/1 var(--fuente-texto); text-decoration: underline; text-underline-offset: 3px; padding: var(--e1); cursor: pointer; }
+/* Ficha: cerrarla o pasarla, arriba. */
+.u .li-rapidas { display: flex; flex-wrap: wrap; gap: var(--e2); padding-bottom: var(--e3); border-bottom: 1px solid var(--color-linea); }
+.u .li-r-hecha { color: var(--color-bien); border-color: color-mix(in srgb, var(--color-bien) 40%, var(--color-superficie)); }
+.u .li-r-hecha .u-icono { width: 18px; height: 18px; }
+/* El siguiente paso, al cerrar. */
+.u .li-sig-ok { margin: 0; display: flex; align-items: center; gap: var(--e1); color: var(--color-bien); font-weight: 600; overflow-wrap: anywhere; }
+.u .li-sig-ok .u-icono { width: 18px; height: 18px; flex: none; }
+/* Días de un toque (el siguiente paso y la fecha del alta). */
+.u .li-dias { border: 0; padding: 0; margin: 0; }
+.u .li-dias > div, .u div.li-dias { display: flex; flex-wrap: wrap; gap: var(--e1) var(--e2); margin-top: var(--e1); }
+.u .li-dia { border: 1px solid var(--color-linea); background: var(--color-superficie); color: var(--color-texto); border-radius: 999px; min-height: 34px;
+  padding: 0 var(--e3); font: 400 14px/1 var(--fuente-texto); cursor: pointer; }
+.u .li-dia[aria-pressed="true"] { background: var(--color-principal-oscuro); border-color: var(--color-principal-oscuro); color: var(--color-sobre-principal, #fff); }
+.u .li-dia[aria-pressed="true"] small { color: inherit; }
+/* T0746 · Un campo de dos opciones (Sí | No) en la ficha: dos botones juntos; el elegido, con el fondo de su color (o el
+ * verde suave, como en la maqueta de T0702) y en negrita. */
+.u .li-dos { display: inline-flex; align-self: flex-start; width: max-content; margin-top: var(--e1); border: 1px solid var(--color-borde-campo, var(--color-linea)); border-radius: 8px; overflow: hidden; background: var(--color-superficie); }
+.u .li-dos-b { min-height: 36px; min-width: 64px; padding: 0 var(--e3); border: 0; background: none; color: var(--color-texto); font: 500 14px/1 var(--fuente-texto); cursor: pointer; }
+.u .li-dos-b + .li-dos-b { border-left: 1px solid var(--color-borde-campo, var(--color-linea)); }
+.u .li-dos-b[aria-pressed="true"] { background: var(--est-verde-f); font-weight: 600; }
+.u .li-dos-b[class*=" li-"][aria-pressed="true"] { background: var(--li-fondo); color: var(--li-c); }
+.u .li-dos-b:focus-visible { outline: 2px solid var(--color-principal); outline-offset: -2px; }
+@media (hover: hover) { .u .li-dos-b:not([aria-pressed="true"]):hover { background: color-mix(in srgb, var(--color-texto) 5%, var(--color-superficie)); } }
+@media (max-width: 639px) { .u .li-dos-b { min-height: 44px; min-width: 76px; font-size: 15px; } }
+/* El alta: lo de más, plegado. */
+.u .li-mas { border-top: 1px dashed var(--color-linea); padding-top: var(--e3); }
+.u .li-mas summary { cursor: pointer; color: var(--color-principal-oscuro); font-weight: 600; }
+.u .li-mas > .u-campos { margin-top: var(--e3); }
+/* T0652 · Sección Listado: el resumen de con quién es una tarea (lo último que se hizo con el cliente, lo que queda y su
+   ficha en dos líneas), sin salir de la lista. Al lado en el ordenador; desde abajo en el móvil. */
+.u .li-ctx-b { border: 0; background: none; padding: 2px var(--e1); margin: -2px calc(var(--e1) * -1); border-radius: var(--radio-peq); font: inherit; color: var(--color-principal-oscuro);
+  font-weight: 600; text-align: left; cursor: pointer; }
+.u .li-ctx-b:focus-visible, .u .li-ctx-b[aria-expanded="true"] { background: var(--color-bloque); } @media (hover: hover) { .u .li-ctx-b:hover { background: var(--color-bloque); } }
+.u .li-ctx-b > span[aria-hidden] { font-weight: 400; opacity: .7; }
+.u .li-t-ctx .li-tarjeta { padding-bottom: calc(var(--e3) + 30px); }
+.u .li-t-ctx > .li-ctx-b { position: absolute; left: calc(var(--e3) + var(--e1)); bottom: var(--e2); z-index: 1; font-size: 14px; }
+.u .li-t-ci.li-t-ctx > .li-ctx-b { left: calc(var(--e3) * 2 + 30px + var(--e1)); }
+.u .li-ctx { position: fixed; z-index: 55; top: var(--tope, 0px); right: 0; bottom: 0; width: min(380px, 100%); overflow-y: auto; display: grid; align-content: start;
+  gap: var(--e3); padding: var(--e4, 20px) var(--e4, 20px) calc(var(--e4, 20px) + env(safe-area-inset-bottom, 0px)); background: var(--color-superficie);
+  border-left: 1px solid var(--color-linea); box-shadow: var(--sombra-flota); }
+.u .li-ctx[hidden] { display: none; }
+@media (max-width: 639px) {
+  .u .li-ctx { top: auto; left: 0; width: 100%; max-height: 80vh; border-left: 0; border-top: 1px solid var(--color-linea); border-radius: var(--radio) var(--radio) 0 0;
+    padding-left: max(var(--e3), env(safe-area-inset-left, 0px)); padding-right: max(var(--e3), env(safe-area-inset-right, 0px)); }
+}
+.u .li-ctx-cab { display: flex; gap: var(--e2); align-items: flex-start; justify-content: space-between; }
+.u .li-ctx-cab h2 { margin: 0; font-size: 20px; }
+.u .li-ctx-cab h2:focus { outline: none; }
+.u .li-ctx-sub { margin: 2px 0 0; color: var(--color-suave); font-size: 14px; }
+.u .li-ctx-chips { display: flex; flex-wrap: wrap; gap: var(--e1); margin: 0; }
+.u .li-ctx-nota { margin: 0; }
+.u .li-ctx-bl { display: grid; gap: var(--e1); }
+.u .li-ctx-bl h4 { margin: 0; }
+.u .li-ctx-bl .u-nota { margin: 0; }
+.u .li-ctx-l { list-style: none; margin: 0; padding: 0; display: grid; }
+.u .li-ctx-ev { width: 100%; display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: var(--e2); align-items: start; text-align: left; border: 0; background: none;
+  padding: var(--e1); margin: 0 calc(var(--e1) * -1); border-radius: var(--radio-peq); font: 400 15px/1.35 var(--fuente-texto); color: var(--color-texto); cursor: pointer; }
+.u .li-ctx-ev:focus-visible { background: var(--color-bloque); } @media (hover: hover) { .u .li-ctx-ev:hover { background: var(--color-bloque); } }
+.u .li-ctx-f { color: var(--color-suave); font-size: 13px; font-variant-numeric: tabular-nums; padding-top: 2px; }
+.u .li-ctx-q { min-width: 0; overflow-wrap: anywhere; }
+.u .li-ctx-q small { display: block; color: var(--color-suave); font-size: 13px; }
+.u .li-ctx-q small.li-ctx-tarde { color: var(--color-vencido); font-weight: 600; }
+.u .li-ctx-ok { display: inline-flex; vertical-align: -3px; margin-right: 4px; color: var(--color-bien); }
+.u .li-ctx-ok .u-icono { width: 16px; height: 16px; }
+.u .li-ctx-lin { margin: 0; overflow-wrap: anywhere; }
+.u .li-ctx-lin .u-etiqueta { display: inline; margin-right: var(--e1); }
+.u .li-ctx-ir { text-decoration: none; }
+.u .li-ctx-ficha { display: grid; gap: var(--e2); }
+.u .li-ctx-ficha .li-fg-t { margin-bottom: 0; }
+
+/* T0644 · En el ordenador grande, letra de leer (14–15 px) en las tablas y lo que las rodea, en vez de 12–13 px. */
+@media (min-width: 1200px) {
+  .u .u-tabla { font-size: 15px; }
+  .u .u-tabla th { font-size: 13px; }
+  .u .u-tabla small, .u .u-tabla .u-nota { font-size: 14px; }
+  .u .u-tabla .li-aviso, .u .u-tabla .u-etiqueta, .u .u-tabla .u-chip { font-size: 13px; }
+  .u .u-nota { font-size: 14px; }
+}
+/* T0644 · Personalizar, en el Perfil: una línea por sección, que abre su ventana. */
+.u .pf-pers-l { list-style: none; margin: var(--e2) 0 0; padding: 0; border: 1px solid var(--color-linea); border-radius: var(--radio); background: var(--color-superficie); }
+.u .pf-pers-l li + li { border-top: 1px solid var(--color-linea); }
+.u .pf-pers-l a { display: flex; justify-content: space-between; align-items: center; min-height: 44px; padding: 0 var(--e3); color: var(--color-texto); font-weight: 600; text-decoration: none; }
+@media (hover: hover) { .u .pf-pers-l a:hover { background: color-mix(in srgb, var(--color-bloque) 60%, var(--color-superficie)); } }
+/* T0644 · En el móvil, la primera fila sin desplazar: las vistas y la «i» en una línea, buscar, Filtrar y Añadir en otra,
+   y los avisos en una fila que se desliza de lado. Lo que es la vista, en el ordenador siempre y en el móvil tras la «i». */
+.u .li-arriba { align-items: center; }
+.u .li-qes { flex: none; display: none; width: 40px; min-height: 40px; border-color: transparent; color: var(--color-suave); }
+.u .li-qes[aria-expanded=true] { color: var(--color-principal-oscuro); border-color: var(--color-linea); }
+.u .li-arriba .li-cuenta { flex: none; margin: 0; white-space: nowrap; }
+@media (max-width: 639px) {
+  .u .li-qes { display: inline-flex; }
+  .u .li-texto { display: none; } .u .li-texto.li-abierto { display: block; }
+  .u .li-barra:not(.eco-fbarra), .u .eco-fbarra.eco-fmov { flex-wrap: nowrap; gap: var(--e2); } /* Facturas (más cosas) sí baja de línea */
+  .u .li-barra .li-buscar { flex: 1 1 0; }
+  .u .li-barra .li-filtrar, .u .li-barra .li-nueva { flex: none; padding: 0 var(--e3); }
+  .u .li-barra .li-nueva { order: 3; }
+  .u .li-avisos { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-left: calc(var(--e4) * -1); margin-right: calc(var(--e4) * -1);
+    padding: 0 var(--e4); scroll-padding: 0 var(--e4); }
+  .u .li-avisos::-webkit-scrollbar { display: none; }
+  .u .li-av { flex: none; white-space: nowrap; }
+}
+
+/* ==========================================================================================================================
+ * T0679 · Diseño 2026 del núcleo (dirección D de la maqueta de T0675): compacto en el ordenador, cómodo en el móvil, el mismo
+ * código para todas las marcas (cada una pone su tono en marca.css). Va al final y gana a lo de arriba con la misma regla.
+ * - Colores de estado, funcionales e iguales en todas las marcas: gris pendiente, azul en curso, ocre esperando, verde
+ *   hecho, teja con la fecha pasada (y teal, la muestra recibida). Cada color dice una cosa; nunca adorna.
+ * - Letra: 13,5 px en el ordenador y 15 px en el móvil; título 19 / 26 px.
+ * - Botones: uno lleno por pantalla; los demás, blancos con una línea fina. 32 px en el ordenador, 44 px en el móvil.
+ * - Listas: en el ordenador, tabla de filas de 38 px con cabeceras discretas y lo atrasado arriba; en el móvil, filas de dos
+ *   líneas en su superficie. La ficha, a la derecha de la lista en el ordenador (vista partida); en el móvil, sola.
+ * - Menú del ordenador teñido del tono de la marca; la sección abierta en blanco, con el icono en el color de acción.
+ * ========================================================================================================================== */
+:root {
+  --est-gris: #5D5850;  --est-gris-f: #EFECE7;
+  --est-azul: #2B5C8C;  --est-azul-f: #E6EFF8;
+  --est-ocre: #7A5512;  --est-ocre-f: #F8EDD5;
+  --est-verde: #3B6B35; --est-verde-f: #E4F0DF;
+  --est-teja: #9A3F28;  --est-teja-f: #FBEAE3;
+  --est-teal: #2C6964;  --est-teal-f: #E0F0EE;
+  --ancho-menu: 212px;
+  --ancho-ficha: 460px;
+  /* Líneas: la de una caja (tabla, lista) y la que separa filas, más suave; el fondo de la cabecera de un grupo. */
+  --linea-caja: color-mix(in srgb, var(--color-texto) 10%, var(--color-fondo));
+  --linea-fila: color-mix(in srgb, var(--color-texto) 6%, var(--color-fondo));
+  --fondo-cab: color-mix(in srgb, var(--color-texto) 3%, var(--color-fondo));
+  --linea-btn: color-mix(in srgb, var(--color-texto) 20%, var(--color-fondo));
+  --fondo-sel: color-mix(in srgb, var(--color-accion) 8%, var(--color-superficie));
+  --fondo-encima: color-mix(in srgb, var(--color-accion) 4%, var(--color-superficie));
+  --radio-caja: 8px;
+}
+@media (max-width: 899px) { :root { --radio-caja: 12px; } }
+/* Lo atrasado y lo que vence pronto, con los colores de estado en todas las marcas (antes, el rojo de error en Konamigas). */
+:where(:root) {
+  --color-vencido: var(--est-teja); --color-vencido-fondo: var(--est-teja-f);
+  --color-pendiente: var(--est-ocre); --color-pendiente-fondo: var(--est-ocre-f);
+}
+
+/* ---------- Página y letra ---------- */
+@media (min-width: 900px) { body.u { font-size: 13.5px; } }
+.u h1, .u h2, .u h3 { letter-spacing: 0; }
+.u :focus-visible { outline: 2px solid var(--color-accion); outline-offset: 2px; }
+
+/* ---------- Botones ---------- */
+.u .u-btn { min-height: 44px; padding: 0 var(--e4); border: 1px solid var(--linea-btn); border-radius: var(--radio);
+  background: var(--color-superficie); color: var(--color-principal-oscuro); font: 500 15px/1.2 var(--fuente-texto); white-space: nowrap; }
+@media (hover: hover) { .u .u-btn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--color-texto) 35%, var(--color-fondo)); } }
+.u .u-btn-accion { background: var(--color-accion); color: var(--color-sobre-accion); border-color: var(--color-accion);
+  font-size: 15px; font-weight: var(--peso-accion, 500); padding: 0 var(--e4); }
+@media (hover: hover) { .u .u-btn-accion:hover:not(:disabled) { border-color: var(--color-accion); filter: brightness(.95); } }
+.u .u-btn-texto { background: transparent; border-color: transparent; padding: 0 var(--e2); }
+@media (hover: hover) { .u .u-btn-texto:hover:not(:disabled) { border-color: transparent; } }
+.u .u-btn-claro { background: var(--color-superficie); border-color: var(--linea-btn); }
+.u .u-btn-icono { width: 44px; padding: 0; }
+.u .u-btn svg, .u .u-icono { width: 18px; height: 18px; stroke-width: 1.6; }
+@media (min-width: 900px) {
+  .u .u-btn { min-height: 32px; padding: 0 var(--e3); font-size: 13px; gap: 6px; }
+  .u .u-btn-accion { font-size: 13px; }
+  .u .u-btn-icono { width: 32px; padding: 0; }
+  .u .u-btn svg { width: 16px; height: 16px; }
+}
+
+/* ---------- Campos ---------- */
+.u .u-etiqueta { font: 500 12.5px/1.3 var(--fuente-texto); color: var(--color-suave); text-transform: none; letter-spacing: 0; }
+.u input:not([type=checkbox]):not([type=radio]), .u select, .u textarea { font-weight: 400; border: 1px solid var(--linea-btn); border-radius: var(--radio); background: var(--color-superficie); }
+.u input:not([type=checkbox]):not([type=radio]):focus, .u select:focus, .u textarea:focus { border-color: var(--color-accion); outline: 0; box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accion) 25%, transparent); }
+@media (min-width: 900px) {
+  .u input:not([type=checkbox]):not([type=radio]), .u select { min-height: 32px; font-size: 13.5px; padding: 0 10px; }
+  .u textarea { font-size: 13.5px; }
+}
+@media (min-width: 900px) and (hover: none) { .u input:not([type=checkbox]):not([type=radio]), .u select, .u textarea { font-size: 16px; } }
+
+/* ---------- Píldoras de estado: punto y palabra. El color sale de la clase que pone la sección (li-alto, li-medio, li-info,
+ * li-bien, li-apagado; sin clase, gris) ---------- */
+.u .u-chip { gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px; background: var(--est-gris-f); color: var(--color-texto);
+  font: 500 12.5px/24px var(--fuente-texto); }
+.u .li-estado { --li-c: var(--est-gris); --li-fondo: var(--est-gris-f); }
+.u .li-alto { --li-c: var(--est-teja); --li-fondo: var(--est-teja-f); }
+.u .li-medio { --li-c: var(--est-ocre); --li-fondo: var(--est-ocre-f); }
+.u .li-info { --li-c: var(--est-azul); --li-fondo: var(--est-azul-f); }
+.u .li-bien { --li-c: var(--est-verde); --li-fondo: var(--est-verde-f); }
+.u .li-teal { --li-c: var(--est-teal); --li-fondo: var(--est-teal-f); }
+.u .li-apagado { --li-c: var(--est-gris); --li-fondo: var(--est-gris-f); }
+.u .u-chip.li-estado, .u .li-estado.li-apagado { display: inline-flex; align-items: center; background: var(--li-fondo); color: var(--li-c); border: 0; font-weight: 500; padding: 0 10px 0 8px; }
+.u .u-chip.li-estado::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 3px; background: currentColor; }
+@media (min-width: 900px) {
+  .u .u-chip { height: 20px; padding: 0 8px; font-size: 11.5px; line-height: 20px; }
+  .u .u-chip.li-estado, .u .li-estado.li-apagado { padding: 0 8px 0 6px; }
+}
+/* T0677 la dejaba partirse en una tabla estrecha: una píldora no se parte. */
+@container (max-width: 960px) { .u .u-tabla td.li-td-estado .u-chip { white-space: nowrap; line-height: 20px; } }
+
+/* ---------- Tablas: cabeceras discretas, filas de 38 px, lo atrasado arriba en teja ---------- */
+.u .u-tabla { font-size: 13.5px; border: 1px solid var(--linea-caja); border-radius: var(--radio-caja); background: var(--color-superficie); }
+.u .u-tabla th:first-child { border-top-left-radius: var(--radio-caja); } .u .u-tabla th:last-child { border-top-right-radius: var(--radio-caja); }
+.u .u-tabla th { padding: 7px 14px; font: 500 12px/1.3 var(--fuente-texto); color: var(--color-suave); text-transform: none; letter-spacing: 0;
+  background: var(--color-superficie); border-bottom: 1px solid var(--linea-caja); }
+.u .u-tabla td { padding: 9px 14px; border-bottom: 1px solid var(--linea-fila); vertical-align: middle; line-height: 1.4; }
+.u .u-tabla td.u-tabla-t { font-weight: 500; }
+@media (hover: hover) { .u .u-tabla tr[tabindex]:hover td { background: var(--fondo-encima); } }
+.u .u-tabla tr.li-sel td { background: var(--fondo-sel); }
+.u .u-tabla tr[tabindex]:focus-visible { outline: 2px solid var(--color-accion); outline-offset: -2px; }
+.u .u-tabla tr.u-tabla-total td, .u .u-tabla tr.eco-total td { border-top: 1px solid var(--linea-caja); }
+@media (min-width: 1200px) {
+  .u .u-tabla { font-size: 13.5px; }
+  .u .u-tabla th { font-size: 12px; }
+  .u .u-tabla small, .u .u-tabla .u-nota { font-size: 12.5px; }
+  .u .u-tabla .li-aviso, .u .u-tabla .u-etiqueta { font-size: 12px; }
+  .u .u-tabla .u-chip { font-size: 11.5px; }
+  .u .u-nota { font-size: 13px; }
+}
+@media (min-width: 900px) { .u .u-nota { font-size: 13px; } }
+
+/* ---------- Bloques, ventanas y avisos ---------- */
+.u .u-bloque { background: var(--fondo-cab); border: 1px solid var(--linea-caja); border-radius: var(--radio-caja); }
+.u .u-ventana { background: var(--color-superficie); border-radius: var(--radio-caja); }
+@media (max-width: 640px) { .u .u-ventana { border-radius: 0; } }
+.u .u-aviso { border-radius: var(--radio); font-weight: 500; font-size: 14px; }
+
+/* ---------- Pestañas: una línea con la abierta subrayada en el color de acción ---------- */
+.u .u-pestanas { gap: 2px; border-bottom: 1px solid var(--linea-caja); }
+.u .u-pestanas button { padding: 0 var(--e3); border-bottom: 2px solid transparent; color: var(--color-suave); font: 500 14px/1.2 var(--fuente-texto); }
+.u .u-pestanas button[aria-selected=true] { color: var(--color-texto); font-weight: 600; border-bottom-color: var(--color-accion); }
+@media (min-width: 900px) { .u .u-pestanas button { min-height: 34px; padding: 0 10px; font-size: 13.5px; } }
+
+/* ---------- Menú del ordenador: teñido del tono de la marca, filas de 32 px ---------- */
+@media (min-width: 700px) {
+  .sx.u-sx .sx-in { gap: 2px; padding: var(--e3) var(--e2); }
+  .sx.u-sx .sx-cab { padding: var(--e1) 0 var(--e4) 10px; }
+  .sx.u-sx .sx-marca { font: var(--peso-marca) var(--tam-marca, 20px)/1.1 var(--fuente-marca); color: var(--color-sobre-menu); }
+  .sx.u-sx a { min-height: 32px; padding: 0 10px; gap: 10px; border-radius: var(--radio); font: 400 13.5px/1.2 var(--fuente-texto); color: var(--color-sobre-menu); }
+  .sx.u-sx a svg { width: 18px; height: 18px; opacity: .8; }
+  @media (hover: hover) { .sx.u-sx a:hover, .sx.u-sx .sx-plegar:hover { background: color-mix(in srgb, var(--color-sobre-menu) 6%, var(--color-menu)); } }
+  .sx.u-sx a[aria-current=page] { background: var(--color-menu-elegido, var(--color-superficie)); color: var(--color-sobre-menu-elegido, var(--color-principal-oscuro));
+    font-weight: 600; box-shadow: 0 0 0 1px var(--color-linea-menu, var(--linea-caja)); }
+  .sx.u-sx a[aria-current=page] svg { opacity: 1; color: var(--color-accion); }
+  .sx.u-sx a:focus-visible, .sx.u-sx .sx-plegar:focus-visible { outline: 2px solid var(--color-accion); outline-offset: 1px; }
+  .sx.u-sx a[data-sx=PERFIL] { padding-top: var(--e1); padding-bottom: var(--e1); }
+  .sx.u-sx .sx-quien { font-size: 12px; color: var(--color-suave); }
+  .sx.u-sx .sx-plegar { width: 32px; height: 32px; }
+  /* El número de atrasadas (o de nuevas), teja macizo: es lo único de color del menú. */
+  .sx.u-sx a .bj-n, .sx.u-sx a .bj-n.hay, .sx.u-sx a[aria-current=page] .bj-n { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; text-align: center;
+    background: var(--est-teja); color: var(--sobre-estado); font: 600 12px/20px var(--fuente-texto); }
+}
+/* El móvil: la barra de abajo en blanco; la abierta, en el color de la marca y con el icono en el de acción. */
+@media (max-width: 699px) {
+  .u .sx, .sx.u-sx { background: var(--color-superficie); border-top: 1px solid var(--linea-caja); }
+  .sx.u-sx a, .sx.u-sx .sx-mas { font: 500 11px/1.2 var(--fuente-texto); border-top-color: transparent; }
+  .sx.u-sx a[aria-current=page], .sx.u-sx .sx-mas.sx-dentro { color: var(--color-principal-oscuro); font-weight: 600; border-top-color: transparent; }
+  .sx.u-sx a[aria-current=page] svg { color: var(--color-accion); }
+  .sx.u-sx a .bj-n, .sx.u-sx .sx-mas .bj-n { background: var(--est-teja); color: var(--sobre-estado); border-radius: 9px; }
+  .sx.u-sx .sx-resto { background: var(--color-superficie); }
+  .sx.u-sx .sx-resto a { font-size: 15px; font-weight: 400; }
+  .sx.u-sx .sx-resto a[aria-current=page] { background: var(--fondo-sel); border-left-color: var(--color-accion); }
+}
+
+/* ---------- Cabecera de sección: el título sobre el fondo de la página, sin banda de color ---------- */
+.u .u-cab, body.u-con-barra .u-cab { background: var(--color-fondo); color: var(--color-texto); border-bottom: 0; padding: var(--e4) var(--e4) 0; }
+.u .u-cab h1 { font: 600 26px/1.1 var(--fuente-titulos); color: var(--color-texto); }
+body.u-con-barra .u-cab h1 { color: var(--color-texto); }
+.u .u-main { padding: var(--e4) var(--e4) var(--e5); }
+@media (min-width: 900px) {
+  body.u-con-barra .u-cab { padding: var(--e4) var(--e5) 0; }
+  .u .u-cab h1 { font-size: 19px; }
+  body.u-con-barra .u-main { padding: var(--e3) var(--e5) var(--e5); }
+}
+.u .n-quien { font-weight: 600; color: var(--color-suave); }
+.u .n-aviso-app { font-size: 13px; padding: var(--e2) var(--e4); background: var(--color-pendiente-fondo); border-bottom: 0; }
+.u .n-grupo { color: var(--color-texto); font-weight: 600; }
+
+/* ---------- Sección Listado ---------- */
+/* La barra de arriba: buscar, Filtrar y Añadir a la altura de los botones. */
+.u .li-barra { gap: var(--e2); }
+@media (min-width: 900px) {
+  .u .li-barra .li-buscar { flex: 0 1 320px; }
+  .u .li-barra .li-nueva, .u .li-barra .li-filtrar { font-size: 13px; padding: 0 var(--e3); }
+  .u .li-barra .li-nueva { margin-left: auto; }
+}
+.u .li-n { background: var(--est-teja); }
+/* Avisos de arriba y filtros puestos: chips blancos de línea fina; el aviso elegido, en su color. */
+.u .li-av { min-height: 32px; border: 1px solid var(--linea-btn); border-radius: var(--radio); font: 500 13.5px/1.2 var(--fuente-texto); }
+.u .li-av[aria-pressed=true] { border: 1px solid var(--li-c, var(--color-pendiente)); }
+.u .li-fchip { min-height: 32px; border: 1px solid var(--color-principal-oscuro); border-radius: var(--radio); font: 500 13.5px/1.2 var(--fuente-texto); }
+.u .li-nf { background: var(--color-accion); color: var(--color-sobre-accion); }
+@media (min-width: 900px) { .u .li-av, .u .li-fchip { min-height: 28px; font-size: 12.5px; } .u .li-dia { min-height: 30px; font-size: 13px; } }
+.u .li-cliente { border-left: 0; border: 1px solid color-mix(in srgb, var(--est-azul) 25%, var(--color-superficie)); background: var(--est-azul-f); border-radius: var(--radio-caja); }
+/* La tabla del ordenador: una sola caja; cada grupo, una cabecera discreta (el atrasado, en teja). */
+.u .li-tabla { border: 1px solid var(--linea-caja); border-radius: var(--radio-caja); background: var(--color-superficie); }
+.u .li-tabla .u-tabla { border: 0; border-radius: 0; }
+.u .li-tabla .li-g-cab th { padding: 7px 14px; background: var(--fondo-cab); border-bottom: 1px solid var(--linea-fila); }
+.u .li-tabla tbody + tbody .li-g-cab th { border-top: 1px solid var(--linea-fila); }
+.u .li-tabla .li-g-cab .n-grupo { font: 600 12.5px/1.3 var(--fuente-texto); color: var(--color-texto); }
+.u .li-tabla .li-g-cab .n-grupo .u-cifra { font-weight: 500; font-size: 12.5px; }
+.u .li-tabla .li-g-tarde th { background: var(--est-teja-f); }
+.u .li-tabla .li-g-tarde .n-grupo { color: var(--est-teja); }
+.u .li-tabla tbody:not(:last-child) tr:last-child td { border-bottom: 1px solid var(--linea-fila); }
+.u .u-tabla tr.li-con-aviso td:first-child { box-shadow: inset 3px 0 0 var(--li-barra, transparent); }
+.u .li-cod { font-weight: 500; font-size: 12px; }
+.u .li-marcas { margin-top: 2px; }
+.u .li-aviso { font-weight: 500; }
+.u .li-circ { width: 20px; height: 20px; border-color: color-mix(in srgb, var(--color-texto) 30%, var(--color-fondo)); }
+.u .li-circ .u-icono { width: 13px; height: 13px; }
+.u .li-pasar { min-height: 28px; font-size: 12.5px; }
+.u .li-ctx-b { font-weight: 500; }
+/* Las filas del móvil: dos líneas (qué hay que hacer; con quién y cuándo) en una superficie de esquinas de 12 px por grupo. */
+@media (max-width: 639px) {
+  .u .li-grupo { margin: 0 0 var(--e3); background: var(--color-superficie); border: 1px solid var(--linea-caja); border-radius: var(--radio-caja); overflow: hidden; }
+  .u .li-grupo .n-grupo, .u .li-grupo .n-grupo:first-child { margin: 0; padding: var(--e3) var(--e4) 6px; font: 600 14px/1.3 var(--fuente-texto); }
+  .u .li-grupo.li-g-tarde .n-grupo { color: var(--est-teja); }
+  .u .li-grupo .n-grupo .u-cifra { font-size: 13px; font-weight: 500; }
+  .u .li-grupo .li-tarjetas { display: block; }
+  .u .li-grupo .li-tarjetas > li + li { border-top: 1px solid var(--linea-fila); }
+  .u .li-grupo .li-tarjeta { border: 0; border-radius: 0; background: transparent; padding: 10px var(--e4); min-height: 64px; }
+  .u .li-grupo .li-tarjeta:not(.li-con-foto) { justify-content: center; }
+  .u .li-grupo .li-t-img { width: 56px; height: 56px; }
+  .u .li-grupo .li-tarjeta strong { font-weight: 500; font-size: 15px; }
+  .u .li-grupo .li-det { font-size: 13px; gap: 2px var(--e2); }
+  .u .li-grupo .li-t-rap .li-circ { left: var(--e4); top: 50%; margin-top: -12px; width: 24px; height: 24px; }
+  .u .li-grupo .li-t-ci .li-tarjeta { padding-left: calc(var(--e4) + 24px + var(--e3)); }
+  .u .li-grupo .li-t-ctx .li-tarjeta { padding-bottom: 40px; }
+  .u .li-grupo .li-t-ctx > .li-ctx-b { left: var(--e4); bottom: 10px; }
+  .u .li-grupo .li-t-ci.li-t-ctx > .li-ctx-b { left: calc(var(--e4) + 24px + var(--e3)); }
+  .u .li-grupo .li-t-rap .li-pasar { top: var(--e2); right: var(--e2); }
+}
+.u .li-tarjeta { border-color: var(--linea-caja); border-radius: var(--radio); }
+.u .li-tarjeta strong { font-weight: 500; }
+/* El tablero: columnas claras con su color arriba, tarjetas blancas. */
+.u .li-col { background: var(--fondo-cab); border: 1px solid var(--linea-fila); border-top: 3px solid var(--li-c, var(--linea-caja)); border-radius: var(--radio-caja); }
+.u .li-col-t { font: 600 13px/1.3 var(--fuente-texto); }
+.u .li-col .li-tarjeta { padding: 10px var(--e3); font-size: 14px; background: var(--color-superficie); }
+@media (min-width: 900px) { .u .li-col .li-tarjeta { font-size: 13.5px; } }
+/* La ficha: título y datos con la misma letra que el resto; cada apartado, separado por una línea. */
+.u .li-ficha-cab h2 { font: 600 20px/1.2 var(--fuente-titulos); }
+.u .li-fg-t { font: 600 12.5px/1.3 var(--fuente-texto); color: var(--color-suave); border-bottom: 1px solid var(--linea-fila); text-transform: none; }
+.u .li-rel-f, .u .li-rt-f { border-color: var(--linea-caja); border-radius: var(--radio); }
+@media (hover: hover) { .u .li-rel-f:hover { background: var(--fondo-encima); } }
+@media (min-width: 900px) { .u .li-ficha-cab h2 { font-size: 18px; } .u .n-ventana { padding: var(--e4) var(--e5); gap: var(--e4); } .u .li-valor { font-size: 13.5px; } }
+/* Vista partida (ordenador): la ficha, fija a la derecha, y la lista sigue a la vista y se puede tocar a su izquierda.
+   T0723: desde 1000 px (portátil de 1024, iPad grande en vertical), con el menú plegado y la ficha algo más estrecha hasta 1199. */
+@media (min-width: 1000px) and (max-width: 1199px) { :root { --ancho-ficha: 420px; } }
+@media (min-width: 1000px) {
+  .u .u-velo.li-v-ficha { left: auto; width: var(--ancho-ficha); padding: 0; background: transparent; overflow: visible; align-items: stretch; }
+  .u .u-velo.li-v-ficha > .u-ventana { max-width: none; height: 100%; overflow-y: auto; border-radius: 0; border-left: 1px solid var(--linea-caja);
+    box-shadow: -6px 0 20px color-mix(in srgb, var(--color-texto) 6%, transparent); }
+  body.li-partida #sx-panel { padding-right: var(--ancho-ficha); }
+  /* T0732 (R45): con la ficha abierta al lado, «Añadir» de la barra pasa a contorno: lo único lleno es lo de la ficha. */
+  body.li-partida .li-nueva.u-btn-accion { background: var(--color-superficie); color: var(--color-principal-oscuro); border-color: var(--linea-btn); }
+}
+@media (min-width: 1000px) and (hover: hover) {
+  body.li-partida .li-nueva.u-btn-accion:hover:not(:disabled) { border-color: color-mix(in srgb, var(--color-texto) 35%, var(--color-fondo)); filter: none; }
+}
+/* Calcular precio y Economía: las cajas con la misma línea que las listas. */
+.u .pr-caja { border-color: var(--linea-caja); border-radius: var(--radio-caja); }
+.u .pr-seg { border-color: var(--linea-btn); }
+.u .pr-seg button[aria-pressed=true] { background: var(--color-principal-oscuro); }
+/* Economía: las cifras, en superficies blancas de línea fina (la de Beneficio sigue maciza: es la que manda); lo pasado, en teja. */
+.u .eco-kpi:not(.eco-grande), .u .eco-mini > button { background: var(--color-superficie); border: 1px solid var(--linea-caja); border-radius: var(--radio-caja); }
+.u .eco-kpi.eco-grande { border-radius: var(--radio-caja); }
+.u .eco-card { border-color: var(--linea-caja); border-radius: var(--radio-caja); background: var(--color-superficie); }
+.u .eco-barra-p { background: var(--linea-fila); }
+.u .eco-barra-p i.eco-pasado { background: var(--color-vencido); }
+.u .eco-aviso { border-color: var(--linea-caja); border-left-color: var(--color-vencido); border-radius: var(--radio-caja); }
+/* T0679 · Un enlace de la ficha (web, Instagram, correo, teléfono, foto): su icono y lo que abre, sin subrayar ni flecha. */
+.u a.li-enl { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; color: var(--color-principal-oscuro); font-weight: 500; text-decoration: none; }
+.u a.li-enl > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u a.li-enl .u-icono { width: 16px; height: 16px; flex: none; stroke-width: 1.7; opacity: .85; }
+.u a.li-enl:focus-visible > span { text-decoration: underline; text-underline-offset: 3px; } @media (hover: hover) { .u a.li-enl:hover > span { text-decoration: underline; text-underline-offset: 3px; } }
+
+/* ---------- T0679 · La ficha con jerarquía: se ve primero quién es, en qué punto está y qué toca; cada apartado, su tarjeta.
+ * La etiqueta, pequeña y gris; el dato, más grande y en tinta. ---------- */
+.u .li-ventana { background: var(--fondo-cab); }
+.u .li-ventana .n-ventana { gap: var(--e3); }
+/* Cabecera: el código, discreto encima; el nombre, grande. */
+.u .li-ventana .li-ficha-cab { align-items: flex-start; padding-bottom: var(--e1); }
+.u .li-ventana .li-ficha-cab h2 { display: flex; flex-direction: column; gap: 2px; font: 600 24px/1.15 var(--fuente-titulos); letter-spacing: -.01em; }
+.u .li-ventana .li-ficha-cab h2 .li-cod { font: 500 12px/1.3 var(--fuente-texto); color: var(--color-suave); letter-spacing: .04em; vertical-align: 0; }
+/* Lo que toca (los avisos de la ficha): pastillas de su color, no texto suelto. */
+.u .li-ficha-avisos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 0; }
+.u .li-ficha-avisos .li-aviso, .u .li-ficha-avisos .li-aviso + .li-aviso { display: inline-flex; align-items: center; gap: 6px; height: 26px; margin: 0; padding: 0 10px 0 8px;
+  border-radius: 999px; background: var(--li-fondo, var(--est-ocre-f)); color: var(--li-c, var(--est-ocre)); font: 500 13px/1 var(--fuente-texto); }
+.u .li-ficha-avisos .li-aviso::before, .u .li-ficha-avisos .li-aviso + .li-aviso::before { content: ""; width: 6px; height: 6px; margin: 0; border-radius: 3px; background: currentColor; }
+/* Cada apartado, una tarjeta blanca; su título, en versalitas pequeñas grises. */
+.u .li-ventana .li-fgrupo { background: var(--color-superficie); border: 1px solid var(--linea-caja); border-radius: var(--radio-caja); padding: 14px 16px; gap: var(--e3); }
+.u .li-ventana .li-fg-t { margin: 0; padding: 0; border: 0; font: 600 11px/1.2 var(--fuente-texto); letter-spacing: .08em; text-transform: uppercase; color: var(--color-suave); }
+.u .li-ventana .li-fg-t .u-cifra { font-size: 11px; }
+.u .li-ventana .u-campos { gap: var(--e3) var(--e4); }
+.u .li-ventana .li-dato { gap: 3px; }
+.u .li-ventana .li-dato > .u-etiqueta, .u .li-ventana .u-campo > .u-etiqueta { font: 400 12px/1.3 var(--fuente-texto); color: var(--color-suave); }
+.u .li-ventana .li-valor { font: 400 15px/1.4 var(--fuente-texto); color: var(--color-texto); }
+.u .li-ventana .li-vacios { font-size: 13px; }
+/* La fase o el estado, en una pastilla de su color que se toca para cambiarlo. */
+.u select.li-sel-pil { -webkit-appearance: none; appearance: none; width: auto; max-width: 100%; min-height: 30px; height: 30px; padding: 0 30px 0 12px; border: 0; border-radius: 999px;
+  background: var(--li-fondo) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;
+  color: var(--li-c); font: 600 13.5px/1 var(--fuente-texto); cursor: pointer; }
+.u select.li-sel-pil:focus { box-shadow: 0 0 0 2px color-mix(in srgb, var(--li-c) 35%, transparent); }
+.u .li-gris { --li-c: var(--est-gris); --li-fondo: var(--est-gris-f); }
+/* Las notas: una caja sin marco de formulario hasta que se toca. */
+.u .li-ventana textarea { border-color: transparent; background: var(--fondo-cab); }
+@media (hover: hover) { .u .li-ventana textarea:hover { border-color: var(--linea-btn); } }
+/* Las personas de contacto: el nombre en tinta y, debajo, el cargo y sus enlaces. */
+.u .li-ventana .li-rel-f { border: 0; padding: 0; background: transparent; gap: 4px var(--e3); }
+.u .li-ventana .li-rel li + li { border-top: 1px solid var(--linea-fila); padding-top: var(--e2); margin-top: var(--e1); }
+.u .li-ventana .li-rel-f .li-rel-n { flex: 1 0 100%; font: 600 15px/1.3 var(--fuente-texto); color: var(--color-texto); }
+.u .li-ventana .li-rel-f > span:not(.li-rel-n) { font-size: 13.5px; color: var(--color-suave); }
+@media (hover: hover) { .u .li-ventana a.li-rel-f:hover { background: transparent; } }
+.u .li-ventana .li-accion-t { font-size: 12.5px; }
+.u .li-ventana .n-botones { padding-top: var(--e1); }
+/* T0679 · La fase (o el estado), arriba y sin tarjeta: su pastilla con el nombre del campo pequeño delante. */
+.u .li-ventana .li-f-pil { background: none; border: 0; padding: 0; }
+.u .li-ventana .li-f-pil .u-campos { display: block; }
+.u .li-ventana .li-f-pil .u-campo { flex-direction: row; align-items: center; gap: var(--e2); }
+.u .li-ventana .li-f-pil .li-dos { margin-top: 0; } /* T0746: el Sí | No solo arriba, a la altura de su etiqueta */
+/* Guardar y lo que se hace con la ficha: al final, fijos abajo mientras se baja por ella. */
+.u .li-pie { position: sticky; bottom: 0; z-index: 2; margin: 0 calc(var(--e5) * -1) calc(var(--e5) * -1); padding: var(--e3) var(--e5);
+  background: color-mix(in srgb, var(--fondo-cab) 92%, transparent); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border-top: 1px solid var(--linea-caja); }
+.u .li-pie .li-accion-t { margin: var(--e1) 0 0; }
+@media (max-width: 899px) { .u .li-pie { margin: 0 calc(var(--e4) * -1) calc(var(--e5) * -1); padding: var(--e3) var(--e4) calc(var(--e3) + env(safe-area-inset-bottom, 0px)); } }
+/* Hoy y las listas: «Pasar» aparece al pasar por la fila (con ratón); el día, pequeño y gris debajo de «hace 9 días». */
+@media (hover: hover) {
+  .u .li-tabla tr .li-pasar { opacity: 0; transition: opacity .12s; }
+  .u .li-tabla tr:hover .li-pasar, .u .li-tabla tr:focus-within .li-pasar, .u .li-tabla .li-pasar[aria-expanded=true] { opacity: 1; }
+}
+.u .li-cuando-1 { display: block; white-space: nowrap; }
+.u .li-fecha-d { display: block; font-size: 12px; color: var(--color-suave); white-space: nowrap; }
+.u .li-fecha .li-fecha-d { color: var(--color-suave); font-weight: 400; }
+.u .li-det .li-fecha-d, .u .li-tarjeta .li-fecha-d { display: inline; margin-left: 6px; }
+.u .li-tabla .u-tabla .li-pasar { border-color: transparent; background: transparent; }
+@media (hover: hover) { .u .li-tabla .u-tabla tr:hover .li-pasar { border-color: var(--linea-btn); background: var(--color-superficie); } }
+/* T0679 · Lo que una marca puede poner con su carácter (por defecto, lo de siempre): la letra de los títulos de página y del
+ * nombre de una ficha (--fuente-display), el color de los enlaces y el del icono de la sección abierta en el menú. */
+:where(:root) { --fuente-display: var(--fuente-titulos); --peso-display: 600; --tam-display: 26px; --tam-display-o: 19px; --color-enlace: var(--color-principal-oscuro); --color-icono-menu: var(--color-accion); }
+.u .u-cab h1 { font-family: var(--fuente-display); font-weight: var(--peso-display); font-size: var(--tam-display); }
+@media (min-width: 900px) { .u .u-cab h1 { font-size: var(--tam-display-o); } }
+.u .li-ventana .li-ficha-cab h2 { font-family: var(--fuente-display); font-weight: var(--peso-display); }
+.u .li-ventana .li-ficha-cab h2 .li-cod { font-family: var(--fuente-texto); }
+.u a.li-enl, .u .li-ctx-b { color: var(--color-enlace); }
+@media (min-width: 700px) {
+  .sx.u-sx a[aria-current=page] svg { color: var(--color-icono-menu); }
+  .sx.u-sx .sx-quien { color: color-mix(in srgb, var(--color-sobre-menu) 70%, var(--color-menu)); }
+}
+.u .li-tarjeta .li-cuando-1 { display: inline; }
+.u .li-tarjeta .li-fecha-d { display: inline; margin-left: 0; font-size: 13px; }
+.u .li-tarjeta .li-fecha-d::before { content: " · "; }
+/* T0679 · Móvil: la barra de abajo, clara (como piden las guías de Apple y Google); la pestaña abierta, con una pastilla del
+ * color de acción, suave, detrás de su icono, y el texto en el color de la marca. */
+@media (max-width: 699px) {
+  .sx.u-sx a svg, .sx.u-sx .sx-mas svg { box-sizing: content-box; padding: 3px 16px; border-radius: 999px; transition: background .15s; }
+  .sx.u-sx a[aria-current=page] svg, .sx.u-sx .sx-mas.sx-dentro svg { background: color-mix(in srgb, var(--color-accion) 26%, var(--color-superficie)); color: var(--color-principal-oscuro); }
+  .sx.u-sx .sx-resto a svg { padding: 0; background: none !important; }
+}
+
+/* ---------- T0679 · Móvil: la cabecera de una lista en menos filas y la barra de abajo como isla flotante ----------
+ * Arriba, las vistas como un interruptor, cuántas hay y la «i»; debajo, buscar y filtrar (solo su icono); los avisos, chips
+ * pequeños que se deslizan; «Añadir», un «+» redondo flotante abajo a la derecha, encima de la barra. */
+.u .li-nueva .u-icono { display: none; }
+@media (max-width: 639px) {
+  .u .li-arriba { gap: var(--e2); margin-bottom: var(--e2); }
+  /* T0752: las vistas (y Mías / Todas en Hoy), pestañas subrayadas como en el ordenador; antes, un interruptor en cápsula. */
+  .u .li-arriba .u-pestanas.li-vistas { flex: 1 1 auto; min-width: 0; gap: 0; }
+  .u .li-arriba .u-pestanas.li-vistas button { min-height: 38px; padding: 0 var(--e2); font-size: 14px; }
+  .u .li-arriba .li-cuenta { margin-left: auto; font-size: 13px; }
+  .u .li-qes { width: 34px; min-height: 34px; border: 0; background: transparent; }
+  .u .li-barra { margin-bottom: var(--e2); }
+  .u .li-barra .li-buscar input { min-height: 40px; padding-left: 36px; border-radius: 10px;
+    background: var(--color-superficie) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23777' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M20 20l-4.4-4.4'/%3E%3C/svg%3E") no-repeat 12px center; }
+  .u .li-barra .li-filtrar { width: 40px; min-height: 40px; padding: 0; border-radius: 10px; position: relative; }
+  .u .li-barra .li-filtrar .li-nf { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; font-size: 11px; }
+  .u .li-bt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .u .li-barra .li-nueva { position: fixed; z-index: 44; right: max(var(--e4), env(safe-area-inset-right, 0px)); bottom: calc(var(--alto-barra) + var(--e3) + env(safe-area-inset-bottom, 0px));
+    width: 56px; height: 56px; min-height: 56px; padding: 0; border-radius: 18px; box-shadow: 0 6px 18px color-mix(in srgb, var(--color-accion) 35%, transparent); }
+  .u .li-barra .li-nueva .u-icono { display: block; width: 26px; height: 26px; stroke-width: 2; }
+  .u .li-avisos { margin-bottom: var(--e3); gap: 6px; }
+  .u .li-av { min-height: 32px; padding: 0 var(--e3); border-radius: 999px; font-size: 13px; }
+  /* Sitio abajo para que el «+» no tape la última fila. */
+  .u #li-cont { padding-bottom: 72px; }
+}
+/* La barra de abajo, una isla: flota separada del borde, redondeada. T0723: opaca, sin desenfoque (decidido con Javi: imitar
+   Liquid Glass no lo parece y en Safari gasta batería al desplazar). */
+@media (max-width: 699px) {
+  :root { --alto-barra: 76px; }
+  .u .sx, .sx.u-sx { left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    padding: 0 4px; border: 1px solid color-mix(in srgb, var(--color-texto) 8%, transparent); border-radius: 24px;
+    background: var(--color-superficie);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .12), 0 1px 3px rgba(0, 0, 0, .06); }
+  .sx.u-sx a, .sx.u-sx .sx-mas { min-height: 60px; }
+  .sx.u-sx .sx-resto { bottom: calc(100% + 8px); border: 1px solid var(--linea-caja); border-radius: 18px; box-shadow: 0 8px 28px rgba(0, 0, 0, .14); }
+}
+
+/* ---------- T0679 · Pasar a otro día, cerrar con contexto y filtros en pastillas ---------- */
+/* «Pasar a otro día»: un icono (un calendario con su flecha), sin texto; tenue hasta que se pasa por la fila. */
+.u .li-pasar { width: 36px; min-height: 36px; padding: 0; justify-content: center; border-color: transparent; background: transparent; color: var(--color-suave); }
+.u .li-pasar .u-icono { width: 20px; height: 20px; }
+.u .li-pasar[aria-expanded=true] { color: var(--color-principal-oscuro); border-color: var(--linea-btn); background: var(--color-superficie); } @media (hover: hover) { .u .li-pasar:hover { color: var(--color-principal-oscuro); border-color: var(--linea-btn); background: var(--color-superficie); } }
+@media (hover: hover) {
+  .u .li-tabla tr .li-pasar { opacity: .55; }
+  .u .li-tabla tr:hover .li-pasar, .u .li-tabla tr:focus-within .li-pasar, .u .li-tabla .li-pasar[aria-expanded=true] { opacity: 1; }
+}
+@media (min-width: 900px) { .u .li-pasar { width: 30px; min-height: 30px; } .u .li-pasar .u-icono { width: 18px; height: 18px; } }
+.u .li-t-pa .li-tarjeta > strong, .u .li-t-pa .li-t-txt > strong { padding-right: 44px; }
+.u .li-menu-t { margin: 0; padding: 6px var(--e3) 4px; font: 600 11px/1.2 var(--fuente-texto); letter-spacing: .08em; text-transform: uppercase; color: var(--color-suave); }
+.u .li-menu { border-color: var(--linea-caja); border-radius: 12px; padding: 6px; }
+.u .li-menu button { border-radius: 8px; }
+/* Las ventanas cortas (siguiente paso, otro día, filtrar): en el móvil salen desde abajo, no a pantalla completa. */
+@media (max-width: 640px) {
+  .u .u-velo.li-v-corta { align-items: flex-end; padding: 0; }
+  .u .u-velo.li-v-corta > .u-ventana { min-height: 0; max-height: 88vh; overflow-y: auto; border-radius: 18px 18px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .u .u-velo.li-v-corta > .u-ventana::before { content: ""; display: block; width: 40px; height: 5px; margin: 8px auto 0; border-radius: 3px; background: var(--linea-caja); }
+}
+@media (min-width: 641px) { .u .u-velo.li-v-corta > .u-ventana { max-width: 520px; border-radius: var(--radio-caja); } }
+.u .li-v-corta .li-ventana, .u .li-v-corta > .u-ventana { background: var(--color-superficie); }
+/* Lo que acabas de cerrar y lo que ya hay pendiente con ellos. */
+.u .li-sig-ctx { display: grid; gap: 4px; padding: var(--e3) var(--e4); border-radius: var(--radio-caja); background: var(--fondo-cab); border: 1px solid var(--linea-caja); }
+.u .li-sig-t { margin: 0; font: 500 15px/1.35 var(--fuente-texto); color: var(--color-texto); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--color-texto) 35%, transparent); }
+.u .li-sig-ctx .u-nota { margin: 0; }
+.u .li-sig-pt { margin-top: var(--e2); }
+.u .li-sig-pend { margin: 0; padding-left: 1.1em; font-size: 14px; display: grid; gap: 2px; }
+.u .li-sig-pend small { color: var(--color-suave); }
+.u .li-sig-pend small.li-ctx-tarde { color: var(--color-vencido); font-weight: 600; }
+.u .li-sig-ok { font-size: 13px; }
+/* Filtros en pastillas: en la ventana de filtrar y, el de pocas opciones, a la vista sobre la lista. */
+.u .li-fops { border: 0; padding: 0; margin: 0; }
+.u .li-fops > div { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.u .li-fop { min-height: 34px; padding: 0 var(--e3); border: 1px solid var(--linea-btn); border-radius: 999px; background: var(--color-superficie); color: var(--color-texto);
+  font: 500 13.5px/1 var(--fuente-texto); cursor: pointer; white-space: nowrap; }
+@media (hover: hover) { .u .li-fop:hover { border-color: color-mix(in srgb, var(--color-texto) 35%, var(--color-fondo)); } }
+.u .li-fop[aria-pressed=true] { background: var(--color-principal-oscuro); border-color: var(--color-principal-oscuro); color: var(--color-sobre-principal, #fff); }
+.u .li-rapido { display: flex; align-items: center; gap: 6px; margin: 0 0 var(--e3); overflow-x: auto; scrollbar-width: none; }
+.u .li-rapido::-webkit-scrollbar { display: none; }
+.u .li-rapido-t { flex: none; font-size: 12.5px; color: var(--color-suave); margin-right: 2px; }
+.u .li-rapido .li-fop { flex: none; min-height: 30px; font-size: 13px; }
+@media (max-width: 639px) { .u .li-rapido { margin-left: calc(var(--e4) * -1); margin-right: calc(var(--e4) * -1); padding: 0 var(--e4); } .u .li-rapido .li-fop { min-height: 34px; } }
+.u #li-ff .u-campos { gap: var(--e4); }
+.u .li-ff-pie { position: sticky; bottom: 0; padding: var(--e3) 0 var(--e1); background: var(--color-superficie); border-top: 1px solid var(--linea-fila); }
+
+/* ---------- T0679 · Economía, arriba con menos ruido: el año y la venta, pastillas pequeñas; Beneficio, la cifra grande sin
+ * bloque oscuro; ingresos y gastos, dos cifras; lo demás (IVA, sin factura, pendientes), filas de una lista. ---------- */
+.u .eco-barra { flex-wrap: nowrap; align-items: center; gap: var(--e3); }
+.u .eco-barra .eco-per { flex: none; }
+.u .eco-barra .u-pestanas { flex: 1 1 auto; min-width: 0; }
+.u .eco-per > .u-etiqueta, .u .eco-filtro-des .u-etiqueta { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.u .eco-per select, .u .eco-filtro-des select { -webkit-appearance: none; appearance: none; width: auto; min-height: 34px; height: 34px; padding: 0 30px 0 14px; border: 1px solid var(--linea-btn); border-radius: 999px;
+  background: var(--color-superficie) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 11px center;
+  font: 600 14px/1 var(--fuente-texto); color: var(--color-texto); cursor: pointer; }
+.u .eco-filtro-des { margin: 0 0 var(--e3); }
+.u .eco-filtro-des .u-campo { flex: none; max-width: 100%; }
+.u .eco-filtro-des select { font-weight: 500; max-width: 100%; }
+.u .eco-filtro-des .u-campo::before { content: "Venta"; display: none; }
+/* Beneficio: la cifra que manda, grande y en la letra de los títulos, sobre blanco. */
+.u .eco-kpi.eco-grande { background: var(--color-superficie); color: var(--color-texto); border: 1px solid var(--linea-caja); }
+.u .eco-kpi.eco-grande b { color: var(--color-suave); }
+.u .eco-grande .eco-val { font-family: var(--fuente-display); font-weight: var(--peso-display); font-size: 40px; line-height: 1.05; color: var(--color-texto); }
+.u .eco-grande .eco-pint { font-family: var(--fuente-texto); font-size: 13px; color: var(--color-suave); }
+.u .eco-kpi b { font-weight: 500; font-size: 12.5px; }
+.u .eco-val { font-weight: 600; }
+/* IVA, sin factura y pendientes: una lista en una sola caja (en el móvil, una fila cada uno; en el ordenador, en fila). */
+.u .eco-mini { gap: 0; border: 1px solid var(--linea-caja); border-radius: var(--radio-caja); background: var(--color-superficie); overflow: hidden; }
+.u .eco-mini > button, .u .eco-kpi:not(.eco-grande).x, .u .eco-mini > button:not(.x) { border: 0; border-radius: 0; background: transparent; display: flex; flex-direction: row-reverse; justify-content: space-between; align-items: center; gap: var(--e2);
+  min-height: 48px; padding: 0 var(--e4); text-align: left; }
+.u .eco-mini > button + button { border-left: 1px solid var(--linea-fila); }
+@media (hover: hover) { .u .eco-mini > button:hover { background: var(--fondo-encima); } }
+.u .eco-mini strong { font: 600 16px/1.2 var(--fuente-texto); }
+.u .eco-mini small { font-size: 13.5px; font-weight: 400; color: var(--color-texto); }
+@media (max-width: 639px) {
+  .u .eco-mini { grid-template-columns: 1fr; }
+  .u .eco-mini > button + button { border-left: 0; border-top: 1px solid var(--linea-fila); }
+  .u .eco-barra { flex-wrap: wrap; }
+  .u .eco-barra .u-pestanas { flex-basis: 100%; }
+}
+.u .eco-filtro-des .u-campo { flex-direction: row; align-items: center; gap: var(--e2); }
+.u .eco-filtro-des .u-etiqueta { position: static; width: auto; height: auto; overflow: visible; clip: auto; font-size: 13px; color: var(--color-suave); }
+.u .eco-mini { grid-template-columns: 1fr; align-content: start; }
+.u .eco-mini > button + button { border-left: 0; border-top: 1px solid var(--linea-fila); }
+/* Un filtro de muchas opciones (con quién, ciudad): un desplegable redondeado, a todo el ancho. */
+.u select.li-fsel { -webkit-appearance: none; appearance: none; width: 100%; padding-right: 34px; border-radius: var(--radio);
+  background: var(--color-superficie) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center; }
+/* T0679 · Economía: primero las pestañas; debajo, «Año 2026», solo en las que cuenta (en Caja y Ventas no sale). */
+.u .eco-barra { flex-wrap: wrap; align-items: center; gap: var(--e3); }
+.u .eco-barra .u-pestanas { order: -1; flex: 1 1 100%; }
+.u .eco-per { flex-direction: row; align-items: center; gap: var(--e2); }
+.u .eco-per > .u-etiqueta { position: static; width: auto; height: auto; overflow: visible; clip: auto; font-size: 13px; color: var(--color-suave); }
+
+/* ==========================================================================================================================
+ * T0679 · Segunda vuelta (cinco revisiones): lo roto en el móvil, un significado por color, las mismas piezas en todas las
+ * secciones y seis tamaños de letra (12, 13, 15, 16, 24, 32 y el título de página).
+ * ========================================================================================================================== */
+/* Un significado por color: el rojo de «mal» (cifras en negativo, «te has pasado») es la teja de lo atrasado; la rayita de la
+ * izquierda de una fila, solo para lo atrasado (la ocre de «pronto» no se distinguía y ya lo dice la palabra). */
+.u .u-mal { color: var(--color-vencido); font-weight: 600; }
+.u .u-tabla tr.li-f-medio td:first-child { box-shadow: none; }
+.u .li-tarjeta.li-f-medio, .u .li-f-medio .li-tarjeta { box-shadow: none; }
+/* Las barras de Economía, en el color de acción; lo que se pasa, teja. */
+.u .eco-barra-p i { background: var(--color-accion); }
+/* Las cifras de Economía, todas en la misma letra (la del texto, seminegrita): la grande, 32 px; las demás, 24 px. */
+.u .eco-val { font-family: var(--fuente-texto); font-weight: 600; font-size: 24px; letter-spacing: -.01em; }
+.u .eco-grande .eco-val { font-family: var(--fuente-texto); font-weight: 600; font-size: 32px; }
+/* Un solo desplegable en toda la app: redondeado, con su flecha (también en Calcular precio, Economía y las fichas). */
+.u select:not(.li-sel-pil) { -webkit-appearance: none; appearance: none; padding-right: 34px;
+  background: var(--color-superficie) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center; }
+.u .eco-per select, .u .eco-filtro-des select { border-radius: 999px; }
+/* El interruptor «Por metro / Del pedido» (Calcular precio) y «Entra / Sale / Entre cuentas» (Economía), como pastillas. */
+.u .pr-seg { gap: 4px; border: 0; padding: 3px; border-radius: var(--radio); background: color-mix(in srgb, var(--color-texto) 6%, var(--color-fondo)); }
+.u .pr-seg button { border-radius: var(--radio-peq, 4px); min-height: 32px; }
+.u .pr-seg button[aria-pressed=true] { background: var(--color-superficie); color: var(--color-texto); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .1); }
+/* Calcular precio: el resultado, grande (como las cifras de Economía); los títulos de sus dos cajas, iguales. */
+.u .pr-grande { font: 600 32px/1.1 var(--fuente-texto); letter-spacing: -.01em; }
+.u .pr-h, .u .pr-caja > .u-etiqueta:first-child { font: 600 15px/1.3 var(--fuente-texto); color: var(--color-texto); }
+/* Una sola etiqueta: con punto (gris si no dice otra cosa). El número de una pestaña («Pendiente 10»), texto gris. */
+.u .u-chip:not(.li-estado) { display: inline-flex; align-items: center; gap: 6px; padding: 0 9px 0 7px; }
+.u .u-chip:not(.li-estado)::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 3px; background: color-mix(in srgb, currentColor 55%, transparent); }
+.u .u-pestanas .u-chip, .u .u-pestanas .u-chip:not(.li-estado) { background: none; padding: 0 0 0 2px; color: var(--color-suave); font-weight: 500; }
+.u .u-pestanas .u-chip::before { display: none; }
+/* El tablero: la tarea, por encima de con quién; sin la línea que repite lo atrasado (ya lo dice la fecha en teja). */
+.u .li-col .li-tarjeta > strong, .u .li-col .li-t-txt > strong { font-size: 15px; font-weight: 600; }
+.u .li-col .li-det { font-size: 13px; color: var(--color-suave); }
+.u .li-col .li-marcas { display: none; }
+.u .li-col-vacia { font-size: 13px; }
+/* Los avisos de arriba (cuántas van tarde…): texto con su número en color, no botones como los filtros; el elegido, marcado. */
+.u .li-av { min-height: 30px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; font-weight: 500; color: var(--color-texto); }
+@media (hover: hover) { .u .li-av:hover { background: var(--fondo-cab); } }
+.u .li-av[aria-pressed=true] { border: 0; background: var(--li-fondo, var(--color-pendiente-fondo)); }
+.u .li-avisos { gap: 2px 4px; margin-left: -10px; }
+/* En una ficha, un apartado sin nada («Nada todavía») en una línea, sin caja alta. */
+.u .li-ventana .li-fgrupo:not(:has(.u-campos, .li-rel, .li-rt, .li-ctx-l, table, .li-vacios)) { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px var(--e3); padding: 10px 16px; }
+.u .li-ventana .li-fgrupo:not(:has(.u-campos, .li-rel, .li-rt, .li-ctx-l, table, .li-vacios)) > *:not(.li-fg-t) { margin: 0; padding: 0; font-size: 13px; color: var(--color-suave); }
+/* T0723 · «+ Añadir persona de contacto» en un apartado vacío: con su margen, sus 32 px y centrado en la fila (la regla de arriba lo dejaba sin margen). */
+.u .li-ventana .li-fgrupo:not(:has(.u-campos, .li-rel, .li-rt, .li-ctx-l, table, .li-vacios)) > .li-rel-anadir { align-self: center; padding: 0 var(--e3); color: var(--color-principal-oscuro); }
+/* «Mover»: en el ordenador, solo el icono (con su nombre al pasar el ratón); en el móvil, icono y palabra. */
+.u .li-pasar-t { display: none; }
+@media (max-width: 639px) {
+  .u .li-pasar { width: auto; min-height: 44px; min-width: 44px; padding: 0 10px; gap: 4px; font-size: 13px; font-weight: 500; color: var(--color-principal-oscuro); }
+  .u .li-pasar-t { display: inline; }
+  .u .li-t-pa .li-tarjeta > strong, .u .li-t-pa .li-t-txt > strong { padding-right: 92px; }
+  /* El círculo de «hecha»: el dibujo igual, la zona de toque de 44 px. */
+  .u .li-circ { position: relative; }
+  .u .li-circ::after { content: ""; position: absolute; inset: -10px; }
+  /* Los avisos, en líneas que bajan (no se cortan por el lado). */
+  .u .li-avisos { flex-wrap: wrap; overflow: visible; margin-left: -10px; margin-right: 0; padding: 0; }
+  .u .li-av { white-space: nowrap; }
+  /* Los tableros, uno debajo de otro: cada columna, un grupo; las vacías, una línea. */
+  .u .li-tablero { flex-direction: column; overflow: visible; scroll-snap-type: none; }
+  .u .li-col { flex: none; max-width: none; width: 100%; min-height: 0; }
+  .u .li-col:has(.li-col-vacia) { flex-direction: row; align-items: baseline; gap: var(--e2); padding: 8px 12px; }
+  .u .li-col:has(.li-col-vacia) .li-col-t { padding: 0; }
+  /* Economía: las pestañas, en pastillas que bajan de línea (todas a la vista). */
+  .u .eco-barra .u-pestanas { flex-wrap: wrap; gap: 6px; border-bottom: 0; overflow: visible; -webkit-mask-image: none; mask-image: none; }
+  .u .eco-barra .u-pestanas button { min-height: 36px; padding: 0 12px; border: 1px solid var(--linea-btn); border-radius: 999px; font-size: 14px; }
+  .u .eco-barra .u-pestanas button[aria-selected=true] { background: var(--color-principal-oscuro); border-color: var(--color-principal-oscuro); color: var(--color-sobre-principal, #fff); }
+  .u .eco-barra .u-pestanas button[aria-selected=true] .u-chip { color: inherit; }
+}
+/* Economía en el móvil: «Filtrar» con su palabra (su texto no va aparte) y «Añadir» de Facturas, un botón normal en la barra;
+ * «Añadir movimiento», una pastilla flotante más pequeña. */
+@media (max-width: 639px) {
+  .u .eco-fbarra .li-filtrar { width: auto; padding: 0 var(--e3); }
+  .u .eco-fbarra .li-nueva { position: static; width: auto; height: 40px; min-height: 40px; padding: 0 var(--e4); border-radius: 10px; box-shadow: none; font-size: 15px; }
+  .u .eco-fab { min-height: 48px; padding: 0 var(--e4); border-radius: 16px; font-size: 15px; box-shadow: 0 6px 18px color-mix(in srgb, var(--color-accion) 35%, transparent); }
+  /* La ficha de un movimiento y añadir uno: desde abajo, como las demás ventanas cortas; letra de 16 px en los campos. */
+  .u #eco-velo { align-items: flex-end; padding: 0; }
+  .u #eco-velo > .u-ventana { min-height: 0; max-height: 92vh; overflow-y: auto; border-radius: 18px 18px 0 0; background: var(--color-superficie); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .u #eco-velo > .u-ventana::before { content: ""; display: block; width: 40px; height: 5px; margin: 8px auto 0; border-radius: 3px; background: var(--linea-caja); }
+  .u #eco-velo input:not([type=checkbox]):not([type=radio]), .u #eco-velo select, .u #eco-velo textarea { font-size: 16px; }
+}
+/* «Borrar movimiento», apartado de los demás botones y en teja. */
+.u #d-borrar { margin-left: auto; color: var(--color-vencido); }
+/* Los tableros, sin la rayita de color arriba de cada columna (solo la tenían algunas; el nombre ya lo dice). */
+.u .li-col { border-top: 1px solid var(--linea-fila); }
+@media (max-width: 639px) {
+  /* T0752: con pestañas subrayadas, el número de filas cabe al lado también con tres vistas (T0723 lo bajaba de línea). */
+  /* El filtro rápido, en líneas que bajan (no se corta por el lado). */
+  .u .li-rapido { flex-wrap: wrap; overflow: visible; }
+}
+@media (max-width: 639px) {
+  /* En el móvil, el filtro rápido solo con tres opciones o menos (más «Todos»); con más, ocuparía varias líneas: está en Filtrar. */
+  .u .li-rapido:has(.li-fop:nth-of-type(5)) { display: none; }
+  /* T0691: y entonces lo que tenga puesto sale con los demás filtros puestos, para que se vea y se pueda quitar. */
+  .u .li-rapido:has(.li-fop:nth-of-type(5)) ~ .li-filtros .li-fchip-rap { display: inline-flex; }
+}
+/* El filtro rápido ya se ve en sus pastillas: su etiqueta, escondida (salvo arriba, en el móvil). */
+.u .li-fchip-rap { display: none; }
+/* T0679 · En el móvil, el resumen de con quién es una tarea (al tocar su nombre) sale como las demás ventanas cortas:
+ * desde abajo, con su asa, las mismas esquinas, el mismo fondo y lo de detrás oscurecido. */
+@media (max-width: 639px) {
+  .u .li-ctx { border-top: 0; border-radius: 18px 18px 0 0; background: var(--color-superficie); padding-top: var(--e2);
+    box-shadow: 0 0 0 100vmax color-mix(in srgb, var(--color-texto) 45%, transparent), 0 -8px 24px rgba(0, 0, 0, .12); }
+  .u .li-ctx::before { content: ""; display: block; width: 40px; height: 5px; margin: 0 auto var(--e2); border-radius: 3px; background: var(--linea-caja); }
+  .u .li-ctx-cab h2 { font: 600 20px/1.25 var(--fuente-titulos); }
+}
+@media (max-width: 639px) { .u .li-ctx { padding-left: max(var(--e4), env(safe-area-inset-left, 0px)); padding-right: max(var(--e4), env(safe-area-inset-right, 0px)); } }
+
+/* T0691 · Muestrario: una cuadrícula de fotos grandes (Mis telas). Cada tela, su foto cuadrada y debajo su nombre, su color
+   y lo que cuesta. Sin foto (o con una que no se ve), un fondo neutro del mismo tamaño: la cuadrícula no se descoloca. */
+.u .li-gal-g + .li-gal-g { margin-top: var(--e5); }
+.u .li-galeria { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e4) var(--e3); grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); }
+@media (max-width: 639px) { .u .li-galeria { grid-template-columns: 1fr 1fr; gap: var(--e3) var(--e2); } }
+.u .li-gal-t { width: 100%; display: flex; flex-direction: column; gap: var(--e2); padding: 0; border: 0; background: none; color: var(--color-texto);
+  text-align: left; cursor: pointer; font: 400 14px/1.35 var(--fuente-texto); border-radius: var(--radio-caja, var(--radio)); }
+.u .li-gal-foto { display: block; position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: var(--radio-caja, var(--radio));
+  border: 1px solid var(--linea-caja, var(--color-linea));
+  background: color-mix(in srgb, var(--color-texto) 5%, var(--color-fondo)); }
+.u .li-gal-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .2s ease; }
+@media (hover: hover) { .u .li-gal-t:hover .li-gal-img { transform: scale(1.03); } .u .li-gal-t:hover strong { text-decoration: underline; text-underline-offset: 3px; } }
+.u .li-gal-t:focus-visible { outline: 2px solid var(--color-accion); outline-offset: 3px; }
+.u .li-gal-t.li-sel .li-gal-foto { outline: 2px solid var(--color-accion); outline-offset: 2px; }
+.u .li-gal-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 0 2px; }
+.u .li-gal-txt strong { font-weight: 600; font-size: 14.5px; }
+.u .li-gal-d { color: var(--color-suave); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.u .li-gal-c { font-variant-numeric: tabular-nums; font-weight: 500; margin-top: 2px; }
+.u .li-junta .li-rel-f { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e1) var(--e3); }
+.u .li-junta .li-rel-n { font-weight: 500; flex: 1 1 auto; }
+.u .li-gal-c.li-gal-sin { color: var(--color-suave); font-weight: 400; }
+/* T0730 (R41): el aviso cuando falta la cifra («Falta el coste»), una pastilla de su color. */
+.u .li-gal-c.li-gal-av { align-self: flex-start; color: var(--li-c); background: var(--li-fondo); border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 600; }
+/* ==========================================================================================================================
+ * T0684 · Elegir escribiendo (nucleo/elegir.js): un desplegable largo es un botón como los demás campos (las mismas esquinas,
+ * letra y flecha) que abre una lista con un buscador encima. En el ordenador, debajo del campo; en el móvil, desde abajo,
+ * como las demás ventanas cortas (su asa, las esquinas de 18 px y lo de detrás oscurecido).
+ * ========================================================================================================================== */
+.u .u-elegir-nativo { position: absolute !important; width: 1px !important; height: 1px !important; min-height: 0 !important; padding: 0 !important;
+  margin: -1px !important; overflow: hidden; clip: rect(0 0 0 0); border: 0 !important; opacity: 0; pointer-events: none; }
+.u .u-elegir-boton { display: flex; align-items: center; width: 100%; max-width: 100%; min-width: 0; min-height: 44px; padding: 0 34px 0 var(--e3);
+  font: 400 15px/1.3 var(--fuente-texto); color: var(--color-texto); text-align: left; cursor: pointer;
+  border: 1px solid var(--linea-btn); border-radius: var(--radio);
+  background: var(--color-superficie) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center; }
+.u .u-elegir-boton .u-elegir-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u .u-elegir-boton.u-elegir-vacio { color: var(--color-suave); }
+.u .u-elegir-boton:focus-visible, .u .u-elegir-boton.u-elegir-abierto { border-color: var(--color-accion); outline: 0; box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accion) 25%, transparent); }
+.u .u-elegir-boton:disabled { opacity: .55; cursor: default; }
+@media (min-width: 900px) { .u .u-elegir-boton { min-height: 32px; font-size: 13.5px; padding-left: 10px; } }
+/* Los filtros de muchas opciones (Filtrar), redondeados como antes. */
+.u .li-form .u-campo > .u-elegir-boton { border-radius: var(--radio); }
+
+.u .u-elegir-caja { position: fixed; z-index: 1000; display: flex; flex-direction: column; background: var(--color-superficie); color: var(--color-texto);
+  border: 1px solid var(--linea-caja); border-radius: var(--radio-caja); box-shadow: 0 12px 32px rgba(0, 0, 0, .14), 0 2px 6px rgba(0, 0, 0, .06);
+  font: 400 13.5px/1.3 var(--fuente-texto); overflow: hidden; }
+.u .u-elegir-buscar { display: flex; align-items: center; gap: var(--e2); padding: 0 var(--e3); border-bottom: 1px solid var(--linea-fila); }
+.u .u-elegir-buscar .u-icono { width: 16px; height: 16px; flex: none; color: var(--color-suave); }
+.u .u-elegir-buscar input[type=search] { flex: 1; min-width: 0; min-height: 40px; border: 0 !important; box-shadow: none !important; padding: 0; background: transparent; }
+.u .u-elegir-lista { list-style: none; margin: 0; padding: var(--e1); overflow-y: auto; overscroll-behavior: contain; outline: 0; }
+.u .u-elegir-op { padding: 7px var(--e2); border-radius: var(--radio-peq); cursor: pointer; overflow-wrap: anywhere; }
+.u .u-elegir-op.u-elegir-activa { background: var(--fondo-sel); }
+.u .u-elegir-op[aria-selected=true] { font-weight: 600; color: var(--color-principal-oscuro); }
+.u .u-elegir-op[aria-selected=true]::after { content: "✓"; float: right; margin-left: var(--e2); color: var(--color-accion); }
+.u .u-elegir-op[aria-disabled=true] { opacity: .45; cursor: default; }
+.u .u-elegir-op mark { background: none; color: inherit; font-weight: 700; text-decoration: underline; text-decoration-color: var(--color-destacado, var(--color-accion)); text-decoration-thickness: 2px; text-underline-offset: 2px; }
+.u .u-elegir-nada { color: var(--color-suave); }
+.u .u-elegir-siempre { border-top: 1px solid var(--linea-fila); margin-top: var(--e1); padding-top: 9px; color: var(--color-enlace, var(--color-principal-oscuro)); }
+.u .u-elegir-grupo { padding: var(--e2) var(--e2) 2px; font: 500 11.5px/1.3 var(--fuente-texto); color: var(--color-suave); text-transform: uppercase; letter-spacing: .04em; }
+.u .u-elegir-grupo:first-child { padding-top: 4px; }
+.u .u-elegir-vacia { padding: var(--e3) var(--e2); color: var(--color-suave); }
+
+/* En el móvil, la hoja desde abajo: asa, título y «Cerrar», el buscador y la lista con filas de 44 px. */
+.u .u-elegir-velo { position: fixed; inset: 0; z-index: 999; background: color-mix(in srgb, var(--color-texto) 45%, transparent); }
+.u .u-elegir-hoja { left: 0; right: 0; bottom: 0; top: auto; max-height: 82vh; max-height: 82dvh; border: 0; border-radius: 18px 18px 0 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px); box-shadow: 0 -8px 24px rgba(0, 0, 0, .12); font-size: 15px; }
+.u .u-elegir-hoja::before { content: ""; display: block; flex: none; width: 40px; height: 5px; margin: var(--e2) auto 0; border-radius: 3px; background: var(--linea-caja); }
+.u .u-elegir-cab { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); padding: var(--e2) var(--e4) var(--e1); }
+.u .u-elegir-cab h2 { margin: 0; font: 600 20px/1.25 var(--fuente-titulos); }
+.u .u-elegir-hoja .u-elegir-buscar { margin: var(--e2) var(--e4); padding: 0 var(--e3); border: 1px solid var(--linea-btn); border-radius: var(--radio); }
+.u .u-elegir-hoja .u-elegir-buscar input[type=search] { min-height: 44px; font-size: 16px; }
+.u .u-elegir-hoja .u-elegir-lista { flex: 1; padding: 0 var(--e3) var(--e3); }
+.u .u-elegir-hoja .u-elegir-op { min-height: 44px; padding: 12px var(--e2) 11px; border-bottom: 1px solid var(--linea-fila); border-radius: 0; }
+.u .u-elegir-hoja .u-elegir-op.u-elegir-activa { background: transparent; }
+.u .u-elegir-hoja .u-elegir-op:active { background: var(--fondo-sel); }
+.u .u-elegir-hoja .u-elegir-grupo { padding: var(--e3) var(--e2) var(--e1); }
+@media (prefers-reduced-motion: no-preference) {
+  .u .u-elegir-hoja { animation: u-elegir-sube .18s ease-out; }
+  @keyframes u-elegir-sube { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+}
+
+/* ==========================================================================================================================
+ * T0685 · Buscar en toda la app (nucleo/buscar.js): «Buscar» arriba del menú del ordenador (con ⌘K), la lupa de la cabecera
+ * en el móvil y la ventana con los resultados por grupos. En el ordenador, centrada arriba sobre la sección; en el móvil, a
+ * pantalla completa con «Cancelar». Solo variables de la marca.
+ * ========================================================================================================================== */
+.sx.u-sx .sx-buscar { display: none; }
+@media (min-width: 700px) {
+  .sx.u-sx .sx-buscar { display: flex; align-items: center; gap: var(--e3); min-height: 40px; margin: 0 0 var(--e3); padding: 0 var(--e3); cursor: pointer; text-align: left;
+    border: 1px solid color-mix(in srgb, var(--color-sobre-menu) 22%, var(--color-menu)); border-radius: var(--radio);
+    background: color-mix(in srgb, var(--color-sobre-menu) 7%, var(--color-menu)); color: var(--color-sobre-menu); font: 400 14px/1.2 var(--fuente-texto); }
+  @media (hover: hover) { .sx.u-sx .sx-buscar:hover { background: color-mix(in srgb, var(--color-sobre-menu) 14%, var(--color-menu)); } }
+  .sx.u-sx .sx-buscar:focus-visible { outline: 3px solid var(--color-sobre-menu); outline-offset: 2px; }
+  .sx.u-sx .sx-buscar svg { width: 18px; height: 18px; flex: none; }
+  .sx.u-sx .sx-buscar span { flex: 1 1 auto; min-width: 0; color: color-mix(in srgb, var(--color-sobre-menu) 80%, var(--color-menu)); }
+  .sx.u-sx .sx-buscar kbd { flex: none; padding: 2px 5px; border: 1px solid color-mix(in srgb, var(--color-sobre-menu) 30%, var(--color-menu)); border-radius: var(--radio-peq, 4px);
+    font: 600 11px/1.2 var(--fuente-texto); color: color-mix(in srgb, var(--color-sobre-menu) 75%, var(--color-menu)); }
+  body.u-menu-plegado .sx.u-sx .sx-buscar { justify-content: center; padding: 0; }
+  body.u-menu-plegado .sx.u-sx .sx-buscar span, body.u-menu-plegado .sx.u-sx .sx-buscar kbd { display: none; }
+}
+.u .n-lupa { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin: -6px -6px -6px 0; padding: 0;
+  border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
+.u .n-lupa svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.u .n-lupa:focus-visible { outline: 3px solid currentColor; outline-offset: -3px; }
+@media (min-width: 900px) { .u .n-lupa { display: none; } }
+
+.u .bu-velo { position: fixed; inset: 0; z-index: 900; display: flex; justify-content: center; align-items: flex-start; padding: 10vh var(--e4) var(--e4);
+  background: var(--color-velo); font: 400 15px/1.4 var(--fuente-texto); color: var(--color-texto); }
+.u .bu-panel { width: 100%; max-width: 680px; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; background: var(--color-superficie);
+  border-radius: var(--radio-caja); box-shadow: 0 18px 50px rgba(0, 0, 0, .25); }
+.u .bu-campo { display: flex; align-items: center; gap: var(--e3); padding: var(--e2) var(--e3) var(--e2) var(--e4); border-bottom: 1px solid var(--color-linea); }
+.u .bu-campo > .u-icono { width: 20px; height: 20px; flex: none; fill: none; stroke: var(--color-suave); stroke-width: 1.8; stroke-linecap: round; }
+.u .bu-campo input[type=search] { flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 0; border: 0; outline: 0; box-shadow: none; background: transparent;
+  font: 400 18px/1.3 var(--fuente-texto); color: var(--color-texto); -webkit-appearance: none; appearance: none; }
+.u .bu-campo input[type=search]:focus { border: 0; box-shadow: none; outline: 0; }
+.u .bu-campo input[type=search]::placeholder { color: var(--color-suave); opacity: .8; }
+.u .bu-cerrar { flex: none; min-height: 44px; padding: 0 var(--e2); border: 0; background: transparent; color: var(--color-enlace, var(--color-principal-oscuro));
+  font: 600 14px/1 var(--fuente-texto); cursor: pointer; border-radius: var(--radio); }
+.u .bu-cerrar:focus-visible { outline: 3px solid var(--color-principal-oscuro); outline-offset: -3px; }
+.u .bu-cerrar .bu-movil { display: none; }
+.u .bu-res { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: var(--e1) 0 var(--e3); }
+.u .bu-cuenta { margin: 0; padding: var(--e2) var(--e4) 0; font-size: 13px; color: var(--color-suave); }
+.u .bu-grupo h2 { display: flex; justify-content: space-between; margin: 0; padding: var(--e4) var(--e4) var(--e1);
+  font: 700 11.5px/1.2 var(--fuente-texto); letter-spacing: .06em; text-transform: uppercase; color: var(--color-principal-oscuro); }
+.u .bu-grupo h2 span { font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--color-suave); font-size: 13px; }
+.u .bu-fila { display: flex; align-items: center; gap: var(--e3); min-height: 52px; padding: var(--e2) var(--e4); color: inherit; text-decoration: none; }
+.u .bu-fila.bu-activa { background: var(--color-bloque); } @media (hover: hover) { .u .bu-fila:hover { background: var(--color-bloque); } }
+.u .bu-fila:focus-visible { outline: 3px solid var(--color-principal-oscuro); outline-offset: -3px; }
+.u .bu-ic { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: var(--radio); background: var(--color-bloque); color: var(--color-principal-oscuro); }
+.u .bu-fila.bu-activa .bu-ic { background: var(--color-superficie); } @media (hover: hover) { .u .bu-fila:hover .bu-ic { background: var(--color-superficie); } }
+.u .bu-ic svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.u .bu-tx { flex: 1 1 auto; min-width: 0; }
+.u .bu-t, .u .bu-d { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u .bu-t { font-weight: 600; }
+.u .bu-d { font-size: 13px; color: var(--color-suave); }
+.u .bu-fila mark { background: color-mix(in srgb, var(--color-destacado, var(--color-accion)) 45%, transparent); color: inherit; border-radius: 2px; }
+.u .bu-chip { flex: none; padding: 3px 9px; border-radius: 99px; background: var(--color-bloque); color: var(--color-principal-oscuro); font: 600 12px/1.3 var(--fuente-texto); }
+.u .bu-fila.bu-activa .bu-chip { background: var(--color-superficie); } @media (hover: hover) { .u .bu-fila:hover .bu-chip { background: var(--color-superficie); } }
+.u .bu-mas { display: block; min-height: 36px; padding: 0 var(--e4) 0 62px; border: 0; background: transparent; color: var(--color-enlace, var(--color-principal-oscuro));
+  font: 400 14px/1.2 var(--fuente-texto); cursor: pointer; }
+@media (hover: hover) { .u .bu-mas:hover { text-decoration: underline; } }
+.u .bu-mas-nota { padding-left: 62px; }
+.u .bu-vacio { padding: var(--e5) var(--e5) var(--e4); color: var(--color-suave); }
+.u .bu-vacio p { margin: 0 0 var(--e2); }
+.u .bu-pie { display: flex; gap: var(--e4); padding: var(--e2) var(--e4); border-top: 1px solid var(--color-linea); font-size: 12px; color: var(--color-suave); }
+.u .bu-pie kbd { font: 600 11px/1 var(--fuente-texto); padding: 2px 4px; margin-right: 2px; border: 1px solid var(--color-linea); border-radius: 4px; }
+@media (max-width: 899px) {
+  .u .bu-velo { padding: 0; background: var(--color-fondo); }
+  .u .bu-panel { max-width: none; max-height: none; height: 100%; border-radius: 0; box-shadow: none; background: var(--color-fondo);
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+  .u .bu-campo { padding: var(--e2) var(--e2) var(--e2) var(--e4); }
+  .u .bu-campo > .u-icono { display: none; }
+  .u .bu-campo input[type=search] { min-height: 40px; padding: 0 var(--e4); border: 1px solid var(--color-linea); border-radius: 99px; background: var(--color-superficie); font-size: 16px; }
+  .u .bu-campo input[type=search]:focus { border: 1px solid var(--color-accion); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accion) 25%, transparent); }
+  .u .bu-cerrar .bu-movil { display: inline; }
+  .u .bu-cerrar .bu-ancho { display: none; }
+  .u .bu-pie { display: none; }
+  .u .bu-fila { min-height: 56px; }
+}
+@media (prefers-reduced-motion: no-preference) and (min-width: 900px) {
+  .u .bu-panel { animation: bu-entra .14s ease-out; }
+  @keyframes bu-entra { from { opacity: 0; transform: translateY(-6px); } }
+}
+
+/* T0690 · Listas largas: ordenar tocando el título de la columna, «Ver más», lo hecho plegado y «Ver todo» en la ficha. */
+.u .u-tabla th .li-ord { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font: inherit; color: inherit;
+  border-radius: 4px; white-space: inherit; }
+.u .u-tabla th.num .li-ord { flex-direction: row-reverse; }
+.u .u-tabla th .li-ord-on { color: var(--color-texto); } @media (hover: hover) { .u .u-tabla th .li-ord:hover { color: var(--color-texto); } }
+.u .u-tabla th .li-ord:focus-visible { outline: 2px solid var(--color-accion); outline-offset: 2px; }
+.u .u-tabla th .li-ord-f { font-size: 11px; opacity: 0; transition: opacity .12s; }
+.u .u-tabla th .li-ord:focus-visible .li-ord-f { opacity: .55; } @media (hover: hover) { .u .u-tabla th .li-ord:hover .li-ord-f { opacity: .55; } }
+.u .u-tabla th .li-ord-on .li-ord-f { opacity: 1; }
+.u .li-tabla .li-mas-f td { padding: 6px 14px; background: transparent; }
+.u .li-tarjetas > .li-mas-f, .u .li-gal-g > .li-mas-f { list-style: none; padding: var(--e1) 0; }
+.u .li-vermas, .u .li-plegar { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 var(--e2);
+  margin-left: calc(-1 * var(--e2)); border-radius: var(--radio); cursor: pointer; font: 600 14px/1.3 var(--fuente-texto); color: var(--color-enlace, var(--color-principal-oscuro)); }
+.u .li-vermas .u-nota { font-weight: 400; }
+@media (hover: hover) { .u .li-vermas:hover, .u .li-plegar:hover { background: color-mix(in srgb, var(--color-texto) 6%, transparent); } }
+.u .li-vermas:focus-visible, .u .li-plegar:focus-visible { outline: 2px solid var(--color-accion); outline-offset: 1px; }
+.u .li-plegar { color: var(--color-suave); }
+.u .li-antiguo { margin: var(--e2) 0 0; padding: 0 14px; } /* T0742: «Ver más» al final de Historial, lo antiguo */
+.u .li-vermas[disabled] { cursor: progress; color: var(--color-suave); }
+.u .li-plegar .u-cifra { font-weight: 400; }
+.u .li-plegar .li-flecha { width: 16px; height: 16px; transition: transform .15s; }
+.u .li-plegar[aria-expanded="true"] .li-flecha { transform: rotate(90deg); }
+.u .li-col-l > .li-mas-f { padding: var(--e1); }
+.u .li-vertodo { margin-top: var(--e1); }
+@media (max-width: 639px) { .u .li-vermas, .u .li-plegar { min-height: 44px; } }
+
+/* ==========================================================================================================================
+ * T0723 · Que en el iPhone y el iPad se porte como una app de Apple.
+ * ========================================================================================================================== */
+/* R54 · La app es clara aunque el iPhone esté en oscuro: así los controles del sistema (casillas, listas, calendario) no salen
+   oscuros sobre fondo blanco. Va con su <meta name="color-scheme" content="light">. En :where, para que el modo oscuro
+   (T0740, abajo y en marca.css) lo cambie. */
+:where(:root) { color-scheme: light; }
+
+/* T0740 · Modo oscuro, voluntario: en las apps que lo tienen (KANBAN.modoOscuro), quien entra lo elige en Perfil › Aspecto
+   (Claro, Oscuro o Como el móvil) y nucleo.js pone <html data-tema="oscuro">. Los colores de la marca, en su marca.css; aquí,
+   los que son iguales en todas: los de estado, más suaves para que se lean sobre tinta (maqueta de T0702: teja para lo
+   atrasado, índigo, oliva), con su fondo apagado; el texto sobre un color lleno pasa a tinta, y el velo y las sombras, a
+   negro (con el texto claro saldrían claros). */
+:root[data-tema="oscuro"] {
+  --est-gris: #B5B0A6;  --est-gris-f: #2B2925;
+  --est-azul: #9DB4DE;  --est-azul-f: #1E2634;
+  --est-ocre: #D9B26A;  --est-ocre-f: #2F2718;
+  --est-verde: #9CC78F; --est-verde-f: #1F2A1C;
+  --est-teja: #E08A6F;  --est-teja-f: #34211B;
+  --est-teal: #8CC7BF;  --est-teal-f: #1A2B29;
+  --estado-bl: #E08A6F; --estado-ec: #9DB4DE; --estado-pr: #D9B26A; --estado-co: #9CC78F; --estado-ni: #B5B0A6; --estado-x: #B5B0A6;
+  --color-error: #E08A6F;
+  --color-bien: #9CC78F;
+  --sobre-estado: #171815;
+  --color-velo: rgb(0 0 0 / 60%);
+  --sombra-flota: 0 6px 20px rgb(0 0 0 / 55%);
+}/* En oscuro, la opción elegida de un interruptor (Mías/Todas, las vistas, Calcular precio, Aspecto) sobre su carril: un gris
+   más claro, que la superficie casi no se distingue del carril. */
+:root[data-tema="oscuro"] .u .li-mias button[aria-pressed=true], :root[data-tema="oscuro"] .u .pr-seg button[aria-pressed=true] {
+  background: color-mix(in srgb, var(--color-texto) 20%, var(--color-superficie)); box-shadow: none; }
+
+/* R47 · Mantener apretado lo que se toca no saca el menú del enlace de Safari ni selecciona texto, y el toque no deja el
+   recuadro gris. Lo que se copia (un teléfono, un correo, las notas y los campos) sigue pudiéndose copiar. T0749: tampoco
+   lo levanta para arrastrarlo (el recuadro con sombra que salía al mantener apretado Hoy o Historial en la barra). */
+.u a:not(.li-enl), .u button, .u .u-btn, .u [role=tab], .u label, .sx.u-sx a, .sx.u-sx button {
+  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  -webkit-user-drag: none; }
+@media (hover: none) {
+  .u .u-tabla tr[tabindex], .u .li-gal-t, .u .li-tarjeta, .u .u-chip, .u .li-av, .u .li-rel-f {
+    -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+    -webkit-user-drag: none; }
+  /* Sin el recuadro gris, el toque se nota al momento en la fila. */
+  .u .u-tabla tr[tabindex]:active td, .u .li-rel-f:active { background: var(--fondo-encima); }
+}
+.u a.li-enl, .u .cm-contacto, .u .li-valor, .u .u-nota, .u input, .u textarea, .u [contenteditable] { -webkit-user-select: text; user-select: text; }
+.u a.li-enl { -webkit-tap-highlight-color: transparent; }
+/* R48 · Con una ventana encima, la página de detrás no se mueve (ni al llegar al final de la ventana ni si es corta). En la vista
+   partida (desde 1000 px) la lista sí se mueve: está al lado de la ficha, no debajo. */
+.u .u-velo { overscroll-behavior: contain; }
+@media (max-width: 999px) { html:has(body.u .u-velo.abierto) { overflow: hidden; } }
+@media (min-width: 1000px) { html:has(body.u .u-velo.abierto:not(.li-v-ficha)) { overflow: hidden; } }
+/* R52 · La ficha encima de la lista (menos de 1000 px): el nombre y la × se quedan arriba al bajar. overflow: clip en vez de
+   hidden para que la ventana no sea la caja que se desplaza (si no, sticky no se pega). */
+.u .u-ventana.li-ventana { overflow: clip; }
+.u .li-ventana .n-ventana > .li-ficha-cab { position: sticky; top: 0; z-index: 3; background: var(--fondo-cab);
+  margin: 0 calc(-1 * var(--e4)); padding: var(--e2) var(--e4) var(--e1); }
+.u .li-ventana .n-ventana > .li-ficha-cab:first-child { margin-top: calc(-1 * var(--e5)); padding-top: var(--e5); }
+@media (min-width: 900px) {
+  .u .li-ventana .n-ventana > .li-ficha-cab { margin: 0 calc(-1 * var(--e5)); padding: var(--e2) var(--e5) var(--e1); }
+  .u .li-ventana .n-ventana > .li-ficha-cab:first-child { margin-top: calc(-1 * var(--e4)); padding-top: var(--e4); }
+}
+
+/* ---------- T0726 · Economía y Pedidos, más claros ---------- */
+/* Un gasto sin previsto: su barra en gris (no hay con qué compararla), no en teja. */
+.u .eco-barra-p i.eco-sinprev { background: color-mix(in srgb, var(--est-gris) 45%, var(--color-superficie)); }
+/* Facturas: lo que suman las emitidas y lo que suman las recibidas, aparte; el estado, en su píldora junto a la fecha. */
+.u .eco-fac-tot { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e1) var(--e4); margin: 0 0 var(--e3); font-size: 14px; }
+.u .eco-fac-tot b { font-weight: 600; }
+.u .eco-fac-l .u-chip { margin-left: var(--e1); vertical-align: middle; }
+.u .u-chip.eco-anulada { text-decoration: line-through; }
+/* El importe de un movimiento con su moneda al lado (€, ₹, $) y, para la que no tiene cambio guardado, «1 € = … $». */
+.u .eco-imp-m { display: flex; gap: var(--e2); min-width: 0; }
+.u .eco-imp-m .eco-imp { flex: 1; min-width: 0; }
+.u .eco-imp-m .eco-moneda { flex: none; width: auto; min-width: 4.2em; }
+.u .eco-cambio-f { display: flex; align-items: center; gap: var(--e2); white-space: nowrap; }
+.u .eco-cambio-f input { width: 7em; text-align: right; }
+/* Pedidos: las cifras, todas a 24 px (antes, de 22 a 40). */
+.u .eco-kpis-ven .eco-val, .u .eco-kpis-ven .eco-grande .eco-val { font-size: 24px; line-height: 1.2; }
+
+/* T0752 · En el móvil, la cabecera de la sección (el título y quién ha entrado) se queda fija arriba. En Safari (iOS 26) lo que
+   sube por debajo de la hora se ve borroso: con algo fijo arriba, Safari pinta esa franja de su color y el título no se
+   emborrona al bajar. Lo demás que se pega arriba (cabeceras de tabla, la barra de Calcular precio…) va debajo de ella:
+   --alto-cab, de nucleo.js (tope). */
+@media (max-width: 699px) {
+  body.u-con-barra .u-cab { position: sticky; top: var(--tope, 0px); z-index: 30; background: var(--color-fondo); padding-bottom: var(--e2); }
+  .u .u-tabla th, .u .pr-barra, .u .barra, .u .f-cambio { top: calc(var(--tope, 0px) + var(--alto-cab, 0px)); }
+}
