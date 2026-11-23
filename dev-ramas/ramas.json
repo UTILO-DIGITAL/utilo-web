@@ -1833,7 +1833,7 @@
   "konamigas": {
    "rama": "main y las ramas abiertas",
    "commit": "534ea511",
-   "fecha": "2026-11-22T12:01:00.536Z",
+   "fecha": "2026-11-23T13:41:31.805Z",
    "migraciones": [
     "20261105150000_latido.sql",
     "20261105170000_acceso.sql",
